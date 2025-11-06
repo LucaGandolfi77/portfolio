@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <!-- EmailJS SDK (used for sending contact form) -->
     <script src="https://cdn.emailjs.com/sdk/3.2.0/email.min.js"></script>
+    <!-- Google reCAPTCHA v3 (replace SITE_KEY) -->
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_RECAPTCHA_SITE_KEY"></script>
     <style>
         :root {
             --bg-900: #0a1628;
@@ -1015,7 +1017,7 @@
             localStorage.setItem('theme', next === 'light' ? 'light' : 'dark');
         });
 
-        // --- EmailJS configuration (replace with your values) ---
+    // --- EmailJS configuration (replace with your values) ---
         // Create an EmailJS account and set up a service + template.
         // Example values:
         // const EMAILJS_SERVICE_ID = 'service_xxx';
@@ -1024,6 +1026,9 @@
         const EMAILJS_SERVICE_ID = 'your_service_id';
         const EMAILJS_TEMPLATE_ID = 'your_template_id';
         const EMAILJS_PUBLIC_KEY = 'your_public_key';
+
+    // --- reCAPTCHA v3 site key (replace with your site key) ---
+    const RECAPTCHA_SITE_KEY = 'your_recaptcha_site_key';
 
         // Initialize EmailJS SDK (public key)
         if (window.emailjs) {
@@ -1034,7 +1039,8 @@
         function createContactModal() {
             const modal = document.createElement('div');
             modal.id = 'contactModal';
-            modal.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:2000;pointer-events:none;';
+            // hidden by default
+            modal.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;z-index:2000;pointer-events:none;';
             modal.innerHTML = `
                 <div style="background:rgba(10,22,40,0.95);backdrop-filter:blur(8px);padding:24px;border-radius:12px;max-width:520px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.6);pointer-events:all;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -1054,12 +1060,37 @@
                     </form>
                 </div>`;
             document.body.appendChild(modal);
+            modal.setAttribute('aria-hidden', 'true');
 
-            function closeModal() { modal.style.display = 'none'; }
-            function openModal() { modal.style.display = 'flex'; }
+            function closeModal() { modal.style.display = 'none'; modal.style.pointerEvents = 'none'; }
+            function openModal() { modal.style.display = 'flex'; modal.style.pointerEvents = 'all'; }
 
             document.getElementById('modalClose').addEventListener('click', closeModal);
             document.getElementById('modalCancel').addEventListener('click', closeModal);
+
+            // Accessibility: close on ESC and trap focus roughly
+            let previousActive = null;
+            function onKeyDown(e) {
+                if (e.key === 'Escape') closeModal();
+            }
+
+            function openModalWithFocus() {
+                previousActive = document.activeElement;
+                openModal();
+                document.body.style.overflow = 'hidden';
+                modal.setAttribute('aria-hidden', 'false');
+                const first = modal.querySelector('#cfEmail');
+                if (first) first.focus();
+                document.addEventListener('keydown', onKeyDown);
+            }
+
+            function closeModalWithFocus() {
+                closeModal();
+                document.body.style.overflow = '';
+                modal.setAttribute('aria-hidden', 'true');
+                if (previousActive && previousActive.focus) previousActive.focus();
+                document.removeEventListener('keydown', onKeyDown);
+            }
 
             document.getElementById('contactForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -1089,21 +1120,32 @@
                 statusEl.textContent = '';
 
                 try {
+                    // If reCAPTCHA v3 is configured, execute to get token
+                    let recaptchaToken = null;
+                    if (window.grecaptcha && RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.includes('your_')) {
+                        try {
+                            recaptchaToken = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: 'submit' });
+                        } catch (rcErr) {
+                            console.warn('reCAPTCHA execute failed', rcErr);
+                        }
+                    }
+
                     const templateParams = {
                         from_email: email,
                         message: message,
-                        subject: 'New contact from portfolio'
+                        subject: 'New contact from portfolio',
+                        recaptcha_token: recaptchaToken || ''
                     };
 
                     const res = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-                    // emailjs returns an object but resolves on success
+                    // emailjs resolves on success
                     statusEl.innerHTML = '✅ Message sent. Thank you!';
                     statusEl.style.color = 'lightgreen';
                     document.getElementById('cfEmail').value = '';
                     document.getElementById('cfMessage').value = '';
                     // subtle success highlight
                     submitBtn.innerHTML = 'Sent';
-                    setTimeout(() => closeModal(), 1200);
+                    setTimeout(() => closeModalWithFocus(), 1200);
                 } catch (err) {
                     console.error('EmailJS send error', err);
                     statusEl.textContent = 'Errore durante l\'invio. Riprova più tardi.';
@@ -1115,11 +1157,29 @@
                 }
             });
 
-            return { open: openModal, close: closeModal };
+            return { open: openModalWithFocus, close: closeModalWithFocus };
         }
         const contactModal = createContactModal();
         const contactBtn = document.getElementById('contactBtn');
-        if (contactBtn) contactBtn.addEventListener('click', () => contactModal.open());
+        // Header contact button should scroll to the contact section (do NOT open modal)
+        if (contactBtn) contactBtn.addEventListener('click', (e) => {
+            const target = document.querySelector('#contact');
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        // Menu 'Contact' link should open the modal. Select specific nav link and override default.
+        const navContact = document.querySelector('.nav-link[href="#contact"]');
+        if (navContact) {
+            navContact.addEventListener('click', (e) => {
+                e.preventDefault();
+                // close hamburger menu visually
+                if (burgerMenu.classList.contains('active')) toggleMenu();
+                // open modal after menu close animation
+                setTimeout(() => {
+                    try { if (contactModal && typeof contactModal.open === 'function') contactModal.open(); } catch (err) { /* ignore */ }
+                }, 350);
+            });
+        }
 
         // Project configuration (modify this data)
         const projects = [
@@ -1161,11 +1221,13 @@
         burgerMenu.addEventListener('click', toggleMenu);
         overlay.addEventListener('click', toggleMenu);
 
-        // Close menu when clicking on a link
+        // Close menu when clicking on a link (except contact which opens modal)
         navLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href === '#contact') return; // handled separately
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const targetId = link.getAttribute('href');
+                const targetId = href;
                 const targetSection = document.querySelector(targetId);
                 
                 if (targetSection) {
