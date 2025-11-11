@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Blog — Luca Gandolfi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-900:#0a1628;--bg-800:#1a2940;--accent:#00d4ff;--muted:#64c8ff;--card-bg:rgba(26,41,64,0.6);--glass:rgba(10,22,40,0.95);--transition:.35s}
+    html,body{height:100%;margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-900),var(--bg-800));color:#fff}
+    .container{max-width:1100px;margin:36px auto;padding:20px}
+    .hero{background:var(--card-bg);padding:28px;border-radius:14px;border:1px solid rgba(100,200,255,0.06)}
+    .hero h1{color:var(--accent);margin:0 0 6px;font-size:1.8rem}
+    .hero p{color:#a0c0e0;margin:0}
+    .actions{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+    .btn{padding:10px 14px;border-radius:999px;border:none;cursor:pointer}
+    .btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.06)}
+
+    .posts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:22px}
+    .post-card{background:rgba(255,255,255,0.03);padding:18px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);transition:transform var(--transition),box-shadow var(--transition);cursor:pointer}
+    .post-card:hover{transform:translateY(-6px);box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+    .post-title{color:var(--accent);font-size:1.05rem;margin-bottom:8px}
+    .post-meta{color:#8fcaff;font-size:0.85rem;margin-bottom:10px}
+    .post-excerpt{color:#cfefff;font-size:0.95rem}
+
+    /* modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:2000;padding:20px}
+    .modal.active{display:flex}
+    .modal-panel{max-width:900px;width:100%;max-height:90vh;overflow:auto;background:var(--glass);border-radius:10px;padding:22px;border:1px solid rgba(255,255,255,0.04)}
+    .modal h2{color:var(--accent);margin-top:0}
+    .modal .content{color:#d7ecff;line-height:1.7}
+
+    .empty{color:#9fcfff;opacity:0.8;padding:22px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.03)}
+
+    @media (max-width:600px){.hero h1{font-size:1.4rem}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1 data-i18n="blog.heading">Blog & Articles</h1>
+      <p data-i18n="blog.lead">Short articles, notes and write-ups. Add posts by creating /assets/blog/posts.json or editing the embedded list below.</p>
+      <div class="actions">
+        <a href="index.html" class="btn btn-ghost" data-i18n="blog.back">Back to portfolio</a>
+        <button id="newPostBtn" class="btn btn-ghost" data-i18n="blog.howto">How to add a post</button>
+      </div>
+    </div>
+
+    <div id="postsContainer" class="posts" aria-live="polite"></div>
+
+    <div id="emptyNote" class="empty" style="display:none;margin-top:18px" data-i18n="blog.empty">No posts found. Create /assets/blog/posts.json or add posts to the embedded list.</div>
+  </div>
+
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-panel" role="document">
+      <button id="modalClose" class="btn btn-ghost" style="float:right">Close</button>
+      <h2 id="modalTitle"></h2>
+      <div id="modalMeta" class="post-meta"></div>
+      <div id="modalContent" class="content"></div>
+    </div>
+  </div>
+
+  <script>
+    // Embedded translations (EN/IT) for this standalone page
+    const translations = {
+      en: {
+        blog: { heading: 'Blog & Articles', lead: 'Short articles, notes and write-ups. Add posts by creating /assets/blog/posts.json or editing the embedded list below.', back: 'Back to portfolio', howto: 'How to add a post', empty: 'No posts found. Create /assets/blog/posts.json or add posts to the embedded list.' }
+      },
+      it: {
+        blog: { heading: 'Blog & Articoli', lead: 'Brevi articoli, appunti e scritti. Aggiungi post creando /assets/blog/posts.json o modificando la lista incorporata qui sotto.', back: 'Torna al portfolio', howto: 'Come aggiungere un post', empty: 'Nessun post trovato. Crea /assets/blog/posts.json o aggiungi post alla lista incorporata.' }
+      }
+    };
+
+    function getNested(o, path){ return path.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o); }
+    function applyTranslations(lang){ if(!lang) lang='en'; const t = translations[lang]||translations['en']; document.querySelectorAll('[data-i18n]').forEach(el=>{ const key=el.getAttribute('data-i18n'); const v=getNested(t,key); if(v!==undefined) el.innerText=v; }); }
+    const savedLang = localStorage.getItem('lang') || 'en'; applyTranslations(savedLang);
+
+    // Try to load posts from /assets/blog/posts.json; fallback to embedded sample posts
+    async function loadPosts(){
+      try{
+        const res = await fetch('/assets/blog/posts.json');
+        if(res.ok){ const data = await res.json(); return data.posts || []; }
+      }catch(e){ /* ignore */ }
+      // fallback sample posts
+      return [
+        { title:'First notes on embedded systems', date:'2024-06-01', excerpt:'Thoughts on building reliable firmware and tooling.', slug:'embedded-systems', content:'<p>I write about low-level systems, testing and reproducibility. More content to come.</p>' },
+        { title:'A short take on developer ergonomics', date:'2024-04-12', excerpt:'Small improvements that make a big difference in daily development.', slug:'dev-ergonomics', content:'<p>Editor choices, automation and tiny tools that save time.</p>' }
+      ];
+    }
+
+    function renderPosts(posts){
+      const container = document.getElementById('postsContainer');
+      container.innerHTML = '';
+      if(!posts || posts.length===0){ document.getElementById('emptyNote').style.display='block'; return; }
+      document.getElementById('emptyNote').style.display='none';
+      posts.forEach(p=>{
+        const card = document.createElement('article'); card.className='post-card'; card.tabIndex=0; card.setAttribute('role','button');
+        card.innerHTML = `<div class="post-title">${p.title}</div><div class="post-meta">${p.date}</div><div class="post-excerpt">${p.excerpt || ''}</div>`;
+        card.addEventListener('click', ()=> openPost(p));
+        card.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') openPost(p); });
+        container.appendChild(card);
+      });
+    }
+
+    function openPost(post){
+      document.getElementById('modalTitle').innerText = post.title;
+      document.getElementById('modalMeta').innerText = post.date || '';
+      document.getElementById('modalContent').innerHTML = post.content || '<p>No content</p>';
+      const modal = document.getElementById('modal'); modal.classList.add('active'); modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
+    }
+
+    function closeModal(){ const modal=document.getElementById('modal'); modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modal').addEventListener('click', (e)=>{ if(e.target.id==='modal') closeModal(); });
+
+    document.getElementById('newPostBtn').addEventListener('click', ()=>{
+      alert('To add posts: create /assets/blog/posts.json with structure: { "posts": [{ "title":"...","date":"YYYY-MM-DD","excerpt":"...","slug":"...","content":"<p>HTML</p>" }] }');
+    });
+
+    // Init
+    (async ()=>{ const posts = await loadPosts(); renderPosts(posts); })();
+  </script>
+</body>
+</html>
