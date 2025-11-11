@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Poems — Luca Gandolfi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-900:#0a1628;--bg-800:#1a2940;--accent:#00d4ff;--muted:#64c8ff;--card-bg:rgba(26,41,64,0.6);--glass:rgba(10,22,40,0.95);}
+    html,body{height:100%;margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-900),var(--bg-800));color:#fff}
+    .container{max-width:1100px;margin:32px auto;padding:20px}
+    .hero{background:var(--card-bg);padding:24px;border-radius:14px;border:1px solid rgba(100,200,255,0.06)}
+    .hero h1{color:var(--accent);margin:0 0 8px}
+    .hero p{color:#a0c0e0}
+    .poem{background:rgba(255,255,255,0.02);padding:18px;border-radius:10px;margin-top:18px;border:1px solid rgba(255,255,255,0.03)}
+    .poem h2{color:#cfefff;margin:0 0 8px}
+    .poem pre{white-space:pre-wrap;font-family:inherit;color:#eaf8ff;margin:0}
+    .back{display:inline-block;margin-top:12px;padding:8px 12px;border-radius:999px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);text-decoration:none}
+    .lang-top-left { position: fixed; top: 16px; left: 16px; z-index: 1003; }
+    .lang-top-left select { background: transparent; border: none; color: white; font-weight: 600; cursor: pointer; font-size: 0.95rem; padding: 6px 8px; border-radius:6px; }
+    @media (max-width:600px){ .hero h1{font-size:1.3rem} }
+  </style>
+</head>
+<body>
+  <div class="lang-top-left">
+    <label for="langSelect" class="visually-hidden">Select language</label>
+    <select id="langSelect" aria-label="Select language" title="Change language">
+        <option value="en">🇬🇧 EN</option>
+        <option value="it">🇮🇹 IT</option>
+        <option value="fr">🇫🇷 FR</option>
+        <option value="es">🇪🇸 ES</option>
+        <option value="zh">🇨🇳 中</option>
+        <option value="ru">🇷🇺 RU</option>
+        <option value="de">🇩🇪 DE</option>
+        <option value="ja">🇯🇵 日本</option>
+        <option value="sv">🇸🇪 SV</option>
+        <option value="ar">🇸🇦 AR</option>
+        <option value="he">🇮🇱 HE</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <h1 data-i18n="sections.poems">Poems</h1>
+      <p data-i18n="poems.lead">A collection of poems. Select a language from the top-left selector to see translations where available.</p>
+      <a href="index.html" class="back">← Back to portfolio</a>
+    </div>
+
+    <div id="poemsWrap">
+      <!-- Poems will be injected here -->
+    </div>
+  </div>
+
+  <script>
+    // Embedded fallback translations (English minimal bundle + poem)
+    const embedded = {
+      en: {
+        sections: { poems: 'Poems' },
+        poems: {
+          lead: 'A collection of poems. Select a language from the top-left selector to see translations where available.',
+          because_i_could_not: {
+            title: 'Because I could not stop for Death',
+            text: `Because I could not stop for Death –\nHe kindly stopped for me –\nThe Carriage held but just Ourselves –\nAnd Immortality.\n\nWe slowly drove – He knew no haste\nAnd I had put away\nMy labor and my leisure too,\nFor His Civility –\n\nWe passed the School, where Children strove\nAt Recess – in the Ring –\nWe passed the Fields of Gazing Grain –\nWe passed the Setting Sun –\n\nOr rather – He passed us –\nThe Dews drew quivering and chill –\nFor only Gossamer, my Gown –\nMy Tippet – only Tulle –\n\nWe paused before a House that seemed\nA Swelling of the Ground –\nThe Roof was scarcely visible –\nThe Cornice – in the Ground –\n\nSince then – 'tis Centuries – and yet\nFeels shorter than the Day\nI first surmised the Horses' Heads\nWere toward Eternity –`
+          }
+        }
+      }
+    };
+
+    // Try to load translations from /i18n/<lang>.json; fallback to embedded
+    async function loadTranslations(lang) {
+      if(!lang) lang = 'en';
+      try {
+        const res = await fetch('/i18n/' + lang + '.json');
+        if (res.ok) return await res.json();
+      } catch (e) { /* ignore */ }
+      return embedded[lang] || embedded['en'];
+    }
+
+    function getNested(o, path){ return path.split('.').reduce((a,k)=> (a && a[k]!==undefined)? a[k] : undefined, o); }
+
+    async function renderPoems(lang) {
+      const t = await loadTranslations(lang);
+      const wrap = document.getElementById('poemsWrap');
+      wrap.innerHTML = '';
+      const keys = ['because_i_could_not','the_second_coming','macbeth_tomorrow','do_not_go_gentle'];
+      keys.forEach(k => {
+        const poem = getNested(t, `poems.${k}`) || getNested(embedded, `en.poems.${k}`);
+        if (!poem) return;
+        const title = poem.title || k;
+        const text = poem.text || '';
+        const node = document.createElement('div'); node.className = 'poem';
+        node.innerHTML = `<h2>${escapeHtml(title)}</h2><pre>${escapeHtml(text)}</pre>`;
+        wrap.appendChild(node);
+      });
+    }
+
+    function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Wire language selector
+    const select = document.getElementById('langSelect');
+    const savedLang = localStorage.getItem('lang') || 'en';
+    select.value = savedLang;
+    renderPoems(savedLang);
+    select.addEventListener('change', async (e)=>{ const v = e.target.value||'en'; localStorage.setItem('lang', v); renderPoems(v); });
+  </script>
+</body>
+</html>

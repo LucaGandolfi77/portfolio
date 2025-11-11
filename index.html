@@ -1050,6 +1050,30 @@
             </div>
         </div>
 
+        <!-- Poem Section -->
+        <div class="section" data-section id="poems">
+            <h2 class="section-title" data-i18n="sections.poems">Poems</h2>
+            <div class="poems-list" id="poemsList" style="margin-top:12px">
+                <div class="acc-item">
+                    <div class="acc-header">
+                        <button aria-expanded="false" class="acc-btn" style="all:unset;display:flex;align-items:center;justify-content:space-between;width:100%;cursor:pointer;padding:12px;border-radius:8px;">
+                            <div style="display:flex;flex-direction:column;align-items:flex-start">
+                                <div class="acc-title" data-i18n="poems.because_i_could_not.title">Because I could not stop for Death</div>
+                                <div class="acc-preview" style="color:#a0c0e0">Emily Dickinson — click to expand</div>
+                            </div>
+                            <div class="caret">▸</div>
+                        </button>
+                    </div>
+                    <div class="acc-content" aria-hidden="true" style="max-height:0;overflow:hidden;transition:max-height 0.35s ease;padding:0 12px;">
+                        <div style="color:#cfefff;padding:12px 0;">
+                            <p data-i18n="poems.because_i_could_not.excerpt">Because I could not stop for Death – He kindly stopped for me – The Carriage held but just Ourselves – And Immortality.</p>
+                            <p style="margin-top:8px"><a href="poem.html" class="btn btn-ghost">Read full poems</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Memes Section -->
         <div class="section" data-section id="memes">
         <h2 class="section-title">Memes</h2>
@@ -1188,6 +1212,34 @@
                 footer: { text: '© 2025 ルカ・ガンドルフィ。情熱と技術で作成。' }
             }
         };
+
+        // Expose the embedded translations on window so loadTranslations fallback can use them
+        window.translations = window.translations || {};
+        // Merge the embedded `translations` object into window.translations for each language
+        Object.keys(translations).forEach(lang => {
+            window.translations[lang] = Object.assign(window.translations[lang] || {}, translations[lang]);
+        });
+
+        // Add poem section translations (public-domain poem by Emily Dickinson) for all languages
+        const poemEnglish = `Because I could not stop for Death –\nHe kindly stopped for me –\nThe Carriage held but just Ourselves –\nAnd Immortality.\n\nWe slowly drove – He knew no haste\nAnd I had put away\nMy labor and my leisure too,\nFor His Civility –\n\nWe passed the School, where Children strove\nAt Recess – in the Ring –\nWe passed the Fields of Gazing Grain –\nWe passed the Setting Sun –\n\nOr rather – He passed us –\nThe Dews drew quivering and chill –\nFor only Gossamer, my Gown –\nMy Tippet – only Tulle –\n\nWe paused before a House that seemed\nA Swelling of the Ground –\nThe Roof was scarcely visible –\nThe Cornice – in the Ground –\n\nSince then – 'tis Centuries – and yet\nFeels shorter than the Day\nI first surmised the Horses' Heads\nWere toward Eternity –`;
+
+        const poemKey = {
+            sections: { poems: 'Poems' },
+            poems: {
+                because_i_could_not: {
+                    title: 'Because I could not stop for Death',
+                    text: poemEnglish
+                }
+            }
+        };
+
+        // Apply to every language present as placeholder (can be replaced by /i18n/<lang>.json later)
+        Object.keys(window.translations).forEach(lang => {
+            window.translations[lang].sections = window.translations[lang].sections || {};
+            window.translations[lang].sections.poems = window.translations[lang].sections.poems || poemKey.sections.poems;
+            window.translations[lang].poems = window.translations[lang].poems || {};
+            window.translations[lang].poems.because_i_could_not = window.translations[lang].poems.because_i_could_not || poemKey.poems.because_i_could_not;
+        });
 
         // Try to load translations from /i18n/<lang>.json first, fall back to the embedded `translations` object
         async function loadTranslations(lang) {
@@ -1552,6 +1604,40 @@
             });
         }
 
+        // Poems expand/collapse wiring
+        function createPoems() {
+            const list = document.getElementById('poemsList');
+            if (!list) return;
+            list.querySelectorAll('.acc-item').forEach(item => {
+                const btn = item.querySelector('.acc-btn');
+                const content = item.querySelector('.acc-content');
+                const caret = item.querySelector('.caret');
+                if (!btn || !content) return;
+                btn.addEventListener('click', () => {
+                    const isOpen = btn.getAttribute('aria-expanded') === 'true';
+                    if (isOpen) {
+                        btn.setAttribute('aria-expanded', 'false');
+                        content.style.maxHeight = '0';
+                        content.setAttribute('aria-hidden', 'true');
+                        caret.style.transform = '';
+                    } else {
+                        // close others
+                        list.querySelectorAll('.acc-btn[aria-expanded="true"]').forEach(ob => {
+                            ob.setAttribute('aria-expanded', 'false');
+                            const oc = ob.closest('.acc-item').querySelector('.acc-content');
+                            if (oc) { oc.style.maxHeight = '0'; oc.setAttribute('aria-hidden', 'true'); }
+                            const ocaret = ob.closest('.acc-item').querySelector('.caret'); if (ocaret) ocaret.style.transform = '';
+                        });
+                        btn.setAttribute('aria-expanded', 'true');
+                        content.setAttribute('aria-hidden', 'false');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        caret.style.transform = 'rotate(90deg)';
+                    }
+                });
+                btn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); } });
+            });
+        }
+
         // Profile image fallback
         document.getElementById('profileImg').onerror = function() {
             this.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22%3E%3Ccircle cx=%22100%22 cy=%22100%22 r=%22100%22 fill=%22%231a2940%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2300d4ff%22 font-size=%2248%22 font-weight=%22bold%22%3ELG%3C/text%3E%3C/svg%3E';
@@ -1574,6 +1660,7 @@
             loadProjects();
             createBubbles();
             handleScroll();
+            createPoems();
 
             // Quick search easter-egg: type "easter" and press Enter to open easter_egg.html
             const quickSearch = document.getElementById('quickSearch');
