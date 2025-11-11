@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Quizzes — Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg-900:#0a1628;--bg-800:#1a2940;--accent:#00d4ff;--muted:#64c8ff;--glass:rgba(10,22,40,0.95)}
+        [data-theme="light"]{--bg-900:#f7fbff;--bg-800:#e9f5ff;--accent:#0066cc;--muted:#1a416e;--glass:rgba(255,255,255,0.95)}
+        *{box-sizing:border-box}
+        body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial; margin:0; background:linear-gradient(135deg,var(--bg-900),var(--bg-800)); color:#fff;}
+        .container{max-width:1000px;margin:24px auto;padding:20px}
+        .header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+        h1{font-size:1.6rem;color:var(--accent);margin:0}
+        .controls{display:flex;gap:8px;align-items:center}
+        select{background:transparent;border:1px solid rgba(255,255,255,0.08);color:inherit;padding:6px 8px;border-radius:6px}
+        .card{background:var(--glass);padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.04);margin-top:18px}
+        .quiz-list{display:grid;gap:12px}
+        .quiz-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:rgba(0,0,0,0.12);text-decoration:none;color:inherit}
+        .btn{background:linear-gradient(90deg,var(--accent),#0099ff);padding:8px 12px;border-radius:8px;border:none;color:#fff;cursor:pointer}
+        .meta{color:#cfeeff;font-size:0.95rem}
+        a.quiz-item:hover{transform:translateY(-4px)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 data-i18n="quiz.header">Quizzes</h1>
+            <div class="controls">
+                <label for="langSelect" class="visually-hidden">Select language</label>
+                <select id="langSelect" aria-label="Select language">
+                    <option value="en">🇬🇧 EN</option>
+                    <option value="it">🇮🇹 IT</option>
+                    <option value="fr">🇫🇷 FR</option>
+                    <option value="es">🇪🇸 ES</option>
+                    <option value="de">🇩🇪 DE</option>
+                    <option value="ru">🇷🇺 RU</option>
+                    <option value="ja">🇯🇵 日本</option>
+                    <option value="zh">🇨🇳 中</option>
+                </select>
+                <button id="themeToggle" class="btn" title="Toggle theme">🌙</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <p class="meta" data-i18n="quiz.lead">Select a quiz from the list below. Click to open a dedicated quiz page.</p>
+            <div class="quiz-list" id="quizList" aria-live="polite">
+                <!-- quizzes loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        function applyTheme(theme){ if(theme==='light') document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); themeToggle.textContent = theme==='light' ? '☀️' : '🌙'; }
+        const savedTheme = localStorage.getItem('theme'); if(savedTheme) applyTheme(savedTheme);
+        themeToggle.addEventListener('click', ()=>{ const isLight = document.documentElement.getAttribute('data-theme')==='light'; const next = isLight ? 'dark' : 'light'; applyTheme(next==='light' ? 'light' : 'dark'); localStorage.setItem('theme', next==='light' ? 'light' : 'dark'); });
+
+        // Minimal embedded translations as fallback
+        const embedded = {
+            en: { quiz: { header: 'Quizzes', lead: 'Select a quiz from the list below. Click to open a dedicated quiz page.' }, common: { start: 'Start' } },
+            it: { quiz: { header: 'Quiz', lead: "Seleziona un quiz dalla lista qui sotto. Clicca per aprire la pagina del quiz." }, common: { start: 'Inizia' } },
+            es: { quiz: { header: 'Cuestionarios', lead: 'Selecciona un quiz de la lista a continuación. Haz clic para abrir la página del quiz.' }, common: { start: 'Comenzar' } }
+        };
+
+        function getNested(obj, path){ return path.split('.').reduce((o,k)=>o && o[k]!==undefined ? o[k] : undefined, obj); }
+
+        async function loadTranslations(lang){ if(!lang) lang='en'; try{ const res = await fetch('/i18n/'+lang+'.json'); if(res.ok) return await res.json(); throw new Error('no-fetch'); }catch(e){ return embedded[lang]||embedded['en']; } }
+
+        async function applyTranslations(lang){ const t = await loadTranslations(lang); document.querySelectorAll('[data-i18n]').forEach(el=>{ const key = el.getAttribute('data-i18n'); let txt = getNested(t, key); if(txt===undefined) txt = getNested(embedded[lang]||embedded.en, key); if(txt!==undefined) el.innerText = txt; }); }
+
+        // Language selector
+        const langSelect = document.getElementById('langSelect'); const savedLang = localStorage.getItem('lang')||'en'; langSelect.value = savedLang; applyTranslations(savedLang);
+        langSelect.addEventListener('change', (e)=>{ const v = e.target.value||'en'; applyTranslations(v); localStorage.setItem('lang', v); loadQuizzes(v); });
+
+        // Load quizzes index
+        async function loadQuizzes(lang){ const list = document.getElementById('quizList'); list.innerHTML = 'Loading...'; try{ const res = await fetch('/assets/quizzes/index.json'); if(!res.ok) throw new Error('no-index'); const data = await res.json(); list.innerHTML = ''; data.forEach(q=>{ const title = (q.title && (q.title[lang]||q.title.en)) || q.slug; const desc = (q.desc && (q.desc[lang]||q.desc.en))||''; const a = document.createElement('a'); a.href = q.slug+'.html'; a.className = 'quiz-item'; a.setAttribute('aria-label', title); a.innerHTML = `<div><strong>${title}</strong><div class="meta">${desc}</div></div><div><button class="btn">${getNested(embedded[lang]||embedded.en,'common.start')}</button></div>`; list.appendChild(a); }); }catch(err){ list.innerHTML = '<div class="meta">Failed to load quizzes</div>'; console.warn(err); } }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', ()=>{ loadQuizzes(savedLang); });
+    </script>
+</body>
+</html>

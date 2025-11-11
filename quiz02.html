@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Quiz 02 — JavaScript Basics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-900:#0a1628;--bg-800:#1a2940;--accent:#00d4ff}
+    [data-theme="light"]{--bg-900:#f7fbff;--bg-800:#e9f5ff;--accent:#0066cc}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto; margin:0;background:linear-gradient(135deg,var(--bg-900),var(--bg-800));color:#fff}
+    .wrap{max-width:900px;margin:18px auto;padding:18px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    h1{color:var(--accent);margin:0}
+    .card{background:rgba(10,22,40,0.95);padding:18px;border-radius:12px;margin-top:14px}
+    .question{margin:14px 0;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .choices{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .btn{background:linear-gradient(90deg,var(--accent),#0099ff);padding:8px 12px;border-radius:8px;border:none;color:#fff;cursor:pointer}
+    .meta{color:#cfeeff;font-size:0.95rem}
+    label.choice{display:flex;gap:8px;align-items:center}
+    input[type=radio]{accent-color: #00d4ff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 id="quizTitle">Quiz</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="langSelect">
+          <option value="en">🇬🇧 EN</option>
+          <option value="it">🇮🇹 IT</option>
+          <option value="es">🇪🇸 ES</option>
+        </select>
+        <button id="themeToggle" class="btn">🌙</button>
+      </div>
+    </header>
+
+    <div class="card" id="card">
+      <p class="meta" id="quizDesc">Loading quiz…</p>
+      <form id="quizForm">
+        <div id="questions"></div>
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <button type="submit" class="btn">Submit</button>
+          <a href="/quiz.html" class="meta" style="text-decoration:none;color:inherit">← Back to quizzes</a>
+        </div>
+      </form>
+      <div id="result" style="margin-top:12px;font-weight:600"></div>
+    </div>
+  </div>
+
+  <script>
+    // Theme
+    const themeToggle = document.getElementById('themeToggle');
+    function applyTheme(theme){ if(theme==='light') document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); themeToggle.textContent = theme==='light' ? '☀️' : '🌙'; }
+    const savedTheme = localStorage.getItem('theme'); if(savedTheme) applyTheme(savedTheme);
+    themeToggle.addEventListener('click', ()=>{ const isLight = document.documentElement.getAttribute('data-theme')==='light'; const next = isLight ? 'dark' : 'light'; applyTheme(next==='light'?'light':'dark'); localStorage.setItem('theme', next==='light'?'light':'dark'); });
+
+    // Language
+    const langSelect = document.getElementById('langSelect'); const savedLang = localStorage.getItem('lang')||'en'; langSelect.value = savedLang;
+    langSelect.addEventListener('change', (e)=>{ const v = e.target.value||'en'; localStorage.setItem('lang', v); loadQuiz(v); });
+
+    function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    async function loadQuiz(lang){ const titleEl = document.getElementById('quizTitle'); const descEl = document.getElementById('quizDesc'); const questionsEl = document.getElementById('questions'); questionsEl.innerHTML=''; descEl.textContent='Loading…'; try{ const res = await fetch('/assets/quizzes/quiz02.json'); if(!res.ok) throw new Error('no-quiz'); const data = await res.json(); titleEl.textContent = (data.title && (data.title[lang]||data.title.en)) || data.slug; descEl.textContent = data.description || '';
+        // Render questions
+        data.questions.forEach((q, idx)=>{
+          const qDiv = document.createElement('div'); qDiv.className='question';
+          const qText = (q.text && (q.text[lang]||q.text.en)) || ('Question '+(idx+1));
+          qDiv.innerHTML = `<div><strong>${idx+1}. ${escapeHtml(qText)}</strong></div>`;
+          const choices = document.createElement('div'); choices.className='choices';
+          q.choices.forEach((c,i)=>{
+            const id = `q${q.id}_c${i}`;
+            const label = document.createElement('label'); label.className='choice';
+            const radio = document.createElement('input'); radio.type='radio'; radio.name='q'+q.id; radio.value = i; radio.id = id;
+            const span = document.createElement('span'); span.textContent = (c[lang]||c.en||c);
+            label.appendChild(radio); label.appendChild(span); choices.appendChild(label);
+          });
+          qDiv.appendChild(choices); questionsEl.appendChild(qDiv);
+        });
+
+        // submit handler
+        const form = document.getElementById('quizForm'); const result = document.getElementById('result');
+        form.onsubmit = (ev)=>{ ev.preventDefault(); let score=0; data.questions.forEach(q=>{ const sel = form.querySelector(`input[name="q${q.id}"]:checked`); if(sel && parseInt(sel.value,10)===q.answer) score++; }); result.textContent = `You scored ${score} / ${data.questions.length}`; };
+    }catch(err){ descEl.textContent='Failed to load quiz.'; console.warn(err); } }
+
+    document.addEventListener('DOMContentLoaded', ()=> loadQuiz(savedLang));
+  </script>
+</body>
+</html>
