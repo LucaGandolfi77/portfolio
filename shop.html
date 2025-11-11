@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shop — Luca Gandolfi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-900:#0a1628;--bg-800:#1a2940;--accent:#00d4ff;--muted:#64c8ff;--card-bg:rgba(26,41,64,0.6);--glass:rgba(10,22,40,0.95);--transition:.35s}
+    html,body{height:100%;margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-900),var(--bg-800));color:#fff}
+    .container{max-width:1200px;margin:36px auto;padding:20px}
+    .hero{background:var(--card-bg);padding:24px;border-radius:12px;border:1px solid rgba(100,200,255,0.06);display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .hero h1{color:var(--accent);margin:0;font-size:1.6rem}
+    .hero p{color:#a0c0e0;margin:0}
+    .controls{display:flex;gap:12px;align-items:center}
+    .search{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:white}
+    .tags{display:flex;gap:8px}
+    .tag{padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.04);cursor:pointer;color:#cfefff}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:20px}
+    .card{background:rgba(255,255,255,0.03);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column;gap:8px}
+    .card img{width:100%;height:180px;object-fit:cover;border-radius:8px;background:#0f2336}
+    .card .title{color:var(--accent);font-weight:600}
+    .meta{color:#9fcfff;font-size:0.95rem}
+    .price{font-weight:700;color:#e6fbff}
+    .actions{display:flex;gap:8px;margin-top:auto}
+    .btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn-primary{background:linear-gradient(90deg,var(--accent),#0099ff);color:#04232f}
+    .cart-toggle{position:fixed;right:18px;bottom:18px;z-index:2000;padding:12px;border-radius:999px;background:linear-gradient(90deg,var(--accent),#0099ff);border:none;color:#001;text-shadow:none;cursor:pointer}
+    .cart-drawer{position:fixed;right:0;top:0;height:100%;width:360px;background:var(--glass);padding:18px;border-left:1px solid rgba(255,255,255,0.04);transform:translateX(100%);transition:transform var(--transition);z-index:2001;overflow:auto}
+    .cart-drawer.open{transform:translateX(0)}
+    .cart-item{display:flex;gap:10px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.03);padding:10px 0}
+    .qty{display:flex;gap:6px;align-items:center}
+    .empty{color:#9fcfff;opacity:0.8;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    @media(max-width:720px){.cart-drawer{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div>
+        <h1 data-i18n="shop.heading">Shop</h1>
+        <p data-i18n="shop.lead">Browse products, add to cart and checkout. This demo stores cart locally.</p>
+      </div>
+      <div class="controls">
+        <input id="search" class="search" placeholder="Search products..." aria-label="Search products">
+        <div class="tags" id="tags"></div>
+      </div>
+    </div>
+
+    <div id="products" class="grid" aria-live="polite"></div>
+  </div>
+
+  <button id="cartBtn" class="cart-toggle" aria-label="Open cart">Cart 🛒 <span id="cartCount" style="margin-left:8px;font-weight:700;color:#04232f"></span></button>
+  <aside id="cartDrawer" class="cart-drawer" aria-hidden="true">
+    <h2 data-i18n="shop.cartTitle">Your cart</h2>
+    <div id="cartItems"></div>
+    <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.04);padding-top:12px">
+      <div class="meta">Total: <span id="cartTotal">0.00</span> <small id="currency">EUR</small></div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button id="checkoutBtn" class="btn btn-primary" data-i18n="shop.checkout">Checkout</button>
+        <button id="clearBtn" class="btn">Clear</button>
+      </div>
+      <div style="margin-top:10px;color:#cfefff;font-size:0.9rem" id="checkoutNote">No payment gateway configured. Integrate Stripe/PayPal for live checkout.</div>
+    </div>
+  </aside>
+
+  <script>
+    // load products
+    let products = [];
+    const cartKey = 'shop_cart_v1';
+    function fmt(n){ return Number(n).toFixed(2); }
+
+    async function loadProducts(){
+      try{
+        const res = await fetch('/assets/shop/products.json');
+        if(res.ok){ const j = await res.json(); products = j.products || []; }
+      }catch(e){ console.warn('Failed to load products', e); }
+      renderTags(); renderProducts(products);
+      updateCartCount();
+    }
+
+    function renderTags(){
+      const tagsEl = document.getElementById('tags');
+      const tags = new Set(); products.forEach(p=> (p.tags||[]).forEach(t=>tags.add(t)));
+      tagsEl.innerHTML = '';
+      ['all', ...Array.from(tags)].forEach(t=>{
+        const b = document.createElement('button'); b.className='tag'; b.innerText = t; b.onclick=()=>{ filterByTag(t); };
+        tagsEl.appendChild(b);
+      });
+    }
+
+    function renderProducts(list){
+      const el = document.getElementById('products'); el.innerHTML = '';
+      if(!list.length){ el.innerHTML = '<div class="empty">No products found</div>'; return; }
+      list.forEach(p=>{
+        const card = document.createElement('div'); card.className='card';
+        card.innerHTML = `<img src="${p.image}" alt="${p.title}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22120%22%3E%3Crect width=%22200%22 height=%22120%22 fill=%22%230f2336%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%239fcfff%22 font-size=%2214%22%3Eimage%3C/text%3E%3C/svg%3E' /><div class="title">${p.title}</div><div class="meta">${p.excerpt||''}</div><div class="price">${fmt(p.price)} ${p.currency||'EUR'}</div><div class="actions"><button class="btn btn-primary" data-id="${p.id}">Add to cart</button><button class="btn" data-id="${p.id}" data-action="view">View</button></div>`;
+        el.appendChild(card);
+      });
+      // add handlers
+      document.querySelectorAll('[data-id]').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          const id = btn.getAttribute('data-id');
+          const action = btn.getAttribute('data-action');
+          if(action==='view') viewProduct(id); else addToCart(id);
+        });
+      });
+    }
+
+    function filterByTag(tag){ if(tag==='all'){ renderProducts(products); return; } renderProducts(products.filter(p=> (p.tags||[]).includes(tag))); }
+    document.getElementById('search').addEventListener('input', (e)=>{ const q=e.target.value.toLowerCase().trim(); renderProducts(products.filter(p=> p.title.toLowerCase().includes(q) || (p.excerpt||'').toLowerCase().includes(q))); });
+
+    // cart
+    function getCart(){ try{ return JSON.parse(localStorage.getItem(cartKey)||'[]'); }catch(e){ return []; } }
+    function setCart(c){ localStorage.setItem(cartKey, JSON.stringify(c)); updateCartCount(); renderCart(); }
+    function addToCart(id){ const p = products.find(x=>x.id===id); if(!p) return; const cart = getCart(); const found = cart.find(i=>i.id===id); if(found){ found.qty += 1; } else cart.push({ id:id, qty:1, title:p.title, price:p.price, currency:p.currency }); setCart(cart); }
+    function updateCartCount(){ const count = getCart().reduce((s,i)=>s+i.qty,0); document.getElementById('cartCount').innerText = count; }
+    function renderCart(){ const el = document.getElementById('cartItems'); const cart = getCart(); el.innerHTML = ''; if(!cart.length){ el.innerHTML = '<div class="empty">Your cart is empty</div>'; document.getElementById('cartTotal').innerText='0.00'; return; }
+      let total=0; cart.forEach(item=>{
+        total += item.qty * item.price;
+        const row = document.createElement('div'); row.className='cart-item'; row.innerHTML = `<div style="flex:1"><div style="font-weight:600">${item.title}</div><div class="meta">${fmt(item.price)} ${item.currency||'EUR'}</div></div><div class="qty"><button data-action="dec" data-id="${item.id}" class="btn">-</button><div>${item.qty}</div><button data-action="inc" data-id="${item.id}" class="btn">+</button></div>`;
+        el.appendChild(row);
+      });
+      document.getElementById('cartTotal').innerText = fmt(total);
+      document.querySelectorAll('[data-action]').forEach(b=> b.addEventListener('click', (e)=>{
+        const id = b.getAttribute('data-id'), action = b.getAttribute('data-action'); const cart = getCart(); const idx = cart.findIndex(x=>x.id===id); if(idx<0) return; if(action==='inc') cart[idx].qty++; else { cart[idx].qty--; if(cart[idx].qty<=0) cart.splice(idx,1); } setCart(cart);
+      }));
+    }
+
+    function viewProduct(id){ const p = products.find(x=>x.id===id); if(!p) return; alert(`${p.title}\n\n${p.description}\n\nPrice: ${fmt(p.price)} ${p.currency||'EUR'}`); }
+
+    // cart drawer
+    const cartBtn = document.getElementById('cartBtn'); const drawer = document.getElementById('cartDrawer'); cartBtn.addEventListener('click', ()=>{ const open = drawer.classList.toggle('open'); drawer.setAttribute('aria-hidden', String(!open)); renderCart(); });
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ localStorage.removeItem(cartKey); renderCart(); updateCartCount(); });
+
+    document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+      // Placeholder checkout flow
+      const cart = getCart(); if(!cart.length){ alert('Your cart is empty'); return; }
+      // Ideally integrate with Stripe Checkout or a server-side order API.
+      // For now we show an order summary and instructions.
+      const summary = cart.map(i=> `${i.qty}× ${i.title} — ${fmt(i.price*i.qty)} ${i.currency||'EUR'}`).join('\n');
+      alert('Order summary:\n\n' + summary + '\n\nTo accept payments integrate Stripe Checkout server-side.');
+    });
+
+    // init
+    loadProducts();
+    // update cart UI when page loads
+    renderCart(); updateCartCount();
+  </script>
+</body>
+</html>
