@@ -46,14 +46,19 @@
 
         /* Books table styles */
         .books-table-wrap { margin-top: 8px; }
-        .books-controls { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
-        .books-search { flex:1; padding:8px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.08); font-weight:600 }
+        .books-controls { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+        .books-search { flex:1; min-width:200px; padding:8px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.08); font-weight:600 }
         .books-table { width:100%; border-collapse:collapse; background:rgba(255,255,255,0.92); border-radius:12px; overflow:hidden; box-shadow:0 6px 24px rgba(0,0,0,0.08); }
         .books-table thead { background:linear-gradient(90deg,#f0f6fb,#e8f3ff); color:#1b3a57; }
         .books-table th, .books-table td { padding:12px 14px; text-align:left; font-size:0.95rem; border-bottom:1px solid rgba(0,0,0,0.06); }
+        .books-table th { user-select:none; font-weight:700; cursor:pointer; position:relative; padding-right:24px; }
+        .books-table th:hover { background:linear-gradient(90deg,#e8f3ff,#d4e8ff); }
+        .books-table th::after { content:''; position:absolute; right:8px; top:50%; transform:translateY(-50%); width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #1b3a57; opacity:0; transition:opacity 0.2s ease; }
+        .books-table th.sort-asc::after { opacity:1; }
+        .books-table th.sort-desc::after { opacity:1; transform:translateY(-50%) rotateZ(180deg); }
         .books-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.01); }
-        .books-table tbody tr:hover td { transform: translateY(-2px); background: linear-gradient(90deg, rgba(0,212,255,0.04), rgba(0,212,255,0.02)); }
-        .books-badge { display:inline-block; padding:6px 8px; border-radius:999px; font-weight:700; font-size:0.85rem; background:linear-gradient(90deg,#00d4ff,#0099ff); color:white }
+        .books-table tbody tr:hover td { background: linear-gradient(90deg, rgba(0,212,255,0.04), rgba(0,212,255,0.02)); }
+        .books-badge { display:inline-block; padding:6px 8px; border-radius:6px; font-weight:700; font-size:0.85rem; background:white; color:#3a2b22; border:1px solid rgba(0,0,0,0.08); white-space:nowrap; }
         @media (max-width:700px) {
             .quick-nav { display:none; }
             .books-table th:nth-child(3), .books-table td:nth-child(3) { display:none; }
@@ -149,7 +154,7 @@
                                 <div class="books-table-wrap">
                                     <div class="books-controls">
                                         <input class="books-search" placeholder="Search books (title, author, year)..." aria-label="Search books">
-                                        <div class="books-count" style="font-weight:600;color:#3a3a3a"></div>
+                                        <div class="books-count" style="font-weight:600;color:#3a3a3a;white-space:nowrap"></div>
                                     </div>
                                     <div class="book-table-container"></div>
                                 </div>
@@ -182,18 +187,42 @@
                 btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(item, btn, content, caret); } });
                 acc.appendChild(item);
 
-                // If this is the read section, populate the table (if CSV present) and wire search
+                // If this is the read section, populate the table (if CSV present) and wire search and sort
                 if (key === 'read') {
                     const container = item.querySelector('.book-table-container');
                     const searchInput = item.querySelector('.books-search');
                     const countEl = item.querySelector('.books-count');
                     const books = (window.csvBooks && window.csvBooks.length>0) ? window.csvBooks : (s.items||[]).map(title=>({ title }));
-                    populateBooksTable(container, books, countEl);
-                    if (searchInput) {
-                        searchInput.addEventListener('input', (e)=>{
-                            const q = e.target.value.trim().toLowerCase();
-                            populateBooksTable(container, books, countEl, q);
+                    
+                    // State for this section
+                    let currentSort = 'title';
+                    let currentSortDir = 'asc';
+                    
+                    // Helper function to update display based on current sort
+                    const updateDisplay = () => {
+                        const q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+                        const onSortChange = (newSort, newDir) => {
+                            currentSort = newSort;
+                            currentSortDir = newDir;
+                            updateDisplay();
+                        };
+                        populateBooksTable(container, books, countEl, q, currentSort, currentSortDir, onSortChange);
+                        
+                        // Update header visual indicators
+                        container.querySelectorAll('th[data-sort]').forEach(th => {
+                            th.classList.remove('sort-asc', 'sort-desc');
+                            if (th.getAttribute('data-sort') === currentSort) {
+                                th.classList.add(currentSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+                            }
                         });
+                    };
+                    
+                    // Initial display
+                    updateDisplay();
+                    
+                    // Wire search input
+                    if (searchInput) {
+                        searchInput.addEventListener('input', updateDisplay);
                     }
                 }
             }
@@ -286,15 +315,35 @@
             return rows;
         }
 
-            // Populate a container with a table of books; optional query for filtering
-            function populateBooksTable(container, books, countEl, query) {
+            // Populate a container with a table of books; optional query for filtering; optional sort ('title', 'author', 'year', 'stars', 'hearts', or 'tears')
+            function populateBooksTable(container, books, countEl, query, sort, sortDir, onSortChange) {
                 if(!container) return;
                 query = (query||'').toLowerCase();
-                const filtered = books.filter(b=>{
+                sort = sort || 'title';
+                sortDir = sortDir || 'asc';
+                let filtered = books.filter(b=>{
                     if(!b) return false;
                     const hay = ((b.title||'') + ' ' + (b.author||'') + ' ' + (b.year||'')).toLowerCase();
                     return !query || hay.indexOf(query) !== -1;
                 });
+
+                // Apply sorting
+                if (sort === 'title') {
+                    filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                } else if (sort === 'author') {
+                    filtered.sort((a, b) => (a.author || '').localeCompare(b.author || ''));
+                } else if (sort === 'year') {
+                    filtered.sort((a, b) => parseInt(a.year || 0) - parseInt(b.year || 0));
+                } else if (sort === 'stars') {
+                    filtered.sort((a, b) => parseInt(b.stars || 0) - parseInt(a.stars || 0));
+                } else if (sort === 'hearts') {
+                    filtered.sort((a, b) => parseInt(b.hearts || 0) - parseInt(a.hearts || 0));
+                } else if (sort === 'tears') {
+                    filtered.sort((a, b) => parseInt(b.tears || 0) - parseInt(a.tears || 0));
+                }
+                
+                // Apply sort direction
+                if (sortDir === 'desc') filtered.reverse();
 
                 countEl && (countEl.textContent = filtered.length + ' results');
 
@@ -305,25 +354,48 @@
 
                 // build table HTML
                 const rowsHtml = filtered.map(b=>{
-                    const stars = b.stars ? `<span class="books-badge">${b.stars}★</span>` : '';
-                    const hearts = b.hearts ? ` ❤️ ${b.hearts}` : '';
-                    const tears = b.tears ? ` 😭 ${b.tears}` : '';
+                    const stars = b.stars ? `<span class="books-badge">⭐ ${b.stars}</span>` : '-';
+                    const hearts = b.hearts || '-';
+                    const tears = b.tears || '-';
                     return `<tr>
                         <td>${escapeHtml(b.title)}</td>
                         <td>${escapeHtml(b.author)}</td>
                         <td>${escapeHtml(b.year)}</td>
-                        <td style="white-space:nowrap">${stars} ${hearts} ${tears}</td>
+                        <td>${stars}</td>
+                        <td style="text-align:center">❤️ ${hearts}</td>
+                        <td style="text-align:center">😭 ${tears}</td>
                     </tr>`;
                 }).join('');
 
                 container.innerHTML = `
                     <table class="books-table" role="table">
                         <thead>
-                            <tr><th>Title</th><th>Author</th><th>Year</th><th>Feedback</th></tr>
+                            <tr>
+                                <th data-sort="title">Title</th>
+                                <th data-sort="author">Author</th>
+                                <th data-sort="year">Year</th>
+                                <th data-sort="stars">Rating</th>
+                                <th data-sort="hearts">Hearts</th>
+                                <th data-sort="tears">Tears</th>
+                            </tr>
                         </thead>
                         <tbody>${rowsHtml}</tbody>
                     </table>
                 `;
+                
+                // Wire up header click handlers for sorting
+                container.querySelectorAll('th[data-sort]').forEach(th => {
+                    th.addEventListener('click', () => {
+                        const newSort = th.getAttribute('data-sort');
+                        let newDir = 'asc';
+                        if (sort === newSort && sortDir === 'asc') {
+                            newDir = 'desc';
+                        }
+                        if (onSortChange) {
+                            onSortChange(newSort, newDir);
+                        }
+                    });
+                });
             }
 
             function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
