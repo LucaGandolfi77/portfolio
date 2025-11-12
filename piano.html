@@ -3,14 +3,671 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title data-i18n="piano.page.title">Piano — Luca Gandolfi</title>
+    <title data-i18n="piano.page.title">Piano Studio — Luca Gandolfi</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
-        html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#07101b,#0f1724);color:white}
-        .wrap{max-width:1000px;margin:36px auto;padding:28px}
-        .lang-top-left { position: fixed; top: 12px; left: 12px; z-index: 1002; }
-        .lang-top-left select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: white; font-weight: 600; cursor: pointer; font-size: 0.95rem; padding: 6px 8px; border-radius:6px; }
-        a.back{color:#00d4ff;text-decoration:none;font-weight:600}
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --accent-2: #0099ff;
+            --muted: #64c8ff;
+            --card-bg: rgba(26, 41, 64, 0.6);
+            --glass: rgba(10,22,40,0.95);
+            --white-key: #ffffff;
+            --black-key: #1a1a1a;
+            --key-shadow: rgba(0,0,0,0.2);
+            --key-active: var(--accent);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-900) 0%, var(--bg-800) 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 200, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 3em;
+            background: linear-gradient(90deg, var(--accent), #ffffff, var(--accent));
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--muted);
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: 2px solid rgba(100, 200, 255, 0.3);
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab-btn.active,
+        .tab-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: var(--accent);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Piano Styles */
+        .piano-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .piano {
+            display: flex;
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .white-key {
+            width: 50px;
+            height: 200px;
+            background: var(--white-key);
+            border: 1px solid #ccc;
+            margin-right: 2px;
+            border-radius: 0 0 5px 5px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            font-size: 12px;
+            color: #666;
+            user-select: none;
+        }
+
+        .white-key:hover {
+            background: #f0f0f0;
+            transform: translateY(1px);
+        }
+
+        .white-key.active {
+            background: var(--accent);
+            color: white;
+            transform: translateY(2px);
+        }
+
+        .black-key {
+            width: 30px;
+            height: 120px;
+            background: var(--black-key);
+            position: absolute;
+            border-radius: 0 0 3px 3px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            z-index: 2;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 8px;
+            font-size: 10px;
+            color: #888;
+            user-select: none;
+        }
+
+        .black-key:hover {
+            background: #333;
+            transform: translateY(1px);
+        }
+
+        .black-key.active {
+            background: var(--accent);
+            color: white;
+            transform: translateY(2px);
+        }
+
+        /* Position black keys */
+        .black-key:nth-of-type(1) { left: 37px; }
+        .black-key:nth-of-type(2) { left: 89px; }
+        .black-key:nth-of-type(3) { left: 193px; }
+        .black-key:nth-of-type(4) { left: 245px; }
+        .black-key:nth-of-type(5) { left: 297px; }
+
+        /* Practice Log Styles */
+        .practice-log {
+            display: grid;
+            gap: 20px;
+        }
+
+        .practice-entry {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .practice-entry:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .practice-date {
+            color: var(--muted);
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .practice-piece {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .practice-notes {
+            color: #a0c0e0;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .practice-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .audio-player {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 212, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 25px;
+            border: 1px solid rgba(100, 200, 255, 0.3);
+        }
+
+        .play-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .play-btn:hover {
+            color: white;
+        }
+
+        .tempo-indicator {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            color: var(--muted);
+        }
+
+        /* Metronome Styles */
+        .metronome {
+            text-align: center;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(100, 200, 255, 0.3);
+        }
+
+        .tempo-display {
+            font-size: 3em;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .tempo-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .tempo-btn {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .tempo-btn:hover {
+            background: var(--accent-2);
+            transform: scale(1.1);
+        }
+
+        .tempo-slider {
+            width: 300px;
+            margin: 0 15px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 5px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .tempo-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .metronome-btn {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .metronome-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .beat-indicator {
+            width: 20px;
+            height: 20px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            margin: 10px;
+            transition: all 0.1s ease;
+        }
+
+        .beat-indicator.active {
+            background: var(--accent);
+            transform: scale(1.3);
+        }
+
+        .beats-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .lang-top-left {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1002;
+        }
+
+        .lang-top-left select {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 6px 8px;
+            border-radius: 6px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            border-radius: 25px;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(0, 212, 255, 0.2);
+            transform: translateX(-5px);
+        }
+
+        @media (max-width: 768px) {
+            .piano {
+                transform: scale(0.7);
+                margin: 0 -50px;
+            }
+            
+            .tempo-controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .tempo-slider {
+                width: 250px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .piano {
+                transform: scale(0.5);
+                margin: 0 -100px;
+            }
+            
+            .tabs {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        /* Sheet Music Viewer Styles */
+        .pdf-viewer-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 600px;
+        }
+
+        .sheet-music-library {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            min-height: 600px;
+        }
+
+        .sheet-music-sidebar {
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(100, 200, 255, 0.3);
+        }
+
+        .sheet-category {
+            margin-bottom: 20px;
+        }
+
+        .sheet-category h3 {
+            color: var(--accent);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(100, 200, 255, 0.2);
+        }
+
+        .sheet-category h3:hover {
+            color: white;
+        }
+
+        .sheet-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .sheet-item {
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #a0c0e0;
+            font-size: 0.9em;
+        }
+
+        .sheet-item:hover,
+        .sheet-item.selected {
+            background: var(--accent);
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .pdf-viewer {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .pdf-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pdf-info {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .pdf-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .pdf-btn {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .pdf-btn:hover {
+            background: var(--accent-2);
+            transform: translateY(-2px);
+        }
+
+        .pdf-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .page-input {
+            width: 60px;
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            margin: 0 10px;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .pdf-canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            overflow: auto;
+            min-height: 500px;
+        }
+
+        .pdf-canvas {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 100%;
+            height: auto;
+        }
+
+        .no-sheet-selected {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+        }
+
+        .no-sheet-selected i {
+            font-size: 4em;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(100, 200, 255, 0.3);
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            margin: 20px 0;
+            background: rgba(0, 212, 255, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .upload-text {
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .upload-btn {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .sheet-music-library {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .pdf-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .pdf-nav {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -30,20 +687,924 @@
         </select>
     </div>
 
-    <div class="wrap">
-        <a class="back" href="index.html">← <span data-i18n="page.back">Back to portfolio</span></a>
-        <h1 data-i18n="piano.page.heading">Piano</h1>
-        <p data-i18n="piano.page.lead">Practice log, pieces and short recordings.</p>
+<body>
+    <div class="lang-top-left">
+        <select id="langSelect" aria-label="Select language">
+            <option value="en">🇬🇧 EN</option>
+            <option value="it">🇮🇹 IT</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="zh">🇨🇳 中</option>
+            <option value="ru">🇷🇺 RU</option>
+            <option value="de">🇩🇪 DE</option>
+            <option value="ja">🇯🇵 日本</option>
+            <option value="sv">🇸🇪 SV</option>
+            <option value="ar">🇸🇦 AR</option>
+            <option value="he">🇮🇱 HE</option>
+        </select>
+    </div>
 
-        <div>
-            <p>Example entry: Chopin Nocturne — short note and practice tempo.</p>
+    <div class="container">
+        <a class="back-btn" href="index.html">
+            <i class="fas fa-arrow-left"></i>
+            <span data-i18n="page.back">Back to portfolio</span>
+        </a>
+
+        <div class="header">
+            <h1 data-i18n="piano.page.heading">🎹 Piano Studio</h1>
+            <p data-i18n="piano.page.lead">Interactive practice space, repertoire, and musical journey</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="virtual">
+                <i class="fas fa-music"></i> Virtual Piano
+            </button>
+            <button class="tab-btn" data-tab="practice">
+                <i class="fas fa-book"></i> Practice Log
+            </button>
+            <button class="tab-btn" data-tab="metronome">
+                <i class="fas fa-clock"></i> Metronome
+            </button>
+            <button class="tab-btn" data-tab="sheets">
+                <i class="fas fa-file-pdf"></i> Sheet Music
+            </button>
+            <button class="tab-btn" data-tab="repertoire">
+                <i class="fas fa-list"></i> Repertoire
+            </button>
+        </div>
+
+        <!-- Virtual Piano Tab -->
+        <div class="tab-content active" id="virtual">
+            <div class="section">
+                <h2><i class="fas fa-piano"></i> Interactive Piano</h2>
+                <p style="text-align: center; color: var(--muted); margin-bottom: 20px;">
+                    Click the keys or use your keyboard: A S D F G H J (white keys) and W E T Y U (black keys)
+                </p>
+                
+                <div class="piano-container">
+                    <div class="piano">
+                        <div class="white-key" data-note="C4" data-key="a">C</div>
+                        <div class="white-key" data-note="D4" data-key="s">D</div>
+                        <div class="white-key" data-note="E4" data-key="d">E</div>
+                        <div class="white-key" data-note="F4" data-key="f">F</div>
+                        <div class="white-key" data-note="G4" data-key="g">G</div>
+                        <div class="white-key" data-note="A4" data-key="h">A</div>
+                        <div class="white-key" data-note="B4" data-key="j">B</div>
+                        <div class="white-key" data-note="C5" data-key="k">C</div>
+                        
+                        <div class="black-key" data-note="C#4" data-key="w">C#</div>
+                        <div class="black-key" data-note="D#4" data-key="e">D#</div>
+                        <div class="black-key" data-note="F#4" data-key="t">F#</div>
+                        <div class="black-key" data-note="G#4" data-key="y">G#</div>
+                        <div class="black-key" data-note="A#4" data-key="u">A#</div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <div style="background: rgba(0, 212, 255, 0.1); padding: 15px; border-radius: 15px; display: inline-block;">
+                        <p style="color: var(--accent); font-weight: 600; margin-bottom: 5px;">Last played:</p>
+                        <span id="lastNote" style="font-size: 1.2em; color: white;">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Practice Log Tab -->
+        <div class="tab-content" id="practice">
+            <div class="section">
+                <h2><i class="fas fa-book-open"></i> Practice Journal</h2>
+                
+                <div class="practice-log">
+                    <div class="practice-entry">
+                        <div class="practice-date">November 12, 2025</div>
+                        <div class="practice-piece">Chopin - Nocturne Op. 9 No. 2</div>
+                        <div class="practice-notes">
+                            Focused on the ornamental passages in bars 9-12. Working on maintaining legato in the left hand while executing the right hand decorations. Tempo gradually increasing from 60 to 80 BPM.
+                        </div>
+                        <div class="practice-controls">
+                            <div class="audio-player">
+                                <button class="play-btn" onclick="playRecording('chopin_nocturne')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <span>Practice Recording</span>
+                            </div>
+                            <div class="tempo-indicator">♩ = 80</div>
+                            <div class="tempo-indicator">45 min</div>
+                        </div>
+                    </div>
+
+                    <div class="practice-entry">
+                        <div class="practice-date">November 10, 2025</div>
+                        <div class="practice-piece">Bach - Invention No. 1 in C Major</div>
+                        <div class="practice-notes">
+                            Polyphonic clarity exercise. Practicing each voice separately, then combining. Focus on independence of hands and articulation. The counterpoint is becoming clearer.
+                        </div>
+                        <div class="practice-controls">
+                            <div class="audio-player">
+                                <button class="play-btn" onclick="playRecording('bach_invention')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <span>Practice Recording</span>
+                            </div>
+                            <div class="tempo-indicator">♩ = 120</div>
+                            <div class="tempo-indicator">30 min</div>
+                        </div>
+                    </div>
+
+                    <div class="practice-entry">
+                        <div class="practice-date">November 8, 2025</div>
+                        <div class="practice-piece">Debussy - Clair de Lune</div>
+                        <div class="practice-notes">
+                            Working on impressionistic touch and pedaling. The piece requires a very nuanced approach to dynamics and color. Experimenting with different pedal techniques for the flowing passages.
+                        </div>
+                        <div class="practice-controls">
+                            <div class="audio-player">
+                                <button class="play-btn" onclick="playRecording('debussy_clair')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <span>Practice Recording</span>
+                            </div>
+                            <div class="tempo-indicator">♩ = 60</div>
+                            <div class="tempo-indicator">40 min</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metronome Tab -->
+        <div class="tab-content" id="metronome">
+            <div class="section">
+                <h2><i class="fas fa-hourglass-half"></i> Digital Metronome</h2>
+                
+                <div class="metronome">
+                    <div class="tempo-display" id="tempoDisplay">120</div>
+                    <div style="color: var(--muted); margin-bottom: 20px;">BPM</div>
+                    
+                    <div class="tempo-controls">
+                        <button class="tempo-btn" onclick="adjustTempo(-10)">
+                            <i class="fas fa-backward"></i>
+                        </button>
+                        <button class="tempo-btn" onclick="adjustTempo(-1)">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="range" class="tempo-slider" id="tempoSlider" min="40" max="200" value="120" oninput="setTempo(this.value)">
+                        <button class="tempo-btn" onclick="adjustTempo(1)">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button class="tempo-btn" onclick="adjustTempo(10)">
+                            <i class="fas fa-forward"></i>
+                        </button>
+                    </div>
+
+                    <div class="beats-container">
+                        <div class="beat-indicator" id="beat1"></div>
+                        <div class="beat-indicator" id="beat2"></div>
+                        <div class="beat-indicator" id="beat3"></div>
+                        <div class="beat-indicator" id="beat4"></div>
+                    </div>
+
+                    <button class="metronome-btn" id="metronomeBtn" onclick="toggleMetronome()">
+                        <i class="fas fa-play"></i> Start Metronome
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sheet Music Tab -->
+        <div class="tab-content" id="sheets">
+            <div class="section">
+                <h2><i class="fas fa-file-pdf"></i> Sheet Music Library</h2>
+                
+                <!-- Upload Area -->
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" accept=".pdf" multiple onchange="handleFileUpload(event)">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <div class="upload-text">Click to upload PDF sheet music</div>
+                    <div style="font-size: 0.9em; color: var(--muted);">Drag and drop PDF files or click to browse</div>
+                    <button class="upload-btn">Choose Files</button>
+                </div>
+
+                <!-- Sheet Music Library -->
+                <div class="sheet-music-library">
+                    <!-- Sidebar with categories and files -->
+                    <div class="sheet-music-sidebar">
+                        <div class="sheet-category">
+                            <h3 onclick="toggleCategory('classical')">
+                                <i class="fas fa-chevron-down" id="classical-icon"></i>
+                                <i class="fas fa-crown"></i> Classical
+                            </h3>
+                            <ul class="sheet-list" id="classical-list">
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/classical/chopin-nocturne-op9-no2.pdf', 'Chopin - Nocturne Op. 9 No. 2')">
+                                    <i class="fas fa-file-pdf"></i> Chopin - Nocturne Op. 9 No. 2
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/classical/bach-invention-1.pdf', 'Bach - Invention No. 1')">
+                                    <i class="fas fa-file-pdf"></i> Bach - Invention No. 1
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/classical/debussy-clair-de-lune.pdf', 'Debussy - Clair de Lune')">
+                                    <i class="fas fa-file-pdf"></i> Debussy - Clair de Lune
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/classical/mozart-sonata-k331.pdf', 'Mozart - Sonata K. 331')">
+                                    <i class="fas fa-file-pdf"></i> Mozart - Sonata K. 331
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="sheet-category">
+                            <h3 onclick="toggleCategory('jazz')">
+                                <i class="fas fa-chevron-down" id="jazz-icon"></i>
+                                <i class="fas fa-saxophone"></i> Jazz
+                            </h3>
+                            <ul class="sheet-list" id="jazz-list">
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/jazz/autumn-leaves.pdf', 'Autumn Leaves')">
+                                    <i class="fas fa-file-pdf"></i> Autumn Leaves
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/jazz/all-the-things.pdf', 'All The Things You Are')">
+                                    <i class="fas fa-file-pdf"></i> All The Things You Are
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/jazz/take-five.pdf', 'Take Five')">
+                                    <i class="fas fa-file-pdf"></i> Take Five (Dave Brubeck)
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="sheet-category">
+                            <h3 onclick="toggleCategory('contemporary')">
+                                <i class="fas fa-chevron-down" id="contemporary-icon"></i>
+                                <i class="fas fa-music"></i> Contemporary
+                            </h3>
+                            <ul class="sheet-list" id="contemporary-list">
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/contemporary/einaudi-nuvole-bianche.pdf', 'Einaudi - Nuvole Bianche')">
+                                    <i class="fas fa-file-pdf"></i> Einaudi - Nuvole Bianche
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/contemporary/max-richter-nature.pdf', 'Max Richter - On The Nature Of Daylight')">
+                                    <i class="fas fa-file-pdf"></i> Max Richter - On The Nature Of Daylight
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="sheet-category">
+                            <h3 onclick="toggleCategory('original')">
+                                <i class="fas fa-chevron-down" id="original-icon"></i>
+                                <i class="fas fa-pen"></i> My Compositions
+                            </h3>
+                            <ul class="sheet-list" id="original-list">
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/original/composition-1.pdf', 'Original Composition #1')">
+                                    <i class="fas fa-file-pdf"></i> Original Composition #1
+                                </li>
+                                <li class="sheet-item" onclick="loadSheet('assets/sheet-music/original/improvisation-study.pdf', 'Improvisation Study')">
+                                    <i class="fas fa-file-pdf"></i> Improvisation Study
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- PDF Viewer -->
+                    <div class="pdf-viewer">
+                        <div class="pdf-controls">
+                            <div class="pdf-info">
+                                <span id="currentSheetTitle">No sheet selected</span>
+                            </div>
+                            
+                            <div class="pdf-nav">
+                                <button class="pdf-btn" id="prevPageBtn" onclick="previousPage()" disabled>
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </button>
+                                
+                                <span>Page</span>
+                                <input type="number" class="page-input" id="pageInput" min="1" value="1" onchange="goToPage(this.value)">
+                                <span>of <span id="totalPages">0</span></span>
+                                
+                                <button class="pdf-btn" id="nextPageBtn" onclick="nextPage()" disabled>
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+
+                            <div class="zoom-controls">
+                                <button class="pdf-btn" onclick="zoomOut()">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <span id="zoomLevel">100%</span>
+                                <button class="pdf-btn" onclick="zoomIn()">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button class="pdf-btn" onclick="fitToWidth()">
+                                    <i class="fas fa-expand-arrows-alt"></i> Fit
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pdf-canvas-container">
+                            <div class="no-sheet-selected" id="noSheetMessage">
+                                <i class="fas fa-file-pdf"></i>
+                                <h3>Select a sheet music to view</h3>
+                                <p>Choose from your library or upload a new PDF</p>
+                            </div>
+                            <canvas id="pdfCanvas" class="pdf-canvas" style="display: none;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repertoire Tab -->
+        <div class="tab-content" id="repertoire">
+            <div class="section">
+                <h2><i class="fas fa-music"></i> Current Repertoire</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    <div class="practice-entry">
+                        <div class="practice-piece">Classical</div>
+                        <div class="practice-notes">
+                            • Bach - Well-Tempered Clavier (Book 1)<br>
+                            • Mozart - Sonata K.331<br>
+                            • Chopin - Nocturnes Op. 9<br>
+                            • Debussy - Suite Bergamasque
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <div class="tempo-indicator">Difficulty: ★★★★☆</div>
+                        </div>
+                    </div>
+
+                    <div class="practice-entry">
+                        <div class="practice-piece">Jazz Standards</div>
+                        <div class="practice-notes">
+                            • Autumn Leaves<br>
+                            • All The Things You Are<br>
+                            • Blue Moon<br>
+                            • Take Five (Dave Brubeck)
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <div class="tempo-indicator">Difficulty: ★★★☆☆</div>
+                        </div>
+                    </div>
+
+                    <div class="practice-entry">
+                        <div class="practice-piece">Contemporary</div>
+                        <div class="practice-notes">
+                            • Ludovico Einaudi - Nuvole Bianche<br>
+                            • Max Richter - On The Nature Of Daylight<br>
+                            • Ólafur Arnalds - Near Light<br>
+                            • Original Compositions
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <div class="tempo-indicator">Difficulty: ★★★☆☆</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px; text-align: center;">
+                    <div style="background: rgba(0, 212, 255, 0.1); padding: 20px; border-radius: 15px; border: 1px solid rgba(100, 200, 255, 0.3);">
+                        <h3 style="color: var(--accent); margin-bottom: 10px;">Practice Statistics</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                            <div>
+                                <div style="font-size: 2em; font-weight: 700; color: var(--accent);">248</div>
+                                <div style="color: var(--muted);">Hours Practiced</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 2em; font-weight: 700; color: var(--accent);">23</div>
+                                <div style="color: var(--muted);">Pieces Learned</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 2em; font-weight: 700; color: var(--accent);">45</div>
+                                <div style="color: var(--muted);">Practice Sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        async function loadTranslations(lang){try{const res=await fetch('/i18n/'+lang+'.json'); if(!res.ok) throw 0; return await res.json();}catch(e){try{const r2 = await fetch('/i18n/en.json'); if(r2.ok) return await r2.json();}catch(e){} return {};}}
-        function getNested(o,p){return p.split('.').reduce((a,k)=> (a && a[k]!==undefined)? a[k]: undefined, o);} const savedLang=localStorage.getItem('lang')||'en';
-        document.addEventListener('DOMContentLoaded', async ()=>{ const t = await loadTranslations(savedLang); document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n'); const v=getNested(t,k); if(v!==undefined) el.textContent=v;}); const sel=document.getElementById('langSelect'); if(sel){sel.value=savedLang; sel.addEventListener('change', async e=>{const v=e.target.value||'en'; localStorage.setItem('lang',v); const tt=await loadTranslations(v); document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n'); const vv=getNested(tt,k); if(vv!==undefined) el.textContent=vv;});}); }});
+        // Translation system
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch('/i18n/' + lang + '.json');
+                if (!res.ok) throw 0;
+                return await res.json();
+            } catch (e) {
+                try {
+                    const r2 = await fetch('/i18n/en.json');
+                    if (r2.ok) return await r2.json();
+                } catch (e) {}
+                return {};
+            }
+        }
+
+        function getNested(o, p) {
+            return p.split('.').reduce((a, k) => (a && a[k] !== undefined) ? a[k] : undefined, o);
+        }
+
+        // Tab system
+        function initTabs() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.getAttribute('data-tab');
+                    
+                    // Remove active class from all tabs
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab
+                    btn.classList.add('active');
+                    document.getElementById(target).classList.add('active');
+                });
+            });
+        }
+
+        // Virtual Piano
+        function initPiano() {
+            const keys = document.querySelectorAll('.white-key, .black-key');
+            const lastNoteDisplay = document.getElementById('lastNote');
+
+            // Audio context for generating tones
+            let audioContext;
+
+            function initAudio() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            function getFrequency(note) {
+                const notes = {
+                    'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13,
+                    'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00,
+                    'G#4': 415.30, 'A4': 440.00, 'A#4': 466.16, 'B4': 493.88, 'C5': 523.25
+                };
+                return notes[note] || 440;
+            }
+
+            function playNote(frequency, duration = 0.5) {
+                initAudio();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+            }
+
+            function activateKey(key, note) {
+                key.classList.add('active');
+                lastNoteDisplay.textContent = note;
+                playNote(getFrequency(note));
+                
+                setTimeout(() => {
+                    key.classList.remove('active');
+                }, 150);
+            }
+
+            // Click events
+            keys.forEach(key => {
+                key.addEventListener('click', () => {
+                    const note = key.getAttribute('data-note');
+                    activateKey(key, note);
+                });
+            });
+
+            // Keyboard events
+            document.addEventListener('keydown', (e) => {
+                const key = document.querySelector(`[data-key="${e.key.toLowerCase()}"]`);
+                if (key && !key.classList.contains('active')) {
+                    const note = key.getAttribute('data-note');
+                    activateKey(key, note);
+                }
+            });
+        }
+
+        // Metronome
+        let metronomeInterval;
+        let isMetronomeRunning = false;
+        let currentBeat = 0;
+        let tempo = 120;
+
+        function adjustTempo(change) {
+            tempo = Math.max(40, Math.min(200, tempo + change));
+            updateTempoDisplay();
+        }
+
+        function setTempo(newTempo) {
+            tempo = parseInt(newTempo);
+            updateTempoDisplay();
+        }
+
+        function updateTempoDisplay() {
+            document.getElementById('tempoDisplay').textContent = tempo;
+            document.getElementById('tempoSlider').value = tempo;
+        }
+
+        function toggleMetronome() {
+            const btn = document.getElementById('metronomeBtn');
+            
+            if (isMetronomeRunning) {
+                clearInterval(metronomeInterval);
+                isMetronomeRunning = false;
+                btn.innerHTML = '<i class="fas fa-play"></i> Start Metronome';
+                resetBeats();
+            } else {
+                startMetronome();
+                isMetronomeRunning = true;
+                btn.innerHTML = '<i class="fas fa-stop"></i> Stop Metronome';
+            }
+        }
+
+        function startMetronome() {
+            const interval = 60000 / tempo; // Convert BPM to milliseconds
+            
+            metronomeInterval = setInterval(() => {
+                playMetronomeClick();
+                animateBeat();
+            }, interval);
+        }
+
+        function playMetronomeClick() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Higher pitch for first beat
+            oscillator.frequency.value = currentBeat === 0 ? 800 : 400;
+            oscillator.type = 'square';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        function animateBeat() {
+            // Reset all beats
+            resetBeats();
+            
+            // Activate current beat
+            const beatElement = document.getElementById(`beat${currentBeat + 1}`);
+            if (beatElement) {
+                beatElement.classList.add('active');
+            }
+            
+            currentBeat = (currentBeat + 1) % 4;
+        }
+
+        function resetBeats() {
+            for (let i = 1; i <= 4; i++) {
+                const beat = document.getElementById(`beat${i}`);
+                if (beat) beat.classList.remove('active');
+            }
+            currentBeat = 0;
+        }
+
+        // Audio player for practice recordings
+        function playRecording(recordingId) {
+            // Placeholder function - in a real implementation, you would load and play actual audio files
+            console.log(`Playing recording: ${recordingId}`);
+            alert(`This would play the practice recording for ${recordingId}. Add your actual audio files to implement this feature!`);
+        }
+
+        // PDF Viewer functionality
+        let currentPdf = null;
+        let currentPage = 1;
+        let totalPages = 0;
+        let scale = 1.0;
+        let pdfDoc = null;
+
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        function toggleCategory(categoryId) {
+            const list = document.getElementById(categoryId + '-list');
+            const icon = document.getElementById(categoryId + '-icon');
+            
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+                icon.className = 'fas fa-chevron-down';
+            } else {
+                list.style.display = 'none';
+                icon.className = 'fas fa-chevron-right';
+            }
+        }
+
+        async function loadSheet(pdfPath, title) {
+            try {
+                // Remove selection from all items
+                document.querySelectorAll('.sheet-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                
+                // Add selection to clicked item
+                event.target.classList.add('selected');
+                
+                // Update title
+                document.getElementById('currentSheetTitle').textContent = title;
+                
+                // Show loading state
+                const canvas = document.getElementById('pdfCanvas');
+                const noSheetMessage = document.getElementById('noSheetMessage');
+                noSheetMessage.style.display = 'flex';
+                noSheetMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i><h3>Loading PDF...</h3>';
+                canvas.style.display = 'none';
+
+                // Load PDF
+                const loadingTask = pdfjsLib.getDocument(pdfPath);
+                pdfDoc = await loadingTask.promise;
+                
+                currentPage = 1;
+                totalPages = pdfDoc.numPages;
+                
+                // Update controls
+                document.getElementById('totalPages').textContent = totalPages;
+                document.getElementById('pageInput').value = currentPage;
+                document.getElementById('pageInput').max = totalPages;
+                
+                // Enable/disable navigation buttons
+                updateNavigationButtons();
+                
+                // Render first page
+                await renderPage(currentPage);
+                
+                // Show canvas and hide no-sheet message
+                noSheetMessage.style.display = 'none';
+                canvas.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                const noSheetMessage = document.getElementById('noSheetMessage');
+                noSheetMessage.innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error loading PDF</h3>
+                    <p>The file "${title}" could not be loaded.<br>
+                    Make sure the PDF file exists in the correct location.</p>
+                `;
+            }
+        }
+
+        async function renderPage(pageNumber) {
+            if (!pdfDoc) return;
+            
+            try {
+                const page = await pdfDoc.getPage(pageNumber);
+                const canvas = document.getElementById('pdfCanvas');
+                const context = canvas.getContext('2d');
+                
+                // Calculate scale to fit container width
+                const container = document.querySelector('.pdf-canvas-container');
+                const containerWidth = container.clientWidth - 40; // Account for padding
+                const viewport = page.getViewport({ scale: 1 });
+                const desiredWidth = Math.min(containerWidth, viewport.width);
+                scale = desiredWidth / viewport.width;
+                
+                const scaledViewport = page.getViewport({ scale: scale });
+                
+                canvas.height = scaledViewport.height;
+                canvas.width = scaledViewport.width;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: scaledViewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                // Update zoom level display
+                document.getElementById('zoomLevel').textContent = Math.round(scale * 100) + '%';
+                
+            } catch (error) {
+                console.error('Error rendering page:', error);
+            }
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+        }
+
+        async function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                document.getElementById('pageInput').value = currentPage;
+                await renderPage(currentPage);
+                updateNavigationButtons();
+            }
+        }
+
+        async function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                document.getElementById('pageInput').value = currentPage;
+                await renderPage(currentPage);
+                updateNavigationButtons();
+            }
+        }
+
+        async function goToPage(pageNumber) {
+            const page = parseInt(pageNumber);
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                await renderPage(currentPage);
+                updateNavigationButtons();
+            } else {
+                document.getElementById('pageInput').value = currentPage;
+            }
+        }
+
+        async function zoomIn() {
+            scale *= 1.25;
+            await renderPage(currentPage);
+        }
+
+        async function zoomOut() {
+            scale *= 0.8;
+            await renderPage(currentPage);
+        }
+
+        async function fitToWidth() {
+            if (!pdfDoc) return;
+            
+            const page = await pdfDoc.getPage(currentPage);
+            const container = document.querySelector('.pdf-canvas-container');
+            const containerWidth = container.clientWidth - 40;
+            const viewport = page.getViewport({ scale: 1 });
+            
+            scale = containerWidth / viewport.width;
+            await renderPage(currentPage);
+        }
+
+        function handleFileUpload(event) {
+            const files = event.target.files;
+            
+            for (let file of files) {
+                if (file.type === 'application/pdf') {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const typedarray = new Uint8Array(e.target.result);
+                        
+                        // Create a temporary URL for the uploaded file
+                        const blob = new Blob([typedarray], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        // Add to the appropriate category (you could implement category selection)
+                        addUploadedSheet(file.name, url);
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            }
+        }
+
+        function addUploadedSheet(fileName, url) {
+            // For simplicity, add to the "original" category
+            const originalList = document.getElementById('original-list');
+            
+            const listItem = document.createElement('li');
+            listItem.className = 'sheet-item';
+            listItem.innerHTML = `<i class="fas fa-file-pdf"></i> ${fileName}`;
+            listItem.onclick = () => loadSheetFromUrl(url, fileName);
+            
+            originalList.appendChild(listItem);
+            
+            // Auto-select and load the uploaded file
+            loadSheetFromUrl(url, fileName);
+        }
+
+        async function loadSheetFromUrl(url, title) {
+            try {
+                // Remove selection from all items
+                document.querySelectorAll('.sheet-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                
+                // Add selection to clicked item
+                event.target.classList.add('selected');
+                
+                // Update title
+                document.getElementById('currentSheetTitle').textContent = title;
+                
+                // Show loading state
+                const canvas = document.getElementById('pdfCanvas');
+                const noSheetMessage = document.getElementById('noSheetMessage');
+                noSheetMessage.style.display = 'flex';
+                noSheetMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i><h3>Loading PDF...</h3>';
+                canvas.style.display = 'none';
+
+                // Load PDF from URL
+                const loadingTask = pdfjsLib.getDocument(url);
+                pdfDoc = await loadingTask.promise;
+                
+                currentPage = 1;
+                totalPages = pdfDoc.numPages;
+                
+                // Update controls
+                document.getElementById('totalPages').textContent = totalPages;
+                document.getElementById('pageInput').value = currentPage;
+                document.getElementById('pageInput').max = totalPages;
+                
+                // Enable/disable navigation buttons
+                updateNavigationButtons();
+                
+                // Render first page
+                await renderPage(currentPage);
+                
+                // Show canvas and hide no-sheet message
+                noSheetMessage.style.display = 'none';
+                canvas.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                const noSheetMessage = document.getElementById('noSheetMessage');
+                noSheetMessage.innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error loading PDF</h3>
+                    <p>The uploaded file could not be loaded.<br>
+                    Please make sure it's a valid PDF file.</p>
+                `;
+            }
+        }
+
+        // Drag and drop functionality
+        function initDragAndDrop() {
+            const uploadArea = document.querySelector('.upload-area');
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(0, 212, 255, 0.2)';
+            });
+            
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(0, 212, 255, 0.05)';
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(0, 212, 255, 0.05)';
+                
+                const files = e.dataTransfer.files;
+                const fileInput = document.getElementById('fileInput');
+                fileInput.files = files;
+                handleFileUpload({ target: { files: files } });
+            });
+        }
+
+        // Initialize everything when the page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load translations
+            const savedLang = localStorage.getItem('lang') || 'en';
+            const translations = await loadTranslations(savedLang);
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const value = getNested(translations, key);
+                if (value !== undefined) el.textContent = value;
+            });
+
+            // Language selector
+            const langSelect = document.getElementById('langSelect');
+            if (langSelect) {
+                langSelect.value = savedLang;
+                langSelect.addEventListener('change', async e => {
+                    const value = e.target.value || 'en';
+                    localStorage.setItem('lang', value);
+                    const newTranslations = await loadTranslations(value);
+                    document.querySelectorAll('[data-i18n]').forEach(el => {
+                        const key = el.getAttribute('data-i18n');
+                        const newValue = getNested(newTranslations, key);
+                        if (newValue !== undefined) el.textContent = newValue;
+                    });
+                });
+            }
+
+            // Initialize components
+            initTabs();
+            initPiano();
+            initDragAndDrop();
+            updateTempoDisplay();
+            
+            // Initialize sheet music categories as collapsed
+            ['classical', 'jazz', 'contemporary', 'original'].forEach(category => {
+                document.getElementById(category + '-list').style.display = 'block';
+            });
+        });
     </script>
 </body>
 </html>
