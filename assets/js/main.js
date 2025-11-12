@@ -362,6 +362,37 @@ function createParticles() {
         particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
         particles.appendChild(particle);
     }
+    
+    // Create stars and lights
+    createStarsAndLights();
+}
+
+function createStarsAndLights() {
+    const particlesContainer = document.getElementById('particles');
+    
+    // Create stars
+    for (let i = 0; i < 40; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        star.style.animationDuration = (Math.random() * 2 + 3) + 's';
+        star.style.opacity = Math.random() * 0.7 + 0.3;
+        particlesContainer.appendChild(star);
+    }
+    
+    // Create lights
+    for (let i = 0; i < 15; i++) {
+        const light = document.createElement('div');
+        light.className = 'light';
+        light.style.left = Math.random() * 100 + '%';
+        light.style.top = Math.random() * 100 + '%';
+        light.style.animationDelay = Math.random() * 4 + 's';
+        light.style.animationDuration = (Math.random() * 3 + 4) + 's';
+        light.style.setProperty('--drift-delay', (Math.random() * 6) + 's');
+        particlesContainer.appendChild(light);
+    }
 }
 
 // Load projects
@@ -505,6 +536,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+    }
+
+    // Achievements Carousel
+    const carousel = document.getElementById('achievementsCarousel');
+    const arrowLeft = document.getElementById('achievementsArrowLeft');
+    const arrowRight = document.getElementById('achievementsArrowRight');
+    if (carousel && arrowLeft && arrowRight) {
+        const scrollAmount = 250;
+        arrowLeft.addEventListener('click', () => {
+            carousel.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        });
+        arrowRight.addEventListener('click', () => {
+            carousel.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        });
+        
+        // Update arrow visibility
+        const updateArrows = () => {
+            arrowLeft.style.opacity = carousel.scrollLeft > 0 ? '1' : '0.3';
+            arrowRight.style.opacity = (carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth - 10) ? '1' : '0.3';
+        };
+        carousel.addEventListener('scroll', updateArrows);
+        window.addEventListener('resize', updateArrows);
+        updateArrows();
     }
 
     (async function populateMemesPreview(){
