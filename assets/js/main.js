@@ -502,8 +502,41 @@ function createPoems() {
     });
 }
 
+// Profile image lightbox
+const profileImg = document.getElementById('profileImg');
+const lightbox = document.createElement('div');
+lightbox.className = 'lightbox';
+lightbox.innerHTML = `
+    <div class="lightbox-content">
+        <img class="lightbox-img" src="./assets/cv_gandolfi.jpeg" alt="Luca Gandolfi - Full Profile">
+        <button class="lightbox-close" aria-label="Close lightbox">✕</button>
+    </div>
+`;
+document.body.appendChild(lightbox);
+
+profileImg.addEventListener('click', () => {
+    lightbox.classList.add('active');
+});
+
+const lightboxClose = lightbox.querySelector('.lightbox-close');
+lightboxClose.addEventListener('click', () => {
+    lightbox.classList.remove('active');
+});
+
+lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) {
+        lightbox.classList.remove('active');
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+        lightbox.classList.remove('active');
+    }
+});
+
 // Profile image fallback
-document.getElementById('profileImg').onerror = function() {
+profileImg.onerror = function() {
     this.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22%3E%3Ccircle cx=%22100%22 cy=%22100%22 r=%22100%22 fill=%22%231a2940%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2300d4ff%22 font-size=%2248%22 font-weight=%22bold%22%3ELG%3C/text%3E%3C/svg%3E';
 };
 
