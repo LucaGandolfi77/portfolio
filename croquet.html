@@ -110,6 +110,10 @@
 
         .tutorial-view {
             display: none;
+        }
+
+        .tutorial-view.active {
+            display: block;
             animation: slideIn 0.5s ease;
         }
 
@@ -469,8 +473,8 @@
         });
 
         backBtn.addEventListener('click', () => {
-            tutorialView.style.display = 'none';
-            stitchList.parentElement.style.display = 'block';
+            tutorialView.classList.remove('active');
+            stitchList.style.display = 'block';
             clearCanvas();
         });
 
@@ -484,20 +488,28 @@
             
             instructions.textContent = stitch.instruction;
             
-            stitchList.parentElement.style.display = 'none';
-            tutorialView.style.display = 'block';
+            stitchList.style.display = 'none';
+            tutorialView.classList.add('active');
             clearCanvas();
         }
 
         function getCoordinates(e) {
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
-            return { x, y };
+            let x, y;
+            
+            if (e.touches) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            
+            return { x: x / 2, y: y / 2 };
         }
 
         function startDrawing(e) {
-            e.preventDefault();
+            if (e.button && e.button !== 0) return;
             isDrawing = true;
             const { x, y } = getCoordinates(e);
             currentPath = [{ x, y, color: currentColor }];
@@ -505,17 +517,18 @@
 
         function draw(e) {
             if (!isDrawing) return;
-            e.preventDefault();
             
             const { x, y } = getCoordinates(e);
             currentPath.push({ x, y, color: currentColor });
             
             ctx.strokeStyle = currentColor;
             ctx.beginPath();
-            const prev = currentPath[currentPath.length - 2];
-            ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(x, y);
-            ctx.stroke();
+            if (currentPath.length > 1) {
+                const prev = currentPath[currentPath.length - 2];
+                ctx.moveTo(prev.x, prev.y);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
         }
 
         function stopDrawing() {
