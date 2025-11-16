@@ -283,8 +283,8 @@ function createContactModal() {
 const contactModal = createContactModal();
 const contactBtn = document.getElementById('contactBtn');
 if (contactBtn) contactBtn.addEventListener('click', (e) => {
-    const target = document.querySelector('#contact');
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Open default email client with pre-filled recipient
+    window.location.href = 'mailto:l.g.gandalf@hotmail.it';
 });
 
 const navContact = document.querySelector('.nav-link[href="#contact"]');
