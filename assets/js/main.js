@@ -134,18 +134,22 @@ async function applyTranslations(lang) {
 
 // Load preferred language
 const savedLang = localStorage.getItem('lang') || 'en';
-document.addEventListener('DOMContentLoaded', () => applyTranslations(savedLang));
+document.addEventListener('DOMContentLoaded', async () => {
+    await applyTranslations(savedLang);
+    
+    // Wire up language selector after DOM is ready
+    const langSelect = document.getElementById('langSelect');
+    if (langSelect) {
+        langSelect.value = savedLang;
+        langSelect.addEventListener('change', async (e) => {
+            const v = e.target.value || 'en';
+            await applyTranslations(v);
+            localStorage.setItem('lang', v);
+        });
+    }
+});
 
-// Handle language change
-const langSelect = document.getElementById('langSelect');
-if (langSelect) {
-    langSelect.value = savedLang;
-    langSelect.addEventListener('change', (e) => {
-        const v = e.target.value || 'en';
-        applyTranslations(v);
-        localStorage.setItem('lang', v);
-    });
-}
+// Handle language change for cases where langSelect is already in DOM before DOMContentLoaded
 
 // --- EmailJS configuration (replace with your values) ---
 const EMAILJS_SERVICE_ID = 'your_service_id';
