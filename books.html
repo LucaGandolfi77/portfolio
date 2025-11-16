@@ -32,7 +32,7 @@
         .book-item{padding:8px;border-radius:8px;background:rgba(0,0,0,0.02);border:1px solid rgba(0,0,0,0.03)}
 
         /* small screens */
-        @media (max-width:640px){.wrap{margin:18px;padding:18px}.acc-header{padding:12px}.acc-content.open{padding:10px 12px 14px}}
+        @media (max-width:640px){.wrap{margin:18px;padding:18px}.acc-header{padding:12px}.acc-content.open{padding:10px 12px 14px}.lang-top-left select{min-height:44px;min-width:100px;padding:8px 12px;font-size:0.9rem}}
 
         /* Top-left language selector (consistent with main site) */
         .lang-top-left { position: fixed; top: 12px; left: 12px; z-index: 1002; }
@@ -63,6 +63,25 @@
             .quick-nav { display:none; }
             .books-table th:nth-child(3), .books-table td:nth-child(3) { display:none; }
         }
+        @media (max-width:640px) {
+            .books-table-wrap { overflow-x: auto; }
+            .books-table { font-size:0.85rem; }
+            .books-table th, .books-table td { padding:8px 10px; }
+            .books-search { min-width:150px; font-size:0.9rem; }
+        }
+        @media (max-width:480px) {
+            .books-table { font-size:0.8rem; }
+            .books-table th, .books-table td { padding:6px 8px; }
+            .books-table th::after { right:4px; border-left:3px solid transparent; border-right:3px solid transparent; border-top:4px solid #1b3a57; }
+            .books-search { min-width:120px; padding:6px 8px; font-size:0.85rem; }
+            .books-badge { padding:4px 6px; font-size:0.75rem; }
+        }
+        .book-card { padding:12px; background:rgba(255,255,255,0.85); border-radius:10px; border:1px solid rgba(0,0,0,0.06); margin-bottom:8px; }
+        .book-card-title { font-weight:700; color:#3a2b22; margin-bottom:4px; }
+        .book-card-author { font-size:0.9rem; color:#6b5a4a; margin-bottom:2px; }
+        .book-card-meta { display:flex; gap:12px; font-size:0.85rem; color:#7b6a5a; margin-top:8px; }
+        .book-card-rating { display:flex; gap:8px; margin-top:6px; }
+        @media (min-width:641px) { .book-card { display:none; } }
     </style>
 </head>
 <body>
@@ -137,6 +156,7 @@
                 const s = sections[key] || { title: key, preview: '', items: [] };
                 const item = document.createElement('div');
                 item.className = 'acc-item';
+                item.setAttribute('data-i18n-section', key);
                     // For 'read' we prefer to show the CSV-powered searchable table when available
                     if (key === 'read') {
                         item.innerHTML = `
@@ -352,50 +372,77 @@
                     return;
                 }
 
-                // build table HTML
-                const rowsHtml = filtered.map(b=>{
-                    const stars = b.stars ? `<span class="books-badge">⭐ ${b.stars}</span>` : '-';
-                    const hearts = b.hearts || '-';
-                    const tears = b.tears || '-';
-                    return `<tr>
-                        <td>${escapeHtml(b.title)}</td>
-                        <td>${escapeHtml(b.author)}</td>
-                        <td>${escapeHtml(b.year)}</td>
-                        <td>${stars}</td>
-                        <td style="text-align:center">❤️ ${hearts}</td>
-                        <td style="text-align:center">😭 ${tears}</td>
-                    </tr>`;
-                }).join('');
-
-                container.innerHTML = `
-                    <table class="books-table" role="table">
-                        <thead>
-                            <tr>
-                                <th data-sort="title">Title</th>
-                                <th data-sort="author">Author</th>
-                                <th data-sort="year">Year</th>
-                                <th data-sort="stars">Rating</th>
-                                <th data-sort="hearts">Hearts</th>
-                                <th data-sort="tears">Tears</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rowsHtml}</tbody>
-                    </table>
-                `;
+                // Detect if mobile (< 640px) and render cards instead of table
+                const isMobile = window.innerWidth < 640;
                 
-                // Wire up header click handlers for sorting
-                container.querySelectorAll('th[data-sort]').forEach(th => {
-                    th.addEventListener('click', () => {
-                        const newSort = th.getAttribute('data-sort');
-                        let newDir = 'asc';
-                        if (sort === newSort && sortDir === 'asc') {
-                            newDir = 'desc';
-                        }
-                        if (onSortChange) {
-                            onSortChange(newSort, newDir);
-                        }
+                if (isMobile) {
+                    // Mobile: render cards
+                    const cardsHtml = filtered.map(b => {
+                        const stars = b.stars ? `⭐ ${b.stars}` : '';
+                        const hearts = b.hearts ? `❤️ ${b.hearts}` : '';
+                        const tears = b.tears ? `😭 ${b.tears}` : '';
+                        return `
+                            <div class="book-card">
+                                <div class="book-card-title">${escapeHtml(b.title)}</div>
+                                <div class="book-card-author">${escapeHtml(b.author)}</div>
+                                <div class="book-card-meta">
+                                    ${b.year ? `<span>📅 ${escapeHtml(b.year)}</span>` : ''}
+                                </div>
+                                <div class="book-card-rating">
+                                    ${stars ? `<span>${stars}</span>` : ''}
+                                    ${hearts ? `<span>${hearts}</span>` : ''}
+                                    ${tears ? `<span>${tears}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    container.innerHTML = cardsHtml;
+                } else {
+                    // Desktop: render table
+                    const rowsHtml = filtered.map(b=>{
+                        const stars = b.stars ? `<span class="books-badge">⭐ ${b.stars}</span>` : '-';
+                        const hearts = b.hearts || '-';
+                        const tears = b.tears || '-';
+                        return `<tr>
+                            <td>${escapeHtml(b.title)}</td>
+                            <td>${escapeHtml(b.author)}</td>
+                            <td>${escapeHtml(b.year)}</td>
+                            <td>${stars}</td>
+                            <td style="text-align:center">❤️ ${hearts}</td>
+                            <td style="text-align:center">😭 ${tears}</td>
+                        </tr>`;
+                    }).join('');
+
+                    container.innerHTML = `
+                        <table class="books-table" role="table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="title">Title</th>
+                                    <th data-sort="author">Author</th>
+                                    <th data-sort="year">Year</th>
+                                    <th data-sort="stars">Rating</th>
+                                    <th data-sort="hearts">Hearts</th>
+                                    <th data-sort="tears">Tears</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    `;
+                    
+                    // Wire up header click handlers for sorting (only for desktop/table)
+                    container.querySelectorAll('th[data-sort]').forEach(th => {
+                        th.addEventListener('click', () => {
+                            const newSort = th.getAttribute('data-sort');
+                            let newDir = 'asc';
+                            if (sort === newSort && sortDir === 'asc') {
+                                newDir = 'desc';
+                            }
+                            if (onSortChange) {
+                                onSortChange(newSort, newDir);
+                            }
+                        });
                     });
-                });
+                }
             }
 
             function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -412,6 +459,21 @@
                 buildAccordion(t);
             });
         }
+
+        // Handle window resize to re-render books table/cards when orientation changes
+        window.addEventListener('resize', () => {
+            const readSection = document.querySelector('[data-i18n-section="read"]');
+            if (readSection) {
+                const container = readSection.querySelector('.book-table-container');
+                if (container && window.csvBooks) {
+                    const searchInput = readSection.querySelector('.books-search');
+                    const countEl = readSection.querySelector('.books-count');
+                    const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+                    // Re-render with current sort state; default to 'title' asc
+                    populateBooksTable(container, window.csvBooks, countEl, q, 'title', 'asc', null);
+                }
+            }
+        });
     </script>
 </body>
 </html>
