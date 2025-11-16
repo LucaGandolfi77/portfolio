@@ -98,16 +98,16 @@ Object.keys(translations).forEach(lang => {
     window.translations[lang] = Object.assign(window.translations[lang] || {}, translations[lang]);
 });
 
-// Try to load translations from /i18n/<lang>.json first, fall back to the embedded `translations` object
+// Try to load translations from ./i18n/<lang>.json first, fall back to the embedded `translations` object
 async function loadTranslations(lang) {
     if (!lang) lang = 'en';
     try {
-        const res = await fetch('/i18n/' + lang + '.json');
+        const res = await fetch('./i18n/' + lang + '.json');
         if (res.ok) return await res.json();
         throw new Error('fetch-not-ok');
     } catch (err) {
         // fallback to inline translations bundle if available
-        console.warn('Failed to fetch /i18n/' + lang + '.json — falling back to embedded translations.', err);
+        console.warn('Failed to fetch ./i18n/' + lang + '.json — falling back to embedded translations.', err);
         if (window.translations && window.translations[lang]) return window.translations[lang];
         return window.translations && window.translations['en'] ? window.translations['en'] : {};
     }
@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const preview = document.getElementById('memesPreview');
         if (!preview) return;
         try {
-            const res = await fetch('/assets/memes/index.json', { cache: 'no-cache' });
+            const res = await fetch('./assets/memes/index.json', { cache: 'no-cache' });
             let imgs = [];
             if (res && res.ok) {
                 const j = await res.json();
