@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Play Connect Four (Forza 4) against an AI opponent — Luca Gandolfi's Portfolio">
+    <meta name="keywords" content="connect four, forza 4, game, ai, minimax">
+    <meta name="author" content="Luca Gandolfi">
+    <title>Connect Four — Luca Gandolfi</title>
+    
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .forza4-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .forza4-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .forza4-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .forza4-subtitle {
+            color: #a0c0e0;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .game-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #a0c0e0;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .game-board {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(0, 153, 255, 0.08));
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .board-cell {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .board-cell:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .board-cell.disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .piece {
+            width: 85%;
+            height: 85%;
+            border-radius: 50%;
+            position: absolute;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .piece.player {
+            background: radial-gradient(circle at 30% 30%, #ffeb3b, #fbc02d);
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+        }
+
+        .piece.ai {
+            background: radial-gradient(circle at 30% 30%, #ff5252, #d32f2f);
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.5);
+        }
+
+        .piece.dropping {
+            animation: dropPiece 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes dropPiece {
+            from {
+                transform: translateY(-400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .column-buttons {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .column-btn {
+            padding: 12px 8px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 153, 255, 0.2));
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            color: #00d4ff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .column-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.4), rgba(0, 153, 255, 0.4));
+            border-color: rgba(0, 212, 255, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+        }
+
+        .column-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .game-message {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.08);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0c0e0;
+            font-weight: 600;
+        }
+
+        .game-message.player-win {
+            background: rgba(255, 235, 59, 0.1);
+            border-color: rgba(255, 235, 59, 0.3);
+            color: #ffeb3b;
+        }
+
+        .game-message.ai-win {
+            background: rgba(255, 82, 82, 0.1);
+            border-color: rgba(255, 82, 82, 0.3);
+            color: #ff5252;
+        }
+
+        .game-message.draw {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+        }
+
+        .game-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-game {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .btn-game-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            color: #0a1428;
+        }
+
+        .btn-game-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-game-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+
+        .btn-game-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .difficulty-selector {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .difficulty-label {
+            color: #a0c0e0;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .difficulty-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #a0c0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .difficulty-btn.active {
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            border-color: #00d4ff;
+            color: #0a1428;
+        }
+
+        .difficulty-btn:hover {
+            border-color: rgba(0, 212, 255, 0.5);
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #a0c0e0;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            color: #00d4ff;
+            transform: translateX(-4px);
+        }
+
+        @media (max-width: 600px) {
+            .forza4-container {
+                padding: 20px 15px;
+            }
+
+            .forza4-title {
+                font-size: 1.8rem;
+            }
+
+            .game-stats {
+                gap: 20px;
+            }
+
+            .stat-value {
+                font-size: 1.2rem;
+            }
+
+            .board-grid {
+                gap: 6px;
+            }
+
+            .board-cell {
+                border-width: 1px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="lang-top-left" aria-hidden="false">
+        <label for="langSelect" class="visually-hidden">Select language</label>
+        <select id="langSelect" aria-label="Select language" title="Change language">
+            <option value="en">🇬🇧 EN</option>
+            <option value="it">🇮🇹 IT</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="zh">🇨🇳 中</option>
+            <option value="ru">🇷🇺 RU</option>
+            <option value="de">🇩🇪 DE</option>
+            <option value="ja">🇯🇵 日本</option>
+            <option value="sv">🇸🇪 SV</option>
+            <option value="ar">🇸🇦 AR</option>
+            <option value="he">🇮🇱 HE</option>
+        </select>
+    </div>
+
+    <div class="particles" id="particles"></div>
+
+    <div class="forza4-container">
+        <a href="index.html#games" class="back-button">← <span data-i18n="games.forza4.back">Back to Games</span></a>
+
+        <div class="forza4-header">
+            <h1 class="forza4-title">🎮 <span data-i18n="games.forza4.gameTitle">Connect Four</span></h1>
+            <p class="forza4-subtitle" data-i18n="games.forza4.gameSubtitle">Play against an AI opponent</p>
+        </div>
+
+        <div class="game-stats">
+            <div class="stat-item">
+                <div class="stat-label" data-i18n="games.forza4.playerScore">Your Score</div>
+                <div class="stat-value" id="playerScore">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label" data-i18n="games.forza4.aiScore">AI Score</div>
+                <div class="stat-value" id="aiScore">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label" data-i18n="games.forza4.draws">Draws</div>
+                <div class="stat-value" id="draws">0</div>
+            </div>
+        </div>
+
+        <div class="difficulty-selector">
+            <div class="difficulty-label" data-i18n="games.forza4.difficulty">Difficulty</div>
+            <div class="difficulty-buttons">
+                <button class="difficulty-btn active" data-difficulty="easy" data-i18n="games.forza4.easy">Easy</button>
+                <button class="difficulty-btn" data-difficulty="medium" data-i18n="games.forza4.medium">Medium</button>
+                <button class="difficulty-btn" data-difficulty="hard" data-i18n="games.forza4.hard">Hard</button>
+            </div>
+        </div>
+
+        <div class="game-board">
+            <div class="game-message" id="gameMessage" data-i18n="games.forza4.yourTurn">Your turn — Yellow pieces</div>
+
+            <div class="column-buttons" id="columnButtons">
+                <!-- Column buttons generated by JS -->
+            </div>
+
+            <div class="board-grid" id="board">
+                <!-- Game board cells generated by JS -->
+            </div>
+        </div>
+
+        <div class="game-controls">
+            <button class="btn-game btn-game-primary" id="newGameBtn" data-i18n="games.forza4.newGame">New Game</button>
+            <button class="btn-game btn-game-secondary" id="resetStatsBtn" data-i18n="games.forza4.resetStats">Reset Stats</button>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 6;
+        const COLS = 7;
+        const PLAYER = 1;
+        const AI = 2;
+        const EMPTY = 0;
+
+        let board = [];
+        let gameActive = true;
+        let playerScore = 0;
+        let aiScore = 0;
+        let draws = 0;
+        let difficulty = 'medium';
+
+        // Load scores from localStorage
+        function loadScores() {
+            const saved = localStorage.getItem('forza4_scores');
+            if (saved) {
+                const scores = JSON.parse(saved);
+                playerScore = scores.player || 0;
+                aiScore = scores.ai || 0;
+                draws = scores.draws || 0;
+                difficulty = scores.difficulty || 'medium';
+            }
+            updateScoreDisplay();
+            setDifficulty(difficulty);
+        }
+
+        // Save scores to localStorage
+        function saveScores() {
+            localStorage.setItem('forza4_scores', JSON.stringify({
+                player: playerScore,
+                ai: aiScore,
+                draws: draws,
+                difficulty: difficulty
+            }));
+        }
+
+        function initBoard() {
+            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY));
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('playerScore').textContent = playerScore;
+            document.getElementById('aiScore').textContent = aiScore;
+            document.getElementById('draws').textContent = draws;
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'board-cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (board[r][c] !== EMPTY) {
+                        const piece = document.createElement('div');
+                        piece.className = `piece ${board[r][c] === PLAYER ? 'player' : 'ai'}`;
+                        cell.appendChild(piece);
+                    }
+
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function renderColumnButtons() {
+            const buttonsEl = document.getElementById('columnButtons');
+            buttonsEl.innerHTML = '';
+            
+            for (let c = 0; c < COLS; c++) {
+                const btn = document.createElement('button');
+                btn.className = 'column-btn';
+                btn.textContent = c + 1;
+                btn.dataset.col = c;
+                btn.disabled = board[0][c] !== EMPTY || !gameActive;
+                btn.addEventListener('click', () => makeMove(c));
+                buttonsEl.appendChild(btn);
+            }
+        }
+
+        function updateColumnButtons() {
+            document.querySelectorAll('.column-btn').forEach((btn, c) => {
+                btn.disabled = board[0][c] !== EMPTY || !gameActive;
+            });
+        }
+
+        function makeMove(col) {
+            if (!gameActive || board[0][col] !== EMPTY) return;
+
+            // Find the lowest empty row in this column
+            let row = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === EMPTY) {
+                    row = r;
+                    break;
+                }
+            }
+
+            if (row === -1) return;
+
+            // Place player piece
+            board[row][col] = PLAYER;
+            renderBoard();
+            updateColumnButtons();
+
+            if (checkWin(PLAYER)) {
+                endGame('player');
+                return;
+            }
+
+            if (checkDraw()) {
+                endGame('draw');
+                return;
+            }
+
+            // AI move
+            gameActive = false;
+            updateMessage('games.forza4.aiTurn');
+            setTimeout(() => {
+                const aiCol = getAIMove();
+                placeAIMove(aiCol);
+                gameActive = true;
+                updateColumnButtons();
+
+                if (checkWin(AI)) {
+                    endGame('ai');
+                } else if (checkDraw()) {
+                    endGame('draw');
+                } else {
+                    updateMessage('games.forza4.yourTurn');
+                }
+            }, 800);
+        }
+
+        function placeAIMove(col) {
+            let row = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === EMPTY) {
+                    row = r;
+                    break;
+                }
+            }
+
+            if (row === -1) return;
+
+            board[row][col] = AI;
+            renderBoard();
+        }
+
+        function getAIMove() {
+            if (difficulty === 'easy') {
+                // Random valid move
+                const validCols = [];
+                for (let c = 0; c < COLS; c++) {
+                    if (board[0][c] === EMPTY) validCols.push(c);
+                }
+                return validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (difficulty === 'medium') {
+                // 60% best move, 40% random
+                if (Math.random() < 0.6) {
+                    return minimax(board, 4, true, -Infinity, Infinity);
+                } else {
+                    const validCols = [];
+                    for (let c = 0; c < COLS; c++) {
+                        if (board[0][c] === EMPTY) validCols.push(c);
+                    }
+                    return validCols[Math.floor(Math.random() * validCols.length)];
+                }
+            } else {
+                // Always best move (hard)
+                return minimax(board, 6, true, -Infinity, Infinity);
+            }
+        }
+
+        function minimax(boardState, depth, isMaximizing, alpha, beta) {
+            const score = evaluateBoard(boardState);
+
+            if (depth === 0 || Math.abs(score) > 10000) {
+                return score;
+            }
+
+            if (isMaximizing) {
+                let maxScore = -Infinity;
+                let bestCol = 0;
+                for (let c = 0; c < COLS; c++) {
+                    const newBoard = JSON.parse(JSON.stringify(boardState));
+                    const row = getRowForColumn(newBoard, c);
+                    if (row === -1) continue;
+
+                    newBoard[row][c] = AI;
+                    const score = minimax(newBoard, depth - 1, false, alpha, beta);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestCol = c;
+                    }
+                    alpha = Math.max(alpha, score);
+                    if (beta <= alpha) break;
+                }
+                return depth === (difficulty === 'hard' ? 6 : 4) ? bestCol : maxScore;
+            } else {
+                let minScore = Infinity;
+                let bestCol = 0;
+                for (let c = 0; c < COLS; c++) {
+                    const newBoard = JSON.parse(JSON.stringify(boardState));
+                    const row = getRowForColumn(newBoard, c);
+                    if (row === -1) continue;
+
+                    newBoard[row][c] = PLAYER;
+                    const score = minimax(newBoard, depth - 1, true, alpha, beta);
+                    if (score < minScore) {
+                        minScore = score;
+                        bestCol = c;
+                    }
+                    beta = Math.min(beta, score);
+                    if (beta <= alpha) break;
+                }
+                return minScore;
+            }
+        }
+
+        function getRowForColumn(boardState, col) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (boardState[r][col] === EMPTY) return r;
+            }
+            return -1;
+        }
+
+        function evaluateBoard(boardState) {
+            let score = 0;
+
+            // Check all possible 4-in-a-row positions
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    // Horizontal
+                    if (c + 3 < COLS) {
+                        score += evaluateLine(
+                            boardState[r][c],
+                            boardState[r][c + 1],
+                            boardState[r][c + 2],
+                            boardState[r][c + 3]
+                        );
+                    }
+
+                    // Vertical
+                    if (r + 3 < ROWS) {
+                        score += evaluateLine(
+                            boardState[r][c],
+                            boardState[r + 1][c],
+                            boardState[r + 2][c],
+                            boardState[r + 3][c]
+                        );
+                    }
+
+                    // Diagonal down-right
+                    if (r + 3 < ROWS && c + 3 < COLS) {
+                        score += evaluateLine(
+                            boardState[r][c],
+                            boardState[r + 1][c + 1],
+                            boardState[r + 2][c + 2],
+                            boardState[r + 3][c + 3]
+                        );
+                    }
+
+                    // Diagonal down-left
+                    if (r + 3 < ROWS && c - 3 >= 0) {
+                        score += evaluateLine(
+                            boardState[r][c],
+                            boardState[r + 1][c - 1],
+                            boardState[r + 2][c - 2],
+                            boardState[r + 3][c - 3]
+                        );
+                    }
+                }
+            }
+
+            return score;
+        }
+
+        function evaluateLine(p1, p2, p3, p4) {
+            const pieces = [p1, p2, p3, p4];
+            const aiCount = pieces.filter(p => p === AI).length;
+            const playerCount = pieces.filter(p => p === PLAYER).length;
+            const emptyCount = pieces.filter(p => p === EMPTY).length;
+
+            // AI wins
+            if (aiCount === 4) return 10000;
+            // Player wins
+            if (playerCount === 4) return -10000;
+
+            let score = 0;
+
+            // 3 in a row with 1 empty
+            if (aiCount === 3 && emptyCount === 1) score += 500;
+            if (playerCount === 3 && emptyCount === 1) score -= 500;
+
+            // 2 in a row with 2 empty
+            if (aiCount === 2 && emptyCount === 2) score += 50;
+            if (playerCount === 2 && emptyCount === 2) score -= 50;
+
+            // 1 in a row
+            if (aiCount === 1 && emptyCount === 3) score += 5;
+            if (playerCount === 1 && emptyCount === 3) score -= 5;
+
+            return score;
+        }
+
+        function checkWin(player) {
+            // Horizontal
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (board[r][c] === player &&
+                        board[r][c + 1] === player &&
+                        board[r][c + 2] === player &&
+                        board[r][c + 3] === player) {
+                        return true;
+                    }
+                }
+            }
+
+            // Vertical
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS - 3; r++) {
+                    if (board[r][c] === player &&
+                        board[r + 1][c] === player &&
+                        board[r + 2][c] === player &&
+                        board[r + 3][c] === player) {
+                        return true;
+                    }
+                }
+            }
+
+            // Diagonal down-right
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (board[r][c] === player &&
+                        board[r + 1][c + 1] === player &&
+                        board[r + 2][c + 2] === player &&
+                        board[r + 3][c + 3] === player) {
+                        return true;
+                    }
+                }
+            }
+
+            // Diagonal down-left
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 3; c < COLS; c++) {
+                    if (board[r][c] === player &&
+                        board[r + 1][c - 1] === player &&
+                        board[r + 2][c - 2] === player &&
+                        board[r + 3][c - 3] === player) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        function checkDraw() {
+            for (let c = 0; c < COLS; c++) {
+                if (board[0][c] === EMPTY) return false;
+            }
+            return true;
+        }
+
+        function endGame(result) {
+            gameActive = false;
+            updateColumnButtons();
+
+            if (result === 'player') {
+                playerScore++;
+                updateMessage('games.forza4.playerWins');
+            } else if (result === 'ai') {
+                aiScore++;
+                updateMessage('games.forza4.aiWins');
+            } else {
+                draws++;
+                updateMessage('games.forza4.gameDraw');
+            }
+
+            updateScoreDisplay();
+            saveScores();
+        }
+
+        function updateMessage(key) {
+            const msgEl = document.getElementById('gameMessage');
+            msgEl.textContent = getTranslation(key);
+            msgEl.className = 'game-message';
+            
+            if (key.includes('playerWins')) msgEl.classList.add('player-win');
+            else if (key.includes('aiWins')) msgEl.classList.add('ai-win');
+            else if (key.includes('gameDraw')) msgEl.classList.add('draw');
+        }
+
+        function setDifficulty(level) {
+            difficulty = level;
+            saveScores();
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.difficulty === level) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        function newGame() {
+            initBoard();
+            gameActive = true;
+            renderBoard();
+            updateColumnButtons();
+            updateMessage('games.forza4.yourTurn');
+        }
+
+        function resetStats() {
+            if (confirm(getTranslation('games.forza4.confirmReset'))) {
+                playerScore = 0;
+                aiScore = 0;
+                draws = 0;
+                saveScores();
+                updateScoreDisplay();
+                newGame();
+            }
+        }
+
+        function getTranslation(key) {
+            const lang = localStorage.getItem('language') || 'en';
+            const translations = window.i18nData?.[lang] || window.i18nData?.en || {};
+            
+            const keys = key.split('.');
+            let value = translations;
+            for (const k of keys) {
+                value = value?.[k];
+            }
+            return value || key;
+        }
+
+        // i18n initialization
+        let currentLang = localStorage.getItem('language') || 'en';
+
+        async function loadI18n() {
+            try {
+                const response = await fetch(`./i18n/${currentLang}.json`);
+                window.i18nData = await response.json();
+                applyTranslations();
+            } catch (error) {
+                console.error('Failed to load i18n:', error);
+            }
+        }
+
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.dataset.i18n;
+                const text = getTranslation(key);
+                if (text && text !== key) {
+                    el.textContent = text;
+                    el.setAttribute('data-i18n', key);
+                }
+            });
+        }
+
+        document.getElementById('langSelect').addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            localStorage.setItem('language', currentLang);
+            loadI18n();
+        });
+
+        document.getElementById('langSelect').value = currentLang;
+
+        // Event listeners
+        document.getElementById('newGameBtn').addEventListener('click', newGame);
+        document.getElementById('resetStatsBtn').addEventListener('click', resetStats);
+
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', () => setDifficulty(btn.dataset.difficulty));
+        });
+
+        // Initialize
+        loadScores();
+        loadI18n();
+        newGame();
+    </script>
+</body>
+</html>
