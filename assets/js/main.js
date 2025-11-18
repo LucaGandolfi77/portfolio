@@ -640,6 +640,47 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
         }
     })();
+
+    // --- Timeline Events ---
+    const timelineEvents = [
+        { year: 2003, title: '🎂 Nascita', description: 'Sono nato il 12 febbraio 2003 a Fidenza, provincia di Parma, Italia.' },
+        { year: 2007, title: '🏫 Scuola Elementare', description: 'Inizio il mio percorso scolastico con grande entusiasmo e curiosità.' },
+        { year: 2012, title: '📚 Scuola Media', description: 'Anni formativi dove comincio ad interessarmi di tecnologia e informatica.' },
+        { year: 2017, title: '💻 Primo Approccio alla Programmazione', description: 'Scopro la programmazione durante gli studi liceali, inizia la mia passione per il coding.' },
+        { year: 2021, title: '🎓 Diploma al Liceo', description: 'Ottengo il diploma al Liceo Scientifico con orientamento in Informatica.' },
+        { year: 2021, title: '🚀 Inizio Università', description: 'Mi iscrivo all\'Università per studiare Ingegneria Informatica. Cominciano nuove sfide!' },
+        { year: 2022, title: '🔧 Primo Progetto Professionale', description: 'Realizo il mio primo progetto reale con JavaScript, HTML e CSS. Una grande soddisfazione!' },
+        { year: 2023, title: '📱 Sviluppo Mobile & Web', description: 'Espando le mie competenze in React, Node.js e sviluppo full-stack. Nascono i primi progetti personali.' },
+        { year: 2024, title: '🌟 Portfolio e Freelancing', description: 'Lancio il mio portfolio personale e inizio a lavorare come freelancer su vari progetti.' },
+        { year: 2025, title: '🎯 Oggi - Presente', description: 'Continuo a crescere come sviluppatore, cercando sempre nuove sfide e opportunità di apprendimento.' }
+    ];
+
+    (function renderTimeline(){
+        const container = document.getElementById('timelineEvents');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        timelineEvents.forEach((event, idx) => {
+            const div = document.createElement('div');
+            div.className = 'timeline-event';
+            div.style.animationDelay = `${idx * 0.1}s`;
+            
+            const content = document.createElement('div');
+            content.className = 'timeline-event-content';
+            content.innerHTML = `
+                <div class="timeline-year">${event.year}</div>
+                <div class="timeline-title">${event.title}</div>
+                <div class="timeline-description">${event.description}</div>
+            `;
+            
+            const dot = document.createElement('div');
+            dot.className = 'timeline-event-dot';
+            
+            div.appendChild(content);
+            div.appendChild(dot);
+            container.appendChild(div);
+        });
+    })();
 });
 
 window.addEventListener('scroll', handleScroll);
