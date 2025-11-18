@@ -365,7 +365,7 @@
     </div>
 
     <!-- Theme Toggle -->
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark">🌙</button>
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme" title="Hold to select theme">🌙</button>
 
     <!-- Animated particles -->
     <div class="particles" id="particles"></div>
@@ -418,21 +418,194 @@
     </div>
 
     <script>
-        // --- Theme toggle ---
-        const themeToggle = document.getElementById('themeToggle');
-        function applyTheme(theme) {
-            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-            else document.documentElement.removeAttribute('data-theme');
-            themeToggle.textContent = theme === 'light' ? '☀️' : '🌙';
+        // --- Theme toggle with seasonal themes ---
+        const seasonalThemes = [
+            { id: 'default', name: 'Default', emoji: '🌙', data: null },
+            { id: 'easter', name: 'Easter', emoji: '🐰', data: 'easter' },
+            { id: 'summer', name: 'Summer', emoji: '☀️', data: 'summer' },
+            { id: 'autumn', name: 'Autumn', emoji: '🍂', data: 'autumn' },
+            { id: 'christmas', name: 'Christmas', emoji: '🎄', data: 'christmas' },
+            { id: 'halloween', name: 'Halloween', emoji: '👻', data: 'halloween' },
+            { id: 'cyberpunk', name: 'Cyberpunk', emoji: '⚡', data: 'cyberpunk' }
+        ];
+
+        function applySeasonalTheme(themeId) {
+            const theme = seasonalThemes.find(t => t.id === themeId);
+            if (!theme) return;
+            
+            document.documentElement.removeAttribute('data-seasonal-theme');
+            if (theme.data) {
+                document.documentElement.setAttribute('data-seasonal-theme', theme.data);
+            }
+            
+            localStorage.setItem('seasonal-theme', themeId);
+            closeThemeMenu();
+            updateThemeButton();
         }
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) applyTheme(savedTheme);
-        themeToggle.addEventListener('click', () => {
-            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-            const next = isLight ? 'dark' : 'light';
-            applyTheme(next === 'light' ? 'light' : 'dark');
-            localStorage.setItem('theme', next === 'light' ? 'light' : 'dark');
-        });
+
+        function updateThemeButton() {
+            const currentSeasonalTheme = localStorage.getItem('seasonal-theme') || 'default';
+            const theme = seasonalThemes.find(t => t.id === currentSeasonalTheme);
+            if (theme) {
+                document.getElementById('themeToggle').textContent = theme.emoji;
+            }
+        }
+
+        function createThemeMenu() {
+            const container = document.createElement('div');
+            container.className = 'theme-menu-container';
+            
+            const button = document.getElementById('themeToggle');
+            button.className = 'theme-toggle-button';
+            
+            const menu = document.createElement('div');
+            menu.className = 'theme-dropdown';
+            
+            seasonalThemes.forEach(theme => {
+                const option = document.createElement('div');
+                option.className = 'theme-option';
+                option.innerHTML = `
+                    <span class="theme-option-emoji">${theme.emoji}</span>
+                    <span class="theme-option-name">${theme.name}</span>
+                    <span class="theme-option-check">✓</span>
+                `;
+                
+                option.addEventListener('click', () => {
+                    applySeasonalTheme(theme.id);
+                });
+                
+                menu.appendChild(option);
+            });
+            
+            button.parentElement.appendChild(menu);
+            return { button, menu };
+        }
+
+        let themeMenu = null;
+        let holdTimer = null;
+        let isTouching = false;
+
+        function initThemeMenu() {
+            if (!themeMenu) {
+                themeMenu = createThemeMenu();
+                const button = themeMenu.button;
+                const menu = themeMenu.menu;
+                
+                // Mouse events
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    holdTimer = setTimeout(() => openThemeMenu(), 500);
+                });
+                
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    if (holdTimer) clearTimeout(holdTimer);
+                });
+                
+                button.addEventListener('mouseleave', (e) => {
+                    e.preventDefault();
+                    if (holdTimer) clearTimeout(holdTimer);
+                });
+                
+                // Touch events per mobile
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    isTouching = true;
+                    holdTimer = setTimeout(() => {
+                        if (isTouching) {
+                            openThemeMenu();
+                            if (navigator.vibrate) {
+                                navigator.vibrate(50);
+                            }
+                        }
+                    }, 500);
+                }, { passive: false });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    if (holdTimer) clearTimeout(holdTimer);
+                }, { passive: false });
+                
+                button.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    if (holdTimer) clearTimeout(holdTimer);
+                }, { passive: false });
+                
+                button.addEventListener('touchmove', (e) => {
+                    if (holdTimer && e.target === button) {
+                        const touch = e.touches[0];
+                        const rect = button.getBoundingClientRect();
+                        
+                        if (touch.clientX < rect.left || touch.clientX > rect.right ||
+                            touch.clientY < rect.top || touch.clientY > rect.bottom) {
+                            isTouching = false;
+                            clearTimeout(holdTimer);
+                            holdTimer = null;
+                        }
+                    }
+                }, { passive: true });
+                
+                // Close menu on outside click/touch
+                document.addEventListener('click', (e) => {
+                    if (!button.contains(e.target) && !menu.contains(e.target)) {
+                        closeThemeMenu();
+                    }
+                });
+
+                document.addEventListener('touchend', (e) => {
+                    if (!button.contains(e.target) && !menu.contains(e.target)) {
+                        closeThemeMenu();
+                    }
+                });
+            }
+            
+            updateThemeButton();
+        }
+
+        function openThemeMenu() {
+            if (!themeMenu) initThemeMenu();
+            themeMenu.menu.classList.add('active');
+            themeMenu.button.classList.add('active');
+            updateActiveThemeOption();
+        }
+
+        function closeThemeMenu() {
+            if (themeMenu) {
+                themeMenu.menu.classList.remove('active');
+                themeMenu.button.classList.remove('active');
+            }
+        }
+
+        function updateActiveThemeOption() {
+            if (!themeMenu) return;
+            
+            const currentTheme = localStorage.getItem('seasonal-theme') || 'default';
+            const options = themeMenu.menu.querySelectorAll('.theme-option');
+            
+            options.forEach((option, idx) => {
+                if (seasonalThemes[idx].id === currentTheme) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+        }
+
+        // Load saved theme
+        const savedSeasonalTheme = localStorage.getItem('seasonal-theme');
+        if (savedSeasonalTheme) {
+            applySeasonalTheme(savedSeasonalTheme);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initThemeMenu);
+        } else {
+            initThemeMenu();
+        }
+
 
         // --- Load translations from i18n files ---
         const langSelect = document.getElementById('langSelect');
