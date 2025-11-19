@@ -1193,6 +1193,12 @@
 
             function playNote(frequency, duration = 0.5) {
                 initAudio();
+                
+                // Ensure AudioContext is running (needed for some browsers)
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
 
@@ -1200,16 +1206,26 @@
                 gainNode.connect(audioContext.destination);
 
                 oscillator.frequency.value = frequency;
-                oscillator.type = 'sine';
+                oscillator.type = 'triangle'; // Richer sound than sine
 
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                const now = audioContext.currentTime;
+                // Attack
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.3, now + 0.02);
+                // Decay
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
 
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + duration);
+                oscillator.start(now);
+                oscillator.stop(now + duration);
             }
 
             function activateKey(key, note) {
+                console.log('Note played:', note);
+                // Remove active class first to allow re-triggering animation
+                key.classList.remove('active');
+                // Force reflow
+                void key.offsetWidth;
+                
                 key.classList.add('active');
                 lastNoteDisplay.textContent = note;
                 playNote(getFrequency(note));
@@ -1229,8 +1245,10 @@
 
             // Keyboard events
             document.addEventListener('keydown', (e) => {
+                if (e.repeat) return; // Prevent auto-repeat
+                
                 const key = document.querySelector(`[data-key="${e.key.toLowerCase()}"]`);
-                if (key && !key.classList.contains('active')) {
+                if (key) {
                     const note = key.getAttribute('data-note');
                     activateKey(key, note);
                 }

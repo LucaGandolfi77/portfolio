@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title data-i18n="quotes.page.title">Daily Motivation Quotes — Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root{--paper-bg:#f5ead0;--accent:#8b5e34;--muted:#7b5a3c;--glass:rgba(255,255,255,0.6)}
+        html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--paper-bg);color:#2b2b2b}
+        body::before{
+            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px), radial-gradient(rgba(0,0,0,0.02) 0.6px, transparent 0.6px);
+            background-size:100% 24px, 6px 6px;opacity:0.6;
+        }
+        .wrap{position:relative;z-index:1;max-width:1000px;margin:36px auto;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.55));border-radius:12px;box-shadow:0 10px 30px rgba(16,16,16,0.08)}
+        a.back{display:inline-flex;align-items:center;gap:8px;color:var(--accent);text-decoration:none;margin-bottom:12px;font-weight:600}
+        h1{margin:6px 0 10px;font-size:2rem;color:var(--accent)}
+        p.lead{margin-bottom:18px;color:var(--muted)}
+
+        .quote-card {
+            background: rgba(255,255,255,0.85);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(0,0,0,0.06);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .quote-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+        }
+        .quote-card.today {
+            border: 2px solid var(--accent);
+            background: #fff;
+            box-shadow: 0 0 15px rgba(139, 94, 52, 0.2);
+        }
+        .quote-text {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #3a2b22;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .quote-author {
+            font-weight: 600;
+            color: var(--accent);
+            text-align: right;
+            font-size: 0.95rem;
+        }
+        .quote-day {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-box {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            font-family: inherit;
+            min-width: 200px;
+        }
+        .btn-today {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .btn-today:hover { opacity: 0.9; }
+
+        @media (max-width:640px){.wrap{margin:18px;padding:18px}}
+    </style>
+</head>
+<body>
+    <div class="wrap" role="main">
+        <a class="back" href="index.html">← <span data-i18n="page.back">Back to portfolio</span></a>
+        <h1 data-i18n="quotes.page.heading">Daily Motivation</h1>
+        <p class="lead" data-i18n="quotes.page.lead">A collection of 366 quotes to inspire you every day of the year.</p>
+
+        <div class="controls">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search quotes or authors..." aria-label="Search quotes">
+            <button id="jumpToToday" class="btn-today">Jump to Today</button>
+        </div>
+
+        <div id="quotesList">
+            <div style="text-align:center;padding:40px;color:var(--muted)">Loading quotes...</div>
+        </div>
+
+        <footer style="margin-top:20px;color:#6b5a4a;font-size:0.9rem">© 2025 Luca Gandolfi</footer>
+    </div>
+
+    <script>
+        let allQuotes = [];
+
+        // Helper to get day of year (1-366)
+        function getDayOfYear() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 0);
+            const diff = now - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
+
+        // Format day number to date string (e.g. "Day 1" -> "Jan 1")
+        function getDateFromDay(day) {
+            const date = new Date(new Date().getFullYear(), 0, day);
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+
+        async function loadQuotes() {
+            try {
+                const res = await fetch('assets/quotes/quotes.json');
+                if (!res.ok) throw new Error('Failed to load quotes');
+                allQuotes = await res.json();
+                renderQuotes(allQuotes);
+                
+                // Scroll to today if hash is present or just highlight
+                const today = getDayOfYear();
+                setTimeout(() => {
+                    const todayEl = document.getElementById(`day-${today}`);
+                    if (todayEl) {
+                        todayEl.classList.add('today');
+                        todayEl.querySelector('.quote-day').innerHTML += ' <span>★ TODAY</span>';
+                    }
+                }, 100);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('quotesList').innerHTML = '<div style="color:red;text-align:center">Error loading quotes. Please try again later.</div>';
+            }
+        }
+
+        function renderQuotes(quotes) {
+            const container = document.getElementById('quotesList');
+            if (quotes.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px">No quotes found.</div>';
+                return;
+            }
+
+            const html = quotes.map(q => `
+                <div class="quote-card" id="day-${q.day}">
+                    <div class="quote-day">
+                        <span>Day ${q.day} • ${getDateFromDay(q.day)}</span>
+                    </div>
+                    <div class="quote-text">"${escapeHtml(q.text)}"</div>
+                    <div class="quote-author">— ${escapeHtml(q.author)}</div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = allQuotes.filter(q => 
+                q.text.toLowerCase().includes(term) || 
+                q.author.toLowerCase().includes(term) ||
+                q.day.toString() === term
+            );
+            renderQuotes(filtered);
+        });
+
+        document.getElementById('jumpToToday').addEventListener('click', () => {
+            const today = getDayOfYear();
+            const el = document.getElementById(`day-${today}`);
+            if (el) {
+                // If filtered out, reset filter first
+                if (document.getElementById('searchInput').value) {
+                    document.getElementById('searchInput').value = '';
+                    renderQuotes(allQuotes);
+                    // Re-fetch element after render
+                    setTimeout(() => {
+                        const elRef = document.getElementById(`day-${today}`);
+                        if(elRef) {
+                            elRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            elRef.classList.add('today');
+                        }
+                    }, 50);
+                } else {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadQuotes);
+    </script>
+</body>
+</html>

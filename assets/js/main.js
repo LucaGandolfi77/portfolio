@@ -101,73 +101,97 @@ const translations = {
     en: {
         nav: { about: 'About Me', skills: 'Skills', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
-        sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials' },
+        sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
         about: { p1: "Hello! I'm Luca, a passionate full-stack developer with a love for creating innovative digital solutions. With years of experience in web development, embedded systems and AI. I specialize in building modern, scalable applications that make a difference.", p2: 'My journey in tech started with curiosity and has evolved into a career driven by continuous learning and problem-solving. I believe in writing clean code, embracing new technologies, and creating user-centric experiences.', lifeIntro: 'I also created a short illustrated comic that tells the story of my life — a playful timeline in images.', lifeLink: 'Read my life in comics' },
         contact: { email: 'Email', phone: 'Phone', location: 'Location', specialization: 'Specialization' },
         cv: { download: 'Download CV' },
+        dailyQuote: { viewAll: 'View all quotes' },
+        page: { back: 'Back to portfolio' },
+        quotes: { page: { title: 'Daily Motivation Quotes — Luca Gandolfi', heading: 'Daily Motivation', lead: 'A collection of 366 quotes to inspire you every day of the year.' } },
         footer: { text: '© 2025 Luca Gandolfi. Built with passion and technology.' }
     },
     es: {
         nav: { about: 'Sobre mí', skills: 'Habilidades', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
         hero: { title: 'Luca Gandolfi — Ingeniero Full‑Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
-        sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios' },
+        sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
         about: { p1: '¡Hola! Soy Luca, un desarrollador full-stack apasionado por crear soluciones digitales innovadoras. Con años de experiencia en desarrollo web, sistemas embebidos y IA. Me especializo en construir aplicaciones modernas y escalables que marcan la diferencia.', p2: 'Mi trayectoria en tecnología comenzó con la curiosidad y se ha convertido en una carrera impulsada por el aprendizaje continuo y la resolución de problemas. Creo en escribir código limpio, adoptar nuevas tecnologías y crear experiencias centradas en el usuario.' },
         contact: { email: 'Correo', phone: 'Teléfono', location: 'Ubicación', specialization: 'Especialización' },
         cv: { download: 'Descargar CV' },
+        dailyQuote: { viewAll: 'Ver todas las frases' },
+        page: { back: 'Volver al portafolio' },
+        quotes: { page: { title: 'Frases de Motivación Diaria — Luca Gandolfi', heading: 'Motivación Diaria', lead: 'Una colección de 366 frases para inspirarte cada día del año.' } },
         footer: { text: '© 2025 Luca Gandolfi. Construido con pasión y tecnología.' }
     },
     zh: {
         nav: { about: '关于我', skills: '技能', experience: '经验', achievements: '成就', projects: '项目', books: '图书', blog: '博客', testimonials: '推荐', contact: '联系', cv: '下载简历' },
         hero: { title: '卢卡·甘多尔菲 — 全栈工程师', subtitle: '开发者 • 嵌入式系统 • 人工智能 • Web', contactBtn: '联系我', cvBtn: '下载简历' },
-        sections: { about: '关于我', skills: '技术技能', experience: '工作经历', achievements: '成就与认证', contact: '个人信息', cv: '简历', social: '社交 & 联系', projects: '我的项目', testimonials: '推荐' },
+        sections: { about: '关于我', skills: '技术技能', experience: '工作经历', achievements: '成就与认证', contact: '个人信息', cv: '简历', social: '社交 & 联系', projects: '我的项目', testimonials: '推荐', dailyQuote: '每日励志名言' },
         about: { p1: '你好！我是卢卡，一名热衷于创造创新数字解决方案的全栈开发者。在网络开发、嵌入式系统和人工智能领域有多年经验。我专注于构建现代且可扩展的应用程序。', p2: '我的技术之旅始于好奇心，并发展为以持续学习与解决问题为动力的职业。我相信编写整洁的代码、拥抱新技术并创造以用户为中心的体验。' },
         contact: { email: '邮箱', phone: '电话', location: '位置', specialization: '专长' },
         cv: { download: '下载简历' },
+        dailyQuote: { viewAll: '查看所有名言' },
+        page: { back: '返回作品集' },
+        quotes: { page: { title: '每日励志名言 — 卢卡·甘多尔菲', heading: '每日动力', lead: '收集了366句名言，每天为您带来灵感。' } },
         footer: { text: '© 2025 卢卡·甘多尔菲。以热情与技术构建。' }
     },
     ru: {
         nav: { about: 'Обо мне', skills: 'Навыки', experience: 'Опыт', achievements: 'Достижения', projects: 'Проекты', books: 'Книги', blog: 'Блог', testimonials: 'Отзывы', contact: 'Контакт', cv: 'Скачать CV' },
         hero: { title: 'Лука Гандольфи — Full‑Stack инженер', subtitle: 'Разработчик • Встроенные системы • ИИ • Веб', contactBtn: 'Связаться', cvBtn: 'Скачать CV' },
-        sections: { about: 'Обо мне', skills: 'Технические навыки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы' },
+        sections: { about: 'Обо мне', skills: 'Технические навыки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы', dailyQuote: 'Цитата дня' },
         about: { p1: 'Привет! Я Лука, увлеченный full-stack разработчик, создающий инновационные цифровые решения. Многолетний опыт в веб-разработке, встроенных системах и ИИ. Я специализируюсь на создании современных масштабируемых приложений.', p2: 'Моё путешествие в IT началось с любопытства и превратилось в карьеру, основанную на постоянном обучении и решении задач. Я верю в чистый код, освоение новых технологий и создание удобного для пользователей опыта.' },
         contact: { email: 'Эл. почта', phone: 'Телефон', location: 'Местоположение', specialization: 'Специализация' },
         cv: { download: 'Скачать CV' },
+        dailyQuote: { viewAll: 'Посмотреть все цитаты' },
+        page: { back: 'Назад в портфолио' },
+        quotes: { page: { title: 'Ежедневные мотивационные цитаты — Лука Гандольфи', heading: 'Ежедневная мотивация', lead: 'Коллекция из 366 цитат для вдохновения на каждый день года.' } },
         footer: { text: '© 2025 Лука Гандольфи. Создано с страстью и технологиями.' }
     },
     de: {
         nav: { about: 'Über mich', skills: 'Fähigkeiten', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
-        sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen' },
+        sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
         about: { p1: 'Hallo! Ich bin Luca, ein leidenschaftlicher Full‑Stack‑Entwickler, der gerne innovative digitale Lösungen erstellt. Mit mehrjähriger Erfahrung in Webentwicklung, Embedded Systems und KI. Ich spezialisiere mich auf moderne, skalierbare Anwendungen.', p2: 'Meine Reise in der Technik begann mit Neugier und entwickelte sich zu einer Karriere, die von kontinuierlichem Lernen und Problemlösung angetrieben wird. Ich glaube an sauberen Code, neue Technologien und benutzerzentrierte Erlebnisse.' },
         contact: { email: 'E‑Mail', phone: 'Telefon', location: 'Standort', specialization: 'Spezialisierung' },
         cv: { download: 'CV herunterladen' },
+        dailyQuote: { viewAll: 'Alle Zitate anzeigen' },
+        page: { back: 'Zurück zum Portfolio' },
+        quotes: { page: { title: 'Tägliche Motivationszitate — Luca Gandolfi', heading: 'Tägliche Motivation', lead: 'Eine Sammlung von 366 Zitaten, die Sie jeden Tag des Jahres inspirieren.' } },
         footer: { text: '© 2025 Luca Gandolfi. Mit Leidenschaft und Technologie erstellt.' }
     },
     it: {
         nav: { about: 'Chi sono', skills: 'Competenze', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
         hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
-        sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze' },
+        sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
         about: { p1: "Ciao! Sono Luca, uno sviluppatore full-stack appassionato di creare soluzioni digitali innovative. Con anni di esperienza nello sviluppo web, sistemi embedded e IA. Mi specializzo nella costruzione di applicazioni moderne e scalabili che fanno la differenza.", p2: 'Il mio percorso nella tecnologia è iniziato con la curiosità e si è evoluto in una carriera guidata dall\'apprendimento continuo e dalla risoluzione dei problemi. Credo nel codice pulito, nell\'adozione di nuove tecnologie e nella creazione di esperienze centrate sull\'utente.', lifeIntro: 'Ho anche creato un breve fumetto illustrato che racconta la mia vita — una timeline giocosa in immagini.', lifeLink: 'Leggi la mia vita a fumetti' },
         contact: { email: 'Email', phone: 'Telefono', location: 'Posizione', specialization: 'Specializzazione' },
         cv: { download: 'Scarica CV' },
+        dailyQuote: { viewAll: 'Vedi tutte le frasi' },
+        page: { back: 'Torna al portfolio' },
+        quotes: { page: { title: 'Frasi Motivazionali Giornaliere — Luca Gandolfi', heading: 'Motivazione Quotidiana', lead: 'Una raccolta di 366 frasi per ispirarti ogni giorno dell\'anno.' } },
         footer: { text: '© 2025 Luca Gandolfi. Costruito con passione e tecnologia.' }
     },
     fr: {
         nav: { about: 'À propos', skills: 'Compétences', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
         hero: { title: 'Luca Gandolfi — Ingénieur Full‑Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez‑moi', cvBtn: 'Télécharger le CV' },
-        sections: { about: 'À propos', skills: 'Compétences techniques', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages' },
+        sections: { about: 'À propos', skills: 'Compétences techniques', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
         about: { p1: "Bonjour ! Je suis Luca, un développeur full-stack passionné par la création de solutions numériques innovantes. Avec plusieurs années d'expérience en développement web, systèmes embarqués et IA. Je me spécialise dans la création d'applications modernes et évolutives qui font la différence.", p2: "Mon parcours dans la tech a commencé par la curiosité et est devenu une carrière guidée par l'apprentissage continu et la résolution de problèmes. Je crois en l'écriture d'un code propre, l'adoption de nouvelles technologies et la création d'expériences centrées sur l'utilisateur." },
         contact: { email: 'Email', phone: 'Téléphone', location: 'Localisation', specialization: 'Spécialisation' },
         cv: { download: 'Télécharger le CV' },
+        dailyQuote: { viewAll: 'Voir toutes les citations' },
+        page: { back: 'Retour au portfolio' },
+        quotes: { page: { title: 'Citations de Motivation Quotidienne — Luca Gandolfi', heading: 'Motivation Quotidienne', lead: 'Une collection de 366 citations pour vous inspirer chaque jour de l\'année.' } },
         footer: { text: '© 2025 Luca Gandolfi. Construit avec passion et technologie.' }
     },
     ja: {
         nav: { about: '私について', skills: 'スキル', experience: '経験', achievements: '実績', projects: 'プロジェクト', books: '書籍', blog: 'ブログ', testimonials: '推薦', contact: '連絡先', cv: '履歴書をダウンロード' },
         hero: { title: 'ルカ・ガンドルフィ — フルスタックエンジニア', subtitle: '開発者 • 組み込みシステム • AI • Web', contactBtn: 'お問い合わせ', cvBtn: '履歴書をダウンロード' },
-        sections: { about: '私について', skills: '技術スキル', experience: '職務経歴', achievements: '実績と認定', contact: '個人情報', cv: '履歴書', social: 'ソーシャル & 連絡先', projects: '私のプロジェクト', testimonials: '推薦' },
+        sections: { about: '私について', skills: '技術スキル', experience: '職務経歴', achievements: '実績と認定', contact: '個人情報', cv: '履歴書', social: 'ソーシャル & 連絡先', projects: '私のプロジェクト', testimonials: '推薦', dailyQuote: '今日の名言' },
         about: { p1: 'こんにちは！私はルカ、革新的なデジタルソリューションの作成を愛するフルスタック開発者です。ウェブ開発、組み込みシステム、AIでの豊富な経験があります。モダンでスケーラブルなアプリケーション構築を専門としています。', p2: '技術への道は好奇心から始まり、継続的な学習と問題解決によって駆動されるキャリアに発展しました。私はクリーンなコード、新しい技術の採用、ユーザー中心の体験を信じています。' },
         contact: { email: 'メール', phone: '電話', location: '所在地', specialization: '専門分野' },
         cv: { download: '履歴書をダウンロード' },
+        dailyQuote: { viewAll: 'すべての名言を見る' },
+        page: { back: 'ポートフォリオに戻る' },
+        quotes: { page: { title: '毎日のモチベーション名言 — ルカ・ガンドルフィ', heading: '毎日のモチベーション', lead: '一年中毎日あなたを鼓舞する366の名言集。' } },
         footer: { text: '© 2025 ルカ・ガンドルフィ。情熱と技術で作成。' }
     }
 };
@@ -739,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update arrow visibility
         const updateArrows = () => {
             arrowLeft.style.opacity = carousel.scrollLeft > 0 ? '1' : '0.3';
-            arrowRight.style.opacity = (carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth - 10) ? '1' : '0.3';
+            arrowRight.style.opacity = (carousel.scrollLeft < carousel.scrollWidth - carousel.scrollWidth - 10) ? '1' : '0.3';
         };
         carousel.addEventListener('scroll', updateArrows);
         window.addEventListener('resize', updateArrows);
@@ -828,6 +852,45 @@ document.addEventListener('DOMContentLoaded', () => {
             div.appendChild(dot);
             container.appendChild(div);
         });
+    })();
+
+    // --- Daily Quote ---
+    (async function loadDailyQuote() {
+        const quoteText = document.getElementById('dailyQuoteText');
+        const quoteAuthor = document.getElementById('dailyQuoteAuthor');
+        if (!quoteText || !quoteAuthor) return;
+
+        try {
+            const res = await fetch('assets/quotes/quotes.json');
+            if (!res.ok) throw new Error('Failed to load quotes');
+            const quotes = await res.json();
+            
+            // Calculate day of year
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 0);
+            const diff = now - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            const day = Math.floor(diff / oneDay);
+            
+            // Find quote for today (day is 1-based in JSON)
+            // If JSON has fewer quotes, use modulo
+            let quote = quotes.find(q => q.day === day);
+            if (!quote && quotes.length > 0) {
+                quote = quotes[(day - 1) % quotes.length];
+            }
+
+            if (quote) {
+                quoteText.textContent = `"${quote.text}"`;
+                quoteAuthor.textContent = `— ${quote.author}`;
+            } else {
+                quoteText.textContent = "Stay hungry, stay foolish.";
+                quoteAuthor.textContent = "— Steve Jobs";
+            }
+        } catch (err) {
+            console.warn('Error loading daily quote:', err);
+            quoteText.textContent = "The only way to do great work is to love what you do.";
+            quoteAuthor.textContent = "— Steve Jobs";
+        }
     })();
 });
 
