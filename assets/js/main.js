@@ -49,6 +49,12 @@ function createThemeBar() {
     const bar = document.createElement('div');
     bar.className = 'theme-bar';
     
+    // Move language selector into the bar
+    const langSelector = document.querySelector('.lang-top-left');
+    if (langSelector) {
+        bar.appendChild(langSelector);
+    }
+    
     const itemsContainer = document.createElement('div');
     itemsContainer.className = 'theme-bar-items';
     

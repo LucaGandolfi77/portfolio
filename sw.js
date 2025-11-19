@@ -56,9 +56,10 @@ self.addEventListener('install', event => {
                 });
                 
                 // Prova a cachare il manifest separatamente (opzionale)
-                cache.add('/manifest.json').catch(err => {
-                    console.warn('Manifest.json non cachato (probabilmente ambiente dev):', err);
-                });
+                // In ambiente di sviluppo (Codespaces), il manifest potrebbe richiedere auth e fallire
+                // cache.add('/manifest.json').catch(err => {
+                //    console.warn('Manifest.json non cachato (probabilmente ambiente dev):', err);
+                // });
                 
                 return Promise.all(cachePromises);
             })
