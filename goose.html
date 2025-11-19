@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="games.goose.title">Game of the Goose - Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --cell-bg: #e0e0e0;
+            --cell-special: #ffd700;
+            --cell-trap: #ff6b6b;
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-900), var(--bg-800));
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 800px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        h1 { margin: 0 0 10px 0; color: var(--accent); }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+            padding: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: var(--bg-900);
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .dice-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .status {
+            font-size: 1.1rem;
+            color: #a0c0e0;
+            min-height: 1.5em;
+        }
+
+        /* Board Layout */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 6px;
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            background: #2a3b55;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: var(--cell-bg);
+            color: #333;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 2px;
+        }
+
+        .cell.special { background: var(--cell-special); } /* Goose */
+        .cell.trap { background: var(--cell-trap); color: white; } /* Traps */
+        .cell.start { background: #4caf50; color: white; }
+        .cell.end { background: #00d4ff; color: #0a1628; }
+
+        .cell-number {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        .cell-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Players */
+        .player-token {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            position: absolute;
+            transition: all 0.5s ease;
+            z-index: 10;
+        }
+        .p1 { background: #ff4444; bottom: 4px; left: 4px; }
+        .p2 { background: #4444ff; bottom: 4px; right: 4px; }
+        .p3 { background: #44ff44; top: 4px; left: 4px; }
+        .p4 { background: #ffff44; top: 4px; right: 4px; }
+
+        @media (max-width: 600px) {
+            .board { grid-template-columns: repeat(7, 1fr); }
+            .cell-icon { font-size: 1.2rem; }
+            .cell { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html#games" class="back-btn" data-i18n="page.back">← Back to Portfolio</a>
+        <h1 data-i18n="games.goose.title">Game of the Goose</h1>
+        <p data-i18n="games.goose.lead">Classic race game. Roll the dice and avoid the traps!</p>
+    </div>
+
+    <div class="game-container">
+        <div class="status" id="status">Player 1's Turn</div>
+        
+        <div class="controls">
+            <button class="btn" id="rollBtn" onclick="playTurn()" data-i18n="games.goose.roll">Roll Dice</button>
+            <div class="dice-display" id="diceResult">🎲</div>
+            <button class="btn" onclick="resetGame()" style="background: #444;" data-i18n="games.goose.reset">Reset</button>
+        </div>
+
+        <div class="board" id="board">
+            <!-- Cells generated by JS -->
+        </div>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const diceEl = document.getElementById('diceResult');
+        const rollBtn = document.getElementById('rollBtn');
+
+        const SPECIAL_CELLS = {
+            6: { type: 'bridge', icon: '🌉', name: 'Bridge', jump: 12 },
+            19: { type: 'trap', icon: '🏨', name: 'Inn', skip: 1 },
+            31: { type: 'trap', icon: '🕳️', name: 'Well', skip: 2 }, // Simplified: skip 2 turns
+            42: { type: 'trap', icon: '🕸️', name: 'Maze', jump: 39 },
+            52: { type: 'trap', icon: '⛓️', name: 'Prison', skip: 3 }, // Simplified: skip 3 turns
+            58: { type: 'trap', icon: '💀', name: 'Death', jump: 1 },
+            63: { type: 'end', icon: '🏁', name: 'Finish' }
+        };
+        
+        // Goose cells: 5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59
+        const GOOSE_CELLS = [5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59];
+
+        let players = [
+            { id: 1, pos: 0, color: 'p1', skip: 0, name: 'Red' },
+            { id: 2, pos: 0, color: 'p2', skip: 0, name: 'Blue' }
+        ];
+        let currentPlayerIdx = 0;
+        let isAnimating = false;
+
+        function initBoard() {
+            boardEl.innerHTML = '';
+            // Create 63 cells + start (0)
+            // We'll render them in a snake pattern or just grid.
+            // Grid 9x7 = 63. Let's do 64 cells (0-63).
+            
+            for (let i = 0; i <= 63; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.id = `cell-${i}`;
+                
+                const num = document.createElement('span');
+                num.className = 'cell-number';
+                num.textContent = i;
+                cell.appendChild(num);
+
+                if (i === 0) {
+                    cell.classList.add('start');
+                    cell.innerHTML += '<div class="cell-icon">🏠</div>';
+                } else if (i === 63) {
+                    cell.classList.add('end');
+                    cell.innerHTML += '<div class="cell-icon">🏁</div>';
+                } else if (GOOSE_CELLS.includes(i)) {
+                    cell.classList.add('special');
+                    cell.innerHTML += '<div class="cell-icon">🪿</div>';
+                } else if (SPECIAL_CELLS[i]) {
+                    cell.classList.add('trap');
+                    cell.innerHTML += `<div class="cell-icon">${SPECIAL_CELLS[i].icon}</div>`;
+                }
+
+                boardEl.appendChild(cell);
+            }
+            renderPlayers();
+        }
+
+        function renderPlayers() {
+            // Remove existing tokens
+            document.querySelectorAll('.player-token').forEach(el => el.remove());
+
+            players.forEach(p => {
+                const cell = document.getElementById(`cell-${p.pos}`);
+                if (cell) {
+                    const token = document.createElement('div');
+                    token.className = `player-token ${p.color}`;
+                    cell.appendChild(token);
+                }
+            });
+        }
+
+        async function playTurn() {
+            if (isAnimating) return;
+            
+            const player = players[currentPlayerIdx];
+            
+            // Check skipped turns
+            if (player.skip > 0) {
+                player.skip--;
+                statusEl.textContent = `${player.name} skips turn (${player.skip} left).`;
+                nextTurn();
+                return;
+            }
+
+            isAnimating = true;
+            rollBtn.disabled = true;
+
+            // Roll dice
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            const total = d1 + d2;
+            
+            diceEl.textContent = `${d1} + ${d2} = ${total}`;
+            statusEl.textContent = `${player.name} rolls ${total}...`;
+
+            await new Promise(r => setTimeout(r, 500));
+
+            // Move logic
+            let newPos = player.pos + total;
+            
+            // Bounce back if > 63
+            if (newPos > 63) {
+                const excess = newPos - 63;
+                newPos = 63 - excess;
+                statusEl.textContent += " Overshot! Bouncing back.";
+            }
+
+            await movePlayer(player, newPos);
+
+            // Check special cells
+            await checkSpecial(player, total); // Pass roll for Goose logic
+
+            // Check win
+            if (player.pos === 63) {
+                statusEl.textContent = `🎉 ${player.name} Wins!`;
+                statusEl.style.color = '#00d4ff';
+                isAnimating = false;
+                return; // Game Over
+            }
+
+            isAnimating = false;
+            rollBtn.disabled = false;
+            nextTurn();
+        }
+
+        async function movePlayer(player, targetPos) {
+            player.pos = targetPos;
+            renderPlayers();
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        async function checkSpecial(player, lastRoll) {
+            let pos = player.pos;
+            
+            // Goose: Move again by last roll
+            if (GOOSE_CELLS.includes(pos)) {
+                statusEl.textContent = "Goose! Moving again...";
+                await new Promise(r => setTimeout(r, 500));
+                let nextPos = pos + lastRoll;
+                if (nextPos > 63) {
+                    nextPos = 63 - (nextPos - 63);
+                }
+                await movePlayer(player, nextPos);
+                // Recursive check for double goose
+                await checkSpecial(player, lastRoll);
+                return;
+            }
+
+            const special = SPECIAL_CELLS[pos];
+            if (special) {
+                statusEl.textContent = `${special.name}! `;
+                if (special.jump) {
+                    statusEl.textContent += `Jumping to ${special.jump}.`;
+                    await new Promise(r => setTimeout(r, 800));
+                    await movePlayer(player, special.jump);
+                    // Check if jump lands on something special (e.g. Maze -> 39 -> Goose? No 39 is not goose)
+                } else if (special.skip) {
+                    player.skip = special.skip;
+                    statusEl.textContent += `Skip ${special.skip} turns.`;
+                }
+            }
+        }
+
+        function nextTurn() {
+            currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
+            const name = players[currentPlayerIdx].name;
+            // Update status only if game not over
+            if (!statusEl.textContent.includes('Wins')) {
+                setTimeout(() => {
+                    statusEl.textContent = `${name}'s Turn`;
+                    statusEl.style.color = players[currentPlayerIdx].color === 'p1' ? '#ffaaaa' : '#aaaaff';
+                }, 1000);
+            }
+        }
+
+        function resetGame() {
+            players.forEach(p => {
+                p.pos = 0;
+                p.skip = 0;
+            });
+            currentPlayerIdx = 0;
+            isAnimating = false;
+            rollBtn.disabled = false;
+            statusEl.textContent = "Player 1's Turn";
+            statusEl.style.color = '#a0c0e0';
+            diceEl.textContent = '🎲';
+            renderPlayers();
+        }
+
+        // Translations
+        let currentTranslations = {};
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch(`./i18n/${lang}.json`);
+                if (res.ok) return await res.json();
+            } catch (e) { }
+            return null;
+        }
+        function getNested(obj, path) {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+        }
+        async function applyTranslations(lang) {
+            if (!lang) lang = 'en';
+            const t = await loadTranslations(lang);
+            if (t) currentTranslations = t;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = getNested(currentTranslations, key);
+                if (txt) el.textContent = txt;
+            });
+        }
+
+        const savedLang = localStorage.getItem('lang') || 'en';
+        document.addEventListener('DOMContentLoaded', () => {
+            initBoard();
+            applyTranslations(savedLang);
+        });
+    </script>
+</body>
+</html>

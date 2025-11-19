@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="games.backgammon.title">Backgammon - Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --board-bg: #5c4033;
+            --board-inner: #e8c39e;
+            --point-dark: #8b4513;
+            --point-light: #f0d9b5;
+            --piece-w: #e0e0e0;
+            --piece-b: #333333;
+            --highlight: rgba(0, 212, 255, 0.5);
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-900), var(--bg-800));
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 800px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        h1 { margin: 0 0 10px 0; color: var(--accent); }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 700px;
+            padding: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+            align-items: center;
+        }
+
+        .dice-container {
+            display: flex;
+            gap: 10px;
+        }
+        .die {
+            width: 40px;
+            height: 40px;
+            background: white;
+            color: black;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .die.used { opacity: 0.5; }
+
+        .board-container {
+            background-color: var(--board-bg);
+            padding: 15px;
+            border-radius: 4px;
+            width: 100%;
+            aspect-ratio: 1.3;
+            display: flex;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .board-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--board-inner);
+            border: 2px solid #3e2b22;
+        }
+
+        .board-half {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+        .board-half.top { border-bottom: 1px solid rgba(0,0,0,0.1); align-items: flex-start; }
+        .board-half.bottom { border-top: 1px solid rgba(0,0,0,0.1); align-items: flex-end; }
+
+        .bar {
+            width: 40px;
+            background-color: #3e2b22;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .point {
+            flex: 1;
+            height: 40%; /* Visual height of triangle */
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Stack from base */
+            cursor: pointer;
+        }
+        
+        /* Triangle shapes using clip-path or borders is tricky with flex items inside. 
+           We'll use background gradients for the visual triangle. */
+        .point:nth-child(odd) { background-color: var(--point-dark); }
+        .point:nth-child(even) { background-color: var(--point-light); }
+        
+        /* Invert colors for top/bottom visual distinction if desired, but standard is alternating */
+        .board-half.top .point { flex-direction: column; justify-content: flex-start; }
+        .board-half.bottom .point { flex-direction: column-reverse; justify-content: flex-start; }
+
+        /* Visual triangle overlay */
+        .point::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            /* Simple alternating colors is enough for now */
+        }
+
+        .checker {
+            width: 80%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            margin: 1px 0;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+            z-index: 2;
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+        .checker.white { background-color: var(--piece-w); }
+        .checker.black { background-color: var(--piece-b); border-color: white; }
+        
+        .point.highlight { background-color: var(--highlight) !important; }
+        .bar.highlight { box-shadow: inset 0 0 10px var(--accent); }
+
+        .controls {
+            margin-top: 10px;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: var(--accent);
+            color: var(--bg-900);
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Layout adjustments */
+        .board-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .quadrant {
+            flex: 1;
+            display: flex;
+        }
+        /* Top Right: 13-18, Top Left: 19-24 */
+        /* Bottom Left: 12-7, Bottom Right: 6-1 */
+        /* Actually standard view: 
+           White moves counter-clockwise from Top Right (24) to Bottom Right (1).
+           Let's stick to a standard array 0-23 mapping.
+           0 is bottom right (White home), 23 is top right (Black home).
+           Wait, standard notation:
+           White moves 24 -> 1. Black moves 1 -> 24.
+           Let's use 0-23 array.
+           0 = White's 1-point (Bottom Right)
+           23 = White's 24-point (Top Right)
+           
+           Visual Layout:
+           Top Left: 13-18 (Indices 12-17)
+           Top Right: 19-24 (Indices 18-23)
+           Bottom Left: 12-7 (Indices 11-6)
+           Bottom Right: 6-1 (Indices 5-0)
+        */
+
+        .off-board {
+            width: 40px;
+            border-left: 5px solid #3e2b22;
+            background: var(--board-inner);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px 2px;
+        }
+        .off-box {
+            height: 45%;
+            border: 1px dashed rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html#games" class="back-btn" data-i18n="page.back">← Back to Portfolio</a>
+        <h1 data-i18n="games.backgammon.title">Backgammon</h1>
+        <p data-i18n="games.backgammon.lead">Race your checkers to the finish line.</p>
+    </div>
+
+    <div class="game-area">
+        <div class="status-bar">
+            <div id="turn-indicator">White's Turn</div>
+            <div class="dice-container" id="dice-display">
+                <!-- Dice will appear here -->
+            </div>
+        </div>
+
+        <div class="board-container">
+            <!-- Left Side (Outer Board for White usually, depends on orientation) -->
+            <!-- Let's do: Top Left (13-18), Top Right (19-24) -->
+            <!-- Bottom Left (12-7), Bottom Right (6-1) -->
+            
+            <div class="board-side" style="border-right: none;">
+                <div class="board-half top" id="quad-tl">
+                    <!-- Points 13-18 (Indices 12-17) -->
+                </div>
+                <div class="board-half bottom" id="quad-bl">
+                    <!-- Points 12-7 (Indices 11-6) -->
+                </div>
+            </div>
+
+            <div class="bar" id="bar">
+                <!-- Bar for hit pieces -->
+            </div>
+
+            <div class="board-side" style="border-left: none;">
+                <div class="board-half top" id="quad-tr">
+                    <!-- Points 19-24 (Indices 18-23) -->
+                </div>
+                <div class="board-half bottom" id="quad-br">
+                    <!-- Points 6-1 (Indices 5-0) -->
+                </div>
+            </div>
+            
+            <div class="off-board">
+                <div class="off-box" id="off-white">W: 0</div>
+                <div class="off-box" id="off-black">B: 0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="roll-btn" onclick="rollDice()" data-i18n="games.backgammon.roll">Roll Dice</button>
+            <button class="btn" onclick="resetGame()" style="background: #444;" data-i18n="games.backgammon.reset">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        // Points 0-23. 
+        // White moves 23 -> 0. Black moves 0 -> 23.
+        // Wait, standard setup:
+        // White: 2 on 23, 5 on 12, 3 on 7, 5 on 5. (Indices: 23, 12, 7, 5) -> Moves towards 0.
+        // Black: 2 on 0, 5 on 11, 3 on 16, 5 on 18. (Indices: 0, 11, 16, 18) -> Moves towards 23.
+        
+        let board = Array(24).fill(null).map(() => ({ count: 0, color: null }));
+        let bar = { w: 0, b: 0 };
+        let off = { w: 0, b: 0 };
+        let turn = 'w'; // 'w' or 'b'
+        let dice = [];
+        let movesLeft = []; // Array of values
+        let selectedPoint = null; // index or 'bar'
+
+        const els = {
+            quadTL: document.getElementById('quad-tl'),
+            quadTR: document.getElementById('quad-tr'),
+            quadBL: document.getElementById('quad-bl'),
+            quadBR: document.getElementById('quad-br'),
+            bar: document.getElementById('bar'),
+            dice: document.getElementById('dice-display'),
+            turn: document.getElementById('turn-indicator'),
+            rollBtn: document.getElementById('roll-btn'),
+            offW: document.getElementById('off-white'),
+            offB: document.getElementById('off-black')
+        };
+
+        function initGame() {
+            board = Array(24).fill(null).map(() => ({ count: 0, color: null }));
+            bar = { w: 0, b: 0 };
+            off = { w: 0, b: 0 };
+            turn = 'w';
+            dice = [];
+            movesLeft = [];
+            selectedPoint = null;
+
+            // Setup White
+            board[23] = { count: 2, color: 'w' };
+            board[12] = { count: 5, color: 'w' };
+            board[7]  = { count: 3, color: 'w' };
+            board[5]  = { count: 5, color: 'w' };
+
+            // Setup Black
+            board[0]  = { count: 2, color: 'b' };
+            board[11] = { count: 5, color: 'b' };
+            board[16] = { count: 3, color: 'b' };
+            board[18] = { count: 5, color: 'b' };
+
+            renderBoard();
+            updateStatus();
+        }
+
+        function rollDice() {
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            dice = [d1, d2];
+            
+            if (d1 === d2) {
+                movesLeft = [d1, d1, d1, d1];
+            } else {
+                movesLeft = [d1, d2];
+            }
+
+            els.rollBtn.disabled = true;
+            renderDice();
+            renderBoard(); // Update highlights
+        }
+
+        function renderDice() {
+            els.dice.innerHTML = '';
+            dice.forEach((d, i) => {
+                // Check if this die value is still available in movesLeft
+                // This is tricky because duplicates. We just show all initial dice
+                // and maybe dim them if used?
+                // Simplified: Just show movesLeft as dice
+            });
+            
+            // Better: Show movesLeft as the dice to use
+            movesLeft.forEach(val => {
+                const d = document.createElement('div');
+                d.className = 'die';
+                d.textContent = val;
+                els.dice.appendChild(d);
+            });
+        }
+
+        function getPointEl(index) {
+            // Map index to quadrant
+            // 12-17: TL (Left to Right? No, standard board numbering goes around)
+            // TL: 12, 13, 14, 15, 16, 17 (Indices) -> Visual: 13-18
+            // Let's stick to visual layout:
+            // TL: 12-17. TR: 18-23.
+            // BL: 11-6. BR: 5-0.
+            
+            // Wait, indices 0-23.
+            // 0 is BR rightmost. 5 is BR leftmost.
+            // 6 is BL rightmost. 11 is BL leftmost.
+            // 12 is TL leftmost. 17 is TL rightmost.
+            // 18 is TR leftmost. 23 is TR rightmost.
+            
+            // We need to generate the points in the correct order for the flex container.
+            // Top halves: Left to Right.
+            // TL (12-17): 12,13,14,15,16,17
+            // TR (18-23): 18,19,20,21,22,23
+            
+            // Bottom halves: Left to Right.
+            // BL (11-6): 11,10,9,8,7,6
+            // BR (5-0): 5,4,3,2,1,0
+            
+            // But we are generating them dynamically in renderBoard.
+            return document.querySelector(`.point[data-index="${index}"]`);
+        }
+
+        function renderBoard() {
+            // Clear quadrants
+            [els.quadTL, els.quadTR, els.quadBL, els.quadBR].forEach(el => el.innerHTML = '');
+            els.bar.innerHTML = '';
+
+            // Helper to create point
+            const createPoint = (idx) => {
+                const p = document.createElement('div');
+                p.className = 'point';
+                p.dataset.index = idx;
+                
+                // Checkers
+                const pt = board[idx];
+                if (pt.count > 0) {
+                    // Limit visual checkers to maybe 5-6 to avoid overflow
+                    const showCount = Math.min(pt.count, 6);
+                    for (let i = 0; i < showCount; i++) {
+                        const c = document.createElement('div');
+                        c.className = `checker ${pt.color === 'w' ? 'white' : 'black'}`;
+                        if (i === showCount - 1 && pt.count > 6) {
+                            c.textContent = pt.count;
+                            c.style.display = 'flex';
+                            c.style.alignItems = 'center';
+                            c.style.justifyContent = 'center';
+                            c.style.fontSize = '0.8rem';
+                        }
+                        p.appendChild(c);
+                    }
+                }
+
+                // Highlight if selected or valid target
+                if (selectedPoint === idx) p.classList.add('highlight');
+                
+                p.onclick = () => handlePointClick(idx);
+                return p;
+            };
+
+            // Top Left: 12-17
+            for (let i = 12; i <= 17; i++) els.quadTL.appendChild(createPoint(i));
+            // Top Right: 18-23
+            for (let i = 18; i <= 23; i++) els.quadTR.appendChild(createPoint(i));
+            // Bottom Left: 11-6
+            for (let i = 11; i >= 6; i--) els.quadBL.appendChild(createPoint(i));
+            // Bottom Right: 5-0
+            for (let i = 5; i >= 0; i--) els.quadBR.appendChild(createPoint(i));
+
+            // Bar
+            if (bar.w > 0) {
+                const c = document.createElement('div');
+                c.className = 'checker white';
+                c.textContent = bar.w;
+                c.style.display = 'flex'; c.style.justifyContent='center'; c.style.alignItems='center';
+                c.onclick = () => handleBarClick('w');
+                if (turn === 'w' && selectedPoint === 'bar') c.style.border = '2px solid yellow';
+                els.bar.appendChild(c);
+            }
+            if (bar.b > 0) {
+                const c = document.createElement('div');
+                c.className = 'checker black';
+                c.textContent = bar.b;
+                c.style.display = 'flex'; c.style.justifyContent='center'; c.style.alignItems='center';
+                c.onclick = () => handleBarClick('b');
+                if (turn === 'b' && selectedPoint === 'bar') c.style.border = '2px solid yellow';
+                els.bar.appendChild(c);
+            }
+
+            // Off
+            els.offW.textContent = `W: ${off.w}`;
+            els.offB.textContent = `B: ${off.b}`;
+            
+            // Highlight valid moves if selected
+            if (selectedPoint !== null) {
+                const moves = getValidMoves(selectedPoint);
+                moves.forEach(targetIdx => {
+                    if (targetIdx === 'off') {
+                        // Highlight off board area
+                        if (turn === 'w') els.offW.style.background = 'var(--highlight)';
+                        else els.offB.style.background = 'var(--highlight)';
+                    } else {
+                        const el = getPointEl(targetIdx);
+                        if (el) el.style.boxShadow = 'inset 0 0 15px var(--accent)';
+                    }
+                });
+            } else {
+                els.offW.style.background = '';
+                els.offB.style.background = '';
+            }
+        }
+
+        function handleBarClick(color) {
+            if (turn !== color) return;
+            if (movesLeft.length === 0) return;
+            
+            selectedPoint = 'bar';
+            renderBoard();
+        }
+
+        function handlePointClick(index) {
+            if (movesLeft.length === 0) return;
+
+            // If we have a selection, try to move
+            if (selectedPoint !== null) {
+                const moves = getValidMoves(selectedPoint);
+                if (moves.includes(index)) {
+                    executeMove(selectedPoint, index);
+                    return;
+                }
+                // If clicking off-board area is handled separately? 
+                // Actually bearing off is usually clicking the point then the off area, 
+                // or just clicking the point if the die allows exact bear off.
+                // Let's handle bear off by clicking the point then clicking the off-box?
+                // Or just auto-bear off if clicked again?
+                // Let's stick to: Click Source -> Click Target.
+            }
+
+            // Select source
+            // Must enter from bar if pieces on bar
+            if (bar[turn] > 0) {
+                selectedPoint = 'bar';
+                renderBoard();
+                return;
+            }
+
+            const pt = board[index];
+            if (pt.count > 0 && pt.color === turn) {
+                selectedPoint = index;
+                renderBoard();
+            } else {
+                selectedPoint = null;
+                renderBoard();
+            }
+        }
+
+        // Handle clicking off-board areas for bearing off
+        els.offW.onclick = () => handleOffClick('w');
+        els.offB.onclick = () => handleOffClick('b');
+
+        function handleOffClick(color) {
+            if (turn !== color) return;
+            if (selectedPoint === null) return;
+            
+            const moves = getValidMoves(selectedPoint);
+            if (moves.includes('off')) {
+                executeMove(selectedPoint, 'off');
+            }
+        }
+
+        function getValidMoves(source) {
+            // Source is index or 'bar'
+            const targets = [];
+            const direction = turn === 'w' ? -1 : 1; // White moves to 0, Black to 23
+            
+            // Unique dice values to try
+            const uniqueDice = [...new Set(movesLeft)];
+
+            uniqueDice.forEach(die => {
+                let targetIdx;
+                
+                if (source === 'bar') {
+                    // White enters at 23 (24-die), Black enters at 0 (die-1)
+                    // Wait, indices:
+                    // White enters into Black home (19-23)? No.
+                    // White moves 23 -> 0. Enters at 23? No, enters at 24 (virtual) -> 23..18.
+                    // Indices: 23 is top right. 0 is bottom right.
+                    // White moves 23 -> 0.
+                    // White enters at "24". Target = 24 - die.
+                    // Black moves 0 -> 23.
+                    // Black enters at "-1". Target = -1 + die = die - 1.
+                    
+                    if (turn === 'w') targetIdx = 24 - die;
+                    else targetIdx = die - 1;
+                } else {
+                    targetIdx = source + (die * direction);
+                }
+
+                // Check bounds
+                if (targetIdx < 0 || targetIdx > 23) {
+                    // Bearing off logic
+                    if (canBearOff(turn)) {
+                        // Exact match?
+                        if (turn === 'w' && targetIdx === -1) targets.push('off'); // Exact bear off from 0 with 1? No.
+                        // White bears off from 0-5.
+                        // If source is 2, die is 3 -> target -1. Valid bear off.
+                        // If source is 5, die is 6 -> target -1. Valid.
+                        // Logic:
+                        // 1. Exact bear off: source - die == -1 (White) or source + die == 24 (Black).
+                        // 2. Higher die bear off: If no pieces on higher points, can bear off from highest point.
+                        
+                        // Simplified: Allow bear off if target is off board AND exact or greater die?
+                        // Let's just check if target is off board.
+                        
+                        // White (moves to -1): targetIdx < 0
+                        // Black (moves to 24): targetIdx > 23
+                        
+                        if ((turn === 'w' && targetIdx < 0) || (turn === 'b' && targetIdx > 23)) {
+                            // Check if this is a valid bear off move
+                            // Exact:
+                            if ((turn === 'w' && source - die === -1) || (turn === 'b' && source + die === 24)) {
+                                targets.push('off');
+                            } else {
+                                // Not exact. Allowed only if no pieces on higher points.
+                                // White: Higher points are indices > source (up to 5).
+                                // Black: Higher points are indices < source (down to 18).
+                                const isHighest = checkIsHighest(source);
+                                if (isHighest) targets.push('off');
+                            }
+                        }
+                    }
+                } else {
+                    // Normal move
+                    const pt = board[targetIdx];
+                    // Valid if empty, own color, or only 1 opponent (hit)
+                    if (pt.count === 0 || pt.color === turn || pt.count === 1) {
+                        targets.push(targetIdx);
+                    }
+                }
+            });
+            return targets;
+        }
+
+        function checkIsHighest(source) {
+            if (turn === 'w') {
+                // Check 5 down to source+1
+                for (let i = 5; i > source; i--) {
+                    if (board[i].count > 0 && board[i].color === 'w') return false;
+                }
+                return true;
+            } else {
+                // Check 18 up to source-1
+                for (let i = 18; i < source; i++) {
+                    if (board[i].count > 0 && board[i].color === 'b') return false;
+                }
+                return true;
+            }
+        }
+
+        function canBearOff(player) {
+            // All pieces must be in home board
+            // White home: 0-5. Black home: 18-23.
+            // Check bar
+            if (bar[player] > 0) return false;
+            
+            for (let i = 0; i < 24; i++) {
+                if (board[i].count > 0 && board[i].color === player) {
+                    if (player === 'w' && i > 5) return false;
+                    if (player === 'b' && i < 18) return false;
+                }
+            }
+            return true;
+        }
+
+        function executeMove(from, to) {
+            // Calculate die used
+            let dieUsed = 0;
+            if (from === 'bar') {
+                if (turn === 'w') dieUsed = 24 - to;
+                else dieUsed = to + 1;
+            } else if (to === 'off') {
+                // Find the die that allows this
+                // If exact match exists in movesLeft, use it.
+                // Else use the max die that is greater than needed?
+                // Simplified: Just find a die that works.
+                // Distance needed:
+                const dist = turn === 'w' ? from + 1 : 24 - from;
+                if (movesLeft.includes(dist)) dieUsed = dist;
+                else {
+                    // Must be larger die
+                    dieUsed = Math.max(...movesLeft);
+                }
+            } else {
+                dieUsed = Math.abs(from - to);
+            }
+
+            // Remove die from movesLeft
+            const dieIdx = movesLeft.indexOf(dieUsed);
+            if (dieIdx > -1) movesLeft.splice(dieIdx, 1);
+            else {
+                // Fallback for bear-off with larger die
+                // Remove the largest die?
+                // Or the first die larger than needed?
+                // Let's just remove the first one that works logic-wise
+                // Re-calculate valid moves to find which die generated this 'to'
+                // This is getting complicated.
+                // Simple approach: Remove the first die that matches dieUsed.
+                // If not found (bear off case), remove max die.
+                const max = Math.max(...movesLeft);
+                const idx = movesLeft.indexOf(max);
+                if (idx > -1) movesLeft.splice(idx, 1);
+            }
+
+            // Move logic
+            // Remove from source
+            if (from === 'bar') {
+                bar[turn]--;
+            } else {
+                board[from].count--;
+                if (board[from].count === 0) board[from].color = null;
+            }
+
+            // Add to target
+            if (to === 'off') {
+                off[turn]++;
+            } else {
+                const pt = board[to];
+                if (pt.count === 1 && pt.color !== turn) {
+                    // Hit!
+                    bar[pt.color]++;
+                    pt.count = 1;
+                    pt.color = turn;
+                } else {
+                    pt.count++;
+                    pt.color = turn;
+                }
+            }
+
+            selectedPoint = null;
+            renderDice();
+            renderBoard();
+
+            // Check win
+            if (off[turn] === 15) {
+                alert(`${turn === 'w' ? 'White' : 'Black'} Wins!`);
+                initGame();
+                return;
+            }
+
+            // End turn if no moves
+            if (movesLeft.length === 0) {
+                endTurn();
+            } else {
+                // Check if any moves are possible with remaining dice
+                // If not, end turn
+                if (!canMoveAny()) {
+                    setTimeout(() => {
+                        alert("No valid moves available.");
+                        endTurn();
+                    }, 500);
+                }
+            }
+        }
+
+        function canMoveAny() {
+            // Check bar
+            if (bar[turn] > 0) {
+                return getValidMoves('bar').length > 0;
+            }
+            // Check all points
+            for (let i = 0; i < 24; i++) {
+                if (board[i].count > 0 && board[i].color === turn) {
+                    if (getValidMoves(i).length > 0) return true;
+                }
+            }
+            return false;
+        }
+
+        function endTurn() {
+            turn = turn === 'w' ? 'b' : 'w';
+            movesLeft = [];
+            dice = [];
+            els.rollBtn.disabled = false;
+            updateStatus();
+            renderDice();
+        }
+
+        function updateStatus() {
+            const wTurn = getNested(currentTranslations, 'games.backgammon.whiteTurn') || "White's Turn";
+            const bTurn = getNested(currentTranslations, 'games.backgammon.blackTurn') || "Black's Turn";
+            els.turn.textContent = turn === 'w' ? wTurn : bTurn;
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // Translations
+        let currentTranslations = {};
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch(`./i18n/${lang}.json`);
+                if (res.ok) return await res.json();
+            } catch (e) { }
+            return null;
+        }
+        function getNested(obj, path) {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+        }
+        async function applyTranslations(lang) {
+            if (!lang) lang = 'en';
+            const t = await loadTranslations(lang);
+            if (t) currentTranslations = t;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = getNested(currentTranslations, key);
+                if (txt) el.textContent = txt;
+            });
+            updateStatus();
+        }
+
+        const savedLang = localStorage.getItem('lang') || 'en';
+        document.addEventListener('DOMContentLoaded', () => {
+            initGame();
+            applyTranslations(savedLang);
+        });
+    </script>
+</body>
+</html>

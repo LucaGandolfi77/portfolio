@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="games.dama.title">Checkers - Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --board-light: #f0d9b5;
+            --board-dark: #b58863;
+            --piece-w: #e0e0e0;
+            --piece-b: #333333;
+            --highlight: rgba(0, 212, 255, 0.5);
+            --selected: rgba(255, 255, 0, 0.5);
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-900), var(--bg-800));
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 800px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        h1 { margin: 0 0 10px 0; color: var(--accent); }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+        }
+        .status {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            min-height: 1.5em;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 1;
+            border: 5px solid #5c4033;
+            user-select: none;
+        }
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            position: relative;
+        }
+        @media (max-width: 500px) {
+            .square { font-size: 1.8rem; }
+        }
+        .square.light { background-color: var(--board-light); }
+        .square.dark { background-color: var(--board-dark); }
+        .square.selected { background-color: var(--selected) !important; }
+        .square.highlight::after {
+            content: '';
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            background-color: rgba(0, 255, 0, 0.5);
+            border-radius: 50%;
+        }
+        
+        .piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .piece.white { background-color: var(--piece-w); border: 2px solid #fff; }
+        .piece.black { background-color: var(--piece-b); border: 2px solid #000; }
+        .piece.king::after {
+            content: '👑';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+        }
+        @media (max-width: 500px) {
+            .piece.king::after { font-size: 1rem; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: var(--bg-900);
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .captured {
+            display: flex;
+            gap: 5px;
+            min-height: 30px;
+            font-size: 1.5rem;
+        }
+        .captured-piece {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .captured-piece.white { background-color: var(--piece-w); border: 1px solid #fff; }
+        .captured-piece.black { background-color: var(--piece-b); border: 1px solid #000; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html#games" class="back-btn" data-i18n="page.back">← Back to Portfolio</a>
+        <h1 data-i18n="games.dama.title">Checkers</h1>
+        <p data-i18n="games.dama.lead">Classic board game. Jump over opponent pieces to capture them.</p>
+    </div>
+
+    <div class="game-container">
+        <div class="status" id="status">White's Turn</div>
+        <div class="captured" id="captured-black"></div>
+        <div class="board" id="board"></div>
+        <div class="captured" id="captured-white"></div>
+        <div class="controls">
+            <button class="btn" onclick="resetGame()" data-i18n="games.dama.reset">Reset Game</button>
+        </div>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const capturedWhiteEl = document.getElementById('captured-white');
+        const capturedBlackEl = document.getElementById('captured-black');
+
+        let board = [];
+        let turn = 'w'; // 'w' (white) or 'b' (black)
+        let selectedSquare = null;
+        let validMoves = [];
+        let capturedCount = { w: 0, b: 0 };
+        let mustJump = false; // If true, player must perform a jump move
+
+        function initBoard() {
+            // 8x8 board
+            // 0: empty, {color: 'w', king: false}: white piece
+            board = Array(8).fill(null).map(() => Array(8).fill(null));
+
+            // Place pieces on dark squares
+            // Rows 0-2: Black (b)
+            // Rows 5-7: White (w)
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 !== 0) { // Dark squares
+                        if (row < 3) board[row][col] = { color: 'b', king: false };
+                        else if (row > 4) board[row][col] = { color: 'w', king: false };
+                    }
+                }
+            }
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    
+                    const piece = board[row][col];
+                    if (piece) {
+                        const pieceEl = document.createElement('div');
+                        pieceEl.className = `piece ${piece.color === 'w' ? 'white' : 'black'} ${piece.king ? 'king' : ''}`;
+                        square.appendChild(pieceEl);
+                    }
+
+                    if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
+                        square.classList.add('selected');
+                    }
+
+                    if (validMoves.some(m => m.toRow === row && m.toCol === col)) {
+                        square.classList.add('highlight');
+                    }
+
+                    square.onclick = () => handleSquareClick(row, col);
+                    boardEl.appendChild(square);
+                }
+            }
+            updateStatus();
+            renderCaptured();
+        }
+
+        function updateStatus() {
+            const wTurn = getNested(currentTranslations, 'games.dama.whiteTurn') || "White's Turn";
+            const bTurn = getNested(currentTranslations, 'games.dama.blackTurn') || "Black's Turn";
+            const wWin = getNested(currentTranslations, 'games.dama.whiteWins') || "White Wins!";
+            const bWin = getNested(currentTranslations, 'games.dama.blackWins') || "Black Wins!";
+
+            if (capturedCount.b >= 12) statusEl.textContent = wWin;
+            else if (capturedCount.w >= 12) statusEl.textContent = bWin;
+            else statusEl.textContent = turn === 'w' ? wTurn : bTurn;
+        }
+
+        function renderCaptured() {
+            capturedWhiteEl.innerHTML = '';
+            capturedBlackEl.innerHTML = '';
+            
+            for(let i=0; i<capturedCount.w; i++) {
+                const p = document.createElement('div');
+                p.className = 'captured-piece white';
+                capturedWhiteEl.appendChild(p);
+            }
+            for(let i=0; i<capturedCount.b; i++) {
+                const p = document.createElement('div');
+                p.className = 'captured-piece black';
+                capturedBlackEl.appendChild(p);
+            }
+        }
+
+        function handleSquareClick(row, col) {
+            const piece = board[row][col];
+
+            // If clicking a highlighted move
+            const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+            if (move) {
+                executeMove(move);
+                return;
+            }
+
+            // If clicking own piece
+            if (piece && piece.color === turn) {
+                // If we are in a multi-jump sequence, we might be restricted
+                // For simplicity, we'll recalculate all valid moves for the player
+                // and enforce mandatory jumps if any exist globally.
+                
+                const allMoves = getAllValidMoves(turn);
+                const jumpsExist = allMoves.some(m => m.isJump);
+                
+                // Get moves for this specific piece
+                let moves = getPieceMoves(row, col, piece);
+                
+                // If jumps exist globally, filter this piece's moves to only jumps
+                if (jumpsExist) {
+                    moves = moves.filter(m => m.isJump);
+                }
+
+                if (moves.length > 0) {
+                    selectedSquare = { row, col };
+                    validMoves = moves;
+                    renderBoard();
+                } else {
+                    // Selected piece has no valid moves (or no jumps when jumps are required)
+                    selectedSquare = null;
+                    validMoves = [];
+                    renderBoard();
+                }
+            } else {
+                // Clicking empty square or opponent piece (invalid)
+                selectedSquare = null;
+                validMoves = [];
+                renderBoard();
+            }
+        }
+
+        function executeMove(move) {
+            const piece = board[move.fromRow][move.fromCol];
+            
+            // Move piece
+            board[move.toRow][move.toCol] = piece;
+            board[move.fromRow][move.fromCol] = null;
+
+            // Handle capture
+            if (move.isJump) {
+                board[move.jumpRow][move.jumpCol] = null;
+                if (turn === 'w') capturedCount.b++;
+                else capturedCount.w++;
+            }
+
+            // King promotion
+            if (!piece.king) {
+                if ((piece.color === 'w' && move.toRow === 0) || 
+                    (piece.color === 'b' && move.toRow === 7)) {
+                    piece.king = true;
+                }
+            }
+
+            // Multi-jump logic
+            if (move.isJump) {
+                // Check if this piece can jump again
+                const followUpMoves = getPieceMoves(move.toRow, move.toCol, piece).filter(m => m.isJump);
+                if (followUpMoves.length > 0) {
+                    // Must continue jumping
+                    turn = turn; // Turn stays same
+                    selectedSquare = { row: move.toRow, col: move.toCol };
+                    validMoves = followUpMoves;
+                    renderBoard();
+                    return;
+                }
+            }
+
+            // End turn
+            turn = turn === 'w' ? 'b' : 'w';
+            selectedSquare = null;
+            validMoves = [];
+            
+            // Check for no moves (loss condition)
+            const nextMoves = getAllValidMoves(turn);
+            if (nextMoves.length === 0) {
+                // Current player has no moves -> Other player wins
+                // We can handle this by setting captured count to 12 or custom message
+                // For now, let's just leave it, or maybe show alert
+            }
+
+            renderBoard();
+        }
+
+        function getAllValidMoves(playerColor) {
+            let moves = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === playerColor) {
+                        moves = moves.concat(getPieceMoves(r, c, p));
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function getPieceMoves(row, col, piece) {
+            const moves = [];
+            const dirs = [];
+            
+            if (piece.color === 'w' || piece.king) {
+                dirs.push([-1, -1], [-1, 1]); // Forward for white (up)
+            }
+            if (piece.color === 'b' || piece.king) {
+                dirs.push([1, -1], [1, 1]); // Forward for black (down)
+            }
+
+            dirs.forEach(([dr, dc]) => {
+                // Check simple move
+                const r = row + dr;
+                const c = col + dc;
+                
+                if (isValidPos(r, c)) {
+                    if (!board[r][c]) {
+                        moves.push({ 
+                            fromRow: row, fromCol: col, 
+                            toRow: r, toCol: c, 
+                            isJump: false 
+                        });
+                    } else if (board[r][c].color !== piece.color) {
+                        // Check jump
+                        const jr = r + dr;
+                        const jc = c + dc;
+                        if (isValidPos(jr, jc) && !board[jr][jc]) {
+                            moves.push({
+                                fromRow: row, fromCol: col,
+                                toRow: jr, toCol: jc,
+                                isJump: true,
+                                jumpRow: r, jumpCol: c
+                            });
+                        }
+                    }
+                }
+            });
+
+            return moves;
+        }
+
+        function isValidPos(r, c) {
+            return r >= 0 && r < 8 && c >= 0 && c < 8;
+        }
+
+        function resetGame() {
+            initBoard();
+            turn = 'w';
+            selectedSquare = null;
+            validMoves = [];
+            capturedCount = { w: 0, b: 0 };
+            renderBoard();
+        }
+
+        // Translations
+        let currentTranslations = {};
+
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch(`./i18n/${lang}.json`);
+                if (res.ok) return await res.json();
+            } catch (e) { console.warn('Failed to load translations', e); }
+            return null;
+        }
+
+        function getNested(obj, path) {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+        }
+
+        async function applyTranslations(lang) {
+            if (!lang) lang = 'en';
+            const t = await loadTranslations(lang);
+            if (t) currentTranslations = t;
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = getNested(currentTranslations, key);
+                if (txt) el.textContent = txt;
+            });
+            
+            updateStatus(); 
+        }
+
+        const savedLang = localStorage.getItem('lang') || 'en';
+        document.addEventListener('DOMContentLoaded', () => {
+            initBoard();
+            renderBoard();
+            applyTranslations(savedLang);
+        });
+    </script>
+</body>
+</html>
