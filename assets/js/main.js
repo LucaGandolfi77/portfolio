@@ -1,5 +1,5 @@
 // --- Theme toggle with seasonal themes ---
-const themeToggle = document.getElementById('themeToggle');
+// Note: themeToggle will be created dynamically, don't query it here
 
 // Definizione dei temi stagionali
 const seasonalThemes = [
@@ -33,6 +33,9 @@ function applySeasonalTheme(themeId) {
 }
 
 function updateThemeButton() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (!themeToggle) return; // Exit if button doesn't exist yet
+    
     const currentSeasonalTheme = localStorage.getItem('seasonal-theme') || 'default';
     const theme = seasonalThemes.find(t => t.id === currentSeasonalTheme);
     if (theme) {
@@ -196,10 +199,13 @@ function updateActiveThemeOption() {
     });
 }
 
-// Load saved theme on page load
+// Load saved theme on page load (apply theme without updating button yet)
 const savedSeasonalTheme = localStorage.getItem('seasonal-theme');
 if (savedSeasonalTheme) {
-    applySeasonalTheme(savedSeasonalTheme);
+    const theme = seasonalThemes.find(t => t.id === savedSeasonalTheme);
+    if (theme && theme.data) {
+        document.documentElement.setAttribute('data-seasonal-theme', theme.data);
+    }
 }
 
 // Initialize theme menu when DOM is ready
@@ -529,8 +535,62 @@ function toggleMenu() {
     overlay.classList.toggle('active');
 }
 
+function openMenu() {
+    burgerMenu.classList.add('active');
+    sideNav.classList.add('active');
+    overlay.classList.add('active');
+}
+
+function closeMenu() {
+    burgerMenu.classList.remove('active');
+    sideNav.classList.remove('active');
+    overlay.classList.remove('active');
+}
+
 burgerMenu.addEventListener('click', toggleMenu);
 overlay.addEventListener('click', toggleMenu);
+
+// Swipe gesture to open menu from right edge (mobile)
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
+let isSwiping = false;
+
+document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+    
+    // Check if touch starts from right edge (within 20px)
+    if (touchStartX > window.innerWidth - 20) {
+        isSwiping = true;
+    }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    if (!isSwiping) return;
+    
+    touchEndX = e.changedTouches[0].screenX;
+    touchEndY = e.changedTouches[0].screenY;
+    
+    // Calculate swipe distance
+    const deltaX = touchStartX - touchEndX;
+    const deltaY = Math.abs(touchStartY - touchEndY);
+    
+    // If swiping mostly horizontal and from right to left
+    if (Math.abs(deltaX) > deltaY && deltaX > 50) {
+        openMenu();
+        isSwiping = false;
+    }
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+    isSwiping = false;
+    touchStartX = 0;
+    touchStartY = 0;
+    touchEndX = 0;
+    touchEndY = 0;
+}, { passive: true });
 
 navLinks.forEach(link => {
     const href = link.getAttribute('href');
@@ -541,7 +601,7 @@ navLinks.forEach(link => {
         const targetSection = document.querySelector(targetId);
         
         if (targetSection) {
-            toggleMenu();
+            closeMenu();
             setTimeout(() => {
                 targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 300);
@@ -667,6 +727,18 @@ function handleScroll() {
     });
 }
 
+// Initial visibility check for sections already in viewport
+function checkInitialVisibility() {
+    const sections = document.querySelectorAll('[data-section]');
+    sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        // More lenient check for initial load
+        if (rect.top >= 0 && rect.top < window.innerHeight) {
+            section.classList.add('visible');
+        }
+    });
+}
+
 // Poems expand/collapse wiring
 function createPoems() {
     const list = document.getElementById('poemsList');
@@ -754,7 +826,8 @@ document.addEventListener('DOMContentLoaded', () => {
     createParticles();
     loadProjects();
     createBubbles();
-    handleScroll();
+    checkInitialVisibility(); // Check visibility on page load
+    handleScroll(); // Also run handleScroll
     createPoems();
 
     const quickSearch = document.getElementById('quickSearch');

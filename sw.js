@@ -45,12 +45,22 @@ self.addEventListener('install', event => {
                     '/index.html',
                     '/timeline.html',
                     '/assets/css/main.css',
-                    '/assets/js/main.js',
-                    '/manifest.json'
+                    '/assets/js/main.js'
                 ];
-                return cache.addAll(criticalFiles).catch(err => {
-                    console.warn('Alcuni file non sono stati cachati:', err);
+                
+                // Cache i file critici uno per uno per gestire meglio gli errori
+                const cachePromises = criticalFiles.map(url => {
+                    return cache.add(url).catch(err => {
+                        console.warn(`Impossibile cachare ${url}:`, err);
+                    });
                 });
+                
+                // Prova a cachare il manifest separatamente (opzionale)
+                cache.add('/manifest.json').catch(err => {
+                    console.warn('Manifest.json non cachato (probabilmente ambiente dev):', err);
+                });
+                
+                return Promise.all(cachePromises);
             })
             .then(() => self.skipWaiting())
     );
