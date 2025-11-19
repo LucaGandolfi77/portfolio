@@ -15,7 +15,7 @@ const seasonalThemes = [
 function applyTheme(theme) {
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-    updateThemeButton();
+    updateActiveThemeInBar();
 }
 
 function applySeasonalTheme(themeId) {
@@ -28,178 +28,53 @@ function applySeasonalTheme(themeId) {
     }
     
     localStorage.setItem('seasonal-theme', themeId);
-    closeThemeMenu();
-    updateThemeButton();
+    updateActiveThemeInBar();
 }
 
-function updateThemeButton() {
-    const themeToggle = document.getElementById('themeToggle');
-    if (!themeToggle) return; // Exit if button doesn't exist yet
-    
-    const currentSeasonalTheme = localStorage.getItem('seasonal-theme') || 'default';
-    const theme = seasonalThemes.find(t => t.id === currentSeasonalTheme);
-    if (theme) {
-        themeToggle.textContent = theme.emoji;
-    }
-}
-
-// Create theme menu
-function createThemeMenu() {
-    const container = document.createElement('div');
-    container.className = 'theme-menu-container';
-    
-    const button = document.createElement('button');
-    button.id = 'themeToggle';
-    button.className = 'theme-toggle-button';
-    button.textContent = '🌙';
-    button.title = 'Hold to select theme';
-    
-    const menu = document.createElement('div');
-    menu.className = 'theme-dropdown';
-    
-    seasonalThemes.forEach(theme => {
-        const option = document.createElement('div');
-        option.className = 'theme-option';
-        option.innerHTML = `
-            <span class="theme-option-emoji">${theme.emoji}</span>
-            <span class="theme-option-name">${theme.name}</span>
-            <span class="theme-option-check">✓</span>
-        `;
-        
-        option.addEventListener('click', () => {
-            applySeasonalTheme(theme.id);
-        });
-        
-        menu.appendChild(option);
-    });
-    
-    container.appendChild(button);
-    container.appendChild(menu);
-    
-    document.body.appendChild(container);
-    
-    return { button, menu };
-}
-
-// Initialize theme menu
-let themeMenu = null;
-let holdTimer = null;
-let isTouching = false;
-
-function initThemeMenu() {
-    if (!themeMenu) {
-        themeMenu = createThemeMenu();
-        
-        // Mouse events
-        themeMenu.button.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isTouching = false;
-            holdTimer = setTimeout(() => {
-                openThemeMenu();
-            }, 500);
-        });
-        
-        themeMenu.button.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            if (holdTimer) clearTimeout(holdTimer);
-        });
-        
-        themeMenu.button.addEventListener('mouseleave', (e) => {
-            e.preventDefault();
-            if (holdTimer) clearTimeout(holdTimer);
-        });
-        
-        // Touch events per mobile
-        themeMenu.button.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isTouching = true;
-            holdTimer = setTimeout(() => {
-                if (isTouching) {
-                    openThemeMenu();
-                    // Feedback tattile su dispositivi che lo supportano
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
-                }
-            }, 500);
-        }, { passive: false });
-        
-        themeMenu.button.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            isTouching = false;
-            if (holdTimer) clearTimeout(holdTimer);
-        }, { passive: false });
-        
-        themeMenu.button.addEventListener('touchcancel', (e) => {
-            e.preventDefault();
-            isTouching = false;
-            if (holdTimer) clearTimeout(holdTimer);
-        }, { passive: false });
-        
-        themeMenu.button.addEventListener('touchmove', (e) => {
-            // Se l'utente muove il dito, cancella il timer
-            if (holdTimer && e.target === themeMenu.button) {
-                const touch = e.touches[0];
-                const rect = themeMenu.button.getBoundingClientRect();
-                
-                // Se il tocco esce dal bottone, cancella il timer
-                if (touch.clientX < rect.left || touch.clientX > rect.right ||
-                    touch.clientY < rect.top || touch.clientY > rect.bottom) {
-                    isTouching = false;
-                    clearTimeout(holdTimer);
-                    holdTimer = null;
-                }
-            }
-        }, { passive: true });
-        
-        // Close menu on outside click/touch
-        document.addEventListener('click', (e) => {
-            if (!themeMenu.button.contains(e.target) && !themeMenu.menu.contains(e.target)) {
-                closeThemeMenu();
-            }
-        });
-
-        // Close menu on outside touch
-        document.addEventListener('touchend', (e) => {
-            if (!themeMenu.button.contains(e.target) && !themeMenu.menu.contains(e.target)) {
-                closeThemeMenu();
-            }
-        });
-    }
-    
-    updateThemeButton();
-}
-
-function openThemeMenu() {
-    if (!themeMenu) initThemeMenu();
-    themeMenu.menu.classList.add('active');
-    themeMenu.button.classList.add('active');
-    updateActiveThemeOption();
-}
-
-function closeThemeMenu() {
-    if (themeMenu) {
-        themeMenu.menu.classList.remove('active');
-        themeMenu.button.classList.remove('active');
-    }
-}
-
-function updateActiveThemeOption() {
-    if (!themeMenu) return;
-    
+function updateActiveThemeInBar() {
     const currentTheme = localStorage.getItem('seasonal-theme') || 'default';
-    const options = themeMenu.menu.querySelectorAll('.theme-option');
+    const items = document.querySelectorAll('.theme-bar-item');
     
-    options.forEach((option, idx) => {
-        if (seasonalThemes[idx].id === currentTheme) {
-            option.classList.add('active');
+    items.forEach(item => {
+        if (item.dataset.theme === currentTheme) {
+            item.classList.add('active');
         } else {
-            option.classList.remove('active');
+            item.classList.remove('active');
         }
     });
 }
 
-// Load saved theme on page load (apply theme without updating button yet)
+// Create theme bar
+function createThemeBar() {
+    const bar = document.createElement('div');
+    bar.className = 'theme-bar';
+    
+    const itemsContainer = document.createElement('div');
+    itemsContainer.className = 'theme-bar-items';
+    
+    seasonalThemes.forEach(theme => {
+        const item = document.createElement('div');
+        item.className = 'theme-bar-item';
+        item.dataset.theme = theme.id;
+        item.innerHTML = `
+            <span class="theme-bar-emoji">${theme.emoji}</span>
+            <span class="theme-bar-name">${theme.name}</span>
+        `;
+        
+        item.addEventListener('click', () => {
+            applySeasonalTheme(theme.id);
+        });
+        
+        itemsContainer.appendChild(item);
+    });
+    
+    bar.appendChild(itemsContainer);
+    document.body.prepend(bar);
+    
+    updateActiveThemeInBar();
+}
+
+// Load saved theme on page load
 const savedSeasonalTheme = localStorage.getItem('seasonal-theme');
 if (savedSeasonalTheme) {
     const theme = seasonalThemes.find(t => t.id === savedSeasonalTheme);
@@ -208,11 +83,11 @@ if (savedSeasonalTheme) {
     }
 }
 
-// Initialize theme menu when DOM is ready
+// Initialize theme bar when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initThemeMenu);
+    document.addEventListener('DOMContentLoaded', createThemeBar);
 } else {
-    initThemeMenu();
+    createThemeBar();
 }
 
 // --- Translations ---
@@ -548,7 +423,7 @@ function closeMenu() {
 }
 
 burgerMenu.addEventListener('click', toggleMenu);
-overlay.addEventListener('click', toggleMenu);
+overlay.addEventListener('click', closeMenu);
 
 // Swipe gesture to open menu from right edge (mobile)
 let touchStartX = 0;
