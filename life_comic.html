@@ -20,9 +20,54 @@
     .lang-top-left{position:fixed;top:12px;left:12px;z-index:1002}
     .lang-top-left select{background:transparent;border:none;color:white;font-weight:600;cursor:pointer;font-size:0.95rem;padding:6px 8px;border-radius:6px}
     @media (max-width:600px){.hero h1{font-size:1.4rem}.lang-top-left select{min-height:44px;min-width:100px;padding:8px 12px;font-size:0.9rem}}
+    
+    /* Lightbox styles */
+    .lightbox {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.95); z-index: 2000;
+      display: none; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .lightbox.active { display: flex; opacity: 1; }
+    .lightbox-content { position: relative; max-width: 95vw; max-height: 95vh; display: flex; align-items: center; justify-content: center; }
+    .lightbox-img { max-width: 100%; max-height: 90vh; border-radius: 4px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 20px;
+      background: rgba(255,255,255,0.1); border: none; color: white;
+      font-size: 2rem; width: 50px; height: 50px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; z-index: 2001;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.2); }
+    .lightbox-nav {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.1); border: none; color: white;
+      font-size: 2rem; width: 60px; height: 60px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; z-index: 2001;
+    }
+    .lightbox-nav:hover { background: rgba(255,255,255,0.2); }
+    .lightbox-prev { left: 20px; }
+    .lightbox-next { right: 20px; }
+    @media (max-width: 768px) {
+      .lightbox-nav { width: 44px; height: 44px; font-size: 1.5rem; }
+      .lightbox-prev { left: 10px; }
+      .lightbox-next { right: 10px; }
+      .lightbox-close { top: 10px; right: 10px; width: 40px; height: 40px; font-size: 1.5rem; }
+    }
   </style>
 </head>
 <body>
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <button class="lightbox-close" id="lbClose" aria-label="Close">✕</button>
+    <button class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Previous">‹</button>
+    <button class="lightbox-nav lightbox-next" id="lbNext" aria-label="Next">›</button>
+    <div class="lightbox-content">
+      <img src="" alt="Comic page" class="lightbox-img" id="lbImg">
+    </div>
+  </div>
+
   <div class="lang-top-left">
     <label for="langSelect" class="visually-hidden">Select language</label>
     <select id="langSelect" aria-label="Select language" title="Change language">
@@ -88,6 +133,56 @@
     });
 
     // Populate gallery dynamically using assets/life_comic/index.json (if present).
+    let galleryImages = [];
+    let currentIndex = 0;
+    const lightbox = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lbImg');
+
+    function openLightbox(index) {
+      if (index < 0 || index >= galleryImages.length) return;
+      currentIndex = index;
+      lbImg.src = `assets/life_comic/${galleryImages[currentIndex]}`;
+      lightbox.classList.add('active');
+      lightbox.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      lightbox.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    function showNext(e) {
+      if(e) e.stopPropagation();
+      currentIndex = (currentIndex + 1) % galleryImages.length;
+      lbImg.src = `assets/life_comic/${galleryImages[currentIndex]}`;
+    }
+
+    function showPrev(e) {
+      if(e) e.stopPropagation();
+      currentIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length;
+      lbImg.src = `assets/life_comic/${galleryImages[currentIndex]}`;
+    }
+
+    // Event listeners for lightbox
+    document.getElementById('lbClose').addEventListener('click', closeLightbox);
+    document.getElementById('lbNext').addEventListener('click', showNext);
+    document.getElementById('lbPrev').addEventListener('click', showPrev);
+    
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox || e.target.classList.contains('lightbox-content')) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!lightbox.classList.contains('active')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') showNext();
+      if (e.key === 'ArrowLeft') showPrev();
+    });
+
     async function loadGallery() {
       const gallery = document.getElementById('gallery');
       let images = null;
@@ -106,14 +201,20 @@
         images = [];
         for (let i = 1; i <= 8; i++) images.push(`page${i}.jpg`);
       }
+      
+      galleryImages = images; // Store for lightbox
 
       gallery.innerHTML = '';
-      images.forEach(name => {
+      images.forEach((name, index) => {
         const card = document.createElement('div');
         card.className = 'page-card';
+        card.style.cursor = 'pointer';
+        card.onclick = () => openLightbox(index);
+        
         const img = document.createElement('img');
         img.src = `assets/life_comic/${name}`;
         img.alt = name;
+        img.loading = 'lazy';
         img.onload = () => {};
         img.onerror = function(){ this.parentElement.innerHTML = `<div style='color:#9fcfff;opacity:0.6'>Placeholder for ${name}</div>` };
         card.appendChild(img);
