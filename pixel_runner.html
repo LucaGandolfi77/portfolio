@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="games.pixel_runner.title">Pixel Runner - Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #202028;
+            --accent: #ffcc00;
+        }
+        body {
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            background: var(--bg-color);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            z-index: 10;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-family: sans-serif; /* Readable font for navigation */
+        }
+        h1 { 
+            margin: 0 0 10px 0; 
+            color: var(--accent); 
+            font-size: 1.5rem;
+            text-shadow: 4px 4px 0 #000;
+        }
+        
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 16/9;
+            background: #87CEEB; /* Sky blue */
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated; /* Crucial for pixel art look */
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .score {
+            font-size: 1.2rem;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        .hidden { display: none !important; }
+
+        .btn {
+            margin-top: 20px;
+            padding: 15px 20px;
+            background: #ffcc00;
+            border: 4px solid #fff;
+            box-shadow: 4px 4px 0 #000;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            color: #000;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: translate(4px, 4px); box-shadow: none; }
+
+        .message {
+            font-size: 1rem;
+            line-height: 1.5;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        /* Mobile controls hint */
+        .mobile-hint {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #aaa;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html#games" class="back-btn" data-i18n="page.back">← Back to Portfolio</a>
+        <h1 data-i18n="games.pixel_runner.title">Pixel Runner</h1>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <canvas id="gameCanvas" width="320" height="180"></canvas> <!-- Low res for pixel look -->
+        
+        <div class="ui-layer">
+            <div class="score">SCORE: <span id="scoreVal">0</span></div>
+        </div>
+
+        <div class="overlay" id="startScreen">
+            <div class="message" data-i18n="games.pixel_runner.startMsg">PIXEL RUNNER</div>
+            <div class="message" style="font-size: 0.6rem; color: #ccc" data-i18n="games.pixel_runner.controls">JUMP: Space or Tap</div>
+            <button class="btn" id="startBtn" data-i18n="games.pixel_runner.play">START</button>
+        </div>
+
+        <div class="overlay hidden" id="gameOverScreen">
+            <div class="message" style="color: #ff5555" data-i18n="games.pixel_runner.gameOver">GAME OVER</div>
+            <div class="message">SCORE: <span id="finalScore">0</span></div>
+            <button class="btn" id="restartBtn" data-i18n="games.pixel_runner.restart">RETRY</button>
+        </div>
+    </div>
+    <div class="mobile-hint" data-i18n="games.pixel_runner.mobileHint">Tap screen to jump</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Disable smoothing for pixel art
+        ctx.imageSmoothingEnabled = false;
+
+        // Game Constants
+        const GRAVITY = 0.4;
+        const JUMP_FORCE = -5.5;
+        const GROUND_Y = 140;
+        const SPEED = 2;
+
+        // Assets (Procedural Pixel Art)
+        const PALETTE = {
+            skin: '#ffccaa',
+            shirt: '#3366ff',
+            pants: '#222222',
+            shoes: '#550000',
+            hair: '#553300',
+            slime: '#00ff00',
+            slimeDark: '#00aa00',
+            ground: '#664422',
+            grass: '#44aa44',
+            cloud: '#ffffff'
+        };
+
+        // Sprite Definitions (1 = primary color, 2 = secondary/shade)
+        const SPRITES = {
+            playerRun1: [
+                [0,0,0,5,5,5,0,0],
+                [0,0,5,5,5,5,5,0],
+                [0,0,1,1,1,0,0,0],
+                [0,2,2,2,2,2,0,0],
+                [2,2,2,2,2,2,2,0],
+                [0,0,3,3,3,0,0,0],
+                [0,0,3,0,3,0,0,0],
+                [0,4,4,0,4,4,0,0]
+            ],
+            playerRun2: [
+                [0,0,0,5,5,5,0,0],
+                [0,0,5,5,5,5,5,0],
+                [0,0,1,1,1,0,0,0],
+                [0,2,2,2,2,2,0,0],
+                [2,2,2,2,2,2,2,0],
+                [0,0,3,3,3,0,0,0],
+                [0,0,3,0,0,3,0,0], // Leg moved
+                [0,0,4,4,0,4,4,0]
+            ],
+            slime1: [
+                [0,0,0,0,0,0,0,0],
+                [0,0,6,6,6,6,0,0],
+                [0,6,6,6,6,6,6,0],
+                [6,6,7,6,6,7,6,6],
+                [6,6,6,6,6,6,6,6],
+                [6,6,6,6,6,6,6,6]
+            ],
+            slime2: [
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,6,6,6,6,0,0],
+                [0,6,6,6,6,6,6,0],
+                [6,6,7,6,6,7,6,6],
+                [6,6,6,6,6,6,6,6] // Squished slightly
+            ]
+        };
+
+        function drawSprite(ctx, spriteData, x, y, scale, paletteMap) {
+            for (let r = 0; r < spriteData.length; r++) {
+                for (let c = 0; c < spriteData[r].length; c++) {
+                    const colorCode = spriteData[r][c];
+                    if (colorCode !== 0) {
+                        ctx.fillStyle = paletteMap[colorCode];
+                        ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+                    }
+                }
+            }
+        }
+
+        // Game State
+        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let frame = 0;
+        let score = 0;
+        let highScore = localStorage.getItem('pixelRunnerHighScore') || 0;
+
+        let player = {
+            x: 40,
+            y: GROUND_Y - 16,
+            vy: 0,
+            grounded: true,
+            animTimer: 0
+        };
+
+        let obstacles = [];
+        let clouds = [];
+
+        function init() {
+            player.y = GROUND_Y - 16;
+            player.vy = 0;
+            player.grounded = true;
+            obstacles = [];
+            clouds = [];
+            score = 0;
+            frame = 0;
+            
+            // Init clouds
+            for(let i=0; i<5; i++) {
+                clouds.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * 80,
+                    speed: 0.2 + Math.random() * 0.3,
+                    size: 10 + Math.random() * 20
+                });
+            }
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            frame++;
+            score = Math.floor(frame / 10);
+            document.getElementById('scoreVal').textContent = score;
+
+            // Player Physics
+            player.vy += GRAVITY;
+            player.y += player.vy;
+
+            if (player.y >= GROUND_Y - 16) {
+                player.y = GROUND_Y - 16;
+                player.vy = 0;
+                player.grounded = true;
+            } else {
+                player.grounded = false;
+            }
+
+            // Obstacle Spawning
+            if (frame % 100 === 0 || (frame % 60 === 0 && Math.random() < 0.05 + (score/1000))) {
+                if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length-1].x > 100) {
+                    obstacles.push({
+                        x: canvas.width,
+                        y: GROUND_Y - 12,
+                        type: 'slime',
+                        animTimer: 0
+                    });
+                }
+            }
+
+            // Update Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= SPEED + (score / 500); // Speed up slightly
+                obs.animTimer++;
+
+                // Collision (Simple AABB)
+                // Player is roughly 16x16 (8x8 sprite scaled by 2)
+                // Slime is roughly 16x12
+                if (
+                    player.x < obs.x + 14 &&
+                    player.x + 10 > obs.x + 2 &&
+                    player.y < obs.y + 12 &&
+                    player.y + 16 > obs.y + 4
+                ) {
+                    gameOver();
+                }
+
+                if (obs.x < -20) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Update Clouds
+            clouds.forEach(c => {
+                c.x -= c.speed;
+                if (c.x < -50) c.x = canvas.width + 50;
+            });
+        }
+
+        function draw() {
+            // Clear Sky
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Clouds
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            clouds.forEach(c => {
+                ctx.fillRect(Math.floor(c.x), Math.floor(c.y), c.size, c.size/2);
+            });
+
+            // Draw Ground
+            ctx.fillStyle = PALETTE.ground;
+            ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+            ctx.fillStyle = PALETTE.grass;
+            ctx.fillRect(0, GROUND_Y, canvas.width, 4);
+
+            // Draw Player
+            let sprite = SPRITES.playerRun1;
+            if (!player.grounded) {
+                sprite = SPRITES.playerRun2; // Jump pose
+            } else {
+                if (Math.floor(frame / 10) % 2 === 0) sprite = SPRITES.playerRun2;
+            }
+            
+            // Palette mapping for player
+            const pMap = {
+                1: PALETTE.skin, 2: PALETTE.shirt, 3: PALETTE.pants, 4: PALETTE.shoes, 5: PALETTE.hair
+            };
+            drawSprite(ctx, sprite, player.x, player.y, 2, pMap);
+
+            // Draw Obstacles
+            const sMap = {
+                6: PALETTE.slime, 7: PALETTE.slimeDark
+            };
+            obstacles.forEach(obs => {
+                let sSprite = SPRITES.slime1;
+                if (Math.floor(obs.animTimer / 15) % 2 === 0) sSprite = SPRITES.slime2;
+                drawSprite(ctx, sSprite, obs.x, obs.y, 2, sMap);
+            });
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function jump() {
+            if (gameState === 'START' || gameState === 'GAMEOVER') return;
+            if (player.grounded) {
+                player.vy = JUMP_FORCE;
+                player.grounded = false;
+            }
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').textContent = score;
+        }
+
+        function startGame() {
+            init();
+            gameState = 'PLAYING';
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+        }
+
+        // Input
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                e.preventDefault();
+                if (gameState === 'PLAYING') jump();
+                else startGame();
+            }
+        });
+        
+        const container = document.getElementById('gameContainer');
+        container.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') jump();
+            else startGame();
+        }, {passive: false});
+        
+        container.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'BUTTON') return;
+            if (gameState === 'PLAYING') jump();
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        // Start Loop
+        init();
+        loop();
+
+        // Translations
+        let currentTranslations = {};
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch(`./i18n/${lang}.json`);
+                if (res.ok) return await res.json();
+            } catch (e) { }
+            return null;
+        }
+        function getNested(obj, path) {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+        }
+        async function applyTranslations(lang) {
+            if (!lang) lang = 'en';
+            const t = await loadTranslations(lang);
+            if (t) currentTranslations = t;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = getNested(currentTranslations, key);
+                if (txt) el.textContent = txt;
+            });
+        }
+
+        const savedLang = localStorage.getItem('lang') || 'en';
+        document.addEventListener('DOMContentLoaded', () => {
+            applyTranslations(savedLang);
+        });
+    </script>
+</body>
+</html>
