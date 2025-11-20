@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="games.quantum.title">Quantum Tic-Tac-Toe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --accent-glow: rgba(0, 212, 255, 0.5);
+            --text-main: #ffffff;
+            --cell-bg: rgba(255, 255, 255, 0.05);
+            --cell-hover: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-900), var(--bg-800));
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            user-select: none;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .back-btn {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+        .status {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+            min-height: 1.5em;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .cell {
+            width: 90px;
+            height: 90px;
+            background: var(--cell-bg);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .cell:hover {
+            background: var(--cell-hover);
+        }
+        .cell.selected {
+            background: rgba(0, 212, 255, 0.2);
+            box-shadow: inset 0 0 10px var(--accent);
+        }
+        .cell.classical {
+            font-size: 3.5rem;
+        }
+        .cell.x { color: #ff4d4d; }
+        .cell.o { color: #4dff4d; }
+        
+        /* Quantum Marks (Small) */
+        .q-mark {
+            font-size: 1rem;
+            position: absolute;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        /* Positioning for up to 8 quantum marks roughly */
+        .q-mark:nth-child(1) { top: 5px; left: 5px; }
+        .q-mark:nth-child(2) { top: 5px; right: 5px; }
+        .q-mark:nth-child(3) { bottom: 5px; left: 5px; }
+        .q-mark:nth-child(4) { bottom: 5px; right: 5px; }
+        .q-mark:nth-child(5) { top: 35%; left: 5px; }
+        .q-mark:nth-child(6) { top: 35%; right: 5px; }
+        
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        .btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: var(--accent);
+        }
+        .btn.active {
+            background: var(--accent);
+            color: #0a1628;
+        }
+
+        .mode-switch {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
+        .mode-opt {
+            padding: 8px 16px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .mode-opt.active {
+            background: var(--accent);
+            color: #0a1628;
+            font-weight: bold;
+        }
+
+        /* Collapse Animation */
+        @keyframes collapseFlash {
+            0% { background: white; }
+            100% { background: var(--cell-bg); }
+        }
+        .collapsing {
+            animation: collapseFlash 0.5s ease-out;
+        }
+        
+        .win-line {
+            position: absolute;
+            background: white;
+            height: 5px;
+            border-radius: 2px;
+            transform-origin: left;
+            z-index: 10;
+            box-shadow: 0 0 10px white;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html#games" class="back-btn" data-i18n="games.back">← Back</a>
+            <h1 data-i18n="games.quantum.title">Quantum Tic-Tac-Toe</h1>
+        </div>
+
+        <div class="mode-switch">
+            <div class="mode-opt active" id="modeQuantum" onclick="setMode('quantum')">Quantum Move</div>
+            <div class="mode-opt" id="modeClassic" onclick="setMode('classic')">Classic Move</div>
+        </div>
+
+        <div class="status" id="status">Player X's Turn</div>
+
+        <div class="board" id="board">
+            <!-- Cells generated by JS -->
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="resetGame()" data-i18n="games.restart">Restart</button>
+        </div>
+
+        <div class="instructions">
+            <strong data-i18n="games.quantum.rulesTitle">Rules:</strong>
+            <ul style="padding-left: 20px; margin: 5px 0;">
+                <li data-i18n="games.quantum.rule1"><strong>Quantum Move:</strong> Select 2 cells to place entangled marks.</li>
+                <li data-i18n="games.quantum.rule2"><strong>Classic Move:</strong> Select 1 cell to place a permanent mark.</li>
+                <li data-i18n="games.quantum.rule3"><strong>Collapse:</strong> When a cycle is formed (e.g. A-B, B-C, C-A), the board collapses into a single state randomly.</li>
+                <li data-i18n="games.quantum.rule4"><strong>Win:</strong> Get 3 permanent marks in a row.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        let cells = [];
+        
+        // Game State
+        let currentPlayer = 'X';
+        let moveCount = 1;
+        let boardState = Array(9).fill(null); // null, 'X', 'O' (Classical)
+        let quantumMoves = []; // { id: 1, player: 'X', cells: [0, 4], collapsed: false }
+        let currentMode = 'quantum'; // 'quantum' or 'classic'
+        let selectedCell = null; // For quantum move first selection
+        let gameOver = false;
+        let dragStart = null;
+        let touchStartCell = null;
+
+        // Init
+        function initGame() {
+            boardEl.innerHTML = '';
+            cells = [];
+            for(let i=0; i<9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                
+                // Mouse Events
+                cell.onmousedown = () => handleInputStart(i);
+                cell.onmouseup = () => handleInputEnd(i);
+                
+                // Touch Events
+                cell.ontouchstart = (e) => handleTouchStart(e, i);
+
+                boardEl.appendChild(cell);
+                cells.push(cell);
+            }
+            // Global touch end for board
+            boardEl.ontouchend = handleTouchEnd;
+            
+            resetState();
+        }
+
+        function handleInputStart(idx) {
+            if (gameOver) return;
+            dragStart = idx;
+        }
+
+        function handleInputEnd(idx) {
+            if (gameOver || dragStart === null) return;
+            
+            if (dragStart !== idx) {
+                // Drag operation -> Quantum Move
+                if (currentMode === 'quantum') {
+                    if (boardState[dragStart] === null && boardState[idx] === null) {
+                        makeQuantumMove(dragStart, idx);
+                        selectedCell = null;
+                    }
+                }
+            } else {
+                // Click operation
+                handleCellClick(idx);
+            }
+            dragStart = null;
+        }
+
+        function handleTouchStart(e, idx) {
+            if (gameOver) return;
+            e.preventDefault();
+            touchStartCell = idx;
+            cells[idx].classList.add('selected'); // Visual feedback
+        }
+
+        function handleTouchEnd(e) {
+            if (gameOver || touchStartCell === null) return;
+            e.preventDefault();
+            
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            const cell = target ? target.closest('.cell') : null;
+            
+            // Remove temp feedback if it was just a drag start
+            if (selectedCell !== touchStartCell) {
+                cells[touchStartCell].classList.remove('selected');
+            }
+            
+            if (cell) {
+                const idx = parseInt(cell.dataset.index);
+                if (!isNaN(idx)) {
+                    if (idx !== touchStartCell) {
+                        // Drag
+                        if (currentMode === 'quantum' && boardState[touchStartCell] === null && boardState[idx] === null) {
+                            makeQuantumMove(touchStartCell, idx);
+                            selectedCell = null;
+                        }
+                    } else {
+                        // Tap
+                        handleCellClick(idx);
+                    }
+                }
+            }
+            touchStartCell = null;
+            renderBoard(); // Ensure UI is consistent
+        }
+
+        function resetState() {
+            currentPlayer = 'X';
+            moveCount = 1;
+            boardState = Array(9).fill(null);
+            quantumMoves = [];
+            selectedCell = null;
+            gameOver = false;
+            currentMode = 'quantum';
+            updateUI();
+            renderBoard();
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            selectedCell = null;
+            document.getElementById('modeQuantum').classList.toggle('active', mode === 'quantum');
+            document.getElementById('modeClassic').classList.toggle('active', mode === 'classic');
+            renderBoard(); // clear selection
+        }
+
+        function handleCellClick(idx) {
+            if (gameOver) return;
+            if (boardState[idx] !== null) return; // Cell already collapsed/classical
+
+            const hasQuantumMarks = quantumMoves.some(m => !m.collapsed && m.cells.includes(idx));
+
+            if (currentMode === 'classic') {
+                if (hasQuantumMarks) {
+                    alert("Cannot place classical mark on quantum state!");
+                    return;
+                }
+                makeClassicalMove(idx);
+            } else {
+                // Quantum Move
+                if (selectedCell === null) {
+                    selectedCell = idx;
+                    renderBoard();
+                } else {
+                    if (selectedCell === idx) {
+                        selectedCell = null; // Deselect
+                        renderBoard();
+                    } else {
+                        makeQuantumMove(selectedCell, idx);
+                        selectedCell = null;
+                    }
+                }
+            }
+        }
+
+        function makeClassicalMove(idx) {
+            boardState[idx] = currentPlayer;
+            checkWin();
+            if (!gameOver) {
+                switchTurn();
+            }
+            renderBoard();
+        }
+
+        function makeQuantumMove(idx1, idx2) {
+            const move = {
+                id: moveCount,
+                player: currentPlayer,
+                cells: [idx1, idx2],
+                collapsed: false
+            };
+            quantumMoves.push(move);
+            
+            // Check for cycles
+            const cycle = detectCycle();
+            if (cycle) {
+                collapseCycle(cycle);
+            }
+
+            checkWin();
+            if (!gameOver) {
+                switchTurn();
+            }
+            renderBoard();
+        }
+
+        function switchTurn() {
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            moveCount++;
+            updateUI();
+        }
+
+        function updateUI() {
+            statusEl.textContent = `Player ${currentPlayer}'s Turn (${currentMode === 'quantum' ? 'Quantum' : 'Classic'})`;
+            statusEl.style.color = currentPlayer === 'X' ? '#ff4d4d' : '#4dff4d';
+        }
+
+        function renderBoard() {
+            cells.forEach((cell, i) => {
+                cell.innerHTML = '';
+                cell.className = 'cell';
+                
+                // Classical State
+                if (boardState[i]) {
+                    cell.classList.add('classical', boardState[i].toLowerCase());
+                    cell.textContent = boardState[i];
+                    return;
+                }
+
+                // Selection
+                if (selectedCell === i) {
+                    cell.classList.add('selected');
+                }
+
+                // Quantum Marks
+                const marks = quantumMoves.filter(m => !m.collapsed && m.cells.includes(i));
+                marks.forEach(m => {
+                    const span = document.createElement('span');
+                    span.className = 'q-mark';
+                    span.textContent = `${m.player}${m.id}`;
+                    span.style.color = m.player === 'X' ? '#ff4d4d' : '#4dff4d';
+                    cell.appendChild(span);
+                });
+            });
+        }
+
+        // --- Cycle Detection & Collapse ---
+
+        function detectCycle() {
+            // Build graph of active quantum moves
+            // Nodes: Cells (0-8)
+            // Edges: Moves connecting two cells
+            const activeMoves = quantumMoves.filter(m => !m.collapsed);
+            const adj = {};
+            
+            activeMoves.forEach(m => {
+                const [u, v] = m.cells;
+                if (!adj[u]) adj[u] = [];
+                if (!adj[v]) adj[v] = [];
+                adj[u].push({ to: v, move: m });
+                adj[v].push({ to: u, move: m });
+            });
+
+            // DFS to find cycle
+            const visited = new Set();
+            const path = []; // Stack of {node, move}
+            
+            function dfs(u, parentMoveId) {
+                visited.add(u);
+                if (!adj[u]) return null;
+
+                for (const edge of adj[u]) {
+                    if (edge.move.id === parentMoveId) continue; // Don't go back through same move
+
+                    if (visited.has(edge.to)) {
+                        // Cycle found!
+                        // Reconstruct path from current stack
+                        const cycleMoves = [edge.move];
+                        let idx = path.length - 1;
+                        while (idx >= 0) {
+                            cycleMoves.push(path[idx].move);
+                            if (path[idx].node === edge.to) break;
+                            idx--;
+                        }
+                        return cycleMoves;
+                    }
+
+                    path.push({ node: u, move: edge.move });
+                    const res = dfs(edge.to, edge.move.id);
+                    if (res) return res;
+                    path.pop();
+                }
+                return null;
+            }
+
+            // Check all components
+            for (const m of activeMoves) {
+                const startNode = m.cells[0];
+                if (!visited.has(startNode)) {
+                    const res = dfs(startNode, -1);
+                    if (res) return res;
+                }
+            }
+            return null;
+        }
+
+        function collapseCycle(cycleMoves) {
+            // Randomly choose one of the two possible collapse states for the cycle
+            // A cycle is a sequence of moves connecting cells.
+            // Actually, simpler approach:
+            // Pick the first move in the cycle. Randomly decide which of its 2 cells it collapses into.
+            // Then propagate this constraint to all other moves in the connected component (entanglement).
+            
+            // 1. Identify all moves in the connected component of the cycle
+            // (Because collapsing one part of a tangle collapses the whole tangle)
+            const activeMoves = quantumMoves.filter(m => !m.collapsed);
+            const componentMoves = getConnectedComponent(cycleMoves[0], activeMoves);
+
+            // 2. Randomly pick a collapse configuration
+            // We can simulate this by picking the first move, picking a target cell, and propagating.
+            // If a conflict arises (impossible configuration), we pick the other branch.
+            // But in QTTT, cycles always have 2 valid solutions.
+            
+            // Let's try to resolve the cycle first.
+            // Pick a random move from the cycle
+            const seedMove = cycleMoves[0];
+            const targetCell = Math.random() < 0.5 ? seedMove.cells[0] : seedMove.cells[1];
+
+            // Apply collapse
+            resolveEntanglement(seedMove, targetCell, activeMoves);
+        }
+
+        function getConnectedComponent(startMove, allMoves) {
+            const component = new Set([startMove]);
+            const queue = [startMove];
+            
+            while(queue.length > 0) {
+                const m = queue.shift();
+                // Find moves that share a cell with m
+                const neighbors = allMoves.filter(other => 
+                    !component.has(other) && 
+                    (other.cells.includes(m.cells[0]) || other.cells.includes(m.cells[1]))
+                );
+                neighbors.forEach(n => {
+                    component.add(n);
+                    queue.push(n);
+                });
+            }
+            return Array.from(component);
+        }
+
+        function resolveEntanglement(seedMove, targetCell, allMoves) {
+            // Map: MoveID -> CollapsedCell
+            const solution = {};
+            const queue = [{ move: seedMove, cell: targetCell }];
+            solution[seedMove.id] = targetCell;
+
+            // Propagate
+            // If Move M collapses to Cell C, then any other Move M' sharing Cell C CANNOT collapse to C.
+            // Since M' has only 2 cells, it MUST collapse to the other one.
+            
+            // We need to process the whole connected component
+            const component = getConnectedComponent(seedMove, allMoves);
+            
+            // Simple propagation loop
+            let changed = true;
+            while(changed) {
+                changed = false;
+                for (const m of component) {
+                    if (solution[m.id] !== undefined) continue; // Already solved
+
+                    // Check if one of its cells is taken by a solved move
+                    const c1 = m.cells[0];
+                    const c2 = m.cells[1];
+                    
+                    const taken1 = Object.values(solution).includes(c1);
+                    const taken2 = Object.values(solution).includes(c2);
+
+                    if (taken1 && !taken2) {
+                        solution[m.id] = c2;
+                        changed = true;
+                    } else if (!taken1 && taken2) {
+                        solution[m.id] = c1;
+                        changed = true;
+                    } else if (taken1 && taken2) {
+                        // Conflict? In a simple cycle this shouldn't happen if valid.
+                        // But if it does, it means the random choice was invalid for the whole graph?
+                        // In QTTT, a cycle implies a choice.
+                        console.warn("Conflict in collapse");
+                    }
+                }
+            }
+
+            // Apply solution to board
+            for (const m of component) {
+                m.collapsed = true;
+                if (solution[m.id] !== undefined) {
+                    const cellIdx = solution[m.id];
+                    boardState[cellIdx] = m.player;
+                    // Visual effect
+                    cells[cellIdx].classList.add('collapsing');
+                    setTimeout(() => cells[cellIdx].classList.remove('collapsing'), 500);
+                } else {
+                    // Move didn't get a spot (shouldn't happen in perfect cycle, but possible in complex tangles?)
+                    // In QTTT, every move in the cycle becomes real.
+                    // Moves branching off the cycle might not?
+                    // Actually, if a move is not forced, it remains quantum?
+                    // Standard rule: Only the cycle collapses.
+                    // But we are simplifying: "Decays randomly".
+                    // Let's just collapse what we can.
+                }
+            }
+        }
+
+        function checkWin() {
+            const wins = [
+                [0,1,2], [3,4,5], [6,7,8], // Rows
+                [0,3,6], [1,4,7], [2,5,8], // Cols
+                [0,4,8], [2,4,6]           // Diagonals
+            ];
+
+            for (const combo of wins) {
+                const [a, b, c] = combo;
+                if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                    gameOver = true;
+                    statusEl.textContent = `Player ${boardState[a]} Wins!`;
+                    statusEl.style.color = 'gold';
+                    highlightWin(combo);
+                    return;
+                }
+            }
+
+            if (!boardState.includes(null) && !gameOver) {
+                gameOver = true;
+                statusEl.textContent = "Draw!";
+                statusEl.style.color = 'white';
+            }
+        }
+
+        function highlightWin(combo) {
+            combo.forEach(i => cells[i].style.background = 'rgba(255, 215, 0, 0.3)');
+        }
+
+        function resetGame() {
+            resetState();
+        }
+
+        // Translations
+        async function loadTranslations() {
+            const lang = localStorage.getItem('lang') || 'en';
+            try {
+                const res = await fetch(`./i18n/${lang}.json`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.games && data.games.quantum) {
+                        const t = data.games.quantum;
+                        document.title = t.title;
+                        document.querySelector('h1').textContent = t.title;
+                        document.querySelector('.instructions strong').textContent = t.rulesTitle;
+                        // Update rules list...
+                    }
+                    if (data.games && data.games.back) {
+                        document.querySelector('.back-btn').textContent = "← " + data.games.back;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        window.onload = () => {
+            initGame();
+            loadTranslations();
+        };
+
+    </script>
+</body>
+</html>
