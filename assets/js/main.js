@@ -515,9 +515,12 @@ navLinks.forEach(link => {
 });
 
 // Generate animated particles
-function createParticles() {
+function createParticles(count = 50) {
     const particles = document.getElementById('particles');
-    for (let i = 0; i < 50; i++) {
+    if (!particles) return;
+    particles.innerHTML = ''; // Clear existing
+
+    for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.className = 'particle';
         particle.style.left = Math.random() * 100 + '%';
@@ -742,8 +745,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const val = quickSearch.value.trim().toLowerCase();
                 if (val === 'easter') {
                     window.location.href = 'easter_egg.html';
+                } else if (val === 'spark') {
+                    const sparkControl = document.getElementById('sparkControl');
+                    if (sparkControl) {
+                        sparkControl.style.display = 'block';
+                        if (typeof closeMenu === 'function') closeMenu();
+                    }
                 }
             }
+        });
+    }
+
+    // Spark Control Logic
+    const sparkSlider = document.getElementById('sparkSlider');
+    const sparkValue = document.getElementById('sparkValue');
+    const closeSparkControl = document.getElementById('closeSparkControl');
+    const sparkControl = document.getElementById('sparkControl');
+
+    if (sparkSlider && sparkValue) {
+        sparkSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            sparkValue.textContent = val;
+            createParticles(val);
+        });
+    }
+
+    if (closeSparkControl && sparkControl) {
+        closeSparkControl.addEventListener('click', () => {
+            sparkControl.style.display = 'none';
         });
     }
 
