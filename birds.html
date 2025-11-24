@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Bird Flocking Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            user-select: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+        button:hover { background: white; }
+        button.active { background: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>Flocking Simulation</h2>
+        <p>Realistic Boids Algorithm</p>
+        <p>Birds: <span id="birdCount">0</span></p>
+    </div>
+    <div id="controls">
+        <button id="btnGeneral" class="active">General View</button>
+        <button id="btnBird">Bird View</button>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
+
+        // --- Configuration ---
+        const BIRD_COUNT = 300;
+        const WORLD_SIZE = 800;
+        const SPEED = 2.5;
+        const SEPARATION_RADIUS = 20;
+        const ALIGNMENT_RADIUS = 60;
+        const COHESION_RADIUS = 60;
+        
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 100, 900);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+        camera.position.set(0, 100, 400);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below ground
+
+        // --- Lighting ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+        hemiLight.position.set(0, 200, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(100, 200, 100);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.top = 500;
+        dirLight.shadow.camera.bottom = -500;
+        dirLight.shadow.camera.left = -500;
+        dirLight.shadow.camera.right = 500;
+        dirLight.shadow.camera.near = 0.1;
+        dirLight.shadow.camera.far = 1000;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // --- Environment ---
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(2000, 2000, 64, 64);
+        
+        // Create some terrain variation
+        const posAttribute = groundGeo.attributes.position;
+        const noise = new ImprovedNoise();
+        for (let i = 0; i < posAttribute.count; i++) {
+            const x = posAttribute.getX(i);
+            const y = posAttribute.getY(i); // This is actually Z in world space before rotation
+            // Simple noise for hills
+            const z = noise.noise(x * 0.002, y * 0.002, 0) * 40;
+            posAttribute.setZ(i, z);
+        }
+        groundGeo.computeVertexNormals();
+
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: 0x3a5f0b, 
+            roughness: 0.8,
+            flatShading: true
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Trees
+        function createTree(x, z) {
+            const treeGroup = new THREE.Group();
+            
+            // Trunk
+            const trunkGeo = new THREE.CylinderGeometry(2, 4, 15, 6);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d2926 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 7.5;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            treeGroup.add(trunk);
+
+            // Leaves (Low Poly style)
+            const leavesGeo = new THREE.DodecahedronGeometry(12);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 22;
+            leaves.castShadow = true;
+            leaves.receiveShadow = true;
+            treeGroup.add(leaves);
+
+            // Random scale and rotation
+            const s = 1 + Math.random() * 0.5;
+            treeGroup.scale.set(s, s, s);
+            treeGroup.rotation.y = Math.random() * Math.PI;
+            
+            // Adjust Y based on terrain height (approximate)
+            const y = noise.noise(x * 0.002, -z * 0.002, 0) * 40; // Note: z is negated because of plane rotation logic
+            treeGroup.position.set(x, y, z);
+            
+            scene.add(treeGroup);
+        }
+
+        // Add random trees
+        for (let i = 0; i < 100; i++) {
+            const x = (Math.random() - 0.5) * 1800;
+            const z = (Math.random() - 0.5) * 1800;
+            createTree(x, z);
+        }
+
+        // --- Birds (Boids) ---
+        class Bird {
+            constructor() {
+                this.position = new THREE.Vector3(
+                    (Math.random() - 0.5) * WORLD_SIZE,
+                    50 + Math.random() * 100,
+                    (Math.random() - 0.5) * WORLD_SIZE
+                );
+                this.velocity = new THREE.Vector3(
+                    Math.random() - 0.5,
+                    Math.random() - 0.5,
+                    Math.random() - 0.5
+                ).normalize().multiplyScalar(SPEED);
+                this.acceleration = new THREE.Vector3();
+                
+                // Mesh
+                this.mesh = createBirdMesh();
+                this.mesh.position.copy(this.position);
+                this.mesh.castShadow = true;
+                scene.add(this.mesh);
+
+                // Animation offset
+                this.wingPhase = Math.random() * Math.PI * 2;
+            }
+
+            update(boids, dt) {
+                this.flock(boids);
+                this.updatePhysics(dt);
+                this.updateMesh(dt);
+            }
+
+            flock(boids) {
+                let separation = new THREE.Vector3();
+                let alignment = new THREE.Vector3();
+                let cohesion = new THREE.Vector3();
+                let count = 0;
+
+                for (let other of boids) {
+                    if (other === this) continue;
+
+                    const dist = this.position.distanceTo(other.position);
+
+                    if (dist > 0 && dist < COHESION_RADIUS) {
+                        // Cohesion
+                        cohesion.add(other.position);
+                        
+                        // Alignment
+                        if (dist < ALIGNMENT_RADIUS) {
+                            alignment.add(other.velocity);
+                        }
+
+                        // Separation
+                        if (dist < SEPARATION_RADIUS) {
+                            const diff = new THREE.Vector3().subVectors(this.position, other.position);
+                            diff.normalize().divideScalar(dist); // Weight by distance
+                            separation.add(diff);
+                        }
+                        count++;
+                    }
+                }
+
+                if (count > 0) {
+                    // Cohesion
+                    cohesion.divideScalar(count);
+                    cohesion.sub(this.position); // Vector to center
+                    cohesion.normalize().multiplyScalar(SPEED);
+                    cohesion.sub(this.velocity);
+                    cohesion.clampLength(0, 0.05); // Max steer force
+
+                    // Alignment
+                    alignment.divideScalar(count);
+                    alignment.normalize().multiplyScalar(SPEED);
+                    alignment.sub(this.velocity);
+                    alignment.clampLength(0, 0.05);
+
+                    // Separation
+                    separation.divideScalar(count);
+                    separation.normalize().multiplyScalar(SPEED);
+                    separation.sub(this.velocity);
+                    separation.clampLength(0, 0.1); // Stronger separation
+                }
+
+                this.acceleration.add(separation.multiplyScalar(1.5));
+                this.acceleration.add(alignment.multiplyScalar(1.0));
+                this.acceleration.add(cohesion.multiplyScalar(1.0));
+
+                // Avoid ground
+                if (this.position.y < 30) {
+                    this.acceleration.y += 0.2;
+                }
+                // Avoid ceiling
+                if (this.position.y > 300) {
+                    this.acceleration.y -= 0.1;
+                }
+                // Center attraction (keep in world)
+                if (this.position.length() > WORLD_SIZE) {
+                    const toCenter = new THREE.Vector3().subVectors(new THREE.Vector3(0,100,0), this.position);
+                    toCenter.normalize().multiplyScalar(0.05);
+                    this.acceleration.add(toCenter);
+                }
+            }
+
+            updatePhysics(dt) {
+                this.velocity.add(this.acceleration);
+                this.velocity.clampLength(SPEED * 0.5, SPEED * 1.5); // Min/Max speed
+                this.position.add(this.velocity);
+                this.acceleration.set(0, 0, 0);
+            }
+
+            updateMesh(dt) {
+                this.mesh.position.copy(this.position);
+                
+                // Orientation
+                const target = this.position.clone().add(this.velocity);
+                this.mesh.lookAt(target);
+
+                // Wing animation
+                this.wingPhase += dt * 15;
+                const wingRotation = Math.sin(this.wingPhase) * 0.5;
+                
+                // Access wings in group
+                const leftWing = this.mesh.children[0];
+                const rightWing = this.mesh.children[1];
+                
+                if (leftWing && rightWing) {
+                    leftWing.rotation.z = wingRotation;
+                    rightWing.rotation.z = -wingRotation;
+                }
+            }
+        }
+
+        function createBirdMesh() {
+            const group = new THREE.Group();
+
+            // Body
+            const bodyGeo = new THREE.ConeGeometry(0.5, 2, 8);
+            bodyGeo.rotateX(Math.PI / 2); // Point forward
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            group.add(body);
+
+            // Wings
+            const wingGeo = new THREE.BoxGeometry(2, 0.1, 1);
+            wingGeo.translate(1, 0, 0); // Pivot at edge
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+
+            const leftWing = new THREE.Mesh(wingGeo, wingMat);
+            leftWing.position.set(0, 0, 0);
+            group.add(leftWing);
+
+            const rightWing = new THREE.Mesh(wingGeo, wingMat);
+            rightWing.position.set(0, 0, 0);
+            rightWing.scale.x = -1; // Mirror
+            group.add(rightWing);
+
+            return group;
+        }
+
+        // --- Main Loop ---
+        const birds = [];
+        for (let i = 0; i < BIRD_COUNT; i++) {
+            birds.push(new Bird());
+        }
+        document.getElementById('birdCount').textContent = BIRD_COUNT;
+
+        // Camera State
+        let cameraMode = 'general'; // 'general' or 'bird'
+        let targetBirdIndex = 0;
+
+        // UI Handlers
+        const btnGeneral = document.getElementById('btnGeneral');
+        const btnBird = document.getElementById('btnBird');
+
+        btnGeneral.addEventListener('click', () => {
+            cameraMode = 'general';
+            btnGeneral.classList.add('active');
+            btnBird.classList.remove('active');
+            controls.enabled = true;
+            // Reset camera to a nice view
+            camera.position.set(0, 100, 400);
+            controls.target.set(0, 0, 0);
+        });
+
+        btnBird.addEventListener('click', () => {
+            cameraMode = 'bird';
+            btnBird.classList.add('active');
+            btnGeneral.classList.remove('active');
+            controls.enabled = false;
+            // Pick a random bird
+            targetBirdIndex = Math.floor(Math.random() * birds.length);
+        });
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = clock.getDelta();
+
+            // Update Birds
+            for (let bird of birds) {
+                bird.update(birds, dt);
+            }
+
+            // Update Camera
+            if (cameraMode === 'bird') {
+                const targetBird = birds[targetBirdIndex];
+                if (targetBird) {
+                    // Position camera behind and above bird
+                    const offset = new THREE.Vector3(0, 2, -8); // Behind
+                    offset.applyQuaternion(targetBird.mesh.quaternion);
+                    const camPos = targetBird.position.clone().add(offset);
+                    
+                    // Smooth follow
+                    camera.position.lerp(camPos, 0.1);
+                    
+                    // Look at bird (or slightly ahead)
+                    const lookAtPos = targetBird.position.clone().add(targetBird.velocity.clone().multiplyScalar(2));
+                    camera.lookAt(lookAtPos);
+                }
+            } else {
+                controls.update();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
