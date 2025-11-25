@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Yatzee - 2 Giocatori</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --accent: #fd79a8;
+            --bg: #dfe6e9;
+            --text: #2d3436;
+            --white: #ffffff;
+            --p1-color: #0984e3;
+            --p2-color: #d63031;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Player Info */
+        .players-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .player-card {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            opacity: 0.6;
+        }
+
+        .player-card.active {
+            opacity: 1;
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            font-weight: bold;
+        }
+
+        .p1.active { background-color: rgba(9, 132, 227, 0.1); border: 2px solid var(--p1-color); color: var(--p1-color); }
+        .p2.active { background-color: rgba(214, 48, 49, 0.1); border: 2px solid var(--p2-color); color: var(--p2-color); }
+
+        .score-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Dice Area */
+        .dice-area {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .dice-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .die {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border: 2px solid #b2bec3;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #b2bec3;
+            transition: transform 0.1s, margin-top 0.1s;
+            position: relative;
+            user-select: none;
+        }
+
+        .die.held {
+            border-color: var(--accent);
+            box-shadow: 0 4px 0 var(--accent);
+            background-color: #fff0f6;
+            transform: translateY(4px);
+            margin-top: 4px; /* Visual hold effect */
+        }
+
+        .die.rolling {
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(5deg); }
+            50% { transform: rotate(0deg); }
+            75% { transform: rotate(-5deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        /* Dots for dice */
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #2d3436;
+            border-radius: 50%;
+            position: absolute;
+        }
+        /* Dice Faces */
+        .face-1 .dot:nth-child(1) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        
+        .face-2 .dot:nth-child(1) { top: 20%; left: 20%; }
+        .face-2 .dot:nth-child(2) { bottom: 20%; right: 20%; }
+
+        .face-3 .dot:nth-child(1) { top: 20%; left: 20%; }
+        .face-3 .dot:nth-child(2) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .face-3 .dot:nth-child(3) { bottom: 20%; right: 20%; }
+
+        .face-4 .dot:nth-child(1) { top: 20%; left: 20%; }
+        .face-4 .dot:nth-child(2) { top: 20%; right: 20%; }
+        .face-4 .dot:nth-child(3) { bottom: 20%; left: 20%; }
+        .face-4 .dot:nth-child(4) { bottom: 20%; right: 20%; }
+
+        .face-5 .dot:nth-child(1) { top: 20%; left: 20%; }
+        .face-5 .dot:nth-child(2) { top: 20%; right: 20%; }
+        .face-5 .dot:nth-child(3) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .face-5 .dot:nth-child(4) { bottom: 20%; left: 20%; }
+        .face-5 .dot:nth-child(5) { bottom: 20%; right: 20%; }
+
+        .face-6 .dot:nth-child(1) { top: 20%; left: 20%; }
+        .face-6 .dot:nth-child(2) { top: 20%; right: 20%; }
+        .face-6 .dot:nth-child(3) { top: 50%; left: 20%; transform: translateY(-50%); }
+        .face-6 .dot:nth-child(4) { top: 50%; right: 20%; transform: translateY(-50%); }
+        .face-6 .dot:nth-child(5) { bottom: 20%; left: 20%; }
+        .face-6 .dot:nth-child(6) { bottom: 20%; right: 20%; }
+
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .roll-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(108, 92, 231, 0.4);
+            transition: transform 0.1s;
+            width: 100%;
+            max-width: 250px;
+        }
+
+        .roll-btn:active {
+            transform: scale(0.98);
+        }
+
+        .roll-btn:disabled {
+            background: #b2bec3;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .rolls-left {
+            font-size: 0.9rem;
+            color: #636e72;
+        }
+
+        /* Scorecard */
+        .scorecard {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .score-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            border-bottom: 1px solid #f1f2f6;
+        }
+
+        .score-row:last-child {
+            border-bottom: none;
+        }
+
+        .score-header {
+            background: #f8f9fa;
+            font-weight: bold;
+            padding: 10px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .category-name {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .score-cell {
+            padding: 10px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .score-cell.p1 { border-left: 1px solid #f1f2f6; }
+        .score-cell.p2 { border-left: 1px solid #f1f2f6; }
+
+        .score-cell.filled {
+            color: #2d3436;
+            cursor: default;
+        }
+
+        .score-cell.potential {
+            color: rgba(0,0,0,0.3);
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .score-cell.potential:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+
+        .score-cell.selected {
+            background-color: #ffeaa7;
+            color: #d63031;
+        }
+
+        .total-row {
+            background: #dfe6e9;
+            font-weight: bold;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            width: 300px;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .winner-text {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .restart-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="index.html" class="back-btn">←</a>
+        <h1>Yatzee</h1>
+        <div style="font-size: 0.8rem; opacity: 0.8;">2 Giocatori</div>
+    </header>
+
+    <div class="game-container">
+        
+        <div class="players-info">
+            <div class="player-card p1 active" id="p1-card">
+                <div>Giocatore 1</div>
+                <div class="score-display" id="p1-total">0</div>
+            </div>
+            <div class="player-card p2" id="p2-card">
+                <div>Giocatore 2</div>
+                <div class="score-display" id="p2-total">0</div>
+            </div>
+        </div>
+
+        <div class="dice-area">
+            <div class="dice-container" id="dice-container">
+                <!-- Dice will be generated here -->
+                <div class="die face-1" onclick="toggleHold(0)">
+                    <div class="dot"></div>
+                </div>
+                <div class="die face-2" onclick="toggleHold(1)">
+                    <div class="dot"></div><div class="dot"></div>
+                </div>
+                <div class="die face-3" onclick="toggleHold(2)">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+                <div class="die face-4" onclick="toggleHold(3)">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+                <div class="die face-5" onclick="toggleHold(4)">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="roll-btn" id="roll-btn" onclick="rollDice()">Lancia Dadi</button>
+                <div class="rolls-left" id="rolls-left">Lanci rimasti: 3</div>
+            </div>
+        </div>
+
+        <div class="scorecard" id="scorecard">
+            <div class="score-row score-header">
+                <div>Categoria</div>
+                <div>G1</div>
+                <div>G2</div>
+            </div>
+            <!-- Rows generated by JS -->
+        </div>
+
+    </div>
+
+    <div class="modal-overlay" id="game-over-modal">
+        <div class="modal">
+            <h2>Partita Finita!</h2>
+            <div class="winner-text" id="winner-text">Vince Giocatore 1!</div>
+            <p id="final-scores" style="margin-bottom: 20px;">G1: 100 - G2: 90</p>
+            <button class="restart-btn" onclick="resetGame()">Gioca Ancora</button>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        const gameState = {
+            currentPlayer: 1, // 1 or 2
+            rollsLeft: 3,
+            dice: [1, 1, 1, 1, 1],
+            held: [false, false, false, false, false],
+            scores: {
+                p1: {},
+                p2: {}
+            },
+            turnOver: false
+        };
+
+        const categories = [
+            { id: 'ones', name: 'Uni (1)', type: 'upper' },
+            { id: 'twos', name: 'Due (2)', type: 'upper' },
+            { id: 'threes', name: 'Tre (3)', type: 'upper' },
+            { id: 'fours', name: 'Quattro (4)', type: 'upper' },
+            { id: 'fives', name: 'Cinque (5)', type: 'upper' },
+            { id: 'sixes', name: 'Sei (6)', type: 'upper' },
+            { id: 'bonus', name: 'Bonus (63+)', type: 'bonus', noClick: true },
+            { id: 'threeKind', name: 'Tris', type: 'lower' },
+            { id: 'fourKind', name: 'Poker', type: 'lower' },
+            { id: 'fullHouse', name: 'Full (25)', type: 'lower' },
+            { id: 'smallStraight', name: 'Scala Piccola (30)', type: 'lower' },
+            { id: 'largeStraight', name: 'Scala Grande (40)', type: 'lower' },
+            { id: 'yahtzee', name: 'Yatzee (50)', type: 'lower' },
+            { id: 'chance', name: 'Chance', type: 'lower' }
+        ];
+
+        // Init
+        function init() {
+            renderScorecard();
+            updateUI();
+            resetDiceUI();
+        }
+
+        function resetGame() {
+            gameState.currentPlayer = 1;
+            gameState.rollsLeft = 3;
+            gameState.dice = [1, 1, 1, 1, 1];
+            gameState.held = [false, false, false, false, false];
+            gameState.scores = { p1: {}, p2: {} };
+            gameState.turnOver = false;
+            
+            document.getElementById('game-over-modal').style.display = 'none';
+            
+            // Clear UI
+            document.querySelectorAll('.score-cell').forEach(cell => {
+                cell.classList.remove('filled', 'potential');
+                cell.textContent = '';
+            });
+            
+            updateUI();
+            resetDiceUI();
+        }
+
+        // Dice Logic
+        function rollDice() {
+            if (gameState.rollsLeft <= 0) return;
+
+            const diceElements = document.querySelectorAll('.die');
+            let rollingCount = 0;
+
+            // Animation start
+            diceElements.forEach((die, i) => {
+                if (!gameState.held[i]) {
+                    die.classList.add('rolling');
+                    rollingCount++;
+                }
+            });
+
+            if (rollingCount === 0) return; // No dice to roll
+
+            document.getElementById('roll-btn').disabled = true;
+
+            // Simulate rolling delay
+            setTimeout(() => {
+                // Update values
+                for (let i = 0; i < 5; i++) {
+                    if (!gameState.held[i]) {
+                        gameState.dice[i] = Math.floor(Math.random() * 6) + 1;
+                    }
+                }
+                
+                gameState.rollsLeft--;
+                
+                // Animation end
+                diceElements.forEach(die => die.classList.remove('rolling'));
+                updateDiceUI();
+                updateUI();
+                showPotentialScores();
+
+                document.getElementById('roll-btn').disabled = gameState.rollsLeft <= 0;
+            }, 600);
+        }
+
+        function toggleHold(index) {
+            if (gameState.rollsLeft === 3) return; // Can't hold before first roll
+            gameState.held[index] = !gameState.held[index];
+            updateDiceUI();
+        }
+
+        function updateDiceUI() {
+            const container = document.getElementById('dice-container');
+            container.innerHTML = '';
+            
+            gameState.dice.forEach((val, i) => {
+                const die = document.createElement('div');
+                die.className = `die face-${val} ${gameState.held[i] ? 'held' : ''}`;
+                die.onclick = () => toggleHold(i);
+                
+                // Create dots
+                for(let d=0; d<val; d++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'dot';
+                    die.appendChild(dot);
+                }
+                
+                container.appendChild(die);
+            });
+        }
+        
+        function resetDiceUI() {
+            gameState.dice = [1,1,1,1,1];
+            gameState.held = [false,false,false,false,false];
+            updateDiceUI();
+        }
+
+        // Scoring Logic
+        function calculateScore(category, dice) {
+            const counts = {};
+            let sum = 0;
+            dice.forEach(d => {
+                counts[d] = (counts[d] || 0) + 1;
+                sum += d;
+            });
+            const values = Object.values(counts);
+            const unique = Object.keys(counts).map(Number).sort((a,b) => a-b);
+
+            switch(category) {
+                case 'ones': return (counts[1] || 0) * 1;
+                case 'twos': return (counts[2] || 0) * 2;
+                case 'threes': return (counts[3] || 0) * 3;
+                case 'fours': return (counts[4] || 0) * 4;
+                case 'fives': return (counts[5] || 0) * 5;
+                case 'sixes': return (counts[6] || 0) * 6;
+                
+                case 'threeKind': return values.some(v => v >= 3) ? sum : 0;
+                case 'fourKind': return values.some(v => v >= 4) ? sum : 0;
+                case 'fullHouse': return (values.includes(3) && values.includes(2)) || values.includes(5) ? 25 : 0;
+                case 'smallStraight': 
+                    // Check for 4 consecutive
+                    let cons = 0;
+                    for(let i=0; i<unique.length-1; i++) {
+                        if (unique[i+1] === unique[i]+1) cons++;
+                        else cons = 0;
+                        if (cons >= 3) return 30;
+                    }
+                    return 0;
+                case 'largeStraight':
+                    let consL = 0;
+                    for(let i=0; i<unique.length-1; i++) {
+                        if (unique[i+1] === unique[i]+1) consL++;
+                        else consL = 0;
+                        if (consL >= 4) return 40;
+                    }
+                    return 0;
+                case 'yahtzee': return values.includes(5) ? 50 : 0;
+                case 'chance': return sum;
+                default: return 0;
+            }
+        }
+
+        function renderScorecard() {
+            const container = document.getElementById('scorecard');
+            // Keep header
+            const header = container.firstElementChild;
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            categories.forEach(cat => {
+                const row = document.createElement('div');
+                row.className = 'score-row';
+                if (cat.id === 'bonus') row.classList.add('total-row');
+
+                const name = document.createElement('div');
+                name.className = 'category-name';
+                name.textContent = cat.name;
+                row.appendChild(name);
+
+                // P1 Cell
+                const p1Cell = document.createElement('div');
+                p1Cell.className = 'score-cell p1';
+                p1Cell.id = `p1-${cat.id}`;
+                if (!cat.noClick) p1Cell.onclick = () => selectScore(1, cat.id);
+                row.appendChild(p1Cell);
+
+                // P2 Cell
+                const p2Cell = document.createElement('div');
+                p2Cell.className = 'score-cell p2';
+                p2Cell.id = `p2-${cat.id}`;
+                if (!cat.noClick) p2Cell.onclick = () => selectScore(2, cat.id);
+                row.appendChild(p2Cell);
+
+                container.appendChild(row);
+            });
+            
+            // Total Row
+            const totalRow = document.createElement('div');
+            totalRow.className = 'score-row total-row';
+            totalRow.innerHTML = `
+                <div class="category-name">TOTALE</div>
+                <div class="score-cell" id="p1-grand-total">0</div>
+                <div class="score-cell" id="p2-grand-total">0</div>
+            `;
+            container.appendChild(totalRow);
+        }
+
+        function showPotentialScores() {
+            if (gameState.rollsLeft === 3) return; // Don't show before rolling
+
+            categories.forEach(cat => {
+                if (cat.noClick) return;
+                
+                const player = gameState.currentPlayer;
+                const cellId = `p${player}-${cat.id}`;
+                const cell = document.getElementById(cellId);
+                
+                // Only show if not already filled
+                if (gameState.scores[`p${player}`][cat.id] === undefined) {
+                    const potential = calculateScore(cat.id, gameState.dice);
+                    cell.textContent = potential;
+                    cell.classList.add('potential');
+                }
+            });
+        }
+
+        function clearPotentialScores() {
+            document.querySelectorAll('.score-cell.potential').forEach(cell => {
+                cell.textContent = '';
+                cell.classList.remove('potential');
+            });
+        }
+
+        function selectScore(player, categoryId) {
+            if (player !== gameState.currentPlayer) return;
+            if (gameState.rollsLeft === 3) return; // Must roll at least once
+            if (gameState.scores[`p${player}`][categoryId] !== undefined) return; // Already filled
+
+            const score = calculateScore(categoryId, gameState.dice);
+            gameState.scores[`p${player}`][categoryId] = score;
+
+            // Update UI
+            const cell = document.getElementById(`p${player}-${categoryId}`);
+            cell.textContent = score;
+            cell.classList.remove('potential');
+            cell.classList.add('filled');
+
+            updateTotals(player);
+            clearPotentialScores();
+            switchTurn();
+        }
+
+        function updateTotals(player) {
+            const pScores = gameState.scores[`p${player}`];
+            
+            // Upper Section
+            let upperSum = 0;
+            ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'].forEach(cat => {
+                upperSum += (pScores[cat] || 0);
+            });
+
+            // Bonus
+            let bonus = 0;
+            if (upperSum >= 63) {
+                bonus = 35;
+                pScores['bonus'] = 35; // Mark as achieved
+                document.getElementById(`p${player}-bonus`).textContent = '35';
+            } else {
+                document.getElementById(`p${player}-bonus`).textContent = '0';
+            }
+
+            // Total
+            let total = 0;
+            categories.forEach(cat => {
+                if (cat.id !== 'bonus') total += (pScores[cat.id] || 0);
+            });
+            total += bonus;
+
+            document.getElementById(`p${player}-total`).textContent = total;
+            document.getElementById(`p${player}-grand-total`).textContent = total;
+        }
+
+        function switchTurn() {
+            // Check Game Over
+            const p1Filled = Object.keys(gameState.scores.p1).length;
+            const p2Filled = Object.keys(gameState.scores.p2).length;
+            // Total categories minus bonus = 13
+            // Bonus is auto-filled visually but not in keys count usually unless we add it.
+            // Let's count filled cells in UI or just count keys.
+            // We have 13 playable categories.
+            
+            // Actually, let's just check if all playable categories are filled for both
+            const playableCats = categories.filter(c => !c.noClick).length;
+            
+            // Note: pScores might contain 'bonus' key if we set it.
+            // Let's count playable keys.
+            const countPlayable = (p) => categories.filter(c => !c.noClick && gameState.scores[`p${p}`][c.id] !== undefined).length;
+
+            if (countPlayable(1) === playableCats && countPlayable(2) === playableCats) {
+                endGame();
+                return;
+            }
+
+            gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+            gameState.rollsLeft = 3;
+            gameState.held = [false, false, false, false, false];
+            gameState.dice = [1, 1, 1, 1, 1]; // Reset visuals? Or keep last roll? Usually reset or keep. Let's reset visuals to blank or something.
+            // Actually standard is to clear dice or just reset state.
+            
+            resetDiceUI();
+            updateUI();
+            document.getElementById('roll-btn').disabled = false;
+        }
+
+        function updateUI() {
+            document.getElementById('p1-card').classList.toggle('active', gameState.currentPlayer === 1);
+            document.getElementById('p2-card').classList.toggle('active', gameState.currentPlayer === 2);
+            document.getElementById('rolls-left').textContent = `Lanci rimasti: ${gameState.rollsLeft}`;
+            
+            // Disable other player columns visually?
+            // Handled by selectScore check
+        }
+
+        function endGame() {
+            const p1Score = parseInt(document.getElementById('p1-grand-total').textContent);
+            const p2Score = parseInt(document.getElementById('p2-grand-total').textContent);
+            
+            let text = "";
+            if (p1Score > p2Score) text = "Vince Giocatore 1! 🏆";
+            else if (p2Score > p1Score) text = "Vince Giocatore 2! 🏆";
+            else text = "Pareggio! 🤝";
+
+            document.getElementById('winner-text').textContent = text;
+            document.getElementById('final-scores').textContent = `G1: ${p1Score} - G2: ${p2Score}`;
+            document.getElementById('game-over-modal').style.display = 'flex';
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
