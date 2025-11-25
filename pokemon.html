@@ -154,6 +154,25 @@
             z-index: 20;
             pointer-events: none;
         }
+        
+        #clock-hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 20;
+        }
+
         .inv-item {
             background: rgba(0,0,0,0.6);
             color: white;
@@ -272,6 +291,10 @@
         <div id="game-screen">
             <div id="canvas-wrapper">
                 <div id="transition-overlay"></div>
+                <div id="clock-hud">
+                    <span id="clock-icon">☀️</span>
+                    <span id="clock-time">12:00</span>
+                </div>
                 <div id="tool-hud">
                     <span id="tool-icon">🪓</span>
                     <span id="tool-name">Ascia</span>
@@ -335,6 +358,47 @@
         let savedOutdoorPos = { x: 0, y: 0, wx: 0, wy: 0 };
         let zoomLevel = 0; // Intro zoom start
 
+        // Time System
+        const gameTime = {
+            hour: 12,
+            minute: 0,
+            timer: 0,
+            day: true
+        };
+
+        function updateTime() {
+            gameTime.timer++;
+            if (gameTime.timer > 10) { // Update every 10 frames (fast time)
+                gameTime.timer = 0;
+                gameTime.minute++;
+                if (gameTime.minute >= 60) {
+                    gameTime.minute = 0;
+                    gameTime.hour++;
+                    if (gameTime.hour >= 24) {
+                        gameTime.hour = 0;
+                    }
+                }
+                
+                // Update UI
+                const h = gameTime.hour.toString().padStart(2, '0');
+                const m = gameTime.minute.toString().padStart(2, '0');
+                document.getElementById('clock-time').textContent = `${h}:${m}`;
+                
+                // Update Icon & Day/Night State
+                const icon = document.getElementById('clock-icon');
+                if (gameTime.hour >= 6 && gameTime.hour < 20) {
+                    if (!gameTime.day) {
+                        gameTime.day = true;
+                        icon.textContent = '☀️';
+                    }
+                } else {
+                    if (gameTime.day) {
+                        gameTime.day = false;
+                        icon.textContent = '🌙';
+                    }
+                }
+            }
+        }
         
         // Quiz State
         let quizState = {
@@ -803,7 +867,7 @@
                 }
             }
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], boat: boat, type: 'outdoor', biome: biome };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], fireflies: [], boat: boat, type: 'outdoor', biome: biome };
         }
 
         function generateDungeon() {
@@ -863,7 +927,7 @@
                 }
             }
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'dungeon' };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], fireflies: [], type: 'dungeon' };
         }
 
         function enterDungeon() {
@@ -1038,7 +1102,7 @@
                 newMap[4][6] = 6;
             }
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'indoor', width: size, height: size };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], fireflies: [], type: 'indoor', width: size, height: size };
         }
 
         // Gestione Mappe
@@ -2058,12 +2122,68 @@
         function update() {
             if (isTransitioning) return;
 
+            updateTime();
+
+            // Update Fireflies (Night only)
+            if (currentData.fireflies) {
+                const isNight = gameTime.hour >= 20 || gameTime.hour < 6;
+                
+                if (isNight) {
+                    // Spawn
+                    if (Math.random() < 0.05) { // 5% chance per frame
+                        const mapH = currentMap.length;
+                        const mapW = currentMap[0].length;
+                        const rx = Math.floor(Math.random() * mapW);
+                        const ry = Math.floor(Math.random() * mapH);
+                        const tile = currentMap[ry][rx];
+                        
+                        // Spawn near grass (1) or trees (2) or flowers (3)
+                        if (tile === 1 || tile === 2 || tile === 3) {
+                            currentData.fireflies.push({
+                                x: rx * TILE_SIZE + Math.random() * TILE_SIZE,
+                                y: ry * TILE_SIZE + Math.random() * TILE_SIZE,
+                                vx: (Math.random() - 0.5) * 0.5,
+                                vy: (Math.random() - 0.5) * 0.5,
+                                life: 100 + Math.random() * 100,
+                                maxLife: 200,
+                                opacity: 1
+                            });
+                        }
+                    }
+                }
+
+                // Update
+                for (let i = currentData.fireflies.length - 1; i >= 0; i--) {
+                    const f = currentData.fireflies[i];
+                    f.x += f.vx;
+                    f.y += f.vy;
+                    f.life--;
+                    
+                    // Fade out
+                    if (f.life < 20) f.opacity = f.life / 20;
+                    else if (f.life > f.maxLife - 20) f.opacity = (f.maxLife - f.life) / 20;
+                    else f.opacity = 1;
+
+                    // Random drift change
+                    if (Math.random() < 0.1) {
+                        f.vx += (Math.random() - 0.5) * 0.1;
+                        f.vy += (Math.random() - 0.5) * 0.1;
+                    }
+
+                    if (f.life <= 0) {
+                        currentData.fireflies.splice(i, 1);
+                    }
+                }
+            }
+
             // Update Active Tiles (Shaking)
             if (currentData.activeTiles) {
                 // Randomly add new active tile
                 if (Math.random() < 0.015) { // 1.5% chance per frame
-                    const rx = Math.floor(Math.random() * MAP_SIZE);
-                    const ry = Math.floor(Math.random() * MAP_SIZE);
+                    const mapH = currentMap.length;
+                    const mapW = currentMap[0].length;
+                    const rx = Math.floor(Math.random() * mapW);
+                    const ry = Math.floor(Math.random() * mapH);
                     const tile = currentMap[ry][rx];
                     
                     let canBeActive = false;
@@ -2523,7 +2643,39 @@
                 }
             });
 
+            // Draw Fireflies (World Space)
+            if (currentData.fireflies) {
+                currentData.fireflies.forEach(f => {
+                    // Only draw if visible
+                    if (f.x >= startX * TILE_SIZE && f.x <= (endX + 1) * TILE_SIZE &&
+                        f.y >= startY * TILE_SIZE && f.y <= (endY + 1) * TILE_SIZE) {
+                        
+                        ctx.fillStyle = `rgba(200, 255, 100, ${f.opacity})`;
+                        ctx.beginPath();
+                        ctx.arc(f.x, f.y, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+            }
+
             ctx.restore();
+
+            // Night Overlay (Screen Space)
+            let darkness = 0;
+            const h = gameTime.hour + gameTime.minute / 60;
+            
+            if (h >= 20 || h < 5) {
+                darkness = 0.5; // Night
+            } else if (h >= 18 && h < 20) {
+                darkness = 0.5 * ((h - 18) / 2); // Sunset
+            } else if (h >= 5 && h < 6) {
+                darkness = 0.5 * (1 - (h - 5)); // Sunrise
+            }
+            
+            if (darkness > 0) {
+                ctx.fillStyle = `rgba(0, 0, 20, ${darkness})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
             
             update(); // Game Logic
             requestAnimationFrame(render);
