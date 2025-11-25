@@ -529,7 +529,11 @@
             // Cave
             caveFloor: '#3d3d3d',
             caveWall: '#2d2d2d',
-            caveEntrance: '#000000'
+            caveEntrance: '#000000',
+
+            // Rain
+            rainGrass: '#2d3436',
+            puddle: '#74b9ff'
         };
 
         // Biome Helper
@@ -541,7 +545,9 @@
             if (noise < -0.5) return 'city';
             if (noise < -0.2) return 'forest';
             if (noise < 0.2) return 'lake'; // New Lake Biome
+            if (noise < 0.5) return 'mountain'; // New Mountain Biome
             if (noise < 0.8) return 'tropical';
+            if (noise < 1.2) return 'rain'; // Rain Biome
             return 'desert';
         }
 
@@ -729,6 +735,19 @@
                             else if (rand < 0.25) newMap[y][x] = 3; // Flower
                             else if (noise > 0.1) newMap[y][x] = 1; // Grass
                             else newMap[y][x] = 0; // Jungle Grass
+                        } else if (biome === 'mountain') {
+                            // Mountain Generation
+                            if (rand < 0.3) newMap[y][x] = 11; // Lots of Rocks
+                            else if (rand < 0.35) newMap[y][x] = 12; // Stump (Dead tree)
+                            else if (rand < 0.4) newMap[y][x] = 21; // Pine
+                            else newMap[y][x] = 0; // Ground (will be grey)
+                        } else if (biome === 'rain') {
+                            // Rain Biome
+                            if (rand < 0.1) newMap[y][x] = 24; // Puddle
+                            else if (rand < 0.15) newMap[y][x] = 3; // Flower
+                            else if (rand < 0.2) newMap[y][x] = 2; // Tree
+                            else if (noise > 0.1) newMap[y][x] = 1; // Grass
+                            else newMap[y][x] = 0; // Wet Ground
                         } else {
                             // Forest
                             if (rand < 0.08) newMap[y][x] = 2; // Tree
@@ -1128,6 +1147,8 @@
             if (currentData.biome === 'desert') ctx.fillStyle = colors.sand;
             else if (currentData.biome === 'ice') ctx.fillStyle = colors.snow;
             else if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
+            else if (currentData.biome === 'mountain') ctx.fillStyle = '#95a5a6'; // Mountain Grey
+            else if (currentData.biome === 'rain') ctx.fillStyle = colors.rainGrass;
             else ctx.fillStyle = colors.terrain;
             
             ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -1173,6 +1194,7 @@
                 if (currentData.biome === 'desert') ctx.fillStyle = colors.sand;
                 else if (currentData.biome === 'ice') ctx.fillStyle = colors.snow;
                 else if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
+                else if (currentData.biome === 'rain') ctx.fillStyle = colors.rainGrass;
                 else ctx.fillStyle = colors.terrain;
                 
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -1292,210 +1314,254 @@
             const screenX = x * TILE_SIZE;
             const screenY = y * TILE_SIZE;
 
-            if (type === 1) { // Erba Alta
-                ctx.fillStyle = colors.grass;
-                if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
-                // ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE); // Already drawn ground
-                ctx.fillStyle = colors.grassDetail;
+            // Calcola shake
+            let shakeX = 0;
+            if (currentData.activeTiles) {
+                const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                if (active) {
+                    shakeX = Math.sin(Date.now() / 50) * 2;
+                }
+            }
+
+            // Helper per disegnare sprite cachati
+            const drawTreeLike = (key, drawBodyFn, shadowWidth) => {
+                // Ombra statica
+                ctx.fillStyle = colors.shadow;
+                ctx.beginPath();
+                ctx.ellipse(screenX + 16, screenY + 28, shadowWidth, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
                 
-                let shakeX = 0;
-                if (currentData.activeTiles) {
-                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
-                    if (active) {
-                        shakeX = Math.sin(Date.now() / 50) * 2;
-                    }
-                }
+                // Corpo (Tremolante)
+                const sprite = getCachedSprite(key, (c) => {
+                    c.translate(0, 24); 
+                    drawBodyFn(c);
+                }, 32, 64);
+                ctx.drawImage(sprite, screenX + shakeX, screenY - 24);
+            };
 
-                for(let i=0; i<3; i++) {
-                    const ox = (x * 7 + i * 5) % 20;
-                    const oy = (y * 3 + i * 8) % 20;
-                    ctx.fillRect(screenX + 5 + ox + shakeX, screenY + 5 + oy, 2, 4);
-                }
+            if (type === 1) { // Erba Alta
+                const biome = currentData.biome;
+                const variant = (x + y) % 4;
+                const key = `grass_${biome}_${variant}`;
+                
+                const sprite = getCachedSprite(key, (c) => {
+                    c.fillStyle = (biome === 'tropical') ? colors.jungleGrass : colors.grass;
+                    c.fillStyle = colors.grassDetail;
+                    for(let i=0; i<3; i++) {
+                        const ox = (variant * 7 + i * 5) % 20;
+                        const oy = (variant * 3 + i * 8) % 20;
+                        c.fillRect(5 + ox, 5 + oy, 2, 4);
+                    }
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX + shakeX, screenY);
+
             } else if (type === 2) { // Albero
-                let shakeX = 0;
-                if (currentData.activeTiles) {
-                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
-                    if (active) {
-                        shakeX = Math.sin(Date.now() / 50) * 2;
-                    }
-                }
+                drawTreeLike('tree', (c) => {
+                    const treeY = -16; 
+                    c.fillStyle = colors.treeTrunk;
+                    c.fillRect(12, treeY + 34, 8, 10);
+                    c.fillStyle = colors.treeLeaves;
+                    c.beginPath();
+                    c.arc(16, treeY + 20, 14, 0, Math.PI * 2);
+                    c.arc(8, treeY + 30, 10, 0, Math.PI * 2);
+                    c.arc(24, treeY + 30, 10, 0, Math.PI * 2);
+                    c.fill();
+                }, 10);
 
-                // Draw taller tree
-                const treeY = screenY - 16; // Shift up
-                ctx.fillStyle = colors.treeShadow;
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 28, 10, 4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.treeTrunk;
-                ctx.fillRect(screenX + 12 + shakeX, treeY + 34, 8, 10);
-                ctx.fillStyle = colors.treeLeaves;
-                ctx.beginPath();
-                ctx.arc(screenX + 16 + shakeX, treeY + 20, 14, 0, Math.PI * 2);
-                ctx.arc(screenX + 8 + shakeX, treeY + 30, 10, 0, Math.PI * 2);
-                ctx.arc(screenX + 24 + shakeX, treeY + 30, 10, 0, Math.PI * 2);
-                ctx.fill();
             } else if (type === 20) { // Cactus
-                const cY = screenY - 16;
-                ctx.fillStyle = colors.shadow;
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.cactus;
-                ctx.beginPath();
-                ctx.roundRect(screenX + 12, cY + 10, 8, 38, 4); // Main
-                ctx.roundRect(screenX + 4, cY + 20, 8, 8, 4); // Arm L
-                ctx.roundRect(screenX + 20, cY + 15, 8, 8, 4); // Arm R
-                ctx.fill();
+                drawTreeLike('cactus', (c) => {
+                    const cY = -16;
+                    c.fillStyle = colors.cactus;
+                    c.beginPath();
+                    c.roundRect(12, cY + 10, 8, 38, 4); 
+                    c.roundRect(4, cY + 20, 8, 8, 4); 
+                    c.roundRect(20, cY + 15, 8, 8, 4); 
+                    c.fill();
+                }, 8);
+
             } else if (type === 21) { // Pine
-                const pY = screenY - 20;
-                ctx.fillStyle = colors.shadow;
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 28, 10, 4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.pine;
-                ctx.fillRect(screenX + 14, screenY + 20, 4, 10);
-                ctx.fillStyle = colors.pineLeaves;
-                ctx.beginPath();
-                ctx.moveTo(screenX + 16, pY + 10);
-                ctx.lineTo(screenX + 4, pY + 40);
-                ctx.lineTo(screenX + 28, pY + 40);
-                ctx.fill();
+                drawTreeLike('pine', (c) => {
+                    const pY = -20;
+                    c.fillStyle = colors.pine;
+                    c.fillRect(14, 20, 4, 10);
+                    c.fillStyle = colors.pineLeaves;
+                    c.beginPath();
+                    c.moveTo(16, pY + 10);
+                    c.lineTo(4, pY + 40);
+                    c.lineTo(28, pY + 40);
+                    c.fill();
+                }, 10);
+
             } else if (type === 23) { // Palm
-                const pY = screenY - 24;
-                ctx.fillStyle = colors.shadow;
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.palmTrunk;
-                ctx.beginPath();
-                ctx.moveTo(screenX + 14, screenY + 28);
-                ctx.quadraticCurveTo(screenX + 16, screenY + 10, screenX + 20, pY + 20);
-                ctx.lineTo(screenX + 24, pY + 20);
-                ctx.quadraticCurveTo(screenX + 20, screenY + 10, screenX + 18, screenY + 28);
-                ctx.fill();
-                ctx.fillStyle = colors.palmLeaves;
-                ctx.beginPath();
-                ctx.arc(screenX + 22, pY + 20, 16, Math.PI, 0); // Simple top
-                ctx.fill();
+                drawTreeLike('palm', (c) => {
+                    const pY = -24;
+                    c.fillStyle = colors.palmTrunk;
+                    c.beginPath();
+                    c.moveTo(14, 28);
+                    c.quadraticCurveTo(16, 10, 20, pY + 20);
+                    c.lineTo(24, pY + 20);
+                    c.quadraticCurveTo(20, 10, 18, 28);
+                    c.fill();
+                    c.fillStyle = colors.palmLeaves;
+                    c.beginPath();
+                    c.arc(22, pY + 20, 16, Math.PI, 0); 
+                    c.fill();
+                }, 8);
+
             } else if (type === 3) { // Fiore
-                ctx.fillStyle = colors.flower;
-                for(let i=0; i<5; i++) {
-                    const angle = (Math.PI * 2 / 5) * i;
-                    const px = screenX + 16 + Math.cos(angle) * 5;
-                    const py = screenY + 16 + Math.sin(angle) * 5;
-                    ctx.beginPath();
-                    ctx.arc(px, py, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.fillStyle = colors.flowerCenter;
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 16, 2.5, 0, Math.PI * 2);
-                ctx.fill();
+                const sprite = getCachedSprite('flower', (c) => {
+                    c.fillStyle = colors.flower;
+                    for(let i=0; i<5; i++) {
+                        const angle = (Math.PI * 2 / 5) * i;
+                        const px = 16 + Math.cos(angle) * 5;
+                        const py = 16 + Math.sin(angle) * 5;
+                        c.beginPath();
+                        c.arc(px, py, 3, 0, Math.PI * 2);
+                        c.fill();
+                    }
+                    c.fillStyle = colors.flowerCenter;
+                    c.beginPath();
+                    c.arc(16, 16, 2.5, 0, Math.PI * 2);
+                    c.fill();
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
             } else if (type === 7) { // Muro/Tetto Casa
-                // Check if this is a roof (tile below is 7 or 8 or 18)
                 const isRoof = (y < MAP_SIZE-1 && (currentMap[y+1][x] === 7 || currentMap[y+1][x] === 8 || currentMap[y+1][x] === 18));
                 const isBar = (y < MAP_SIZE-1 && currentMap[y+1][x] === 18);
                 
                 if (isRoof) {
-                    // Draw Roof (Tall)
-                    const roofY = screenY - 16;
-                    ctx.fillStyle = colors.houseRoof;
-                    ctx.beginPath();
-                    ctx.moveTo(screenX, screenY + 32);
-                    ctx.lineTo(screenX + 16, roofY); // Peak
-                    ctx.lineTo(screenX + 32, screenY + 32);
-                    ctx.fill();
-                    // Overhang
-                    ctx.fillRect(screenX - 2, screenY + 20, 36, 12);
+                    const key = isBar ? 'roof_bar' : 'roof';
+                    const sprite = getCachedSprite(key, (c) => {
+                        c.translate(2, 16);
+                        const roofY = -16;
+                        c.fillStyle = colors.houseRoof;
+                        c.beginPath();
+                        c.moveTo(0, 32);
+                        c.lineTo(16, roofY); 
+                        c.lineTo(32, 32);
+                        c.fill();
+                        c.fillRect(-2, 20, 36, 12);
 
-                    if (isBar) {
-                        ctx.fillStyle = '#f1c40f';
-                        ctx.font = 'bold 10px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('BAR', screenX + 16, screenY + 28);
-                    }
+                        if (isBar) {
+                            c.fillStyle = '#f1c40f';
+                            c.font = 'bold 10px Arial';
+                            c.textAlign = 'center';
+                            c.fillText('BAR', 16, 28);
+                        }
+                    }, 40, 64);
+                    ctx.drawImage(sprite, screenX - 2, screenY - 16);
                 } else {
-                    // Wall
-                    ctx.fillStyle = colors.houseWall;
-                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                    // Window
-                    ctx.fillStyle = '#dfe6e9';
-                    ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
-                    ctx.fillStyle = '#b2bec3';
-                    ctx.fillRect(screenX + 15, screenY + 8, 2, 16);
-                    ctx.fillRect(screenX + 8, screenY + 15, 16, 2);
-                }
-            } else if (type === 8 || type === 18) { // Porta (8=House, 18=Bar)
-                ctx.fillStyle = colors.houseWall;
-                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                ctx.fillStyle = type === 18 ? '#c0392b' : colors.houseDoor; // Red door for bar
-                ctx.fillRect(screenX + 6, screenY + 8, 20, 24);
-                ctx.fillStyle = '#ffd700';
-                ctx.beginPath();
-                ctx.arc(screenX + 22, screenY + 20, 2, 0, Math.PI * 2);
-                ctx.fill();
-                if (type === 18) {
-                    // Neon sign above door?
-                    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-                    ctx.fillRect(screenX + 6, screenY + 8, 20, 24);
-                }
-            } else if (type === 11) { // Roccia
-                let shakeX = 0;
-                if (currentData.activeTiles) {
-                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
-                    if (active) {
-                        shakeX = Math.sin(Date.now() / 50) * 2;
-                    }
+                    const sprite = getCachedSprite('wall', (c) => {
+                        c.fillStyle = colors.houseWall;
+                        c.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+                        c.fillStyle = '#dfe6e9';
+                        c.fillRect(8, 8, 16, 16);
+                        c.fillStyle = '#b2bec3';
+                        c.fillRect(15, 8, 2, 16);
+                        c.fillRect(8, 15, 16, 2);
+                    }, 32, 32);
+                    ctx.drawImage(sprite, screenX, screenY);
                 }
 
-                ctx.fillStyle = colors.rock;
-                ctx.beginPath();
-                ctx.arc(screenX + 16 + shakeX, screenY + 16, 12, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.rockDark;
-                ctx.beginPath();
-                ctx.arc(screenX + 12 + shakeX, screenY + 12, 4, 0, Math.PI * 2);
-                ctx.fill();
+            } else if (type === 8 || type === 18) { // Porta
+                const key = (type === 18) ? 'door_bar' : 'door';
+                const sprite = getCachedSprite(key, (c) => {
+                    c.fillStyle = colors.houseWall;
+                    c.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+                    c.fillStyle = type === 18 ? '#c0392b' : colors.houseDoor; 
+                    c.fillRect(6, 8, 20, 24);
+                    c.fillStyle = '#ffd700';
+                    c.beginPath();
+                    c.arc(22, 20, 2, 0, Math.PI * 2);
+                    c.fill();
+                    if (type === 18) {
+                        c.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                        c.fillRect(6, 8, 20, 24);
+                    }
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
+            } else if (type === 11) { // Roccia
+                const sprite = getCachedSprite('rock', (c) => {
+                    c.fillStyle = colors.rock;
+                    c.beginPath();
+                    c.arc(16, 16, 12, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = colors.rockDark;
+                    c.beginPath();
+                    c.arc(12, 12, 4, 0, Math.PI * 2);
+                    c.fill();
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX + shakeX, screenY);
+
             } else if (type === 12) { // Ceppo
-                ctx.fillStyle = colors.stump;
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 20, 10, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = colors.stumpTop;
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 18, 8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = colors.stump;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 18, 5, 0, Math.PI * 2);
-                ctx.stroke();
+                const sprite = getCachedSprite('stump', (c) => {
+                    c.fillStyle = colors.stump;
+                    c.beginPath();
+                    c.arc(16, 20, 10, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = colors.stumpTop;
+                    c.beginPath();
+                    c.arc(16, 18, 8, 0, Math.PI * 2);
+                    c.fill();
+                    c.strokeStyle = colors.stump;
+                    c.lineWidth = 1;
+                    c.beginPath();
+                    c.arc(16, 18, 5, 0, Math.PI * 2);
+                    c.stroke();
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
             } else if (type === 15) { // Bar Counter
-                ctx.fillStyle = colors.barCounter;
-                ctx.fillRect(screenX, screenY + 8, TILE_SIZE, 24);
-                ctx.fillStyle = '#9b59b6'; // Top
-                ctx.fillRect(screenX, screenY + 8, TILE_SIZE, 8);
+                const sprite = getCachedSprite('bar_counter', (c) => {
+                    c.fillStyle = colors.barCounter;
+                    c.fillRect(0, 8, TILE_SIZE, 24);
+                    c.fillStyle = '#9b59b6';
+                    c.fillRect(0, 8, TILE_SIZE, 8);
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
             } else if (type === 16) { // Bar Table
-                ctx.fillStyle = colors.barTable;
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 20, 12, 8, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#e67e22'; // Top highlight
-                ctx.beginPath();
-                ctx.ellipse(screenX + 16, screenY + 18, 10, 6, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // Drink
-                ctx.fillStyle = '#f1c40f';
-                ctx.fillRect(screenX + 14, screenY + 14, 4, 6);
+                const sprite = getCachedSprite('bar_table', (c) => {
+                    c.fillStyle = colors.barTable;
+                    c.beginPath();
+                    c.ellipse(16, 20, 12, 8, 0, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = '#e67e22';
+                    c.beginPath();
+                    c.ellipse(16, 18, 10, 6, 0, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = '#f1c40f';
+                    c.fillRect(14, 14, 4, 6);
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
             } else if (type === 17) { // Bar Chair
-                ctx.fillStyle = colors.barChair;
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 20, 6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#c0392b'; // Darker
-                ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 20, 4, 0, Math.PI * 2);
-                ctx.fill();
+                const sprite = getCachedSprite('bar_chair', (c) => {
+                    c.fillStyle = colors.barChair;
+                    c.beginPath();
+                    c.arc(16, 20, 6, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = '#c0392b';
+                    c.beginPath();
+                    c.arc(16, 20, 4, 0, Math.PI * 2);
+                    c.fill();
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX, screenY);
+
+            } else if (type === 24) { // Puddle
+                const sprite = getCachedSprite('puddle', (c) => {
+                    c.fillStyle = colors.puddle;
+                    c.beginPath();
+                    c.ellipse(16, 20, 12, 6, 0, 0, Math.PI * 2);
+                    c.fill();
+                    c.fillStyle = 'rgba(255,255,255,0.3)';
+                    c.beginPath();
+                    c.ellipse(16, 18, 8, 3, 0, 0, Math.PI * 2);
+                    c.fill();
+                }, 32, 32);
+                ctx.drawImage(sprite, screenX + shakeX, screenY);
             }
         }
 
@@ -1531,6 +1597,12 @@
                 return;
             } else if (npc.species === 'geodude') {
                 drawGeodude(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'onix') {
+                drawOnix(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'wobbuffet') {
+                drawWobbuffet(screenX, drawY, npc.direction);
                 return;
             }
 
@@ -1582,6 +1654,7 @@
 
             // Spots
             ctx.fillStyle = '#27ae60';
+
             ctx.fillRect(x + 8, y + 18, 4, 4);
             ctx.fillRect(x + 20, y + 22, 3, 3);
 
@@ -1752,6 +1825,80 @@
             ctx.fillRect(x + 18, y + 14, 2, 2); // Eye R
             ctx.beginPath(); ctx.arc(x + 16, y + 20, 3, 0, Math.PI, false); ctx.stroke(); // Mouth
         }
+
+        function drawOnix(x, y, dir) {
+            // Body segments (Grey)
+            ctx.fillStyle = '#95a5a6';
+            
+            // Tail to Head
+            ctx.beginPath(); ctx.arc(x + 24, y + 28, 4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x + 20, y + 24, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x + 16, y + 20, 6, 0, Math.PI*2); ctx.fill();
+            
+            // Head
+            ctx.fillStyle = '#7f8c8d';
+            ctx.beginPath(); ctx.arc(x + 12, y + 14, 8, 0, Math.PI*2); ctx.fill();
+            
+            // Horn
+            ctx.fillStyle = '#bdc3c7';
+            ctx.beginPath();
+            ctx.moveTo(x + 12, y + 6);
+            ctx.lineTo(x + 10, y + 2);
+            ctx.lineTo(x + 14, y + 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x + 10, y + 12, 2, 2);
+            ctx.fillRect(x + 14, y + 12, 2, 2);
+        }
+
+        function drawWobbuffet(x, y, dir) {
+            // Body (Blue)
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 20, 12, 14, 0, 0, Math.PI * 2); // Blob body
+            ctx.fill();
+            
+            // Arms (Black/Blue)
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.ellipse(x + 4, y + 20, 4, 8, 0, 0, Math.PI * 2); // Left Arm
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 28, y + 20, 4, 8, 0, 0, Math.PI * 2); // Right Arm
+            ctx.fill();
+
+            // Face (Wavy Mouth)
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y + 22);
+            ctx.quadraticCurveTo(x + 16, y + 26, x + 22, y + 22); // Smile
+            ctx.stroke();
+            
+            // Eyes (Closed lines)
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y + 16);
+            ctx.lineTo(x + 14, y + 14); // Left Eye
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + 22, y + 16);
+            ctx.lineTo(x + 18, y + 14); // Right Eye
+            ctx.stroke();
+            
+            // Tail (Black - visible if back or side?)
+            if (dir === 'up' || dir === 'left' || dir === 'right') {
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(x + 20, y + 28, 6, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Tail eyes
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(x + 18, y + 27, 1, 1);
+                ctx.fillRect(x + 22, y + 27, 1, 1);
+            }
+        }
         
         function drawBoat(x, y, dir) {
             // Hull
@@ -1826,6 +1973,29 @@
             }
         }
         
+        // Sprite Cache System
+        const spriteCache = {};
+
+        function getCachedSprite(key, drawFn, width = TILE_SIZE, height = TILE_SIZE) {
+            if (spriteCache[key]) return spriteCache[key];
+
+            const offscreen = document.createElement('canvas');
+            offscreen.width = width;
+            offscreen.height = height;
+            const oCtx = offscreen.getContext('2d');
+            
+            // Mock context to redirect draw calls to offscreen
+            // We need to pass 0,0 as coordinates to the draw function
+            drawFn(oCtx, 0, 0);
+            
+            spriteCache[key] = offscreen;
+            return offscreen;
+        }
+
+        function clearSpriteCache() {
+            for (const key in spriteCache) delete spriteCache[key];
+        }
+
         // Aggiorna camera (Smooth)
         function updateCamera() {
             const mapWidth = currentMap[0].length;
@@ -1983,11 +2153,15 @@
                     if (activeTile.type === 1) species = 'bulbasaur';
                     else if (activeTile.type === 4) species = 'lapras';
                     else if (activeTile.type === 2) species = 'caterpie';
-                    else if (activeTile.type === 11) species = 'geodude';
+                    else if (activeTile.type === 11) {
+                        if (currentData.biome === 'mountain') species = Math.random() > 0.5 ? 'onix' : 'geodude';
+                        else species = 'geodude';
+                    }
                     else if (activeTile.type === 0) {
                         if (currentData.biome === 'desert') species = 'sandshrew';
                         else if (currentData.biome === 'ice') species = 'spheal';
                     }
+                    else if (activeTile.type === 24) species = 'wobbuffet';
                     
                     const name = species.charAt(0).toUpperCase() + species.slice(1);
                     
@@ -2213,6 +2387,9 @@
 
                     // Rock (11)
                     if (tile === 11) canBeActive = true;
+                    
+                    // Puddle (24)
+                    if (tile === 24) canBeActive = true;
                     
                     // Sand/Snow (0)
                     if (tile === 0 && (currentData.biome === 'desert' || currentData.biome === 'ice')) canBeActive = true;
@@ -2572,7 +2749,7 @@
                     if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
                         const t = currentMap[y][x];
                         // If it's an object that needs sorting
-                        if (t === 1 || t === 2 || t === 3 || t === 6 || t === 7 || t === 8 || t === 11 || t === 12 || t === 15 || t === 16 || t === 17 || t === 18 || t === 20 || t === 21 || t === 23) {
+                        if (t === 1 || t === 2 || t === 3 || t === 6 || t === 7 || t === 8 || t === 11 || t === 12 || t === 15 || t === 16 || t === 17 || t === 18 || t === 20 || t === 21 || t === 23 || t === 24) {
                             sprites.push({
                                 type: 'tile',
                                 tileType: t,
@@ -2675,6 +2852,37 @@
                 });
             }
 
+            // Rain Effect (World Space)
+            if (currentData.biome === 'rain') {
+                ctx.strokeStyle = 'rgba(174, 194, 224, 0.5)';
+                ctx.lineWidth = 1;
+                const time = Date.now() / 20;
+                const rainCount = 100;
+                
+                // Simple rain simulation based on screen coords + time
+                // We want it to look like it's falling across the screen
+                // But we are in world space here? No, we are in world space.
+                // Better to draw rain in screen space (after restore) or relative to camera to cover view.
+                // Let's draw it in world space but relative to camera to cover view.
+                
+                const camX = camera.x * TILE_SIZE;
+                const camY = camera.y * TILE_SIZE;
+                
+                for(let i=0; i<rainCount; i++) {
+                    const rx = (Math.sin(i) * 10000 + time * 5) % (canvas.width / zoomLevel);
+                    const ry = (Math.cos(i) * 10000 + time * 10) % (canvas.height / zoomLevel);
+                    
+                    // Adjust to world space
+                    const wx = camX + Math.abs(rx);
+                    const wy = camY + Math.abs(ry);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(wx, wy);
+                    ctx.lineTo(wx - 2, wy + 10);
+                    ctx.stroke();
+                }
+            }
+
             ctx.restore();
 
             // Night Overlay (Screen Space)
@@ -2738,7 +2946,6 @@
             btn.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(true); });
             btn.addEventListener('touchend', (e) => { e.preventDefault(); handleAction(false); });
             btn.addEventListener('mousedown', (e) => { handleAction(true); });
-            // Mouseup handled globally below
         });
         
         document.addEventListener('mouseup', () => { 
