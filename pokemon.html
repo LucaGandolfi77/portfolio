@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Simulatore Pokémon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px;
+        }
+
+        #game-screen {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            margin-bottom: 15px;
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            background: #0f3460;
+            border: 4px solid #16213e;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 0 5px;
+        }
+
+        #dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 5px;
+            aspect-ratio: 1;
+        }
+
+        .btn {
+            background: linear-gradient(145deg, #2d3561, #1f2749);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(145deg, #1f2749, #2d3561);
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 3; }
+
+        #action-buttons {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 15px;
+            padding: 0 10px;
+        }
+
+        .btn-action {
+            height: 70px;
+            font-size: 20px;
+            letter-spacing: 1px;
+        }
+
+        .btn-a {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+
+        .btn-a:active {
+            background: linear-gradient(145deg, #c0392b, #e74c3c);
+        }
+
+        .btn-b {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+        }
+
+        .btn-b:active {
+            background: linear-gradient(145deg, #2980b9, #3498db);
+        }
+
+        #info {
+            text-align: center;
+            color: white;
+            margin-top: 10px;
+            font-size: 14px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            transition: background 0.3s;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 400px) {
+            .btn {
+                font-size: 14px;
+            }
+            .btn-action {
+                height: 60px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+
+    <div id="game-container">
+        <div id="game-screen">
+            <div id="canvas-wrapper">
+                <canvas id="gameCanvas" width="320" height="320"></canvas>
+            </div>
+        </div>
+        
+        <div id="controls">
+            <div id="dpad">
+                <button class="btn btn-up" data-dir="up">▲</button>
+                <button class="btn btn-left" data-dir="left">◄</button>
+                <button class="btn btn-right" data-dir="right">►</button>
+                <button class="btn btn-down" data-dir="down">▼</button>
+            </div>
+            
+            <div id="action-buttons">
+                <button class="btn btn-action btn-a" data-action="a">A</button>
+                <button class="btn btn-action btn-b" data-action="b">B</button>
+            </div>
+        </div>
+        
+        <div id="info">Usa i pulsanti per muoverti nella mappa!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Configurazione gioco
+        const TILE_SIZE = 32;
+        const MAP_SIZE = 20;
+        const VISIBLE_TILES = 10;
+        
+        // Player
+        const player = {
+            x: 5,
+            y: 5,
+            direction: 'down',
+            animFrame: 0,
+            moving: false
+        };
+        
+        // Camera
+        const camera = {
+            x: 0,
+            y: 0
+        };
+        
+        // Mappa
+        const map = [];
+        for (let y = 0; y < MAP_SIZE; y++) {
+            map[y] = [];
+            for (let x = 0; x < MAP_SIZE; x++) {
+                const rand = Math.random();
+                if (rand < 0.1) map[y][x] = 2; // Albero
+                else if (rand < 0.2) map[y][x] = 3; // Fiore
+                else if (rand < 0.5) map[y][x] = 1; // Erba
+                else map[y][x] = 0; // Terreno
+            }
+        }
+        
+        // Colori
+        const colors = {
+            terrain: '#90EE90',
+            grass: '#228B22',
+            tree: '#2E8B57',
+            flower: '#FFD700',
+            player: '#FF4444',
+            playerBody: '#FF6B6B',
+            playerEyes: '#FFFFFF'
+        };
+        
+        // Disegna tile
+        function drawTile(x, y, type) {
+            const screenX = x * TILE_SIZE;
+            const screenY = y * TILE_SIZE;
+            
+            switch(type) {
+                case 0: // Terreno
+                    ctx.fillStyle = colors.terrain;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    break;
+                case 1: // Erba
+                    ctx.fillStyle = colors.grass;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.terrain;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.fillRect(screenX + 8 + i * 8, screenY + 8, 3, 6);
+                    }
+                    break;
+                case 2: // Albero
+                    ctx.fillStyle = colors.grass;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(screenX + 12, screenY + 16, 8, 12);
+                    ctx.fillStyle = colors.tree;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 12, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                case 3: // Fiore
+                    ctx.fillStyle = colors.terrain;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.flower;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 16, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FF1493';
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (Math.PI / 2) * i;
+                        const px = screenX + 16 + Math.cos(angle) * 6;
+                        const py = screenY + 16 + Math.sin(angle) * 6;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    break;
+            }
+        }
+        
+        // Disegna player
+        function drawPlayer() {
+            const screenX = (player.x - camera.x) * TILE_SIZE;
+            const screenY = (player.y - camera.y) * TILE_SIZE;
+            
+            // Corpo
+            ctx.fillStyle = colors.playerBody;
+            ctx.fillRect(screenX + 8, screenY + 12, 16, 16);
+            
+            // Testa
+            ctx.fillStyle = colors.player;
+            ctx.beginPath();
+            ctx.arc(screenX + 16, screenY + 12, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Occhi
+            ctx.fillStyle = colors.playerEyes;
+            if (player.direction === 'up') {
+                ctx.fillRect(screenX + 12, screenY + 10, 2, 3);
+                ctx.fillRect(screenX + 18, screenY + 10, 2, 3);
+            } else if (player.direction === 'down') {
+                ctx.fillRect(screenX + 12, screenY + 12, 2, 3);
+                ctx.fillRect(screenX + 18, screenY + 12, 2, 3);
+            } else if (player.direction === 'left') {
+                ctx.fillRect(screenX + 11, screenY + 11, 2, 3);
+                ctx.fillRect(screenX + 16, screenY + 11, 2, 3);
+            } else {
+                ctx.fillRect(screenX + 14, screenY + 11, 2, 3);
+                ctx.fillRect(screenX + 19, screenY + 11, 2, 3);
+            }
+            
+            // Gambe (animazione)
+            const legOffset = player.moving ? Math.sin(Date.now() / 100) * 2 : 0;
+            ctx.fillStyle = colors.player;
+            ctx.fillRect(screenX + 10, screenY + 28 + legOffset, 4, 4);
+            ctx.fillRect(screenX + 18, screenY + 28 - legOffset, 4, 4);
+        }
+        
+        // Aggiorna camera
+        function updateCamera() {
+            camera.x = Math.max(0, Math.min(player.x - Math.floor(VISIBLE_TILES / 2), MAP_SIZE - VISIBLE_TILES));
+            camera.y = Math.max(0, Math.min(player.y - Math.floor(VISIBLE_TILES / 2), MAP_SIZE - VISIBLE_TILES));
+        }
+        
+        // Muovi player
+        function movePlayer(dx, dy, dir) {
+            player.direction = dir;
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+            
+            if (newX >= 0 && newX < MAP_SIZE && newY >= 0 && newY < MAP_SIZE) {
+                if (map[newY][newX] !== 2) {
+                    player.x = newX;
+                    player.y = newY;
+                    player.moving = true;
+                    setTimeout(() => player.moving = false, 200);
+                }
+            }
+        }
+        
+        // Render
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let y = 0; y < VISIBLE_TILES; y++) {
+                for (let x = 0; x < VISIBLE_TILES; x++) {
+                    const mapX = camera.x + x;
+                    const mapY = camera.y + y;
+                    if (mapX >= 0 && mapX < MAP_SIZE && mapY >= 0 && mapY < MAP_SIZE) {
+                        drawTile(x, y, map[mapY][mapX]);
+                    }
+                }
+            }
+            
+            drawPlayer();
+            requestAnimationFrame(render);
+        }
+        
+        // Event listeners
+        document.querySelectorAll('[data-dir]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const dir = btn.dataset.dir;
+                switch(dir) {
+                    case 'up': movePlayer(0, -1, 'up'); break;
+                    case 'down': movePlayer(0, 1, 'down'); break;
+                    case 'left': movePlayer(-1, 0, 'left'); break;
+                    case 'right': movePlayer(1, 0, 'right'); break;
+                }
+                updateCamera();
+            });
+            
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.click();
+            });
+        });
+        
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const action = btn.dataset.action;
+                const info = document.getElementById('info');
+                if (action === 'a') {
+                    info.textContent = 'Pulsante A premuto! ⚡';
+                } else {
+                    info.textContent = 'Pulsante B premuto! 🎒';
+                }
+                setTimeout(() => {
+                    info.textContent = 'Usa i pulsanti per muoverti nella mappa!';
+                }, 1000);
+            });
+            
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.click();
+            });
+        });
+        
+        // Tastiera
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp': movePlayer(0, -1, 'up'); break;
+                case 'ArrowDown': movePlayer(0, 1, 'down'); break;
+                case 'ArrowLeft': movePlayer(-1, 0, 'left'); break;
+                case 'ArrowRight': movePlayer(1, 0, 'right'); break;
+                case 'a':
+                case 'A':
+                    document.querySelector('.btn-a').click();
+                    break;
+                case 'b':
+                case 'B':
+                    document.querySelector('.btn-b').click();
+                    break;
+            }
+            updateCamera();
+        });
+        
+        // Inizializza
+        updateCamera();
+        render();
+    </script>
+</body>
+</html>
