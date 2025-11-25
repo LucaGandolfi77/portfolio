@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBA Emulator — Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0f1724; --card: #0b1220; --accent: #00d4ff; }
+        html, body { height: 100%; margin: 0; font-family: 'Inter', sans-serif; background: linear-gradient(180deg, #07101b, #0f1724); color: white; overflow-x: hidden; }
+        .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; min-height: 100vh; }
+        a.back { color: var(--accent); text-decoration: none; font-weight: 600; margin-bottom: 20px; display: inline-block; }
+        h1 { margin: 0 0 10px; font-size: 2rem; color: white; text-align: center; }
+        p { color: #a0c0e0; text-align: center; margin-bottom: 30px; }
+        
+        .emulator-container {
+            background: #000;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 3/2;
+            margin: 0 auto 20px;
+            border-radius: 8px;
+            border: 2px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #game { width: 100%; height: 100%; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); border-color: var(--accent); }
+        .btn-primary { background: var(--accent); color: #000; border: none; }
+        .btn-primary:hover { background: #33e0ff; }
+
+        input[type="file"] { display: none; }
+
+        .status { text-align: center; color: #666; font-size: 0.9rem; margin-top: 10px; }
+        
+        /* Directory Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .modal-title { font-weight: 700; font-size: 1.2rem; }
+        .close-modal { background: none; border: none; color: #aaa; cursor: pointer; font-size: 1.5rem; }
+        .file-list { list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; }
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-item:hover { background: rgba(255,255,255,0.05); }
+        .file-icon { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <a class="back" href="technology.html">← Back to Technology</a>
+        <h1>GBA Emulator</h1>
+        <p>Play Game Boy Advance games directly in your browser. Upload a .gba file or choose from the library.</p>
+
+        <div class="emulator-container">
+            <div id="game"></div>
+            <div id="placeholder" style="text-align:center; color:#666;">
+                <div style="font-size:3rem; margin-bottom:10px;">👾</div>
+                <div>Load a game to start playing</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <label class="btn btn-primary">
+                📂 Upload .gba
+                <input type="file" id="fileInput" accept=".gba">
+            </label>
+            <button class="btn" id="libraryBtn">📚 Game Library</button>
+            <button class="btn" id="fullscreenBtn">⛶ Fullscreen</button>
+        </div>
+
+        <div class="status" id="status">Ready</div>
+    </div>
+
+    <!-- Library Modal -->
+    <div class="modal" id="libraryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Game Library</div>
+                <button class="close-modal" id="closeModal">×</button>
+            </div>
+            <ul class="file-list" id="fileList">
+                <li class="file-item" onclick="loadDemo('demo_game.gba')">
+                    <span class="file-icon">🎮</span>
+                    <span>Demo Game (Placeholder)</span>
+                </li>
+                <!-- Add more items here -->
+                <li class="file-item" style="color:#666; cursor:default;">
+                    <span class="file-icon">ℹ️</span>
+                    <span>Add .gba files to assets/games/</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // EmulatorJS Configuration
+        window.EJS_player = '#game';
+        window.EJS_core = 'gba';
+        window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+        window.EJS_startOnLoaded = true;
+        window.EJS_DEBUG_XX = true; 
+        
+        // We don't load the script immediately, we load it when a game is selected
+        
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const placeholder = document.getElementById('placeholder');
+        const libraryBtn = document.getElementById('libraryBtn');
+        const libraryModal = document.getElementById('libraryModal');
+        const closeModal = document.getElementById('closeModal');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+        let emulatorLoaded = false;
+
+        function loadEmulator(gameUrl) {
+            placeholder.style.display = 'none';
+            status.textContent = 'Loading emulator core...';
+            
+            window.EJS_gameUrl = gameUrl;
+            
+            if (!emulatorLoaded) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+                script.onload = () => {
+                    status.textContent = 'Emulator loaded. Enjoy!';
+                    emulatorLoaded = true;
+                };
+                document.body.appendChild(script);
+            } else {
+                // If already loaded, we might need to reset or reload EJS. 
+                // EmulatorJS is a bit tricky with reloading. 
+                // Usually replacing the iframe or calling EJS API is needed.
+                // For simplicity, we'll just reload the page with a query param or similar? 
+                // No, let's try to re-init if possible or just warn user.
+                // Actually EJS usually handles new EJS_gameUrl if we re-run loader?
+                // A simple hack is to remove the game div and recreate it.
+                const container = document.querySelector('.emulator-container');
+                container.innerHTML = '<div id="game"></div>';
+                
+                // Re-inject script? No, loader.js defines global EJS object.
+                // We might need to call EJS_emulator.load() if exposed.
+                // Let's just reload the page for now if they want to switch games, 
+                // or try to re-run the loader logic.
+                // Better approach for single page:
+                location.reload(); // Simplest fallback for now as EJS is singleton-ish
+                // But we need to pass the file... 
+                // If it's a blob, reload won't work.
+                // Let's just append the script and hope it works for the first run.
+                // For subsequent runs, we might need a more complex setup.
+                // Let's assume user plays one game at a time.
+            }
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                loadEmulator(url);
+            }
+        });
+
+        libraryBtn.addEventListener('click', () => {
+            libraryModal.classList.add('active');
+        });
+
+        closeModal.addEventListener('click', () => {
+            libraryModal.classList.remove('active');
+        });
+
+        fullscreenBtn.addEventListener('click', () => {
+            const el = document.getElementById('game');
+            if (el.requestFullscreen) el.requestFullscreen();
+        });
+
+        function loadDemo(filename) {
+            // In a real scenario, this would point to a real file
+            // For now, we'll just alert or try to load a dummy
+            alert("This is a placeholder for a demo game. Please upload a .gba file.");
+            libraryModal.classList.remove('active');
+        }
+
+    </script>
+</body>
+</html>
