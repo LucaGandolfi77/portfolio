@@ -335,7 +335,8 @@
             pixelY: 10 * TILE_SIZE, // Visual Y
             direction: 'down',
             moving: false,
-            stepAnim: 0
+            stepAnim: 0,
+            isSurfing: false
         };
         
         // Camera
@@ -417,16 +418,23 @@
             // City
             cityRoad: '#57606f',
             citySidewalk: '#a4b0be',
-            cityBuilding: '#747d8c'
+            cityBuilding: '#747d8c',
+
+            // Boat
+            boatBody: '#e74c3c',
+            boatSeat: '#c0392b',
+            boatFloor: '#d35400'
         };
 
         // Biome Helper
         function getBiome(wx, wy) {
             // Simple noise for biome
             const noise = Math.sin(wx * 0.3) + Math.cos(wy * 0.3);
+            if (noise < -1.3) return 'frozen_lake'; // Frozen Lake
             if (noise < -1) return 'ice';
             if (noise < -0.5) return 'city';
-            if (noise < 0.2) return 'forest';
+            if (noise < -0.2) return 'forest';
+            if (noise < 0.2) return 'lake'; // New Lake Biome
             if (noise < 0.8) return 'tropical';
             return 'desert';
         }
@@ -524,6 +532,7 @@
         function generateMap(wx, wy) {
             const newMap = [];
             const newNPCs = [];
+            let boat = null;
             const biome = getBiome(wx, wy);
             
             // Inizializza mappa vuota
@@ -556,6 +565,38 @@
                             if (rand < 0.05) newMap[y][x] = 20; // Cactus
                             else if (rand < 0.1) newMap[y][x] = 11; // Rock
                             else newMap[y][x] = 0; // Sand
+                        } else if (biome === 'lake') {
+                            // Big Lake in the middle
+                            const centerX = MAP_SIZE / 2;
+                            const centerY = MAP_SIZE / 2;
+                            const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+                            
+                            if (dist < 7) {
+                                newMap[y][x] = 4; // Water
+                            } else if (dist < 8 && rand < 0.5) {
+                                newMap[y][x] = 4; // Irregular edge
+                            } else {
+                                // Shore
+                                if (rand < 0.1) newMap[y][x] = 3; // Flower
+                                else if (rand < 0.2) newMap[y][x] = 1; // Grass
+                                else newMap[y][x] = 0; // Terrain
+                            }
+                        } else if (biome === 'frozen_lake') {
+                            // Big Ice Lake
+                            const centerX = MAP_SIZE / 2;
+                            const centerY = MAP_SIZE / 2;
+                            const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+                            
+                            if (dist < 7) {
+                                newMap[y][x] = 22; // Ice
+                            } else if (dist < 8 && rand < 0.5) {
+                                newMap[y][x] = 22; // Irregular edge
+                            } else {
+                                // Shore
+                                if (rand < 0.1) newMap[y][x] = 11; // Rock
+                                else if (rand < 0.2) newMap[y][x] = 21; // Pine
+                                else newMap[y][x] = 0; // Snow
+                            }
                         } else if (biome === 'city') {
                             // City Pattern
                             if (x % 6 === 0 || y % 6 === 0) newMap[y][x] = 25; // Road
@@ -683,7 +724,25 @@
                 }
             }
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'outdoor', biome: biome };
+            // Spawn Boat in Lake
+            if (biome === 'lake') {
+                // Find a shore spot for the boat
+                for (let y = 5; y < MAP_SIZE - 5; y++) {
+                    for (let x = 5; x < MAP_SIZE - 5; x++) {
+                        if (newMap[y][x] === 4) {
+                            // Check neighbors for land (0, 1, etc)
+                            const isLand = (t) => t === 0 || t === 1 || t === 14;
+                            if (isLand(newMap[y+1][x]) || isLand(newMap[y-1][x]) || isLand(newMap[y][x+1]) || isLand(newMap[y][x-1])) {
+                                boat = { x: x, y: y, direction: 'right' };
+                                break;
+                            }
+                        }
+                    }
+                    if (boat) break;
+                }
+            }
+
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], boat: boat, type: 'outdoor', biome: biome };
         }
 
         function generateInterior(type) {
@@ -1391,16 +1450,41 @@
             ctx.beginPath(); ctx.arc(x + 16, y + 20, 3, 0, Math.PI, false); ctx.stroke(); // Mouth
         }
         
+        function drawBoat(x, y, dir) {
+            // Hull
+            ctx.fillStyle = colors.boatBody;
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 24, 14, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Interior
+            ctx.fillStyle = colors.boatFloor;
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 24, 10, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Seat
+            ctx.fillStyle = colors.boatSeat;
+            ctx.fillRect(x + 10, y + 22, 12, 4);
+        }
+
         // Disegna player
         function drawPlayer() {
             const screenX = player.pixelX; // Absolute world coords for sorting
             const screenY = player.pixelY;
             
+            // Draw Boat if Surfing
+            if (player.isSurfing) {
+                drawBoat(screenX, screenY + 4, player.direction);
+            }
+
             // Ombra
-            ctx.fillStyle = colors.shadow;
-            ctx.beginPath();
-            ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
-            ctx.fill();
+            if (!player.isSurfing) {
+                ctx.fillStyle = colors.shadow;
+                ctx.beginPath();
+                ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             // Animazione camminata
             const bounce = player.moving ? Math.abs(Math.sin(Date.now() / 100)) * 3 : 0;
@@ -1486,6 +1570,7 @@
                 player.pixelX = player.x * TILE_SIZE;
                 player.pixelY = player.y * TILE_SIZE;
                 player.moving = false;
+                player.isSurfing = false; // Reset surfing on map switch
 
                 updateCamera();
                 
@@ -1514,6 +1599,7 @@
                 player.pixelX = player.x * TILE_SIZE;
                 player.pixelY = player.y * TILE_SIZE;
                 player.direction = 'up';
+                player.moving = false; // Ensure not moving
                 
                 updateCamera();
                 
@@ -1812,6 +1898,19 @@
                 if (player.pixelX === targetPixelX && player.pixelY === targetPixelY) {
                     player.moving = false;
                     addFootprint(player.x, player.y);
+
+                    // SLIDING LOGIC (Ice)
+                    const currentTile = currentMap[player.y][player.x];
+                    if (currentTile === 22) { // Ice
+                        let dx = 0; let dy = 0;
+                        if (player.direction === 'up') dy = -1;
+                        if (player.direction === 'down') dy = 1;
+                        if (player.direction === 'left') dx = -1;
+                        if (player.direction === 'right') dx = 1;
+                        
+                        // Attempt to continue moving
+                        attemptMove(dx, dy);
+                    }
                 }
                 updateCamera();
                 return; // Non accettare nuovi input finché non finisce il movimento
@@ -1844,29 +1943,85 @@
             else if (keys.right) { dx = 1; player.direction = 'right'; }
 
             if (dx !== 0 || dy !== 0) {
+                attemptMove(dx, dy);
+            }
+        }
+
+        function attemptMove(dx, dy) {
                 const newX = player.x + dx;
                 const newY = player.y + dy;
+                const mapW = currentMap[0].length;
+                const mapH = currentMap.length;
 
                 // Check confini (Cambio Mappa)
-                if (newX < 0) { switchMap(-1, 0); return; }
-                if (newX >= MAP_SIZE && !isIndoors) { switchMap(1, 0); return; } // Indoors bounded
-                if (newY < 0) { switchMap(0, -1); return; }
-                if (newY >= MAP_SIZE && !isIndoors) { switchMap(0, 1); return; } // Indoors bounded
+                if (newX < 0) { 
+                    if (!isIndoors) { switchMap(-1, 0); return true; }
+                    else return false; // Blocked
+                }
+                if (newX >= mapW) { 
+                    if (!isIndoors) { switchMap(1, 0); return true; }
+                    else return false; // Blocked
+                }
+                if (newY < 0) { 
+                    if (!isIndoors) { switchMap(0, -1); return true; }
+                    else return false; // Blocked
+                }
+                if (newY >= mapH) { 
+                    if (!isIndoors) { switchMap(0, 1); return true; }
+                    else return false; // Blocked
+                }
 
                 // Check collisioni
                 const tile = currentMap[newY][newX];
                 
+                // Boat Logic
+                if (currentData.boat && !player.isSurfing) {
+                    if (currentData.boat.x === newX && currentData.boat.y === newY) {
+                        // Enter Boat
+                        player.isSurfing = true;
+                        player.x = newX;
+                        player.y = newY;
+                        player.moving = true;
+                        return true;
+                    }
+                }
+
+                if (player.isSurfing) {
+                    // Can move on Water (4)
+                    if (tile === 4) {
+                        player.x = newX;
+                        player.y = newY;
+                        player.moving = true;
+                        return true;
+                    }
+                    
+                    // Exit Boat (if moving to land)
+                    // Land tiles: 0=Ground, 1=Grass, 5=Bridge, 9=Floor, 10=Mat, 13=Tilled, 14=Road, 25=CityRoad, 26=Sidewalk, 22=Ice
+                    const isLand = (t) => t === 0 || t === 1 || t === 5 || t === 9 || t === 10 || t === 13 || t === 14 || t === 25 || t === 26 || t === 22;
+                    
+                    if (isLand(tile)) {
+                        // Leave boat at current pos (last water tile)
+                        currentData.boat.x = player.x;
+                        currentData.boat.y = player.y;
+                        currentData.boat.direction = player.direction;
+                        player.isSurfing = false;
+                        // Fall through to normal movement to execute the move to land
+                    } else {
+                        return false; // Blocked (e.g. rock in water)
+                    }
+                }
+
                 if (tile === 8) { // Door
                     enterHouse('house');
-                    return;
+                    return true;
                 }
                 if (tile === 18) { // Bar Door
                     enterHouse('bar');
-                    return;
+                    return true;
                 }
                 if (tile === 10) { // Mat
                     exitHouse();
-                    return;
+                    return true;
                 }
 
                 // Check NPC collision
@@ -1880,8 +2035,9 @@
                     player.x = newX;
                     player.y = newY;
                     player.moving = true;
+                    return true;
                 }
-            }
+                return false;
         }
         
         function addFootprint(x, y) {
@@ -1996,6 +2152,19 @@
                 }
             });
 
+            // Boat (if not surfing)
+            if (currentData.boat && !player.isSurfing) {
+                // Only visible
+                if (currentData.boat.x >= startX && currentData.boat.x <= endX &&
+                    currentData.boat.y >= startY && currentData.boat.y <= endY) {
+                    sprites.push({
+                        type: 'boat',
+                        data: currentData.boat,
+                        sortY: (currentData.boat.y + 1) * TILE_SIZE
+                    });
+                }
+            }
+
             // Player
             sprites.push({
                 type: 'player',
@@ -2009,10 +2178,10 @@
             sprites.forEach(s => {
                 if (s.type === 'tile') {
                     drawObject(s.x, s.y, s.tileType);
-                } else if (s.type === 'npc' || s.type === 'player') {
+                } else if (s.type === 'npc' || s.type === 'player' || s.type === 'boat') {
                     // Reflection Logic
-                    const tx = s.type === 'npc' ? s.data.x : player.x;
-                    const ty = s.type === 'npc' ? s.data.y : player.y;
+                    const tx = s.type === 'npc' ? s.data.x : (s.type === 'boat' ? s.data.x : player.x);
+                    const ty = s.type === 'npc' ? s.data.y : (s.type === 'boat' ? s.data.y : player.y);
                     
                     // Check if on reflective surface (Water=4, Ice=22)
                     // Also check if valid coords
@@ -2028,6 +2197,7 @@
                             ctx.translate(0, -feetY);
                             
                             if (s.type === 'npc') drawNPC(s.data);
+                            else if (s.type === 'boat') drawBoat(s.data.x * TILE_SIZE, s.data.y * TILE_SIZE, s.data.direction);
                             else drawPlayer();
                             
                             ctx.restore();
@@ -2036,6 +2206,8 @@
 
                     if (s.type === 'npc') {
                         drawNPC(s.data);
+                    } else if (s.type === 'boat') {
+                        drawBoat(s.data.x * TILE_SIZE, s.data.y * TILE_SIZE, s.data.direction);
                     } else if (s.type === 'player') {
                         drawPlayer();
                     }
