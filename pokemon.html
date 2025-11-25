@@ -293,7 +293,8 @@
         const TILE_SIZE = 32;
         const MAP_SIZE = 20;
         const VISIBLE_TILES = 10;
-        const MOVE_SPEED = 2; // Pixel per frame (32 / 2 = 16 frames per tile)
+        const WALK_SPEED = 2;
+        const RUN_SPEED = 4;
         
         // World State
         const world = {}; // Cache: "x,y" -> { tiles: matrix, npcs: array }
@@ -303,6 +304,8 @@
         let isDialogueOpen = false;
         let isIndoors = false;
         let savedOutdoorPos = { x: 0, y: 0, wx: 0, wy: 0 };
+        let zoomLevel = 0; // Intro zoom start
+
         
         // Quiz State
         let quizState = {
@@ -399,7 +402,11 @@
             rockDark: '#7f8c8d',
             stump: '#8b5a2b',
             stumpTop: '#d7ccc8',
-            tilled: '#5d4037'
+            tilled: '#5d4037',
+            
+            // Road
+            road: '#95a5a6',
+            roadDetail: '#7f8c8d'
         };
 
         // Biome Helper
@@ -423,7 +430,7 @@
             "Ho perso le mie chiavi... o forse non le ho mai avute.",
             "Se premi 'B' puoi correre... ah no, aspetta, non è vero.",
             "La musica di questo posto è molto rilassante, vero?",
-            "Sono qui da ore e non ho ancora catt
+            "Sono qui da ore e non ho ancora catturato nulla...",
             "Usa l'ascia per tagliare gli alberi!",
             "Il piccone è utile per spaccare le rocce."
         ];
@@ -561,6 +568,8 @@
 
             // Generazione Case (Tentativo)
             let housePlaced = false;
+            let houseX = 0;
+            let houseY = 0;
             const houseRand = Math.abs(Math.sin(wx * 45.23 + wy * 23.11) * 12345.67) % 1;
             
             if (houseRand > 0.3 && biome !== 'ice') { // No houses in ice for now
@@ -584,7 +593,30 @@
                         newMap[hy+1][hx+1] = 8; // Porta
                         newMap[hy+2][hx+1] = 0;
                         housePlaced = true;
+                        houseX = hx + 1;
+                        houseY = hy + 1;
                         break;
+                    }
+                }
+            }
+
+            // Generazione Strade (Roads)
+            // Main horizontal road
+            const roadY = Math.floor(MAP_SIZE / 2) + Math.floor(Math.sin(wx * 10) * 2);
+            for (let x = 1; x < MAP_SIZE - 1; x++) {
+                if (newMap[roadY][x] !== 4 && newMap[roadY][x] !== 5 && newMap[roadY][x] !== 7 && newMap[roadY][x] !== 8) {
+                     newMap[roadY][x] = 14;
+                }
+            }
+
+            // Connect house to road
+            if (housePlaced) {
+                const startY = houseY + 2;
+                const endY = roadY;
+                const dir = startY < endY ? 1 : -1;
+                for (let y = startY; y !== endY + dir; y += dir) {
+                    if (newMap[y][houseX] !== 4 && newMap[y][houseX] !== 5 && newMap[y][houseX] !== 7 && newMap[y][houseX] !== 8) {
+                        newMap[y][houseX] = 14;
                     }
                 }
             }
@@ -593,22 +625,27 @@
             for (let y = 1; y < MAP_SIZE-1; y++) {
                 for (let x = 1; x < MAP_SIZE-1; x++) {
                     const t = newMap[y][x];
-                    if (t === 0 || t === 1) {
+                    if (t === 0 || t === 1 || t === 14) { // Can spawn on roads too
                         const rand = Math.random();
                         if (rand > 0.985) {
                              newNPCs.push({
                                 x: x,
                                 y: y,
+                                pixelX: x * TILE_SIZE,
+                                pixelY: y * TILE_SIZE,
+                                direction: 'down',
+                                moving: false,
+                                moveTimer: Math.random() * 100,
                                 text: dialogues[Math.floor(Math.random() * dialogues.length)],
                                 color: `hsl(${Math.random() * 360}, 70%, 60%)`
                             });
-                            newMap[y][x] = 6;
+                            // newMap[y][x] = 6; // Don't mark as solid 6, handle collision dynamically
                         }
                     }
                 }
             }
 
-            return { tiles: newMap, npcs: newNPCs, type: 'outdoor', biome: biome };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], type: 'outdoor', biome: biome };
         }
 
         function generateInterior() {
@@ -634,6 +671,11 @@
             newNPCs.push({
                 x: 3,
                 y: 4,
+                pixelX: 3 * TILE_SIZE,
+                pixelY: 4 * TILE_SIZE,
+                direction: 'down',
+                moving: false,
+                moveTimer: 0,
                 quiz: houseQuizzes[0],
                 color: '#ff9ff3'
             });
@@ -643,12 +685,17 @@
             newNPCs.push({
                 x: 6,
                 y: 4,
+                pixelX: 6 * TILE_SIZE,
+                pixelY: 4 * TILE_SIZE,
+                direction: 'down',
+                moving: false,
+                moveTimer: 0,
                 quiz: houseQuizzes[1],
                 color: '#54a0ff'
             });
             newMap[4][6] = 6;
 
-            return { tiles: newMap, npcs: newNPCs, type: 'indoor', width: size, height: size };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], type: 'indoor', width: size, height: size };
         }
 
         // Gestione Mappe
@@ -693,6 +740,18 @@
                 ctx.fillStyle = colors.waterHighlight;
                 ctx.fillRect(screenX + 4 + waveOffset, screenY + 8, 6, 2);
                 ctx.fillRect(screenX + 18 - waveOffset, screenY + 20, 8, 2);
+
+                // Active Tile Effect (Shaking Water)
+                if (currentData.activeTiles) {
+                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                    if (active) {
+                        const shake = Math.sin(Date.now() / 50) * 2;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        ctx.beginPath();
+                        ctx.arc(screenX + 16 + shake, screenY + 16, 10 + shake, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                }
             } else if (type === 5) { // Bridge
                 ctx.fillStyle = currentData.biome === 'tropical' ? colors.jungleWater : colors.water;
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -717,6 +776,16 @@
                 for(let i=0; i<4; i++) {
                     ctx.fillRect(screenX, screenY + (i*8) + 2, TILE_SIZE, 2);
                 }
+            } else if (type === 14) { // Road
+                ctx.fillStyle = colors.road;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = colors.roadDetail;
+                // Gravel texture
+                for(let i=0; i<4; i++) {
+                    const rx = (x * 13 + i * 7) % 24;
+                    const ry = (y * 17 + i * 11) % 24;
+                    ctx.fillRect(screenX + rx + 2, screenY + ry + 2, 2, 2);
+                }
             } else if (type === 22) { // Ice Patch
                 ctx.fillStyle = colors.ice;
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -738,10 +807,19 @@
                 if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
                 // ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE); // Already drawn ground
                 ctx.fillStyle = colors.grassDetail;
+                
+                let shakeX = 0;
+                if (currentData.activeTiles) {
+                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                    if (active) {
+                        shakeX = Math.sin(Date.now() / 50) * 2;
+                    }
+                }
+
                 for(let i=0; i<3; i++) {
                     const ox = (x * 7 + i * 5) % 20;
                     const oy = (y * 3 + i * 8) % 20;
-                    ctx.fillRect(screenX + 5 + ox, screenY + 5 + oy, 2, 4);
+                    ctx.fillRect(screenX + 5 + ox + shakeX, screenY + 5 + oy, 2, 4);
                 }
             } else if (type === 2) { // Albero
                 // Draw taller tree
@@ -878,31 +956,147 @@
 
         // Disegna NPC
         function drawNPC(npc) {
-            const screenX = npc.x * TILE_SIZE;
-            const screenY = npc.y * TILE_SIZE;
+            const screenX = (npc.pixelX !== undefined ? npc.pixelX : npc.x * TILE_SIZE);
+            const screenY = (npc.pixelY !== undefined ? npc.pixelY : npc.y * TILE_SIZE);
             
+            // Animazione camminata (se si muove)
+            const bounce = npc.moving ? Math.abs(Math.sin(Date.now() / 100)) * 3 : 0;
+            const drawY = screenY - bounce;
+
             // Ombra
             ctx.fillStyle = colors.shadow;
             ctx.beginPath();
             ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            if (npc.species === 'bulbasaur') {
+                drawBulbasaur(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'lapras') {
+                drawLapras(screenX, drawY, npc.direction);
+                return;
+            }
+
             // Corpo
             ctx.fillStyle = npc.color || colors.npcBody;
             ctx.beginPath();
-            ctx.roundRect(screenX + 8, screenY + 14, 16, 14, 4);
+            ctx.roundRect(screenX + 8, drawY + 14, 16, 14, 4);
             ctx.fill();
 
             // Testa
             ctx.fillStyle = colors.playerSkin;
             ctx.beginPath();
-            ctx.roundRect(screenX + 6, screenY + 2, 20, 18, 6);
+            ctx.roundRect(screenX + 6, drawY + 2, 20, 18, 6);
             ctx.fill();
 
             // Occhi
             ctx.fillStyle = '#333';
-            ctx.fillRect(screenX + 10, screenY + 10, 2, 4);
-            ctx.fillRect(screenX + 20, screenY + 10, 2, 4);
+            if (npc.direction === 'left') {
+                ctx.fillRect(screenX + 8, drawY + 10, 2, 4);
+            } else if (npc.direction === 'right') {
+                ctx.fillRect(screenX + 22, drawY + 10, 2, 4);
+            } else if (npc.direction === 'up') {
+                // No eyes visible from back
+            } else {
+                // Down (default)
+                ctx.fillRect(screenX + 10, drawY + 10, 2, 4);
+                ctx.fillRect(screenX + 20, drawY + 10, 2, 4);
+            }
+        }
+
+        function drawBulbasaur(x, y, dir) {
+            // Body (Teal)
+            ctx.fillStyle = '#48d0b0';
+            ctx.beginPath();
+            ctx.roundRect(x + 4, y + 12, 24, 18, 6);
+            ctx.fill();
+            
+            // Bulb (Green)
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 10, 8, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Head
+            ctx.fillStyle = '#48d0b0';
+            ctx.beginPath();
+            ctx.roundRect(x + 6, y + 6, 20, 16, 5);
+            ctx.fill();
+
+            // Spots
+            ctx.fillStyle = '#27ae60';
+            ctx.fillRect(x + 8, y + 18, 4, 4);
+            ctx.fillRect(x + 20, y + 22, 3, 3);
+
+            // Eyes
+            ctx.fillStyle = '#fff';
+            if (dir === 'left') {
+                ctx.fillRect(x + 6, y + 10, 4, 4);
+                ctx.fillStyle = '#c0392b';
+                ctx.fillRect(x + 6, y + 11, 2, 2);
+            } else if (dir === 'right') {
+                ctx.fillRect(x + 22, y + 10, 4, 4);
+                ctx.fillStyle = '#c0392b';
+                ctx.fillRect(x + 24, y + 11, 2, 2);
+            } else if (dir === 'down' || !dir) {
+                ctx.fillRect(x + 8, y + 10, 4, 4);
+                ctx.fillRect(x + 20, y + 10, 4, 4);
+                ctx.fillStyle = '#c0392b';
+                ctx.fillRect(x + 9, y + 11, 2, 2);
+                ctx.fillRect(x + 21, y + 11, 2, 2);
+            }
+        }
+
+        function drawLapras(x, y, dir) {
+            // Body (Blue)
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 24, 14, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Shell (Grey)
+            ctx.fillStyle = '#95a5a6';
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 20, 10, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Shell bumps
+            ctx.fillStyle = '#7f8c8d';
+            ctx.beginPath();
+            ctx.arc(x + 12, y + 18, 2, 0, Math.PI*2);
+            ctx.arc(x + 20, y + 18, 2, 0, Math.PI*2);
+            ctx.arc(x + 16, y + 16, 2, 0, Math.PI*2);
+            ctx.fill();
+
+            // Neck & Head
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            if (dir === 'left') {
+                ctx.moveTo(x + 10, y + 24);
+                ctx.quadraticCurveTo(x + 6, y + 16, x + 8, y + 8); // Neck
+                ctx.ellipse(x + 8, y + 6, 6, 5, 0, 0, Math.PI*2); // Head
+            } else if (dir === 'right') {
+                ctx.moveTo(x + 22, y + 24);
+                ctx.quadraticCurveTo(x + 26, y + 16, x + 24, y + 8); // Neck
+                ctx.ellipse(x + 24, y + 6, 6, 5, 0, 0, Math.PI*2); // Head
+            } else {
+                ctx.moveTo(x + 16, y + 24);
+                ctx.quadraticCurveTo(x + 16, y + 16, x + 16, y + 8); // Neck
+                ctx.stroke(); // Just line for neck? No, fill
+                ctx.fillRect(x + 14, y + 10, 4, 14);
+                ctx.ellipse(x + 16, y + 6, 6, 5, 0, 0, Math.PI*2); // Head
+            }
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#000';
+            if (dir === 'left') {
+                ctx.fillRect(x + 6, y + 5, 2, 2);
+            } else if (dir === 'right') {
+                ctx.fillRect(x + 24, y + 5, 2, 2);
+            } else {
+                ctx.fillRect(x + 14, y + 5, 2, 2);
+                ctx.fillRect(x + 18, y + 5, 2, 2);
+            }
         }
         
         // Disegna player
@@ -1085,6 +1279,35 @@
             if (player.direction === 'left') targetX--;
             if (player.direction === 'right') targetX++;
 
+            // Check for Active Tiles (Pokemon Hiding)
+            if (currentData.activeTiles) {
+                const activeIndex = currentData.activeTiles.findIndex(t => t.x === targetX && t.y === targetY);
+                if (activeIndex !== -1) {
+                    const activeTile = currentData.activeTiles[activeIndex];
+                    currentData.activeTiles.splice(activeIndex, 1); // Remove effect
+                    
+                    // Spawn Pokemon
+                    const species = activeTile.type === 1 ? 'bulbasaur' : 'lapras';
+                    const name = species.charAt(0).toUpperCase() + species.slice(1);
+                    
+                    currentNPCs.push({
+                        x: targetX,
+                        y: targetY,
+                        pixelX: targetX * TILE_SIZE,
+                        pixelY: targetY * TILE_SIZE,
+                        direction: 'down',
+                        moving: false,
+                        moveTimer: Math.random() * 100,
+                        species: species,
+                        text: `${name}: Verso!`,
+                        color: '#fff' // Unused for pokemon
+                    });
+                    
+                    showDialogue(`Un ${name} selvatico è apparso!`);
+                    return;
+                }
+            }
+
             // Cerca NPC
             const npc = currentNPCs.find(n => n.x === targetX && n.y === targetY);
             if (npc) {
@@ -1151,15 +1374,112 @@
         function update() {
             if (isTransitioning) return;
 
+            // Update Active Tiles (Shaking)
+            if (currentData.activeTiles) {
+                // Randomly add new active tile
+                if (Math.random() < 0.01) { // 1% chance per frame
+                    const rx = Math.floor(Math.random() * MAP_SIZE);
+                    const ry = Math.floor(Math.random() * MAP_SIZE);
+                    const tile = currentMap[ry][rx];
+                    
+                    // Only Grass (1) or Water (4)
+                    if (tile === 1 || tile === 4) {
+                        // Check if occupied
+                        const occupied = currentNPCs.some(n => n.x === rx && n.y === ry) || (player.x === rx && player.y === ry);
+                        const alreadyActive = currentData.activeTiles.some(t => t.x === rx && t.y === ry);
+                        
+                        if (!occupied && !alreadyActive) {
+                            currentData.activeTiles.push({
+                                x: rx,
+                                y: ry,
+                                type: tile,
+                                timer: 300 // 5 seconds at 60fps
+                            });
+                        }
+                    }
+                }
+
+                // Update timers
+                for (let i = currentData.activeTiles.length - 1; i >= 0; i--) {
+                    currentData.activeTiles[i].timer--;
+                    if (currentData.activeTiles[i].timer <= 0) {
+                        currentData.activeTiles.splice(i, 1);
+                    }
+                }
+            }
+
+            // Update NPCs
+            currentNPCs.forEach(npc => {
+                if (npc.moving) {
+                    const targetPixelX = npc.x * TILE_SIZE;
+                    const targetPixelY = npc.y * TILE_SIZE;
+                    const speed = WALK_SPEED; // NPCs always walk
+
+                    if (npc.pixelX < targetPixelX) npc.pixelX = Math.min(npc.pixelX + speed, targetPixelX);
+                    if (npc.pixelX > targetPixelX) npc.pixelX = Math.max(npc.pixelX - speed, targetPixelX);
+                    if (npc.pixelY < targetPixelY) npc.pixelY = Math.min(npc.pixelY + speed, targetPixelY);
+                    if (npc.pixelY > targetPixelY) npc.pixelY = Math.max(npc.pixelY - speed, targetPixelY);
+
+                    if (npc.pixelX === targetPixelX && npc.pixelY === targetPixelY) {
+                        npc.moving = false;
+                        npc.moveTimer = Math.random() * 200 + 50; // Wait a bit
+                    }
+                } else {
+                    if (npc.moveTimer > 0) {
+                        npc.moveTimer--;
+                    } else {
+                        // Decide action
+                        const action = Math.random();
+                        if (action < 0.02) { // 2% chance to move per frame when timer is 0
+                            const dirs = ['up', 'down', 'left', 'right'];
+                            const dir = dirs[Math.floor(Math.random() * dirs.length)];
+                            npc.direction = dir;
+
+                            let tx = npc.x;
+                            let ty = npc.y;
+                            if (dir === 'up') ty--;
+                            if (dir === 'down') ty++;
+                            if (dir === 'left') tx--;
+                            if (dir === 'right') tx++;
+
+                            // Check bounds and collision
+                            if (tx >= 0 && tx < MAP_SIZE && ty >= 0 && ty < MAP_SIZE) {
+                                const tile = currentMap[ty][tx];
+                                // Check if tile is walkable (0=ground, 1=grass, 9=floor, 10=mat, 13=tilled, 14=road)
+                                // Also check if player is there
+                                const playerHere = (player.x === tx && player.y === ty);
+                                const npcHere = currentNPCs.some(n => n !== npc && n.x === tx && n.y === ty);
+                                
+                                const walkable = (tile === 0 || tile === 1 || tile === 9 || tile === 10 || tile === 13 || tile === 14);
+
+                                if (walkable && !playerHere && !npcHere) {
+                                    npc.x = tx;
+                                    npc.y = ty;
+                                    npc.moving = true;
+                                } else {
+                                    npc.moveTimer = Math.random() * 100 + 20; // Wait if blocked
+                                }
+                            }
+                        } else if (action < 0.05) { // Just look around
+                             const dirs = ['up', 'down', 'left', 'right'];
+                             npc.direction = dirs[Math.floor(Math.random() * dirs.length)];
+                             npc.moveTimer = Math.random() * 50 + 20;
+                        }
+                    }
+                }
+            });
+
             // Se il player si sta muovendo (animazione tra tile)
             if (player.moving) {
                 const targetPixelX = player.x * TILE_SIZE;
                 const targetPixelY = player.y * TILE_SIZE;
                 
-                if (player.pixelX < targetPixelX) player.pixelX = Math.min(player.pixelX + MOVE_SPEED, targetPixelX);
-                if (player.pixelX > targetPixelX) player.pixelX = Math.max(player.pixelX - MOVE_SPEED, targetPixelX);
-                if (player.pixelY < targetPixelY) player.pixelY = Math.min(player.pixelY + MOVE_SPEED, targetPixelY);
-                if (player.pixelY > targetPixelY) player.pixelY = Math.max(player.pixelY - MOVE_SPEED, targetPixelY);
+                const speed = keys.b ? RUN_SPEED : WALK_SPEED;
+
+                if (player.pixelX < targetPixelX) player.pixelX = Math.min(player.pixelX + speed, targetPixelX);
+                if (player.pixelX > targetPixelX) player.pixelX = Math.max(player.pixelX - speed, targetPixelX);
+                if (player.pixelY < targetPixelY) player.pixelY = Math.min(player.pixelY + speed, targetPixelY);
+                if (player.pixelY > targetPixelY) player.pixelY = Math.max(player.pixelY - speed, targetPixelY);
 
                 // Arrivato a destinazione?
                 if (player.pixelX === targetPixelX && player.pixelY === targetPixelY) {
@@ -1217,8 +1537,14 @@
                     return;
                 }
 
-                // 2=Albero, 4=Acqua, 6=NPC, 7=Muro
-                if (tile !== 2 && tile !== 4 && tile !== 6 && tile !== 7) {
+                // Check NPC collision
+                const npcHere = currentNPCs.some(n => n.x === newX && n.y === newY);
+
+                // 2=Albero, 4=Acqua, 7=Muro, 11=Roccia, 20=Cactus, 21=Pino, 23=Palma
+                // Also check for other solid objects if added
+                const isSolid = (tile === 2 || tile === 4 || tile === 7 || tile === 11 || tile === 20 || tile === 21 || tile === 23);
+
+                if (!isSolid && !npcHere) {
                     player.x = newX;
                     player.y = newY;
                     player.moving = true;
@@ -1228,6 +1554,12 @@
         
         // Render Loop (Y-Sorted)
         function render() {
+            // Intro Zoom Logic
+            if (zoomLevel < 1) {
+                zoomLevel += 0.015;
+                if (zoomLevel > 1) zoomLevel = 1;
+            }
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1235,15 +1567,34 @@
             const mapWidth = currentMap[0].length;
             const mapHeight = currentMap.length;
 
-            const startX = Math.floor(camera.x);
-            const startY = Math.floor(camera.y);
-            
             ctx.save();
+
+            // Apply Zoom centered on screen
+            if (zoomLevel < 1) {
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(zoomLevel, zoomLevel);
+                ctx.translate(-canvas.width / 2, -canvas.height / 2);
+            }
+
             ctx.translate(-(camera.x * TILE_SIZE), -(camera.y * TILE_SIZE));
 
+            // Culling logic adjustment for zoom
+            let startX = Math.floor(camera.x);
+            let startY = Math.floor(camera.y);
+            let endX = startX + VISIBLE_TILES + 1;
+            let endY = startY + VISIBLE_TILES + 1;
+
+            if (zoomLevel < 1) {
+                // Draw everything during zoom out to avoid popping
+                startX = 0;
+                startY = 0;
+                endX = MAP_SIZE;
+                endY = MAP_SIZE;
+            }
+
             // 1. Draw Ground Layer (All visible)
-            for (let y = startY; y <= startY + VISIBLE_TILES + 1; y++) {
-                for (let x = startX; x <= startX + VISIBLE_TILES + 1; x++) {
+            for (let y = startY; y <= endY; y++) {
+                for (let x = startX; x <= endX; x++) {
                     if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
                         drawGround(x, y, currentMap[y][x]);
                     }
@@ -1254,8 +1605,8 @@
             const sprites = [];
 
             // Map Objects
-            for (let y = startY; y <= startY + VISIBLE_TILES + 1; y++) {
-                for (let x = startX; x <= startX + VISIBLE_TILES + 1; x++) {
+            for (let y = startY; y <= endY; y++) {
+                for (let x = startX; x <= endX; x++) {
                     if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
                         const t = currentMap[y][x];
                         // If it's an object that needs sorting
@@ -1275,8 +1626,8 @@
             // NPCs
             currentNPCs.forEach(npc => {
                 // Only visible
-                if (npc.x >= startX && npc.x <= startX + VISIBLE_TILES + 1 &&
-                    npc.y >= startY && npc.y <= startY + VISIBLE_TILES + 1) {
+                if (npc.x >= startX && npc.x <= endX &&
+                    npc.y >= startY && npc.y <= endY) {
                     sprites.push({
                         type: 'npc',
                         data: npc,
