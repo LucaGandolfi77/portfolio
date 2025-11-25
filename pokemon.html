@@ -167,6 +167,54 @@
             border-radius: 16px;
         }
 
+        #dialogue-box {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            display: none;
+            z-index: 50;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #dialogue-text {
+            color: #000;
+            margin-bottom: 5px;
+        }
+        #dialogue-options {
+            margin-top: 8px;
+            display: none;
+        }
+        .dialogue-option {
+            padding: 4px 8px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+        }
+        .dialogue-option.selected {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .dialogue-option::before {
+            content: "  ";
+        }
+        .dialogue-option.selected::before {
+            content: "▶ ";
+        }
+        #dialogue-next {
+            text-align: right;
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 12px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
         @media (max-width: 400px) {
             .btn {
                 font-size: 14px;
@@ -185,6 +233,11 @@
         <div id="game-screen">
             <div id="canvas-wrapper">
                 <div id="transition-overlay"></div>
+                <div id="dialogue-box">
+                    <div id="dialogue-text"></div>
+                    <div id="dialogue-options"></div>
+                    <div id="dialogue-next">▼ (A)</div>
+                </div>
                 <canvas id="gameCanvas" width="320" height="320"></canvas>
             </div>
         </div>
@@ -210,25 +263,52 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const transitionOverlay = document.getElementById('transition-overlay');
+        const dialogueBox = document.getElementById('dialogue-box');
+        const dialogueText = document.getElementById('dialogue-text');
+        const dialogueOptions = document.getElementById('dialogue-options');
         
         // Configurazione gioco
         const TILE_SIZE = 32;
         const MAP_SIZE = 20;
         const VISIBLE_TILES = 10;
+        const MOVE_SPEED = 2; // Pixel per frame (32 / 2 = 16 frames per tile)
         
         // World State
-        const world = {}; // Cache delle mappe generate: "x,y" -> matrix
+        const world = {}; // Cache: "x,y" -> { tiles: matrix, npcs: array }
         let worldX = 0;
         let worldY = 0;
         let isTransitioning = false;
+        let isDialogueOpen = false;
+        let isIndoors = false;
+        let savedOutdoorPos = { x: 0, y: 0, wx: 0, wy: 0 };
+        
+        // Quiz State
+        let quizState = {
+            active: false,
+            options: [],
+            selected: 0,
+            callback: null
+        };
+
+        // Input State
+        const keys = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            a: false,
+            b: false
+        };
 
         // Player
         const player = {
-            x: 10, // Start center
-            y: 10,
+            x: 10, // Grid X (Target)
+            y: 10, // Grid Y (Target)
+            pixelX: 10 * TILE_SIZE, // Visual X
+            pixelY: 10 * TILE_SIZE, // Visual Y
             direction: 'down',
-            animFrame: 0,
-            moving: false
+            moving: false,
+            stepAnim: 0
         };
         
         // Camera
@@ -237,52 +317,206 @@
             y: 0
         };
         
-        // Colori
+        // Colori Palette "Indie Cozy"
         const colors = {
-            terrain: '#90EE90',
-            grass: '#228B22',
-            tree: '#2E8B57',
-            flower: '#FFD700',
-            water: '#4FA4F4',
-            bridge: '#DEB887',
-            bridgeDetail: '#C19A6B',
-            player: '#FF4444',
-            playerBody: '#FF6B6B',
-            playerEyes: '#FFFFFF'
+            terrain: '#7ec850',
+            grass: '#67b040',
+            grassDetail: '#5a9e35',
+            treeTrunk: '#8b5a2b',
+            treeLeaves: '#4a8f3c',
+            treeShadow: 'rgba(0,0,0,0.2)',
+            flower: '#ff9d9d',
+            flowerCenter: '#ffe082',
+            water: '#5dade2',
+            waterDeep: '#4a9ccf',
+            waterHighlight: 'rgba(255,255,255,0.4)',
+            bridge: '#d4a373',
+            bridgeDark: '#b08055',
+            playerBody: '#ff6b6b',
+            playerHat: '#ff4757',
+            playerSkin: '#ffeaa7',
+            npcBody: '#a29bfe',
+            npcHat: '#6c5ce7',
+            shadow: 'rgba(0,0,0,0.15)',
+            houseWall: '#f3a683',
+            houseRoof: '#e77f67',
+            houseDoor: '#596275',
+            houseFloor: '#f7d794',
+            houseMat: '#303952'
         };
+
+        // Dialoghi NPC
+        const dialogues = [
+            "Ciao! Che bella giornata per un'avventura!",
+            "Hai visto dei Pokémon rari da queste parti?",
+            "Attento all'erba alta, è piena di insetti!",
+            "Mi piace stare qui a guardare l'acqua...",
+            "Si dice che ci sia un tesoro nascosto oltre il ponte.",
+            "Il mio Pokémon preferito è Snorlax. Dorme sempre!",
+            "Ho perso le mie chiavi... o forse non le ho mai avute.",
+            "Se premi 'B' puoi correre... ah no, aspetta, non è vero.",
+            "La musica di questo posto è molto rilassante, vero?",
+            "Sono qui da ore e non ho ancora catturato nulla."
+        ];
+        
+        // Quiz NPC Casa
+        const houseQuizzes = [
+            {
+                question: "Qual è il Pokémon iniziale di tipo Fuoco a Kanto?",
+                options: ["Bulbasaur", "Charmander", "Squirtle"],
+                correct: 1,
+                win: "Esatto! Charmander è il migliore!",
+                lose: "Sbagliato! Riprova."
+            },
+            {
+                question: "Cosa usa Pikachu per attaccare?",
+                options: ["Fuoco", "Acqua", "Elettricità"],
+                correct: 2,
+                win: "Bzzzt! Corretto!",
+                lose: "No, non credo proprio."
+            }
+        ];
 
         // Generazione Mappa Procedurale
         function generateMap(wx, wy) {
             const newMap = [];
-            const seed = Math.sin(wx * 100 + wy) * 1000; // Pseudo-random seed basato su coordinate
+            const newNPCs = [];
+            const seed = Math.sin(wx * 100 + wy) * 1000; 
             
+            // Inizializza mappa vuota
             for (let y = 0; y < MAP_SIZE; y++) {
                 newMap[y] = [];
                 for (let x = 0; x < MAP_SIZE; x++) {
+                    newMap[y][x] = 0;
+                }
+            }
+
+            for (let y = 0; y < MAP_SIZE; y++) {
+                for (let x = 0; x < MAP_SIZE; x++) {
                     // Bordi (Acqua)
                     if (x === 0 || x === MAP_SIZE - 1 || y === 0 || y === MAP_SIZE - 1) {
-                        // Ponti al centro dei lati
                         const isBridgeX = (y === Math.floor(MAP_SIZE/2) || y === Math.floor(MAP_SIZE/2)-1);
                         const isBridgeY = (x === Math.floor(MAP_SIZE/2) || x === Math.floor(MAP_SIZE/2)-1);
                         
-                        if ((x === 0 || x === MAP_SIZE - 1) && isBridgeX) newMap[y][x] = 5; // Ponte Orizzontale
-                        else if ((y === 0 || y === MAP_SIZE - 1) && isBridgeY) newMap[y][x] = 5; // Ponte Verticale
-                        else newMap[y][x] = 4; // Acqua
+                        if ((x === 0 || x === MAP_SIZE - 1) && isBridgeX) newMap[y][x] = 5; 
+                        else if ((y === 0 || y === MAP_SIZE - 1) && isBridgeY) newMap[y][x] = 5; 
+                        else newMap[y][x] = 4; 
                     } else {
-                        // Interno
-                        const rand = Math.random(); // In un gioco vero useremmo un noise basato sul seed
-                        if (rand < 0.05) newMap[y][x] = 2; // Albero
+                        // Noise
+                        const globalX = wx * MAP_SIZE + x;
+                        const globalY = wy * MAP_SIZE + y;
+                        const noise = Math.sin(globalX * 0.5) * Math.cos(globalY * 0.5);
+                        const rand = Math.abs(Math.sin(globalX * 12.9898 + globalY * 78.233) * 43758.5453) % 1;
+
+                        if (rand < 0.08) newMap[y][x] = 2; // Albero
                         else if (rand < 0.15) newMap[y][x] = 3; // Fiore
-                        else if (rand < 0.4) newMap[y][x] = 1; // Erba
+                        else if (noise > 0.2) newMap[y][x] = 1; // Erba alta
                         else newMap[y][x] = 0; // Terreno
                     }
                 }
             }
-            return newMap;
+
+            // Generazione Case (Tentativo)
+            // Proviamo a piazzare 1 casa per mappa se c'è spazio
+            let housePlaced = false;
+            const houseRand = Math.abs(Math.sin(wx * 45.23 + wy * 23.11) * 12345.67) % 1;
+            
+            if (houseRand > 0.3) { // 70% chance di casa
+                // Cerca spazio 4x3 (x,y top-left)
+                // Evita bordi (1-18)
+                for(let attempt=0; attempt<50; attempt++) {
+                    const hx = Math.floor(Math.random() * (MAP_SIZE - 6)) + 3;
+                    const hy = Math.floor(Math.random() * (MAP_SIZE - 6)) + 3;
+                    
+                    // Check collisioni
+                    let clear = true;
+                    for(let dy=0; dy<4; dy++) {
+                        for(let dx=0; dx<4; dx++) {
+                            if (newMap[hy+dy][hx+dx] === 4 || newMap[hy+dy][hx+dx] === 5) clear = false;
+                        }
+                    }
+                    
+                    if (clear) {
+                        // Piazza casa
+                        // 7 7 7
+                        // 7 8 7
+                        for(let dx=0; dx<3; dx++) {
+                            newMap[hy][hx+dx] = 7; // Tetto/Muro alto
+                            newMap[hy+1][hx+dx] = 7; // Muro
+                        }
+                        newMap[hy+1][hx+1] = 8; // Porta
+                        
+                        // Pulisci davanti alla porta
+                        newMap[hy+2][hx+1] = 0;
+                        housePlaced = true;
+                        break;
+                    }
+                }
+            }
+
+            // Spawn NPC
+            for (let y = 1; y < MAP_SIZE-1; y++) {
+                for (let x = 1; x < MAP_SIZE-1; x++) {
+                    if (newMap[y][x] === 0 || newMap[y][x] === 1) {
+                        const rand = Math.random();
+                        if (rand > 0.985) {
+                             newNPCs.push({
+                                x: x,
+                                y: y,
+                                text: dialogues[Math.floor(Math.random() * dialogues.length)],
+                                color: `hsl(${Math.random() * 360}, 70%, 60%)`
+                            });
+                            newMap[y][x] = 6;
+                        }
+                    }
+                }
+            }
+
+            return { tiles: newMap, npcs: newNPCs, type: 'outdoor' };
+        }
+
+        function generateInterior() {
+            const newMap = [];
+            const newNPCs = [];
+            const size = 10; // Piccola stanza
+            
+            for (let y = 0; y < size; y++) {
+                newMap[y] = [];
+                for (let x = 0; x < size; x++) {
+                    if (x === 0 || x === size-1 || y === 0 || y === size-1) {
+                        newMap[y][x] = 7; // Muro
+                    } else {
+                        newMap[y][x] = 9; // Pavimento
+                    }
+                }
+            }
+            
+            // Uscita
+            newMap[size-1][Math.floor(size/2)] = 10; // Mat (Exit)
+            
+            // NPC Quiz 1
+            newNPCs.push({
+                x: 3,
+                y: 4,
+                quiz: houseQuizzes[0],
+                color: '#ff9ff3'
+            });
+            newMap[4][3] = 6;
+
+            // NPC Quiz 2
+            newNPCs.push({
+                x: 6,
+                y: 4,
+                quiz: houseQuizzes[1],
+                color: '#54a0ff'
+            });
+            newMap[4][6] = 6;
+
+            return { tiles: newMap, npcs: newNPCs, type: 'indoor', width: size, height: size };
         }
 
         // Gestione Mappe
-        function getCurrentMap() {
+        function getCurrentData() {
             const key = `${worldX},${worldY}`;
             if (!world[key]) {
                 world[key] = generateMap(worldX, worldY);
@@ -290,7 +524,9 @@
             return world[key];
         }
 
-        let currentMap = getCurrentMap();
+        let currentData = getCurrentData();
+        let currentMap = currentData.tiles;
+        let currentNPCs = currentData.npcs;
         
         // Disegna tile
         function drawTile(x, y, type) {
@@ -299,106 +535,218 @@
             
             switch(type) {
                 case 0: // Terreno
+                case 6: // NPC (disegna terreno sotto)
                     ctx.fillStyle = colors.terrain;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    if ((x + y) % 2 === 0) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.02)';
+                        ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    }
                     break;
-                case 1: // Erba
+                case 1: // Erba Alta
                     ctx.fillStyle = colors.grass;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                    ctx.fillStyle = colors.terrain;
-                    for (let i = 0; i < 3; i++) {
-                        ctx.fillRect(screenX + 8 + i * 8, screenY + 8, 3, 6);
+                    ctx.fillStyle = colors.grassDetail;
+                    for(let i=0; i<3; i++) {
+                        const ox = (x * 7 + i * 5) % 20;
+                        const oy = (y * 3 + i * 8) % 20;
+                        ctx.fillRect(screenX + 5 + ox, screenY + 5 + oy, 2, 4);
                     }
                     break;
                 case 2: // Albero
                     ctx.fillStyle = colors.grass;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                    ctx.fillStyle = '#8B4513';
-                    ctx.fillRect(screenX + 12, screenY + 16, 8, 12);
-                    ctx.fillStyle = colors.tree;
+                    ctx.fillStyle = colors.treeShadow;
                     ctx.beginPath();
-                    ctx.arc(screenX + 16, screenY + 12, 10, 0, Math.PI * 2);
+                    ctx.ellipse(screenX + 16, screenY + 28, 10, 4, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = colors.treeTrunk;
+                    ctx.fillRect(screenX + 12, screenY + 18, 8, 10);
+                    ctx.fillStyle = colors.treeLeaves;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 10, 11, 0, Math.PI * 2);
+                    ctx.arc(screenX + 10, screenY + 16, 9, 0, Math.PI * 2);
+                    ctx.arc(screenX + 22, screenY + 16, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 8, 6, 0, Math.PI * 2);
                     ctx.fill();
                     break;
                 case 3: // Fiore
                     ctx.fillStyle = colors.terrain;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.grassDetail;
+                    ctx.fillRect(screenX + 15, screenY + 18, 2, 6);
                     ctx.fillStyle = colors.flower;
-                    ctx.beginPath();
-                    ctx.arc(screenX + 16, screenY + 16, 4, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = '#FF1493';
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (Math.PI / 2) * i;
-                        const px = screenX + 16 + Math.cos(angle) * 6;
-                        const py = screenY + 16 + Math.sin(angle) * 6;
+                    for(let i=0; i<5; i++) {
+                        const angle = (Math.PI * 2 / 5) * i;
+                        const px = screenX + 16 + Math.cos(angle) * 5;
+                        const py = screenY + 16 + Math.sin(angle) * 5;
                         ctx.beginPath();
                         ctx.arc(px, py, 3, 0, Math.PI * 2);
                         ctx.fill();
                     }
+                    ctx.fillStyle = colors.flowerCenter;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 16, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
                     break;
                 case 4: // Acqua
                     ctx.fillStyle = colors.water;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                    // Onde
-                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                    ctx.fillRect(screenX + 5, screenY + 10, 10, 2);
-                    ctx.fillRect(screenX + 15, screenY + 20, 8, 2);
+                    const time = Date.now() / 500;
+                    const waveOffset = Math.sin(time + x + y) * 2;
+                    ctx.fillStyle = colors.waterHighlight;
+                    ctx.fillRect(screenX + 4 + waveOffset, screenY + 8, 6, 2);
+                    ctx.fillRect(screenX + 18 - waveOffset, screenY + 20, 8, 2);
                     break;
                 case 5: // Ponte
+                    ctx.fillStyle = colors.water;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
                     ctx.fillStyle = colors.bridge;
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                    ctx.fillStyle = colors.bridgeDetail;
-                    // Assi del ponte
+                    ctx.fillStyle = colors.bridgeDark;
                     for(let i=0; i<4; i++) {
-                        ctx.fillRect(screenX, screenY + (i*8), TILE_SIZE, 2);
+                        ctx.fillRect(screenX, screenY + (i*8), TILE_SIZE, 1);
+                        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                        ctx.fillRect(screenX + 2, screenY + (i*8) + 2, 2, 2);
+                        ctx.fillRect(screenX + 28, screenY + (i*8) + 2, 2, 2);
+                        ctx.fillStyle = colors.bridgeDark;
                     }
                     break;
+                case 7: // Muro Casa
+                    ctx.fillStyle = colors.houseWall;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.houseRoof;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, 10); // Tetto
+                    break;
+                case 8: // Porta Casa
+                    ctx.fillStyle = colors.houseWall;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.houseDoor;
+                    ctx.fillRect(screenX + 6, screenY + 8, 20, 24);
+                    ctx.fillStyle = '#ffd700'; // Maniglia
+                    ctx.beginPath();
+                    ctx.arc(screenX + 22, screenY + 20, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                case 9: // Pavimento Interno
+                    ctx.fillStyle = colors.houseFloor;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    if ((x + y) % 2 === 0) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+                        ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    }
+                    break;
+                case 10: // Tappeto Uscita
+                    ctx.fillStyle = colors.houseFloor;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.houseMat;
+                    ctx.fillRect(screenX + 4, screenY + 8, 24, 16);
+                    break;
             }
+        }
+
+        // Disegna NPC
+        function drawNPC(npc) {
+            const screenX = npc.x * TILE_SIZE;
+            const screenY = npc.y * TILE_SIZE;
+            
+            // Ombra
+            ctx.fillStyle = colors.shadow;
+            ctx.beginPath();
+            ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Corpo
+            ctx.fillStyle = npc.color || colors.npcBody;
+            ctx.beginPath();
+            ctx.roundRect(screenX + 8, screenY + 14, 16, 14, 4);
+            ctx.fill();
+
+            // Testa
+            ctx.fillStyle = colors.playerSkin;
+            ctx.beginPath();
+            ctx.roundRect(screenX + 6, screenY + 2, 20, 18, 6);
+            ctx.fill();
+
+            // Occhi
+            ctx.fillStyle = '#333';
+            ctx.fillRect(screenX + 10, screenY + 10, 2, 4);
+            ctx.fillRect(screenX + 20, screenY + 10, 2, 4);
         }
         
         // Disegna player
         function drawPlayer() {
-            const screenX = (player.x - camera.x) * TILE_SIZE;
-            const screenY = (player.y - camera.y) * TILE_SIZE;
+            const screenX = player.pixelX - (camera.x * TILE_SIZE);
+            const screenY = player.pixelY - (camera.y * TILE_SIZE);
             
+            // Ombra
+            ctx.fillStyle = colors.shadow;
+            ctx.beginPath();
+            ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Animazione camminata
+            const bounce = player.moving ? Math.abs(Math.sin(Date.now() / 100)) * 3 : 0;
+            const drawY = screenY - bounce;
+
             // Corpo
             ctx.fillStyle = colors.playerBody;
-            ctx.fillRect(screenX + 8, screenY + 12, 16, 16);
-            
-            // Testa
-            ctx.fillStyle = colors.player;
             ctx.beginPath();
-            ctx.arc(screenX + 16, screenY + 12, 8, 0, Math.PI * 2);
+            ctx.roundRect(screenX + 8, drawY + 14, 16, 14, 4);
             ctx.fill();
-            
+
+            // Testa
+            ctx.fillStyle = colors.playerSkin;
+            ctx.beginPath();
+            ctx.roundRect(screenX + 6, drawY + 2, 20, 18, 6);
+            ctx.fill();
+
+            // Cappello
+            ctx.fillStyle = colors.playerHat;
+            ctx.beginPath();
+            ctx.moveTo(screenX + 6, drawY + 8);
+            ctx.lineTo(screenX + 26, drawY + 8);
+            ctx.arc(screenX + 16, drawY + 8, 10, Math.PI, 0);
+            ctx.fill();
+            ctx.fillRect(screenX + 6, drawY + 6, 20, 4);
+
             // Occhi
-            ctx.fillStyle = colors.playerEyes;
-            if (player.direction === 'up') {
-                ctx.fillRect(screenX + 12, screenY + 10, 2, 3);
-                ctx.fillRect(screenX + 18, screenY + 10, 2, 3);
-            } else if (player.direction === 'down') {
-                ctx.fillRect(screenX + 12, screenY + 12, 2, 3);
-                ctx.fillRect(screenX + 18, screenY + 12, 2, 3);
-            } else if (player.direction === 'left') {
-                ctx.fillRect(screenX + 11, screenY + 11, 2, 3);
-                ctx.fillRect(screenX + 16, screenY + 11, 2, 3);
+            ctx.fillStyle = '#333';
+            if (player.direction === 'left') {
+                ctx.fillRect(screenX + 8, drawY + 10, 2, 4);
+            } else if (player.direction === 'right') {
+                ctx.fillRect(screenX + 22, drawY + 10, 2, 4);
             } else {
-                ctx.fillRect(screenX + 14, screenY + 11, 2, 3);
-                ctx.fillRect(screenX + 19, screenY + 11, 2, 3);
+                ctx.fillRect(screenX + 10, drawY + 10, 2, 4);
+                ctx.fillRect(screenX + 20, drawY + 10, 2, 4);
             }
-            
-            // Gambe (animazione)
-            const legOffset = player.moving ? Math.sin(Date.now() / 100) * 2 : 0;
-            ctx.fillStyle = colors.player;
-            ctx.fillRect(screenX + 10, screenY + 28 + legOffset, 4, 4);
-            ctx.fillRect(screenX + 18, screenY + 28 - legOffset, 4, 4);
         }
         
-        // Aggiorna camera
+        // Aggiorna camera (Smooth)
         function updateCamera() {
-            camera.x = Math.max(0, Math.min(player.x - Math.floor(VISIBLE_TILES / 2), MAP_SIZE - VISIBLE_TILES));
-            camera.y = Math.max(0, Math.min(player.y - Math.floor(VISIBLE_TILES / 2), MAP_SIZE - VISIBLE_TILES));
+            const mapWidth = currentMap[0].length;
+            const mapHeight = currentMap.length;
+
+            // Camera segue il pixel position del player
+            const targetCamX = (player.pixelX / TILE_SIZE) - (VISIBLE_TILES / 2);
+            const targetCamY = (player.pixelY / TILE_SIZE) - (VISIBLE_TILES / 2);
+            
+            // Clamp ai bordi della mappa
+            // Se la mappa è più piccola della view, centra
+            if (mapWidth <= VISIBLE_TILES) {
+                camera.x = -(VISIBLE_TILES - mapWidth) / 2;
+            } else {
+                camera.x = Math.max(0, Math.min(targetCamX, mapWidth - VISIBLE_TILES));
+            }
+
+            if (mapHeight <= VISIBLE_TILES) {
+                camera.y = -(VISIBLE_TILES - mapHeight) / 2;
+            } else {
+                camera.y = Math.max(0, Math.min(targetCamY, mapHeight - VISIBLE_TILES));
+            }
         }
 
         // Cambio Mappa
@@ -409,14 +757,21 @@
             setTimeout(() => {
                 worldX += dx;
                 worldY += dy;
-                currentMap = getCurrentMap();
+                currentData = getCurrentData();
+                currentMap = currentData.tiles;
+                currentNPCs = currentData.npcs;
 
-                // Riposiziona player sul lato opposto
-                if (dx > 0) player.x = 1;
-                else if (dx < 0) player.x = MAP_SIZE - 2;
+                // Riposiziona player
+                if (dx > 0) { player.x = 1; }
+                else if (dx < 0) { player.x = MAP_SIZE - 2; }
                 
-                if (dy > 0) player.y = 1;
-                else if (dy < 0) player.y = MAP_SIZE - 2;
+                if (dy > 0) { player.y = 1; }
+                else if (dy < 0) { player.y = MAP_SIZE - 2; }
+
+                // Reset pixel position immediato
+                player.pixelX = player.x * TILE_SIZE;
+                player.pixelY = player.y * TILE_SIZE;
+                player.moving = false;
 
                 updateCamera();
                 
@@ -426,127 +781,297 @@
                 }, 100);
             }, 300);
         }
-        
-        // Muovi player
-        function movePlayer(dx, dy, dir) {
-            if (isTransitioning) return;
 
-            player.direction = dir;
-            const newX = player.x + dx;
-            const newY = player.y + dy;
+        function enterHouse() {
+            isTransitioning = true;
+            transitionOverlay.style.opacity = 1;
             
-            // Controllo confini mappa (Cambio Mappa)
-            if (newX < 0) {
-                switchMap(-1, 0);
-                return;
-            }
-            if (newX >= MAP_SIZE) {
-                switchMap(1, 0);
-                return;
-            }
-            if (newY < 0) {
-                switchMap(0, -1);
-                return;
-            }
-            if (newY >= MAP_SIZE) {
-                switchMap(0, 1);
+            savedOutdoorPos = { x: player.x, y: player.y, wx: worldX, wy: worldY };
+            
+            setTimeout(() => {
+                isIndoors = true;
+                currentData = generateInterior();
+                currentMap = currentData.tiles;
+                currentNPCs = currentData.npcs;
+                
+                // Place player at bottom center (above mat)
+                player.x = 5; 
+                player.y = 8;
+                player.pixelX = player.x * TILE_SIZE;
+                player.pixelY = player.y * TILE_SIZE;
+                player.direction = 'up';
+                
+                updateCamera();
+                
+                setTimeout(() => {
+                    transitionOverlay.style.opacity = 0;
+                    isTransitioning = false;
+                }, 100);
+            }, 300);
+        }
+
+        function exitHouse() {
+            isTransitioning = true;
+            transitionOverlay.style.opacity = 1;
+            
+            setTimeout(() => {
+                isIndoors = false;
+                worldX = savedOutdoorPos.wx;
+                worldY = savedOutdoorPos.wy;
+                currentData = getCurrentData(); // Reload outdoor map
+                currentMap = currentData.tiles;
+                currentNPCs = currentData.npcs;
+                
+                player.x = savedOutdoorPos.x;
+                player.y = savedOutdoorPos.y + 1; // Step out
+                player.pixelX = player.x * TILE_SIZE;
+                player.pixelY = player.y * TILE_SIZE;
+                player.direction = 'down';
+                
+                updateCamera();
+                
+                setTimeout(() => {
+                    transitionOverlay.style.opacity = 0;
+                    isTransitioning = false;
+                }, 100);
+            }, 300);
+        }
+
+        // Interazione
+        function interact() {
+            if (quizState.active) {
+                checkQuizAnswer();
                 return;
             }
 
-            // Movimento normale
-            const tile = currentMap[newY][newX];
-            // 2 = Albero (Collisione), 4 = Acqua (Collisione)
-            if (tile !== 2 && tile !== 4) {
-                player.x = newX;
-                player.y = newY;
-                player.moving = true;
-                setTimeout(() => player.moving = false, 200);
+            if (isDialogueOpen) {
+                closeDialogue();
+                return;
+            }
+
+            let targetX = player.x;
+            let targetY = player.y;
+
+            if (player.direction === 'up') targetY--;
+            if (player.direction === 'down') targetY++;
+            if (player.direction === 'left') targetX--;
+            if (player.direction === 'right') targetX++;
+
+            // Cerca NPC
+            const npc = currentNPCs.find(n => n.x === targetX && n.y === targetY);
+            if (npc) {
+                if (npc.quiz) {
+                    startQuiz(npc.quiz);
+                } else {
+                    showDialogue(npc.text);
+                }
+            }
+        }
+
+        function showDialogue(text) {
+            isDialogueOpen = true;
+            dialogueText.textContent = text;
+            dialogueOptions.style.display = 'none';
+            dialogueBox.style.display = 'block';
+        }
+
+        function closeDialogue() {
+            isDialogueOpen = false;
+            dialogueBox.style.display = 'none';
+        }
+        
+        // Quiz Logic
+        function startQuiz(quiz) {
+            isDialogueOpen = true;
+            quizState.active = true;
+            quizState.options = quiz.options;
+            quizState.selected = 0;
+            quizState.quizRef = quiz;
+            quizState.callback = (correct) => {
+                quizState.active = false;
+                showDialogue(correct ? quiz.win : quiz.lose);
+            };
+            
+            dialogueText.textContent = quiz.question;
+            renderQuizOptions();
+            dialogueOptions.style.display = 'block';
+            dialogueBox.style.display = 'block';
+        }
+
+        function renderQuizOptions() {
+            dialogueOptions.innerHTML = '';
+            quizState.options.forEach((opt, idx) => {
+                const div = document.createElement('div');
+                div.className = `dialogue-option ${idx === quizState.selected ? 'selected' : ''}`;
+                div.textContent = opt;
+                div.onclick = () => {
+                    quizState.selected = idx;
+                    renderQuizOptions();
+                };
+                dialogueOptions.appendChild(div);
+            });
+        }
+
+        function checkQuizAnswer() {
+            if (quizState.callback && quizState.quizRef) {
+                const isCorrect = quizState.selected === quizState.quizRef.correct;
+                quizState.callback(isCorrect);
             }
         }
         
-        // Render
+        // Game Loop Logic
+        function update() {
+            if (isTransitioning) return;
+
+            // Se il player si sta muovendo (animazione tra tile)
+            if (player.moving) {
+                const targetPixelX = player.x * TILE_SIZE;
+                const targetPixelY = player.y * TILE_SIZE;
+                
+                if (player.pixelX < targetPixelX) player.pixelX = Math.min(player.pixelX + MOVE_SPEED, targetPixelX);
+                if (player.pixelX > targetPixelX) player.pixelX = Math.max(player.pixelX - MOVE_SPEED, targetPixelX);
+                if (player.pixelY < targetPixelY) player.pixelY = Math.min(player.pixelY + MOVE_SPEED, targetPixelY);
+                if (player.pixelY > targetPixelY) player.pixelY = Math.max(player.pixelY - MOVE_SPEED, targetPixelY);
+
+                // Arrivato a destinazione?
+                if (player.pixelX === targetPixelX && player.pixelY === targetPixelY) {
+                    player.moving = false;
+                }
+                updateCamera();
+                return; // Non accettare nuovi input finché non finisce il movimento
+            }
+
+            // Se il dialogo è aperto, blocca movimento
+            if (isDialogueOpen) {
+                if (quizState.active) {
+                    if (keys.up) {
+                        keys.up = false; // Consume key
+                        quizState.selected = (quizState.selected - 1 + quizState.options.length) % quizState.options.length;
+                        renderQuizOptions();
+                    }
+                    if (keys.down) {
+                        keys.down = false; // Consume key
+                        quizState.selected = (quizState.selected + 1) % quizState.options.length;
+                        renderQuizOptions();
+                    }
+                }
+                return;
+            }
+
+            // Input Handling (Nuovo movimento)
+            let dx = 0;
+            let dy = 0;
+
+            if (keys.up) { dy = -1; player.direction = 'up'; }
+            else if (keys.down) { dy = 1; player.direction = 'down'; }
+            else if (keys.left) { dx = -1; player.direction = 'left'; }
+            else if (keys.right) { dx = 1; player.direction = 'right'; }
+
+            if (dx !== 0 || dy !== 0) {
+                const newX = player.x + dx;
+                const newY = player.y + dy;
+
+                // Check confini (Cambio Mappa)
+                if (newX < 0) { switchMap(-1, 0); return; }
+                if (newX >= MAP_SIZE && !isIndoors) { switchMap(1, 0); return; } // Indoors bounded
+                if (newY < 0) { switchMap(0, -1); return; }
+                if (newY >= MAP_SIZE && !isIndoors) { switchMap(0, 1); return; } // Indoors bounded
+
+                // Check collisioni
+                const tile = currentMap[newY][newX];
+                
+                if (tile === 8) { // Door
+                    enterHouse();
+                    return;
+                }
+                if (tile === 10) { // Mat
+                    exitHouse();
+                    return;
+                }
+
+                // 2=Albero, 4=Acqua, 6=NPC, 7=Muro
+                if (tile !== 2 && tile !== 4 && tile !== 6 && tile !== 7) {
+                    player.x = newX;
+                    player.y = newY;
+                    player.moving = true;
+                }
+            }
+        }
+        
+        // Render Loop
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Disegna sfondo nero (per i bordi fuori mappa durante le transizioni)
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            for (let y = 0; y < VISIBLE_TILES; y++) {
-                for (let x = 0; x < VISIBLE_TILES; x++) {
-                    const mapX = camera.x + x;
-                    const mapY = camera.y + y;
-                    
-                    if (mapX >= 0 && mapX < MAP_SIZE && mapY >= 0 && mapY < MAP_SIZE) {
-                        drawTile(x, y, currentMap[mapY][mapX]);
+            const mapWidth = currentMap[0].length;
+            const mapHeight = currentMap.length;
+
+            // Disegna Mappa
+            const startX = Math.floor(camera.x);
+            const startY = Math.floor(camera.y);
+            
+            // Disegna un tile in più per evitare flickering ai bordi durante lo scroll smooth
+            for (let y = startY; y <= startY + VISIBLE_TILES + 1; y++) {
+                for (let x = startX; x <= startX + VISIBLE_TILES + 1; x++) {
+                    if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
+                        // Calcola posizione relativa alla camera (che ora è float)
+                        // Semplificazione: Disegniamo tutto traslato
+                        ctx.save();
+                        ctx.translate(-(camera.x * TILE_SIZE), -(camera.y * TILE_SIZE));
+                        drawTile(x, y, currentMap[y][x]);
+                        ctx.restore();
                     }
                 }
             }
+
+            // Disegna NPC
+            ctx.save();
+            ctx.translate(-(camera.x * TILE_SIZE), -(camera.y * TILE_SIZE));
+            currentNPCs.forEach(npc => drawNPC(npc));
+            ctx.restore();
             
             drawPlayer();
+            
+            update(); // Game Logic
             requestAnimationFrame(render);
         }
         
-        // Event listeners
-        document.querySelectorAll('[data-dir]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const dir = btn.dataset.dir;
-                switch(dir) {
-                    case 'up': movePlayer(0, -1, 'up'); break;
-                    case 'down': movePlayer(0, 1, 'down'); break;
-                    case 'left': movePlayer(-1, 0, 'left'); break;
-                    case 'right': movePlayer(1, 0, 'right'); break;
-                }
-                updateCamera();
-            });
-            
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                btn.click();
-            });
-        });
-        
-        document.querySelectorAll('[data-action]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const action = btn.dataset.action;
-                const info = document.getElementById('info');
-                if (action === 'a') {
-                    info.textContent = 'Pulsante A premuto! ⚡';
-                } else {
-                    info.textContent = 'Pulsante B premuto! 🎒';
-                }
-                setTimeout(() => {
-                    info.textContent = 'Usa i pulsanti per muoverti nella mappa!';
-                }, 1000);
-            });
-            
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                btn.click();
-            });
-        });
-        
-        // Tastiera
-        document.addEventListener('keydown', (e) => {
-            switch(e.key) {
-                case 'ArrowUp': movePlayer(0, -1, 'up'); break;
-                case 'ArrowDown': movePlayer(0, 1, 'down'); break;
-                case 'ArrowLeft': movePlayer(-1, 0, 'left'); break;
-                case 'ArrowRight': movePlayer(1, 0, 'right'); break;
-                case 'a':
-                case 'A':
-                    document.querySelector('.btn-a').click();
-                    break;
-                case 'b':
-                case 'B':
-                    document.querySelector('.btn-b').click();
-                    break;
+        // Input Listeners
+        const updateKey = (key, state) => {
+            if (key === 'ArrowUp') keys.up = state;
+            if (key === 'ArrowDown') keys.down = state;
+            if (key === 'ArrowLeft') keys.left = state;
+            if (key === 'ArrowRight') keys.right = state;
+            if (key === 'a' || key === 'A') {
+                if (state && !keys.a) interact(); // Trigger on press only
+                keys.a = state;
             }
-            updateCamera();
-        });
+        };
+
+        document.addEventListener('keydown', (e) => updateKey(e.key, true));
+        document.addEventListener('keyup', (e) => updateKey(e.key, false));
+
+        // Touch Controls
+        const bindTouch = (selector, key) => {
+            const btn = document.querySelector(selector);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
+            btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
+        };
+
+        bindTouch('.btn-up', 'up');
+        bindTouch('.btn-down', 'down');
+        bindTouch('.btn-left', 'left');
+        bindTouch('.btn-right', 'right');
         
+        // Action Buttons
+        const btnA = document.querySelector('.btn-a');
+        btnA.addEventListener('touchstart', (e) => { e.preventDefault(); interact(); });
+        btnA.addEventListener('mousedown', (e) => { e.preventDefault(); interact(); });
+
         // Inizializza
         updateCamera();
         render();
