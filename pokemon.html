@@ -406,7 +406,18 @@
             
             // Road
             road: '#95a5a6',
-            roadDetail: '#7f8c8d'
+            roadDetail: '#7f8c8d',
+            
+            // Bar
+            barCounter: '#8e44ad',
+            barTable: '#d35400',
+            barChair: '#c0392b',
+            barFloor: '#34495e',
+
+            // City
+            cityRoad: '#57606f',
+            citySidewalk: '#a4b0be',
+            cityBuilding: '#747d8c'
         };
 
         // Biome Helper
@@ -414,7 +425,8 @@
             // Simple noise for biome
             const noise = Math.sin(wx * 0.3) + Math.cos(wy * 0.3);
             if (noise < -1) return 'ice';
-            if (noise < -0.2) return 'forest';
+            if (noise < -0.5) return 'city';
+            if (noise < 0.2) return 'forest';
             if (noise < 0.8) return 'tropical';
             return 'desert';
         }
@@ -544,6 +556,13 @@
                             if (rand < 0.05) newMap[y][x] = 20; // Cactus
                             else if (rand < 0.1) newMap[y][x] = 11; // Rock
                             else newMap[y][x] = 0; // Sand
+                        } else if (biome === 'city') {
+                            // City Pattern
+                            if (x % 6 === 0 || y % 6 === 0) newMap[y][x] = 25; // Road
+                            else newMap[y][x] = 26; // Sidewalk
+                            
+                            // Random details
+                            if (rand < 0.02 && newMap[y][x] === 26) newMap[y][x] = 3; // Flower pot?
                         } else if (biome === 'ice') {
                             if (rand < 0.1) newMap[y][x] = 21; // Pine
                             else if (rand < 0.15) newMap[y][x] = 11; // Rock
@@ -585,16 +604,35 @@
                     }
                     
                     if (clear) {
+                        // Decide if House or Bar
+                        const isBar = Math.random() > 0.5;
+                        const doorTile = isBar ? 18 : 8;
+
                         // Piazza casa
                         for(let dx=0; dx<3; dx++) {
                             newMap[hy][hx+dx] = 7; // Tetto
                             newMap[hy+1][hx+dx] = 7; // Muro
                         }
-                        newMap[hy+1][hx+1] = 8; // Porta
+                        newMap[hy+1][hx+1] = doorTile; // Porta
                         newMap[hy+2][hx+1] = 0;
                         housePlaced = true;
                         houseX = hx + 1;
                         houseY = hy + 1;
+                        
+                        // Spawn NPCs outside
+                        if (isBar) {
+                             newNPCs.push({
+                                x: hx + 1,
+                                y: hy + 3,
+                                pixelX: (hx + 1) * TILE_SIZE,
+                                pixelY: (hy + 3) * TILE_SIZE,
+                                direction: 'up',
+                                moving: false,
+                                moveTimer: 0,
+                                text: "Stasera si beve!",
+                                color: '#e74c3c'
+                            });
+                        }
                         break;
                     }
                 }
@@ -604,7 +642,7 @@
             // Main horizontal road
             const roadY = Math.floor(MAP_SIZE / 2) + Math.floor(Math.sin(wx * 10) * 2);
             for (let x = 1; x < MAP_SIZE - 1; x++) {
-                if (newMap[roadY][x] !== 4 && newMap[roadY][x] !== 5 && newMap[roadY][x] !== 7 && newMap[roadY][x] !== 8) {
+                if (newMap[roadY][x] !== 4 && newMap[roadY][x] !== 5 && newMap[roadY][x] !== 7 && newMap[roadY][x] !== 8 && newMap[roadY][x] !== 18) {
                      newMap[roadY][x] = 14;
                 }
             }
@@ -615,7 +653,7 @@
                 const endY = roadY;
                 const dir = startY < endY ? 1 : -1;
                 for (let y = startY; y !== endY + dir; y += dir) {
-                    if (newMap[y][houseX] !== 4 && newMap[y][houseX] !== 5 && newMap[y][houseX] !== 7 && newMap[y][houseX] !== 8) {
+                    if (newMap[y][houseX] !== 4 && newMap[y][houseX] !== 5 && newMap[y][houseX] !== 7 && newMap[y][houseX] !== 8 && newMap[y][houseX] !== 18) {
                         newMap[y][houseX] = 14;
                     }
                 }
@@ -645,10 +683,10 @@
                 }
             }
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], type: 'outdoor', biome: biome };
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'outdoor', biome: biome };
         }
 
-        function generateInterior() {
+        function generateInterior(type) {
             const newMap = [];
             const newNPCs = [];
             const size = 10; // Piccola stanza
@@ -659,7 +697,7 @@
                     if (x === 0 || x === size-1 || y === 0 || y === size-1) {
                         newMap[y][x] = 7; // Muro
                     } else {
-                        newMap[y][x] = 9; // Pavimento
+                        newMap[y][x] = type === 'bar' ? 19 : 9; // Pavimento (19=Bar Floor)
                     }
                 }
             }
@@ -667,35 +705,80 @@
             // Uscita
             newMap[size-1][Math.floor(size/2)] = 10; // Mat (Exit)
             
-            // NPC Quiz 1
-            newNPCs.push({
-                x: 3,
-                y: 4,
-                pixelX: 3 * TILE_SIZE,
-                pixelY: 4 * TILE_SIZE,
-                direction: 'down',
-                moving: false,
-                moveTimer: 0,
-                quiz: houseQuizzes[0],
-                color: '#ff9ff3'
-            });
-            newMap[4][3] = 6;
+            if (type === 'bar') {
+                // Counter
+                for(let x=2; x<8; x++) {
+                    newMap[2][x] = 15; // Counter
+                }
+                newMap[2][2] = 15; // L-shape
+                newMap[3][2] = 15;
 
-            // NPC Quiz 2
-            newNPCs.push({
-                x: 6,
-                y: 4,
-                pixelX: 6 * TILE_SIZE,
-                pixelY: 4 * TILE_SIZE,
-                direction: 'down',
-                moving: false,
-                moveTimer: 0,
-                quiz: houseQuizzes[1],
-                color: '#54a0ff'
-            });
-            newMap[4][6] = 6;
+                // Barman
+                newNPCs.push({
+                    x: 5,
+                    y: 1,
+                    pixelX: 5 * TILE_SIZE,
+                    pixelY: 1 * TILE_SIZE,
+                    direction: 'down',
+                    moving: false,
+                    moveTimer: 0,
+                    text: "Cosa ti porto? Abbiamo Latte Moomoo fresco!",
+                    color: '#2c3e50'
+                });
 
-            return { tiles: newMap, npcs: newNPCs, activeTiles: [], type: 'indoor', width: size, height: size };
+                // Tables & Chairs
+                const tables = [{x: 4, y: 5}, {x: 7, y: 5}, {x: 4, y: 8}, {x: 7, y: 8}];
+                tables.forEach(t => {
+                    newMap[t.y][t.x] = 16; // Table
+                    // Chairs around
+                    if (newMap[t.y][t.x-1] !== 7) newMap[t.y][t.x-1] = 17;
+                    if (newMap[t.y][t.x+1] !== 7) newMap[t.y][t.x+1] = 17;
+                });
+
+                // Patrons
+                newNPCs.push({
+                    x: 3,
+                    y: 5,
+                    pixelX: 3 * TILE_SIZE,
+                    pixelY: 5 * TILE_SIZE,
+                    direction: 'right',
+                    moving: false,
+                    moveTimer: 0,
+                    text: "Hic! Questo posto è fantastico.",
+                    color: '#e67e22'
+                });
+
+            } else {
+                // NPC Quiz 1
+                newNPCs.push({
+                    x: 3,
+                    y: 4,
+                    pixelX: 3 * TILE_SIZE,
+                    pixelY: 4 * TILE_SIZE,
+                    direction: 'down',
+                    moving: false,
+                    moveTimer: 0,
+                    quiz: houseQuizzes[0],
+                    color: '#ff9ff3'
+                });
+                newMap[4][3] = 6;
+
+                // NPC Quiz 2
+                newNPCs.push({
+                    x: 6,
+                    y: 4,
+                    pixelX: 6 * TILE_SIZE,
+                    pixelY: 4 * TILE_SIZE,
+                    direction: 'down',
+                    moving: false,
+                    moveTimer: 0,
+                    quiz: houseQuizzes[1],
+                    color: '#54a0ff'
+                });
+                newMap[4][6] = 6;
+            }
+
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'indoor', width: size, height: size };
         }
 
         // Gestione Mappe
@@ -761,6 +844,30 @@
                 for(let i=0; i<4; i++) {
                     ctx.fillRect(screenX, screenY + (i*8), TILE_SIZE, 1);
                 }
+            } else if (type === 0) { // Generic Ground (Sand/Snow check for active)
+                // Default Ground
+                if (currentData.biome === 'desert') ctx.fillStyle = colors.sand;
+                else if (currentData.biome === 'ice') ctx.fillStyle = colors.snow;
+                else if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
+                else ctx.fillStyle = colors.terrain;
+                
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+
+                // Detail
+                if ((x + y) % 2 === 0) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.02)';
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                }
+
+                if (currentData.activeTiles) {
+                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                    if (active) {
+                        const shake = Math.sin(Date.now() / 50) * 2;
+                        ctx.fillStyle = currentData.biome === 'desert' ? '#d35400' : '#74b9ff';
+                        ctx.fillRect(screenX + 14 + shake, screenY + 14, 4, 4);
+                        ctx.fillRect(screenX + 10 - shake, screenY + 18, 3, 3);
+                    }
+                }
             } else if (type === 9) { // Floor
                 ctx.fillStyle = colors.houseFloor;
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -786,6 +893,14 @@
                     const ry = (y * 17 + i * 11) % 24;
                     ctx.fillRect(screenX + rx + 2, screenY + ry + 2, 2, 2);
                 }
+            } else if (type === 19) { // Bar Floor
+                ctx.fillStyle = colors.barFloor;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                // Checkerboard pattern
+                if ((x+y)%2===0) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                }
             } else if (type === 22) { // Ice Patch
                 ctx.fillStyle = colors.ice;
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -794,6 +909,19 @@
                 ctx.moveTo(screenX, screenY);
                 ctx.lineTo(screenX + 10, screenY + 32);
                 ctx.stroke();
+            } else if (type === 25) { // City Road
+                ctx.fillStyle = colors.cityRoad;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                // Dashed line
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                if (x % 6 === 0 && y % 2 !== 0) ctx.fillRect(screenX + 14, screenY, 4, 32); // Vertical road marking
+                if (y % 6 === 0 && x % 2 !== 0) ctx.fillRect(screenX, screenY + 14, 32, 4); // Horizontal road marking
+            } else if (type === 26) { // City Sidewalk
+                ctx.fillStyle = colors.citySidewalk;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                // Pavement pattern
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(screenX, screenY, TILE_SIZE - 2, TILE_SIZE - 2);
             }
         }
 
@@ -822,6 +950,14 @@
                     ctx.fillRect(screenX + 5 + ox + shakeX, screenY + 5 + oy, 2, 4);
                 }
             } else if (type === 2) { // Albero
+                let shakeX = 0;
+                if (currentData.activeTiles) {
+                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                    if (active) {
+                        shakeX = Math.sin(Date.now() / 50) * 2;
+                    }
+                }
+
                 // Draw taller tree
                 const treeY = screenY - 16; // Shift up
                 ctx.fillStyle = colors.treeShadow;
@@ -829,12 +965,12 @@
                 ctx.ellipse(screenX + 16, screenY + 28, 10, 4, 0, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = colors.treeTrunk;
-                ctx.fillRect(screenX + 12, treeY + 34, 8, 10);
+                ctx.fillRect(screenX + 12 + shakeX, treeY + 34, 8, 10);
                 ctx.fillStyle = colors.treeLeaves;
                 ctx.beginPath();
-                ctx.arc(screenX + 16, treeY + 20, 14, 0, Math.PI * 2);
-                ctx.arc(screenX + 8, treeY + 30, 10, 0, Math.PI * 2);
-                ctx.arc(screenX + 24, treeY + 30, 10, 0, Math.PI * 2);
+                ctx.arc(screenX + 16 + shakeX, treeY + 20, 14, 0, Math.PI * 2);
+                ctx.arc(screenX + 8 + shakeX, treeY + 30, 10, 0, Math.PI * 2);
+                ctx.arc(screenX + 24 + shakeX, treeY + 30, 10, 0, Math.PI * 2);
                 ctx.fill();
             } else if (type === 20) { // Cactus
                 const cY = screenY - 16;
@@ -894,8 +1030,9 @@
                 ctx.arc(screenX + 16, screenY + 16, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             } else if (type === 7) { // Muro/Tetto Casa
-                // Check if this is a roof (tile below is 7 or 8)
-                const isRoof = (y < MAP_SIZE-1 && (currentMap[y+1][x] === 7 || currentMap[y+1][x] === 8));
+                // Check if this is a roof (tile below is 7 or 8 or 18)
+                const isRoof = (y < MAP_SIZE-1 && (currentMap[y+1][x] === 7 || currentMap[y+1][x] === 8 || currentMap[y+1][x] === 18));
+                const isBar = (y < MAP_SIZE-1 && currentMap[y+1][x] === 18);
                 
                 if (isRoof) {
                     // Draw Roof (Tall)
@@ -908,6 +1045,13 @@
                     ctx.fill();
                     // Overhang
                     ctx.fillRect(screenX - 2, screenY + 20, 36, 12);
+
+                    if (isBar) {
+                        ctx.fillStyle = '#f1c40f';
+                        ctx.font = 'bold 10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('BAR', screenX + 16, screenY + 28);
+                    }
                 } else {
                     // Wall
                     ctx.fillStyle = colors.houseWall;
@@ -919,23 +1063,36 @@
                     ctx.fillRect(screenX + 15, screenY + 8, 2, 16);
                     ctx.fillRect(screenX + 8, screenY + 15, 16, 2);
                 }
-            } else if (type === 8) { // Porta
+            } else if (type === 8 || type === 18) { // Porta (8=House, 18=Bar)
                 ctx.fillStyle = colors.houseWall;
                 ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                ctx.fillStyle = colors.houseDoor;
+                ctx.fillStyle = type === 18 ? '#c0392b' : colors.houseDoor; // Red door for bar
                 ctx.fillRect(screenX + 6, screenY + 8, 20, 24);
                 ctx.fillStyle = '#ffd700';
                 ctx.beginPath();
                 ctx.arc(screenX + 22, screenY + 20, 2, 0, Math.PI * 2);
                 ctx.fill();
+                if (type === 18) {
+                    // Neon sign above door?
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                    ctx.fillRect(screenX + 6, screenY + 8, 20, 24);
+                }
             } else if (type === 11) { // Roccia
+                let shakeX = 0;
+                if (currentData.activeTiles) {
+                    const active = currentData.activeTiles.find(t => t.x === x && t.y === y);
+                    if (active) {
+                        shakeX = Math.sin(Date.now() / 50) * 2;
+                    }
+                }
+
                 ctx.fillStyle = colors.rock;
                 ctx.beginPath();
-                ctx.arc(screenX + 16, screenY + 16, 12, 0, Math.PI * 2);
+                ctx.arc(screenX + 16 + shakeX, screenY + 16, 12, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = colors.rockDark;
                 ctx.beginPath();
-                ctx.arc(screenX + 12, screenY + 12, 4, 0, Math.PI * 2);
+                ctx.arc(screenX + 12 + shakeX, screenY + 12, 4, 0, Math.PI * 2);
                 ctx.fill();
             } else if (type === 12) { // Ceppo
                 ctx.fillStyle = colors.stump;
@@ -951,6 +1108,32 @@
                 ctx.beginPath();
                 ctx.arc(screenX + 16, screenY + 18, 5, 0, Math.PI * 2);
                 ctx.stroke();
+            } else if (type === 15) { // Bar Counter
+                ctx.fillStyle = colors.barCounter;
+                ctx.fillRect(screenX, screenY + 8, TILE_SIZE, 24);
+                ctx.fillStyle = '#9b59b6'; // Top
+                ctx.fillRect(screenX, screenY + 8, TILE_SIZE, 8);
+            } else if (type === 16) { // Bar Table
+                ctx.fillStyle = colors.barTable;
+                ctx.beginPath();
+                ctx.ellipse(screenX + 16, screenY + 20, 12, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#e67e22'; // Top highlight
+                ctx.beginPath();
+                ctx.ellipse(screenX + 16, screenY + 18, 10, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Drink
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillRect(screenX + 14, screenY + 14, 4, 6);
+            } else if (type === 17) { // Bar Chair
+                ctx.fillStyle = colors.barChair;
+                ctx.beginPath();
+                ctx.arc(screenX + 16, screenY + 20, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#c0392b'; // Darker
+                ctx.beginPath();
+                ctx.arc(screenX + 16, screenY + 20, 4, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
@@ -974,6 +1157,18 @@
                 return;
             } else if (npc.species === 'lapras') {
                 drawLapras(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'sandshrew') {
+                drawSandshrew(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'spheal') {
+                drawSpheal(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'caterpie') {
+                drawCaterpie(screenX, drawY, npc.direction);
+                return;
+            } else if (npc.species === 'geodude') {
+                drawGeodude(screenX, drawY, npc.direction);
                 return;
             }
 
@@ -1098,6 +1293,103 @@
                 ctx.fillRect(x + 18, y + 5, 2, 2);
             }
         }
+
+        function drawSandshrew(x, y, dir) {
+            // Body (Yellow/Brown)
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 20, 12, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Brick pattern (Scales)
+            ctx.fillStyle = '#d35400';
+            ctx.fillRect(x + 10, y + 16, 4, 2);
+            ctx.fillRect(x + 18, y + 16, 4, 2);
+            ctx.fillRect(x + 14, y + 20, 4, 2);
+            
+            // Head
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 12, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x + 12, y + 10, 3, 3);
+            ctx.fillRect(x + 18, y + 10, 3, 3);
+        }
+
+        function drawSpheal(x, y, dir) {
+            // Body (Blue Round)
+            ctx.fillStyle = '#74b9ff';
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 20, 14, 0, Math.PI * 2);
+            ctx.fill();
+            // Spots
+            ctx.fillStyle = '#dfe6e9';
+            ctx.beginPath();
+            ctx.arc(x + 12, y + 16, 2, 0, Math.PI * 2);
+            ctx.arc(x + 20, y + 16, 2, 0, Math.PI * 2);
+            ctx.arc(x + 16, y + 12, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x + 13, y + 18, 2, 2);
+            ctx.fillRect(x + 17, y + 18, 2, 2);
+        }
+
+        function drawCaterpie(x, y, dir) {
+            // Segments (Green)
+            ctx.fillStyle = '#2ecc71';
+            // Tail
+            ctx.beginPath(); ctx.arc(x + 16, y + 28, 5, 0, Math.PI*2); ctx.fill();
+            // Body
+            ctx.beginPath(); ctx.arc(x + 16, y + 22, 6, 0, Math.PI*2); ctx.fill();
+            // Head
+            ctx.beginPath(); ctx.arc(x + 16, y + 14, 7, 0, Math.PI*2); ctx.fill();
+            
+            // Antennae (Red)
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(x + 14, y + 6, 2, 4);
+            ctx.fillRect(x + 18, y + 6, 2, 4);
+            
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(x + 14, y + 14, 2, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x + 18, y + 14, 2, 0, Math.PI*2); ctx.fill();
+        }
+
+        function drawGeodude(x, y, dir) {
+            // Body (Grey/Brown)
+            ctx.fillStyle = '#95a5a6';
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 16, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Arms
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#95a5a6';
+            ctx.beginPath();
+            // Left Arm
+            ctx.moveTo(x + 8, y + 16);
+            ctx.lineTo(x + 2, y + 10);
+            // Right Arm
+            ctx.moveTo(x + 24, y + 16);
+            ctx.lineTo(x + 30, y + 10);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+
+            // Hands
+            ctx.fillStyle = '#7f8c8d';
+            ctx.beginPath(); ctx.arc(x + 2, y + 10, 4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x + 30, y + 10, 4, 0, Math.PI*2); ctx.fill();
+
+            // Face
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x + 12, y + 14, 2, 2); // Eye L
+            ctx.fillRect(x + 18, y + 14, 2, 2); // Eye R
+            ctx.beginPath(); ctx.arc(x + 16, y + 20, 3, 0, Math.PI, false); ctx.stroke(); // Mouth
+        }
         
         // Disegna player
         function drawPlayer() {
@@ -1204,7 +1496,7 @@
             }, 300);
         }
 
-        function enterHouse() {
+        function enterHouse(type = 'house') {
             isTransitioning = true;
             transitionOverlay.style.opacity = 1;
             
@@ -1212,7 +1504,7 @@
             
             setTimeout(() => {
                 isIndoors = true;
-                currentData = generateInterior();
+                currentData = generateInterior(type);
                 currentMap = currentData.tiles;
                 currentNPCs = currentData.npcs;
                 
@@ -1287,7 +1579,16 @@
                     currentData.activeTiles.splice(activeIndex, 1); // Remove effect
                     
                     // Spawn Pokemon
-                    const species = activeTile.type === 1 ? 'bulbasaur' : 'lapras';
+                    let species = 'bulbasaur';
+                    if (activeTile.type === 1) species = 'bulbasaur';
+                    else if (activeTile.type === 4) species = 'lapras';
+                    else if (activeTile.type === 2) species = 'caterpie';
+                    else if (activeTile.type === 11) species = 'geodude';
+                    else if (activeTile.type === 0) {
+                        if (currentData.biome === 'desert') species = 'sandshrew';
+                        else if (currentData.biome === 'ice') species = 'spheal';
+                    }
+                    
                     const name = species.charAt(0).toUpperCase() + species.slice(1);
                     
                     currentNPCs.push({
@@ -1377,13 +1678,26 @@
             // Update Active Tiles (Shaking)
             if (currentData.activeTiles) {
                 // Randomly add new active tile
-                if (Math.random() < 0.01) { // 1% chance per frame
+                if (Math.random() < 0.015) { // 1.5% chance per frame
                     const rx = Math.floor(Math.random() * MAP_SIZE);
                     const ry = Math.floor(Math.random() * MAP_SIZE);
                     const tile = currentMap[ry][rx];
                     
-                    // Only Grass (1) or Water (4)
-                    if (tile === 1 || tile === 4) {
+                    let canBeActive = false;
+                    
+                    // Grass (1) or Water (4)
+                    if (tile === 1 || tile === 4) canBeActive = true;
+                    
+                    // Tree (2)
+                    if (tile === 2) canBeActive = true;
+
+                    // Rock (11)
+                    if (tile === 11) canBeActive = true;
+                    
+                    // Sand/Snow (0)
+                    if (tile === 0 && (currentData.biome === 'desert' || currentData.biome === 'ice')) canBeActive = true;
+
+                    if (canBeActive) {
                         // Check if occupied
                         const occupied = currentNPCs.some(n => n.x === rx && n.y === ry) || (player.x === rx && player.y === ry);
                         const alreadyActive = currentData.activeTiles.some(t => t.x === rx && t.y === ry);
@@ -1408,6 +1722,16 @@
                 }
             }
 
+            // Update Footprints
+            if (currentData.footprints) {
+                for (let i = currentData.footprints.length - 1; i >= 0; i--) {
+                    currentData.footprints[i].timer--;
+                    if (currentData.footprints[i].timer <= 0) {
+                        currentData.footprints.splice(i, 1);
+                    }
+                }
+            }
+
             // Update NPCs
             currentNPCs.forEach(npc => {
                 if (npc.moving) {
@@ -1423,6 +1747,9 @@
                     if (npc.pixelX === targetPixelX && npc.pixelY === targetPixelY) {
                         npc.moving = false;
                         npc.moveTimer = Math.random() * 200 + 50; // Wait a bit
+                        
+                        // Add Footprint
+                        addFootprint(npc.x, npc.y);
                     }
                 } else {
                     if (npc.moveTimer > 0) {
@@ -1484,6 +1811,7 @@
                 // Arrivato a destinazione?
                 if (player.pixelX === targetPixelX && player.pixelY === targetPixelY) {
                     player.moving = false;
+                    addFootprint(player.x, player.y);
                 }
                 updateCamera();
                 return; // Non accettare nuovi input finché non finisce il movimento
@@ -1529,7 +1857,11 @@
                 const tile = currentMap[newY][newX];
                 
                 if (tile === 8) { // Door
-                    enterHouse();
+                    enterHouse('house');
+                    return;
+                }
+                if (tile === 18) { // Bar Door
+                    enterHouse('bar');
                     return;
                 }
                 if (tile === 10) { // Mat
@@ -1540,9 +1872,9 @@
                 // Check NPC collision
                 const npcHere = currentNPCs.some(n => n.x === newX && n.y === newY);
 
-                // 2=Albero, 4=Acqua, 7=Muro, 11=Roccia, 20=Cactus, 21=Pino, 23=Palma
+                // 2=Albero, 4=Acqua, 7=Muro, 11=Roccia, 15=Counter, 16=Table, 17=Chair, 20=Cactus, 21=Pino, 23=Palma
                 // Also check for other solid objects if added
-                const isSolid = (tile === 2 || tile === 4 || tile === 7 || tile === 11 || tile === 20 || tile === 21 || tile === 23);
+                const isSolid = (tile === 2 || tile === 4 || tile === 7 || tile === 11 || tile === 15 || tile === 16 || tile === 17 || tile === 20 || tile === 21 || tile === 23);
 
                 if (!isSolid && !npcHere) {
                     player.x = newX;
@@ -1552,6 +1884,20 @@
             }
         }
         
+        function addFootprint(x, y) {
+            if (!currentData.footprints) return;
+            
+            // Check if tile is sand or snow
+            const tile = currentMap[y][x];
+            if (tile === 0 && (currentData.biome === 'desert' || currentData.biome === 'ice')) {
+                currentData.footprints.push({
+                    x: x,
+                    y: y,
+                    timer: 300 // 5 seconds
+                });
+            }
+        }
+
         // Render Loop (Y-Sorted)
         function render() {
             // Intro Zoom Logic
@@ -1601,6 +1947,20 @@
                 }
             }
 
+            // Draw Footprints
+            if (currentData.footprints) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                currentData.footprints.forEach(fp => {
+                    if (fp.x >= startX && fp.x <= endX && fp.y >= startY && fp.y <= endY) {
+                        const sx = fp.x * TILE_SIZE;
+                        const sy = fp.y * TILE_SIZE;
+                        ctx.beginPath();
+                        ctx.ellipse(sx + 16, sy + 16, 6, 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+            }
+
             // 2. Collect Sprites for Y-Sorting
             const sprites = [];
 
@@ -1610,7 +1970,7 @@
                     if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
                         const t = currentMap[y][x];
                         // If it's an object that needs sorting
-                        if (t === 1 || t === 2 || t === 3 || t === 6 || t === 7 || t === 8 || t === 11 || t === 12 || t === 20 || t === 21 || t === 23) {
+                        if (t === 1 || t === 2 || t === 3 || t === 6 || t === 7 || t === 8 || t === 11 || t === 12 || t === 15 || t === 16 || t === 17 || t === 18 || t === 20 || t === 21 || t === 23) {
                             sprites.push({
                                 type: 'tile',
                                 tileType: t,
@@ -1649,10 +2009,36 @@
             sprites.forEach(s => {
                 if (s.type === 'tile') {
                     drawObject(s.x, s.y, s.tileType);
-                } else if (s.type === 'npc') {
-                    drawNPC(s.data);
-                } else if (s.type === 'player') {
-                    drawPlayer();
+                } else if (s.type === 'npc' || s.type === 'player') {
+                    // Reflection Logic
+                    const tx = s.type === 'npc' ? s.data.x : player.x;
+                    const ty = s.type === 'npc' ? s.data.y : player.y;
+                    
+                    // Check if on reflective surface (Water=4, Ice=22)
+                    // Also check if valid coords
+                    if (ty >= 0 && ty < mapHeight && tx >= 0 && tx < mapWidth) {
+                        const tile = currentMap[ty][tx];
+                        if (tile === 4 || tile === 22) {
+                            ctx.save();
+                            ctx.globalAlpha = 0.3;
+                            // Translate to feet position
+                            const feetY = s.sortY;
+                            ctx.translate(0, feetY);
+                            ctx.scale(1, -0.6); // Flip and squash
+                            ctx.translate(0, -feetY);
+                            
+                            if (s.type === 'npc') drawNPC(s.data);
+                            else drawPlayer();
+                            
+                            ctx.restore();
+                        }
+                    }
+
+                    if (s.type === 'npc') {
+                        drawNPC(s.data);
+                    } else if (s.type === 'player') {
+                        drawPlayer();
+                    }
                 }
             });
 
