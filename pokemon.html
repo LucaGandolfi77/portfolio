@@ -62,6 +62,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 15px;
             padding: 0 5px;
+            margin-top: 10px;
         }
 
         #dpad {
@@ -70,6 +71,7 @@
             grid-template-rows: repeat(3, 1fr);
             gap: 5px;
             aspect-ratio: 1;
+            touch-action: none; /* Prevent scrolling while sliding */
         }
 
         .btn {
@@ -83,7 +85,7 @@
             transition: all 0.1s;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             user-select: none;
-            touch-action: manipulation;
+            touch-action: none;
         }
 
         .btn:active {
@@ -98,34 +100,48 @@
         .btn-down { grid-column: 2; grid-row: 3; }
 
         #action-buttons {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 10px;
             padding: 0 10px;
+            align-content: center;
         }
 
         .btn-action {
-            height: 70px;
-            font-size: 20px;
+            height: 60px;
+            font-size: 18px;
             letter-spacing: 1px;
         }
 
-        .btn-a {
-            background: linear-gradient(145deg, #e74c3c, #c0392b);
-        }
+        .btn-y { grid-column: 1; grid-row: 1; background: linear-gradient(145deg, #2ecc71, #27ae60); }
+        .btn-x { grid-column: 2; grid-row: 1; background: linear-gradient(145deg, #f1c40f, #f39c12); }
+        .btn-b { grid-column: 1; grid-row: 2; background: linear-gradient(145deg, #3498db, #2980b9); }
+        .btn-a { grid-column: 2; grid-row: 2; background: linear-gradient(145deg, #e74c3c, #c0392b); }
 
-        .btn-a:active {
-            background: linear-gradient(145deg, #c0392b, #e74c3c);
-        }
+        .btn-y:active { background: linear-gradient(145deg, #27ae60, #2ecc71); }
+        .btn-x:active { background: linear-gradient(145deg, #f39c12, #f1c40f); }
+        .btn-b:active { background: linear-gradient(145deg, #2980b9, #3498db); }
+        .btn-a:active { background: linear-gradient(145deg, #c0392b, #e74c3c); }
 
-        .btn-b {
-            background: linear-gradient(145deg, #3498db, #2980b9);
+        #tool-hud {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 20;
         }
-
-        .btn-b:active {
-            background: linear-gradient(145deg, #2980b9, #3498db);
-        }
+        #tool-icon { font-size: 18px; }
 
         #info {
             text-align: center;
@@ -233,6 +249,10 @@
         <div id="game-screen">
             <div id="canvas-wrapper">
                 <div id="transition-overlay"></div>
+                <div id="tool-hud">
+                    <span id="tool-icon">🪓</span>
+                    <span id="tool-name">Ascia</span>
+                </div>
                 <div id="dialogue-box">
                     <div id="dialogue-text"></div>
                     <div id="dialogue-options"></div>
@@ -251,12 +271,14 @@
             </div>
             
             <div id="action-buttons">
-                <button class="btn btn-action btn-a" data-action="a">A</button>
+                <button class="btn btn-action btn-y" data-action="y">Y</button>
+                <button class="btn btn-action btn-x" data-action="x">X</button>
                 <button class="btn btn-action btn-b" data-action="b">B</button>
+                <button class="btn btn-action btn-a" data-action="a">A</button>
             </div>
         </div>
         
-        <div id="info">Usa i pulsanti per muoverti nella mappa!</div>
+        <div id="info">Usa i pulsanti per muoverti! X: Cambia Utensile, Y: Usa Utensile</div>
     </div>
 
     <script>
@@ -297,7 +319,9 @@
             left: false,
             right: false,
             a: false,
-            b: false
+            b: false,
+            x: false,
+            y: false
         };
 
         // Player
@@ -342,7 +366,12 @@
             houseRoof: '#e77f67',
             houseDoor: '#596275',
             houseFloor: '#f7d794',
-            houseMat: '#303952'
+            houseMat: '#303952',
+            rock: '#95a5a6',
+            rockDark: '#7f8c8d',
+            stump: '#8b5a2b',
+            stumpTop: '#d7ccc8',
+            tilled: '#5d4037'
         };
 
         // Dialoghi NPC
@@ -356,7 +385,9 @@
             "Ho perso le mie chiavi... o forse non le ho mai avute.",
             "Se premi 'B' puoi correre... ah no, aspetta, non è vero.",
             "La musica di questo posto è molto rilassante, vero?",
-            "Sono qui da ore e non ho ancora catturato nulla."
+            "Sono qui da ore e non ho ancora catturato nulla.",
+            "Usa l'ascia per tagliare gli alberi!",
+            "Il piccone è utile per spaccare le rocce."
         ];
         
         // Quiz NPC Casa
@@ -376,6 +407,61 @@
                 lose: "No, non credo proprio."
             }
         ];
+
+        // Tools System
+        const tools = [
+            { id: 'axe', name: 'Ascia', icon: '🪓' },
+            { id: 'pickaxe', name: 'Piccone', icon: '⛏️' },
+            { id: 'hoe', name: 'Zappa', icon: '🌱' }
+        ];
+        let currentToolIndex = 0;
+
+        function switchTool() {
+            currentToolIndex = (currentToolIndex + 1) % tools.length;
+            updateToolUI();
+        }
+
+        function updateToolUI() {
+            const tool = tools[currentToolIndex];
+            document.getElementById('tool-name').textContent = tool.name;
+            document.getElementById('tool-icon').textContent = tool.icon;
+        }
+
+        function useTool() {
+            if (isIndoors) return; // No tools indoors for now
+
+            // Get tile in front
+            let tx = player.x;
+            let ty = player.y;
+            if (player.direction === 'up') ty--;
+            if (player.direction === 'down') ty++;
+            if (player.direction === 'left') tx--;
+            if (player.direction === 'right') tx++;
+            
+            if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return;
+            
+            const tile = currentMap[ty][tx];
+            const tool = tools[currentToolIndex].id;
+            
+            if (tool === 'axe' && tile === 2) { // Tree
+                currentMap[ty][tx] = 12; // Stump
+                createParticles(tx, ty, colors.treeLeaves);
+            } else if (tool === 'pickaxe' && tile === 11) { // Rock
+                currentMap[ty][tx] = 0; // Ground
+                createParticles(tx, ty, colors.rock);
+            } else if (tool === 'hoe' && tile === 0) { // Ground
+                currentMap[ty][tx] = 13; // Tilled soil
+                createParticles(tx, ty, colors.tilled);
+            } else if (tool === 'hoe' && tile === 13) { // Tilled
+                currentMap[ty][tx] = 0; // Back to ground
+                createParticles(tx, ty, colors.terrain);
+            }
+        }
+
+        function createParticles(x, y, color) {
+            // Placeholder for particle effect
+            // Could implement simple canvas particles here if needed
+        }
 
         // Generazione Mappa Procedurale
         function generateMap(wx, wy) {
@@ -409,7 +495,8 @@
                         const rand = Math.abs(Math.sin(globalX * 12.9898 + globalY * 78.233) * 43758.5453) % 1;
 
                         if (rand < 0.08) newMap[y][x] = 2; // Albero
-                        else if (rand < 0.15) newMap[y][x] = 3; // Fiore
+                        else if (rand < 0.12) newMap[y][x] = 11; // Roccia (New)
+                        else if (rand < 0.18) newMap[y][x] = 3; // Fiore
                         else if (noise > 0.2) newMap[y][x] = 1; // Erba alta
                         else newMap[y][x] = 0; // Terreno
                     }
@@ -644,6 +731,45 @@
                     ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
                     ctx.fillStyle = colors.houseMat;
                     ctx.fillRect(screenX + 4, screenY + 8, 24, 16);
+                    break;
+                case 11: // Roccia
+                    ctx.fillStyle = colors.terrain;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.rock;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 16, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = colors.rockDark;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 12, screenY + 12, 4, 0, Math.PI * 2);
+                    ctx.arc(screenX + 20, screenY + 20, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                case 12: // Ceppo (Stump)
+                    ctx.fillStyle = colors.terrain;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = colors.stump;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 20, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = colors.stumpTop;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 18, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Rings
+                    ctx.strokeStyle = colors.stump;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 18, 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    break;
+                case 13: // Terreno Zappato (Tilled)
+                    ctx.fillStyle = colors.tilled;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                    for(let i=0; i<4; i++) {
+                        ctx.fillRect(screenX, screenY + (i*8) + 2, TILE_SIZE, 2);
+                    }
                     break;
             }
         }
@@ -1047,30 +1173,82 @@
                 if (state && !keys.a) interact(); // Trigger on press only
                 keys.a = state;
             }
+            if (key === 'x' || key === 'X') {
+                if (state && !keys.x) switchTool();
+                keys.x = state;
+            }
+            if (key === 'y' || key === 'Y') {
+                if (state && !keys.y) useTool();
+                keys.y = state;
+            }
         };
 
         document.addEventListener('keydown', (e) => updateKey(e.key, true));
         document.addEventListener('keyup', (e) => updateKey(e.key, false));
 
-        // Touch Controls
-        const bindTouch = (selector, key) => {
-            const btn = document.querySelector(selector);
-            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
-            btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
-            btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
+        // Touch Controls (Sliding D-pad)
+        const dpad = document.getElementById('dpad');
+        
+        const handleDpad = (e) => {
+            e.preventDefault(); // Prevent scrolling
+            const touch = e.touches ? e.touches[0] : e;
+            
+            // Get element under finger
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            // Reset all directions first
+            keys.up = false;
+            keys.down = false;
+            keys.left = false;
+            keys.right = false;
+            
+            if (el && el.dataset.dir) {
+                keys[el.dataset.dir] = true;
+                // Add active class visual feedback manually since :active might not work well with touchmove
+                document.querySelectorAll('#dpad .btn').forEach(b => b.style.transform = 'scale(1)');
+                el.style.transform = 'scale(0.95)';
+            } else {
+                document.querySelectorAll('#dpad .btn').forEach(b => b.style.transform = 'scale(1)');
+            }
         };
 
-        bindTouch('.btn-up', 'up');
-        bindTouch('.btn-down', 'down');
-        bindTouch('.btn-left', 'left');
-        bindTouch('.btn-right', 'right');
+        dpad.addEventListener('touchstart', handleDpad);
+        dpad.addEventListener('touchmove', handleDpad);
+        dpad.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys.up = keys.down = keys.left = keys.right = false;
+            document.querySelectorAll('#dpad .btn').forEach(b => b.style.transform = 'scale(1)');
+        });
+        
+        // Mouse support for testing on desktop
+        let isMouseDown = false;
+        dpad.addEventListener('mousedown', (e) => { isMouseDown = true; handleDpad(e); });
+        document.addEventListener('mousemove', (e) => { if(isMouseDown) handleDpad(e); });
+        document.addEventListener('mouseup', () => { 
+            if(isMouseDown) {
+                isMouseDown = false; 
+                keys.up = keys.down = keys.left = keys.right = false; 
+                document.querySelectorAll('#dpad .btn').forEach(b => b.style.transform = 'scale(1)');
+            }
+        });
         
         // Action Buttons
-        const btnA = document.querySelector('.btn-a');
-        btnA.addEventListener('touchstart', (e) => { e.preventDefault(); interact(); });
-        btnA.addEventListener('mousedown', (e) => { e.preventDefault(); interact(); });
+        const bindAction = (selector, key, actionFn) => {
+            const btn = document.querySelector(selector);
+            const handler = (e) => {
+                e.preventDefault();
+                if (actionFn) actionFn();
+                keys[key] = true;
+                setTimeout(() => keys[key] = false, 100);
+            };
+            btn.addEventListener('touchstart', handler);
+            btn.addEventListener('mousedown', handler);
+        };
+
+        bindAction('.btn-a', 'a', interact);
+        bindAction('.btn-b', 'b', null); // B is held for running usually, but here just state
+        bindAction('.btn-x', 'x', switchTool);
+        bindAction('.btn-y', 'y', useTool);
 
         // Inizializza
         updateCamera();
