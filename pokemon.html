@@ -143,6 +143,29 @@
         }
         #tool-icon { font-size: 18px; }
 
+        #inventory-hud {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: flex-end;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .inv-item {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
         #info {
             text-align: center;
             color: white;
@@ -253,6 +276,12 @@
                     <span id="tool-icon">🪓</span>
                     <span id="tool-name">Ascia</span>
                 </div>
+                <div id="inventory-hud">
+                    <div class="inv-item">💰 <span id="inv-money">0</span></div>
+                    <div class="inv-item">🪵 <span id="inv-wood">0</span></div>
+                    <div class="inv-item">🪨 <span id="inv-stone">0</span></div>
+                    <div class="inv-item">🌿 <span id="inv-grass">0</span></div>
+                </div>
                 <div id="dialogue-box">
                     <div id="dialogue-text"></div>
                     <div id="dialogue-options"></div>
@@ -336,9 +365,22 @@
             direction: 'down',
             moving: false,
             stepAnim: 0,
-            isSurfing: false
+            isSurfing: false,
+            inventory: {
+                money: 0,
+                wood: 0,
+                stone: 0,
+                grass: 0
+            }
         };
         
+        function updateInventoryUI() {
+            document.getElementById('inv-money').textContent = player.inventory.money;
+            document.getElementById('inv-wood').textContent = player.inventory.wood;
+            document.getElementById('inv-stone').textContent = player.inventory.stone;
+            document.getElementById('inv-grass').textContent = player.inventory.grass;
+        }
+
         // Camera
         const camera = {
             x: 0,
@@ -420,10 +462,10 @@
             citySidewalk: '#a4b0be',
             cityBuilding: '#747d8c',
 
-            // Boat
-            boatBody: '#e74c3c',
-            boatSeat: '#c0392b',
-            boatFloor: '#d35400'
+            // Cave
+            caveFloor: '#3d3d3d',
+            caveWall: '#2d2d2d',
+            caveEntrance: '#000000'
         };
 
         // Biome Helper
@@ -511,15 +553,24 @@
             if (tool === 'axe' && tile === 2) { // Tree
                 currentMap[ty][tx] = 12; // Stump
                 createParticles(tx, ty, colors.treeLeaves);
+                player.inventory.wood++;
+                updateInventoryUI();
             } else if (tool === 'pickaxe' && tile === 11) { // Rock
                 currentMap[ty][tx] = 0; // Ground
                 createParticles(tx, ty, colors.rock);
+                player.inventory.stone++;
+                updateInventoryUI();
             } else if (tool === 'hoe' && tile === 0) { // Ground
                 currentMap[ty][tx] = 13; // Tilled soil
                 createParticles(tx, ty, colors.tilled);
             } else if (tool === 'hoe' && tile === 13) { // Tilled
                 currentMap[ty][tx] = 0; // Back to ground
                 createParticles(tx, ty, colors.terrain);
+            } else if (tool === 'hoe' && tile === 1) { // Grass
+                currentMap[ty][tx] = 0; // Ground
+                createParticles(tx, ty, colors.grass);
+                player.inventory.grass++;
+                updateInventoryUI();
             }
         }
 
@@ -742,7 +793,156 @@
                 }
             }
 
+            // Spawn Cave Entrance (Randomly)
+            if (Math.random() < 0.05 && biome !== 'city' && biome !== 'lake' && biome !== 'frozen_lake') {
+                // Try to place on a rock or empty spot
+                const cx = Math.floor(Math.random() * (MAP_SIZE - 4)) + 2;
+                const cy = Math.floor(Math.random() * (MAP_SIZE - 4)) + 2;
+                if (newMap[cy][cx] === 11 || newMap[cy][cx] === 0) {
+                    newMap[cy][cx] = 30; // Cave Entrance
+                }
+            }
+
             return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], boat: boat, type: 'outdoor', biome: biome };
+        }
+
+        function generateDungeon() {
+            const newMap = [];
+            const newNPCs = [];
+            const size = 15;
+            
+            for (let y = 0; y < size; y++) {
+                newMap[y] = [];
+                for (let x = 0; x < size; x++) {
+                    if (x === 0 || x === size-1 || y === 0 || y === size-1) {
+                        newMap[y][x] = 32; // Cave Wall
+                    } else {
+                        newMap[y][x] = 31; // Cave Floor
+                    }
+                }
+            }
+            
+            // Random Walls
+            for (let i = 0; i < 30; i++) {
+                const rx = Math.floor(Math.random() * (size - 2)) + 1;
+                const ry = Math.floor(Math.random() * (size - 2)) + 1;
+                newMap[ry][rx] = 32;
+            }
+
+            // Ladder Up (Back) - Always at start pos (will be set by enterDungeon logic, but default here)
+            newMap[size-2][Math.floor(size/2)] = 33; 
+
+            // Tunnel Down (Random Exit)
+            let placedExit = false;
+            while(!placedExit) {
+                const ex = Math.floor(Math.random() * (size - 2)) + 1;
+                const ey = Math.floor(Math.random() * (size - 2)) + 1;
+                if (newMap[ey][ex] === 31) {
+                    newMap[ey][ex] = 34;
+                    placedExit = true;
+                }
+            }
+            
+            // Spawn Geodudes
+            for(let i=0; i<3; i++) {
+                const gx = Math.floor(Math.random() * (size - 2)) + 1;
+                const gy = Math.floor(Math.random() * (size - 2)) + 1;
+                if (newMap[gy][gx] === 31) {
+                    newNPCs.push({
+                        x: gx,
+                        y: gy,
+                        pixelX: gx * TILE_SIZE,
+                        pixelY: gy * TILE_SIZE,
+                        direction: 'down',
+                        moving: false,
+                        moveTimer: 0,
+                        species: 'geodude',
+                        text: "Geodude!",
+                        color: '#fff'
+                    });
+                }
+            }
+
+            return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], type: 'dungeon' };
+        }
+
+        function enterDungeon() {
+            isTransitioning = true;
+            transitionOverlay.style.opacity = 1;
+            
+            savedOutdoorPos = { x: player.x, y: player.y, wx: worldX, wy: worldY };
+            
+            setTimeout(() => {
+                isIndoors = true;
+                currentData = generateDungeon();
+                currentMap = currentData.tiles;
+                currentNPCs = currentData.npcs;
+                
+                // Place player at Ladder Up
+                const mapH = currentMap.length;
+                const mapW = currentMap[0].length;
+                // Find ladder
+                let lx = Math.floor(mapW/2);
+                let ly = mapH-2;
+                for(let y=0; y<mapH; y++) {
+                    for(let x=0; x<mapW; x++) {
+                        if (currentMap[y][x] === 33) { lx = x; ly = y; }
+                    }
+                }
+
+                player.x = lx; 
+                player.y = ly;
+                player.pixelX = player.x * TILE_SIZE;
+                player.pixelY = player.y * TILE_SIZE;
+                player.direction = 'up';
+                
+                updateCamera();
+                
+                setTimeout(() => {
+                    transitionOverlay.style.opacity = 0;
+                    isTransitioning = false;
+                }, 100);
+            }, 300);
+        }
+
+        function exitDungeon(randomExit) {
+            isTransitioning = true;
+            transitionOverlay.style.opacity = 1;
+            
+            setTimeout(() => {
+                isIndoors = false;
+                
+                if (randomExit) {
+                    // Random location
+                    worldX = Math.floor(Math.random() * 1000);
+                    worldY = Math.floor(Math.random() * 1000);
+                    currentData = getCurrentData();
+                    currentMap = currentData.tiles;
+                    currentNPCs = currentData.npcs;
+                    player.x = Math.floor(MAP_SIZE/2);
+                    player.y = Math.floor(MAP_SIZE/2);
+                } else {
+                    // Back to entrance
+                    worldX = savedOutdoorPos.wx;
+                    worldY = savedOutdoorPos.wy;
+                    currentData = getCurrentData();
+                    currentMap = currentData.tiles;
+                    currentNPCs = currentData.npcs;
+                    player.x = savedOutdoorPos.x;
+                    player.y = savedOutdoorPos.y + 1;
+                }
+                
+                player.pixelX = player.x * TILE_SIZE;
+                player.pixelY = player.y * TILE_SIZE;
+                player.direction = 'down';
+                
+                updateCamera();
+                
+                setTimeout(() => {
+                    transitionOverlay.style.opacity = 0;
+                    isTransitioning = false;
+                }, 100);
+            }, 300);
         }
 
         function generateInterior(type) {
@@ -781,8 +981,9 @@
                     direction: 'down',
                     moving: false,
                     moveTimer: 0,
-                    text: "Cosa ti porto? Abbiamo Latte Moomoo fresco!",
-                    color: '#2c3e50'
+                    text: "Benvenuto! Vuoi scambiare qualcosa?",
+                    color: '#2c3e50',
+                    role: 'merchant'
                 });
 
                 // Tables & Chairs
@@ -981,6 +1182,44 @@
                 // Pavement pattern
                 ctx.fillStyle = 'rgba(255,255,255,0.1)';
                 ctx.fillRect(screenX, screenY, TILE_SIZE - 2, TILE_SIZE - 2);
+            } else if (type === 30) { // Cave Entrance
+                ctx.fillStyle = colors.rock;
+                ctx.beginPath();
+                ctx.arc(screenX + 16, screenY + 16, 14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = colors.caveEntrance;
+                ctx.beginPath();
+                ctx.arc(screenX + 16, screenY + 18, 8, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (type === 31) { // Cave Floor
+                ctx.fillStyle = colors.caveFloor;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                // Texture
+                if ((x+y)%3===0) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                    ctx.fillRect(screenX + 8, screenY + 8, 4, 4);
+                }
+            } else if (type === 32) { // Cave Wall
+                ctx.fillStyle = colors.caveWall;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            } else if (type === 33) { // Ladder Up
+                ctx.fillStyle = colors.caveFloor;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#8b5a2b';
+                ctx.fillRect(screenX + 8, screenY + 4, 4, 24); // Left rail
+                ctx.fillRect(screenX + 20, screenY + 4, 4, 24); // Right rail
+                for(let i=0; i<5; i++) {
+                    ctx.fillRect(screenX + 8, screenY + 6 + (i*5), 16, 2); // Rungs
+                }
+            } else if (type === 34) { // Tunnel Down (Exit Random)
+                ctx.fillStyle = colors.caveFloor;
+                ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(screenX + 16, screenY + 16, 10, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
@@ -1698,11 +1937,63 @@
             // Cerca NPC
             const npc = currentNPCs.find(n => n.x === targetX && n.y === targetY);
             if (npc) {
-                if (npc.quiz) {
+                if (npc.role === 'merchant') {
+                    openShop();
+                } else if (npc.quiz) {
                     startQuiz(npc.quiz);
                 } else {
                     showDialogue(npc.text);
                 }
+            }
+        }
+
+        function openShop() {
+            isDialogueOpen = true;
+            quizState.active = true; // Reuse quiz state for input handling
+            
+            const shopOptions = [
+                { label: "Vendi Legno (10$)", action: () => sellItem('wood', 10) },
+                { label: "Vendi Sasso (15$)", action: () => sellItem('stone', 15) },
+                { label: "Vendi Erba (5$)", action: () => sellItem('grass', 5) },
+                { label: "Esci", action: () => { closeDialogue(); quizState.active = false; } }
+            ];
+
+            quizState.options = shopOptions.map(o => o.label);
+            quizState.selected = 0;
+            quizState.callback = (index) => {
+                // Execute action
+                if (index >= 0 && index < shopOptions.length) {
+                    shopOptions[index].action();
+                }
+            };
+            
+            // Override render to keep shop open unless exit
+            const originalCallback = quizState.callback;
+            quizState.callback = (index) => {
+                if (index === shopOptions.length - 1) { // Exit
+                    closeDialogue();
+                    quizState.active = false;
+                } else {
+                    originalCallback(index);
+                    // Refresh shop UI to show updated inventory/money if needed, or just keep open
+                    // For simplicity, we just keep it open.
+                }
+            };
+
+            dialogueText.textContent = "Benvenuto al Bar! Cosa vuoi fare?";
+            renderQuizOptions();
+            dialogueOptions.style.display = 'block';
+            dialogueBox.style.display = 'block';
+        }
+
+        function sellItem(item, price) {
+            if (player.inventory[item] > 0) {
+                player.inventory[item]--;
+                player.inventory.money += price;
+                updateInventoryUI();
+                dialogueText.textContent = `Venduto 1 ${item} per ${price}$!`;
+            } else {
+                dialogueText.textContent = `Non hai abbastanza ${item}!`;
             }
         }
 
@@ -1751,9 +2042,15 @@
         }
 
         function checkQuizAnswer() {
-            if (quizState.callback && quizState.quizRef) {
-                const isCorrect = quizState.selected === quizState.quizRef.correct;
-                quizState.callback(isCorrect);
+            if (quizState.callback) {
+                // If it's a quiz with a reference object
+                if (quizState.quizRef) {
+                    const isCorrect = quizState.selected === quizState.quizRef.correct;
+                    quizState.callback(isCorrect);
+                } else {
+                    // Generic callback (Shop)
+                    quizState.callback(quizState.selected);
+                }
             }
         }
         
@@ -2023,13 +2320,25 @@
                     exitHouse();
                     return true;
                 }
+                if (tile === 30) { // Cave Entrance
+                    enterDungeon();
+                    return true;
+                }
+                if (tile === 33) { // Ladder Up (Exit Dungeon Back)
+                    exitDungeon(false);
+                    return true;
+                }
+                if (tile === 34) { // Tunnel Down (Exit Dungeon Random)
+                    exitDungeon(true);
+                    return true;
+                }
 
                 // Check NPC collision
                 const npcHere = currentNPCs.some(n => n.x === newX && n.y === newY);
 
-                // 2=Albero, 4=Acqua, 7=Muro, 11=Roccia, 15=Counter, 16=Table, 17=Chair, 20=Cactus, 21=Pino, 23=Palma
+                // 2=Albero, 4=Acqua, 7=Muro, 11=Roccia, 15=Counter, 16=Table, 17=Chair, 20=Cactus, 21=Pino, 23=Palma, 32=CaveWall
                 // Also check for other solid objects if added
-                const isSolid = (tile === 2 || tile === 4 || tile === 7 || tile === 11 || tile === 15 || tile === 16 || tile === 17 || tile === 20 || tile === 21 || tile === 23);
+                const isSolid = (tile === 2 || tile === 4 || tile === 7 || tile === 11 || tile === 15 || tile === 16 || tile === 17 || tile === 20 || tile === 21 || tile === 23 || tile === 32);
 
                 if (!isSolid && !npcHere) {
                     player.x = newX;
@@ -2226,6 +2535,7 @@
             if (key === 'ArrowDown') keys.down = state;
             if (key === 'ArrowLeft') keys.left = state;
             if (key === 'ArrowRight') keys.right = state;
+            if (key === 'b' || key === 'B') keys.b = state; // Run Hold
             if (key === 'a' || key === 'A') {
                 if (state && !keys.a) interact(); // Trigger on press only
                 keys.a = state;
@@ -2242,6 +2552,30 @@
 
         document.addEventListener('keydown', (e) => updateKey(e.key, true));
         document.addEventListener('keyup', (e) => updateKey(e.key, false));
+
+        // Touch Controls (Action Buttons)
+        const actionButtons = document.querySelectorAll('.btn-action');
+        actionButtons.forEach(btn => {
+            const action = btn.dataset.action;
+            const handleAction = (state) => {
+                if (action === 'b') keys.b = state; // Hold for B
+                else if (state) { // Trigger others on press
+                    if (action === 'a') interact();
+                    if (action === 'x') switchTool();
+                    if (action === 'y') useTool();
+                }
+            };
+            
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(true); });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); handleAction(false); });
+            btn.addEventListener('mousedown', (e) => { handleAction(true); });
+            // Mouseup handled globally below
+        });
+        
+        document.addEventListener('mouseup', () => { 
+            // Reset B if mouse released anywhere
+            if(keys.b) keys.b = false;
+        });
 
         // Touch Controls (Sliding D-pad)
         const dpad = document.getElementById('dpad');
