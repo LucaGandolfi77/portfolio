@@ -429,6 +429,7 @@
             pixelY: 10 * TILE_SIZE, // Visual Y
             direction: 'down',
             moving: false,
+            turnTimer: 0,
             stepAnim: 0,
             isSurfing: false,
             inventory: {
@@ -2085,6 +2086,7 @@
                 player.pixelY = player.y * TILE_SIZE;
                 player.direction = 'up';
                 player.moving = false; // Ensure not moving
+                player.isSurfing = false; // Ensure not surfing indoors
                 
                 updateCamera();
                 
@@ -2629,14 +2631,26 @@
             // Input Handling (Nuovo movimento)
             let dx = 0;
             let dy = 0;
+            let newDir = player.direction;
 
-            if (keys.up) { dy = -1; player.direction = 'up'; }
-            else if (keys.down) { dy = 1; player.direction = 'down'; }
-            else if (keys.left) { dx = -1; player.direction = 'left'; }
-            else if (keys.right) { dx = 1; player.direction = 'right'; }
+            if (keys.up) { dy = -1; newDir = 'up'; }
+            else if (keys.down) { dy = 1; newDir = 'down'; }
+            else if (keys.left) { dx = -1; newDir = 'left'; }
+            else if (keys.right) { dx = 1; newDir = 'right'; }
 
             if (dx !== 0 || dy !== 0) {
-                attemptMove(dx, dy);
+                if (player.direction !== newDir) {
+                    player.direction = newDir;
+                    player.turnTimer = 5; // 5 frames delay to allow turning without moving
+                } else {
+                    if (player.turnTimer > 0) {
+                        player.turnTimer--;
+                    } else {
+                        attemptMove(dx, dy);
+                    }
+                }
+            } else {
+                player.turnTimer = 0;
             }
         }
 
@@ -2691,8 +2705,8 @@
                     }
                     
                     // Exit Boat (if moving to land)
-                    // Land tiles: 0=Ground, 1=Grass, 5=Bridge, 9=Floor, 10=Mat, 13=Tilled, 14=Road, 25=CityRoad, 26=Sidewalk, 22=Ice
-                    const isLand = (t) => t === 0 || t === 1 || t === 5 || t === 9 || t === 10 || t === 13 || t === 14 || t === 25 || t === 26 || t === 22;
+                    // Land tiles: 0=Ground, 1=Grass, 5=Bridge, 9=Floor, 10=Mat, 13=Tilled, 14=Road, 25=CityRoad, 26=Sidewalk, 22=Ice, 19=BarFloor
+                    const isLand = (t) => t === 0 || t === 1 || t === 5 || t === 9 || t === 10 || t === 13 || t === 14 || t === 25 || t === 26 || t === 22 || t === 19;
                     
                     if (isLand(tile)) {
                         // Leave boat at current pos (last water tile)
