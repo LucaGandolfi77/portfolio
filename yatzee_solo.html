@@ -733,6 +733,7 @@
             
             resetDiceUI();
             updateUI();
+            clearPotentialScores();
 
             if (gameState.isCpuTurn) {
                 document.getElementById('roll-btn').disabled = true;
@@ -767,30 +768,58 @@
         // --- AI LOGIC ---
 
         function startCpuTurn() {
-            rollDice(); // First roll
-        }
-
-        function cpuThink() {
-            // Decide whether to roll again or pick a score
-            if (gameState.rollsLeft > 0) {
-                const decision = evaluateRoll(gameState.dice, gameState.rollsLeft, gameState.scores.p2);
-                
-                if (decision.action === 'roll') {
-                    gameState.held = decision.holdMask;
-                    updateDiceUI();
-                    setTimeout(rollDice, 1000);
-                } else {
-                    // Pick score
-                    pickCpuScore(decision.category);
-                }
-            } else {
-                // Must pick score
-                const bestCat = findBestCategory(gameState.dice, gameState.scores.p2);
-                pickCpuScore(bestCat);
+            try {
+                rollDice(); // First roll
+            } catch (e) {
+                console.error("CPU Start Error:", e);
+                pickRandomScoreAndSwitch();
             }
         }
 
+        function cpuThink() {
+            try {
+                // Decide whether to roll again or pick a score
+                if (gameState.rollsLeft > 0) {
+                    const decision = evaluateRoll(gameState.dice, gameState.rollsLeft, gameState.scores.p2);
+                    
+                    if (decision.action === 'roll') {
+                        gameState.held = decision.holdMask;
+                        updateDiceUI();
+                        setTimeout(rollDice, 1000);
+                    } else {
+                        // Pick score
+                        pickCpuScore(decision.category);
+                    }
+                } else {
+                    // Must pick score
+                    const bestCat = findBestCategory(gameState.dice, gameState.scores.p2);
+                    pickCpuScore(bestCat);
+                }
+            } catch (e) {
+                console.error("CPU Think Error:", e);
+                pickRandomScoreAndSwitch();
+            }
+        }
+
+        function pickRandomScoreAndSwitch() {
+             const avail = categories.filter(c => !c.noClick && gameState.scores.p2[c.id] === undefined);
+             if (avail.length > 0) {
+                 const randCat = avail[Math.floor(Math.random() * avail.length)].id;
+                 pickCpuScore(randCat);
+             } else {
+                 // Force switch if stuck
+                 gameState.currentPlayer = 1;
+                 gameState.isCpuTurn = false;
+                 switchTurn();
+             }
+        }
+
         function pickCpuScore(catId) {
+            if (!catId) {
+                console.error("Invalid category picked by CPU");
+                pickRandomScoreAndSwitch();
+                return;
+            }
             const score = calculateScore(catId, gameState.dice);
             gameState.scores.p2[catId] = score;
 
@@ -854,7 +883,7 @@
 
             // Check Straights (Hard only)
             if (gameState.difficulty === 'hard') {
-                const unique = [...new Set(dice)].sort();
+                const unique = [...new Set(dice)].sort((a,b) => a-b);
                 // Check for small straight potential (3 consecutive)
                 let cons = 0;
                 let straightDice = [];

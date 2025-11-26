@@ -198,6 +198,10 @@
             </div>
         </div>
 
+        <div style="margin-top: 10px; text-align: center;">
+            <button id="autoFireBtn" class="btn" style="font-size: 0.9rem; padding: 8px 16px; background-color: #333; border: 1px solid #666; margin-top: 0;">AUTO FIRE: OFF</button>
+        </div>
+
         <div class="controls-info">
             <span data-i18n="games.space_invaders.controls">Controls: Arrow Keys to Move, SPACE to Shoot</span>
         </div>
@@ -234,6 +238,7 @@
         let lives = 3;
         let isGameOver = false;
         let isPaused = true;
+        let isAutoFire = false;
         
         // Entities
         let player = {
@@ -243,12 +248,19 @@
             height: PLAYER_HEIGHT,
             dx: 0,
             bullets: [],
-            cooldown: 0
+            cooldown: 0,
+            powerups: {
+                rapidFire: false,
+                multiShot: false,
+                shield: false
+            },
+            powerupTimer: 0
         };
 
         let aliens = [];
         let alienBullets = [];
         let particles = [];
+        let powerups = [];
         let alienDirection = 1; // 1 right, -1 left
         let alienSpeed = 1;
         let alienDropDistance = 20;
@@ -275,6 +287,14 @@
             
             document.getElementById('startBtn').addEventListener('click', startGame);
             document.getElementById('restartBtn').addEventListener('click', startGame);
+            
+            const autoFireBtn = document.getElementById('autoFireBtn');
+            autoFireBtn.addEventListener('click', () => {
+                isAutoFire = !isAutoFire;
+                autoFireBtn.textContent = `AUTO FIRE: ${isAutoFire ? 'ON' : 'OFF'}`;
+                autoFireBtn.style.backgroundColor = isAutoFire ? '#0f0' : '#333';
+                autoFireBtn.style.color = isAutoFire ? '#000' : '#fff';
+            });
 
             // Mobile Controls
             setupMobileControls();
@@ -343,8 +363,11 @@
             
             player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
             player.bullets = [];
+            player.powerups = { rapidFire: false, multiShot: false, shield: false };
+            player.powerupTimer = 0;
             alienBullets = [];
             particles = [];
+            powerups = [];
             
             initAliens();
             
@@ -371,18 +394,58 @@
         }
 
         function shootBullet() {
+            const x = player.x + player.width / 2 - 2;
+            const y = player.y;
+            
+            // Center bullet
             player.bullets.push({
-                x: player.x + player.width / 2 - 2,
-                y: player.y,
+                x: x,
+                y: y,
                 width: 4,
                 height: 10,
+                active: true,
+                vx: 0
+            });
+
+            if (player.powerups.multiShot) {
+                player.bullets.push({ x: x - 10, y: y + 5, width: 4, height: 10, active: true, vx: -1 });
+                player.bullets.push({ x: x + 10, y: y + 5, width: 4, height: 10, active: true, vx: 1 });
+            }
+
+            player.cooldown = player.powerups.rapidFire ? 10 : 20;
+        }
+
+        function spawnPowerup(x, y) {
+            const types = ['rapidFire', 'multiShot', 'shield'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            powerups.push({
+                x: x,
+                y: y,
+                width: 20,
+                height: 20,
+                type: type,
                 active: true
             });
-            player.cooldown = 20; // Frames between shots
+        }
+
+        function activatePowerup(type) {
+            if (type === 'shield') {
+                player.powerups.shield = true;
+            } else {
+                player.powerups[type] = true;
+                player.powerupTimer = 600; // 10 seconds at 60fps
+            }
+            // Visual feedback
+            createExplosion(player.x, player.y, '#0ff');
         }
 
         function update() {
             if (isPaused || isGameOver) return;
+
+            // Auto Fire
+            if (isAutoFire && player.cooldown <= 0) {
+                shootBullet();
+            }
 
             // Player Movement
             if (keys.ArrowLeft && player.x > 0) {
@@ -398,9 +461,31 @@
             // Player Bullets
             player.bullets.forEach(bullet => {
                 bullet.y -= BULLET_SPEED;
+                if (bullet.vx) bullet.x += bullet.vx;
                 if (bullet.y < 0) bullet.active = false;
             });
             player.bullets = player.bullets.filter(b => b.active);
+
+            // Powerups
+            powerups.forEach(p => {
+                p.y += 2;
+                if (p.y > CANVAS_HEIGHT) p.active = false;
+                
+                if (rectIntersect(p.x, p.y, p.width, p.height, player.x, player.y, player.width, player.height)) {
+                    activatePowerup(p.type);
+                    p.active = false;
+                    score += 50;
+                }
+            });
+            powerups = powerups.filter(p => p.active);
+
+            if (player.powerupTimer > 0) {
+                player.powerupTimer--;
+                if (player.powerupTimer <= 0) {
+                    player.powerups.rapidFire = false;
+                    player.powerups.multiShot = false;
+                }
+            }
 
             // Alien Movement
             let hitEdge = false;
@@ -443,28 +528,43 @@
                 });
             }
 
-            // Alien Bullets
-            alienBullets.forEach(bullet => {
-                bullet.y += BULLET_SPEED * 0.6;
-                if (bullet.y > CANVAS_HEIGHT) bullet.active = false;
-                
-                // Collision with player
-                if (rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
+                            score += 10 * (alienSpeed); // More points for faster levels
+                            createExplosion(alien.x + alien.width/2, alien.y + alien.height/2, '#0f0');
+                            
+                            // Drop Powerup
+                            if (Math.random() < 0.1) { // 10% chance
+                                spawnPowerup(alien.x, alien.y);
+                            }
+
+                            updateUI();
+                        }
+                    }
+                });
+            }); if (rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
                                 player.x, player.y, player.width, player.height)) {
                     bullet.active = false;
                     hitPlayer();
                 }
-            });
-            alienBullets = alienBullets.filter(b => b.active);
+        function hitPlayer() {
+            if (player.powerups.shield) {
+                player.powerups.shield = false;
+                createExplosion(player.x + player.width/2, player.y + player.height/2, '#00f');
+                return;
+            }
 
-            // Bullet vs Alien Collision
-            player.bullets.forEach(bullet => {
-                aliens.forEach(alien => {
-                    if (alien.status === 1 && bullet.active) {
-                        if (rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
-                                        alien.x, alien.y, alien.width, alien.height)) {
-                            alien.status = 0;
-                            bullet.active = false;
+            createExplosion(player.x + player.width/2, player.y + player.height/2, '#fff');
+            lives--;
+            updateUI();
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                // Respawn delay or invulnerability could go here
+                player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
+                // Reset powerups on death
+                player.powerups.rapidFire = false;
+                player.powerups.multiShot = false;
+            }
+        }                   bullet.active = false;
                             score += 10 * (alienSpeed); // More points for faster levels
                             createExplosion(alien.x + alien.width/2, alien.y + alien.height/2, '#0f0');
                             updateUI();
@@ -494,13 +594,35 @@
             }
         }
 
-        function createExplosion(x, y, color) {
-            for (let i = 0; i < 10; i++) {
-                particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 4,
-                    vy: (Math.random() - 0.5) * 4,
+            // Draw Player
+            ctx.fillStyle = player.powerups.shield ? '#00f' : '#0f0'; // Blue if shielded
+            // Simple ship shape
+            ctx.fillRect(player.x, player.y + 10, player.width, 10);
+            ctx.fillRect(player.x + 15, player.y, 10, 10);
+
+            // Draw Powerups
+            powerups.forEach(p => {
+                if (p.type === 'rapidFire') ctx.fillStyle = '#ff0'; // Yellow
+                else if (p.type === 'multiShot') ctx.fillStyle = '#0ff'; // Cyan
+                else if (p.type === 'shield') ctx.fillStyle = '#00f'; // Blue
+                
+                ctx.beginPath();
+                ctx.arc(p.x + p.width/2, p.y + p.height/2, p.width/2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Icon/Text
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                let icon = 'P';
+                if (p.type === 'rapidFire') icon = '⚡';
+                else if (p.type === 'multiShot') icon = '⫚';
+                else if (p.type === 'shield') icon = '🛡️';
+                ctx.fillText(icon, p.x + p.width/2, p.y + p.height/2);
+            });
+
+            // Draw Aliensath.random() - 0.5) * 4,
                     life: 20,
                     color: color
                 });

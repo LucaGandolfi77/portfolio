@@ -397,12 +397,17 @@
 
         function generateObstacle() {
             const obstacleHeight = 40 + Math.random() * 60;
+            const obstacleWidth = 30 + Math.random() * 40; // Random width
             const spawnX = canvas.width + 20;
+            
+            // Randomly decide if obstacle is on floor or ceiling
+            const isCeiling = Math.random() > 0.5;
+            const y = isCeiling ? 0 : canvas.height - obstacleHeight - 50;
             
             obstacles.push({
                 x: spawnX,
-                y: canvas.height - obstacleHeight - 50,
-                width: 40,
+                y: y,
+                width: obstacleWidth,
                 height: obstacleHeight,
                 color: '#ff6b6b'
             });
@@ -551,14 +556,21 @@
             updateStats();
         }
 
-        function jump() {
+        function startJump() {
             if (!gameState.isRunning) return;
-            if (player.jumping) return;
             
             const groundY = canvas.height - 50;
-            if (player.y + player.height >= groundY) {
-                player.velocity = -12;
+            // Check if on ground (with small tolerance)
+            if (player.y + player.height >= groundY - 5) {
+                player.velocity = -14; // Higher initial velocity for max jump
                 player.jumping = true;
+            }
+        }
+
+        function endJump() {
+            // If moving up fast (holding jump), and released, cut velocity
+            if (player.velocity < -6) {
+                player.velocity = -6;
             }
         }
 
@@ -617,19 +629,31 @@
         document.getElementById('startBtn').addEventListener('click', startGame);
         document.getElementById('resetStatsBtn').addEventListener('click', resetStats);
 
-        canvas.addEventListener('click', jump);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === ' ' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                jump();
-            }
-        });
+        // Input handling for variable jump height
+        const handleStart = (e) => {
+            if (e.type === 'keydown' && !(e.key === ' ' || e.key === 'ArrowUp')) return;
+            // Prevent default for touch/keys to avoid scrolling
+            if (e.cancelable && (e.type === 'touchstart' || e.type === 'keydown')) e.preventDefault();
+            startJump();
+        };
 
-        document.addEventListener('touchstart', (e) => {
-            if (e.target === canvas) {
-                jump();
-            }
-        });
+        const handleEnd = (e) => {
+            if (e.type === 'keyup' && !(e.key === ' ' || e.key === 'ArrowUp')) return;
+            endJump();
+        };
+
+        // Mouse
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('mouseleave', handleEnd);
+
+        // Keyboard
+        document.addEventListener('keydown', handleStart);
+        document.addEventListener('keyup', handleEnd);
+
+        // Touch
+        canvas.addEventListener('touchstart', handleStart, { passive: false });
+        canvas.addEventListener('touchend', handleEnd, { passive: false });
 
         document.querySelectorAll('.difficulty-btn').forEach(btn => {
             btn.addEventListener('click', () => {

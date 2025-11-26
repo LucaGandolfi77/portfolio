@@ -16,7 +16,6 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             min-height: 100vh;
-            touch-action: none;
         }
 
         .navbar {
@@ -109,6 +108,7 @@
             margin-top: 20px;
             flex-direction: column;
             gap: 15px;
+            touch-action: none; /* Prevent scrolling when using controls */
         }
 
         .control-row {
@@ -130,6 +130,7 @@
             align-items: center;
             user-select: none;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .control-btn:active {
@@ -146,7 +147,7 @@
             border-color: rgba(255, 0, 0, 0.5);
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 900px) {
             .mobile-controls {
                 display: flex;
             }
@@ -550,24 +551,46 @@
                 } else if (event.keyCode === 38) { // Up
                     playerRotate();
                 }
-            });
-
             // Mobile Controls
             const addTouch = (id, action) => {
                 const btn = document.getElementById(id);
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (!isGameOver && !isPaused) action();
-                });
-                btn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    if (!isGameOver && !isPaused) action();
-                });
+                let interval;
+                let timeout;
+
+                const start = (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    if (isGameOver || isPaused) return;
+                    
+                    action(); // Immediate action
+                    
+                    // Repeat if held (except for rotate maybe? but let's keep it consistent or just for move)
+                    if (id !== 'rotateBtn') {
+                        timeout = setTimeout(() => {
+                            interval = setInterval(() => {
+                                if (!isGameOver && !isPaused) action();
+                            }, 100); // Repeat speed
+                        }, 300); // Delay before repeat
+                    }
+                };
+
+                const end = (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                };
+
+                btn.addEventListener('touchstart', start, { passive: false });
+                btn.addEventListener('touchend', end);
+                btn.addEventListener('mousedown', start);
+                btn.addEventListener('mouseup', end);
+                btn.addEventListener('mouseleave', end);
             };
 
             addTouch('leftBtn', () => playerMove(-1));
             addTouch('rightBtn', () => playerMove(1));
             addTouch('rotateBtn', () => playerRotate());
+            addTouch('downBtn', () => playerDrop());
+        }   addTouch('rotateBtn', () => playerRotate());
             addTouch('downBtn', () => playerDrop());
         }
 
