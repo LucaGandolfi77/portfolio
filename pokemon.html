@@ -358,6 +358,7 @@
         let worldX = 0;
         let worldY = 0;
         let isTransitioning = false;
+        let transitionTimer = 0; // Watchdog for stuck transitions
         let isDialogueOpen = false;
         let isIndoors = false;
         let savedOutdoorPos = { x: 0, y: 0, wx: 0, wy: 0 };
@@ -2078,27 +2079,32 @@
             savedOutdoorPos = { x: player.x, y: player.y, wx: worldX, wy: worldY };
             
             setTimeout(() => {
-                isIndoors = true;
-                currentData = generateInterior(type);
-                currentMap = currentData.tiles;
-                currentNPCs = currentData.npcs;
-                
-                // Place player at bottom center (above mat)
-                player.x = 5; 
-                player.y = 8;
-                player.pixelX = player.x * TILE_SIZE;
-                player.pixelY = player.y * TILE_SIZE;
-                player.direction = 'up';
-                player.moving = false; // Ensure not moving
-                player.isSurfing = false; // Ensure not surfing indoors
-                player.turnTimer = 0; // Reset turn timer
-                
-                updateCamera();
-                
-                setTimeout(() => {
-                    transitionOverlay.style.opacity = 0;
-                    isTransitioning = false;
-                }, 100);
+                try {
+                    isIndoors = true;
+                    currentData = generateInterior(type);
+                    currentMap = currentData.tiles;
+                    currentNPCs = currentData.npcs;
+                    
+                    // Place player at bottom center (above mat)
+                    player.x = 5; 
+                    player.y = 8;
+                    player.pixelX = player.x * TILE_SIZE;
+                    player.pixelY = player.y * TILE_SIZE;
+                    player.direction = 'up';
+                    player.moving = false; // Ensure not moving
+                    player.isSurfing = false; // Ensure not surfing indoors
+                    player.turnTimer = 0; // Reset turn timer
+                    
+                    updateCamera();
+                } catch (e) {
+                    console.error("Error entering house:", e);
+                    isIndoors = false; // Revert
+                } finally {
+                    setTimeout(() => {
+                        transitionOverlay.style.opacity = 0;
+                        isTransitioning = false;
+                    }, 100);
+                }
             }, 300);
         }
 
@@ -2107,33 +2113,37 @@
             transitionOverlay.style.opacity = 1;
             
             setTimeout(() => {
-                isIndoors = false;
-                worldX = savedOutdoorPos.wx;
-                worldY = savedOutdoorPos.wy;
-                currentData = getCurrentData(); // Reload outdoor map
-                currentMap = currentData.tiles;
-                currentNPCs = currentData.npcs;
-                
-                player.x = savedOutdoorPos.x;
-                player.y = savedOutdoorPos.y + 1; // Step out
-                player.pixelX = player.x * TILE_SIZE;
-                player.pixelY = player.y * TILE_SIZE;
-                player.direction = 'down';
-                player.moving = false;
-                player.turnTimer = 0; // Reset turn timer
+                try {
+                    isIndoors = false;
+                    worldX = savedOutdoorPos.wx;
+                    worldY = savedOutdoorPos.wy;
+                    currentData = getCurrentData(); // Reload outdoor map
+                    currentMap = currentData.tiles;
+                    currentNPCs = currentData.npcs;
+                    
+                    player.x = savedOutdoorPos.x;
+                    player.y = savedOutdoorPos.y + 1; // Step out
+                    player.pixelX = player.x * TILE_SIZE;
+                    player.pixelY = player.y * TILE_SIZE;
+                    player.direction = 'down';
+                    player.moving = false;
+                    player.turnTimer = 0; // Reset turn timer
 
-                // Reset keys
-                keys.up = false;
-                keys.down = false;
-                keys.left = false;
-                keys.right = false;
-                
-                updateCamera();
-                
-                setTimeout(() => {
-                    transitionOverlay.style.opacity = 0;
-                    isTransitioning = false;
-                }, 100);
+                    // Reset keys
+                    keys.up = false;
+                    keys.down = false;
+                    keys.left = false;
+                    keys.right = false;
+                    
+                    updateCamera();
+                } catch (e) {
+                    console.error("Error exiting house:", e);
+                } finally {
+                    setTimeout(() => {
+                        transitionOverlay.style.opacity = 0;
+                        isTransitioning = false;
+                    }, 100);
+                }
             }, 300);
         }
 
@@ -2403,7 +2413,17 @@
         function update() {
             updateTime(); // Always update time
 
-            if (isTransitioning) return;
+            if (isTransitioning) {
+                transitionTimer++;
+                if (transitionTimer > 120) { // 2 seconds timeout
+                    console.warn("Transition stuck! Forcing reset.");
+                    isTransitioning = false;
+                    transitionOverlay.style.opacity = 0;
+                    transitionTimer = 0;
+                }
+                return;
+            }
+            transitionTimer = 0;
 
             // Safety Check: If on Exit Mat (10) and not transitioning, exit
             if (isIndoors && currentMap[player.y][player.x] === 10) {
