@@ -294,6 +294,7 @@
                 <div id="clock-hud">
                     <span id="clock-icon">☀️</span>
                     <span id="clock-time">12:00</span>
+                    <button id="save-btn" onclick="saveGame()" style="pointer-events:auto; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4); color:white; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:0.75rem; font-weight:bold; margin-left:8px;">SAVE</button>
                 </div>
                 <div id="tool-hud">
                     <span id="tool-icon">🪓</span>
@@ -2085,12 +2086,6 @@
                 player.direction = 'up';
                 player.moving = false; // Ensure not moving
                 
-                // Reset keys to prevent stuck movement
-                keys.up = false;
-                keys.down = false;
-                keys.left = false;
-                keys.right = false;
-                
                 updateCamera();
                 
                 setTimeout(() => {
@@ -2118,12 +2113,6 @@
                 player.pixelY = player.y * TILE_SIZE;
                 player.direction = 'down';
                 player.moving = false;
-
-                // Reset keys
-                keys.up = false;
-                keys.down = false;
-                keys.left = false;
-                keys.right = false;
                 
                 updateCamera();
                 
@@ -2327,6 +2316,75 @@
             }
         }
         
+        // Save System
+        function saveGame() {
+            const saveData = {
+                player: player,
+                world: world,
+                worldX: worldX,
+                worldY: worldY,
+                gameTime: gameTime,
+                isIndoors: isIndoors,
+                savedOutdoorPos: savedOutdoorPos,
+                indoorData: isIndoors ? currentData : null
+            };
+            
+            try {
+                localStorage.setItem('pokemonSave', JSON.stringify(saveData));
+                showDialogue("Gioco salvato con successo!");
+                setTimeout(() => { if(isDialogueOpen) closeDialogue(); }, 2000);
+            } catch (e) {
+                console.error(e);
+                showDialogue("Errore durante il salvataggio!");
+                setTimeout(() => { if(isDialogueOpen) closeDialogue(); }, 2000);
+            }
+        }
+
+        function loadGame() {
+            const saveString = localStorage.getItem('pokemonSave');
+            if (saveString) {
+                try {
+                    const saveData = JSON.parse(saveString);
+                    
+                    // Restore state
+                    Object.assign(player, saveData.player);
+                    Object.assign(world, saveData.world);
+                    worldX = saveData.worldX;
+                    worldY = saveData.worldY;
+                    Object.assign(gameTime, saveData.gameTime);
+                    isIndoors = saveData.isIndoors;
+                    savedOutdoorPos = saveData.savedOutdoorPos;
+                    
+                    // Restore currentData
+                    if (isIndoors && saveData.indoorData) {
+                        currentData = saveData.indoorData;
+                    } else {
+                        currentData = getCurrentData();
+                    }
+                    
+                    currentMap = currentData.tiles;
+                    currentNPCs = currentData.npcs;
+                    
+                    // Reset visual position
+                    player.pixelX = player.x * TILE_SIZE;
+                    player.pixelY = player.y * TILE_SIZE;
+                    player.moving = false;
+                    
+                    updateInventoryUI();
+                    updateCamera();
+                    
+                    console.log("Game loaded!");
+                    return true;
+                } catch (e) {
+                    console.error("Failed to load save", e);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+
+
         // Game Loop Logic
         function update() {
             updateTime(); // Always update time
@@ -3026,7 +3084,9 @@
         });
 
         // Inizializza
-        updateCamera();
+        if (!loadGame()) {
+            updateCamera();
+        }
         render();
     </script>
 </body>
