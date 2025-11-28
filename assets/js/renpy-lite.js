@@ -25,11 +25,13 @@ const RenPy = (function() {
         label: 'start',
         index: 0,
         history: [],
-        waitingForInput: false
+        waitingForInput: false,
+        inventory: [],
+        metCharacters: new Set()
     };
 
     // DOM Elements
-    let container, bgLayer, charLayer, uiLayer, dialogueBox, nameLabel, dialogueText, choiceMenu;
+    let container, bgLayer, charLayer, uiLayer, dialogueBox, nameLabel, dialogueText, choiceMenu, menuOverlay;
 
     // Config
     const config = {
@@ -75,6 +77,24 @@ const RenPy = (function() {
                 font-family: inherit; font-weight: bold;
             }
             .rp-btn:hover { transform: scale(1.05); background: #fff; color: #0984e3; }
+            .rp-menu-btn {
+                position: absolute; top: 20px; right: 20px; pointer-events: auto;
+                background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #fff;
+                padding: 8px 16px; border-radius: 4px; cursor: pointer; z-index: 50;
+            }
+            .rp-menu-overlay {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); display: none; z-index: 200;
+                color: #fff; padding: 40px; box-sizing: border-box; pointer-events: auto;
+                flex-direction: column;
+            }
+            .rp-menu-title { font-size: 2rem; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px; }
+            .rp-menu-section { margin-bottom: 30px; }
+            .rp-menu-list { display: flex; flex-wrap: wrap; gap: 10px; }
+            .rp-tag { background: #333; padding: 5px 10px; border-radius: 4px; border: 1px solid #555; }
+            .rp-close-btn {
+                position: absolute; top: 20px; right: 20px; background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer;
+            }
             .rp-hidden { display: none !important; }
         `;
         document.head.appendChild(style);
@@ -93,14 +113,37 @@ const RenPy = (function() {
         dialogueBox.appendChild(dialogueText);
         uiLayer.appendChild(dialogueBox);
 
+        // Menu Button
+        const menuBtn = document.createElement('button');
+        menuBtn.className = 'rp-menu-btn';
+        menuBtn.textContent = 'MENU';
+        menuBtn.onclick = toggleMenu;
+        uiLayer.appendChild(menuBtn);
+
         // Choice Menu
         choiceMenu = document.createElement('div'); choiceMenu.className = 'rp-choice-overlay';
+
+        // Menu Overlay (Inventory/Status)
+        menuOverlay = document.createElement('div'); menuOverlay.className = 'rp-menu-overlay';
+        menuOverlay.innerHTML = `
+            <button class="rp-close-btn" onclick="RenPy.toggleMenu()">×</button>
+            <div class="rp-menu-title">Status</div>
+            <div class="rp-menu-section">
+                <h3>Inventory</h3>
+                <div class="rp-menu-list" id="rp-inventory-list"></div>
+            </div>
+            <div class="rp-menu-section">
+                <h3>Characters Met</h3>
+                <div class="rp-menu-list" id="rp-chars-list"></div>
+            </div>
+        `;
 
         // Assemble
         container.appendChild(bgLayer);
         container.appendChild(charLayer);
         container.appendChild(uiLayer);
         container.appendChild(choiceMenu);
+        container.appendChild(menuOverlay);
 
         // Event Listeners
         dialogueBox.addEventListener('click', () => {
@@ -127,6 +170,41 @@ const RenPy = (function() {
         processLine();
     }
 
+    function toggleMenu() {
+        const isHidden = menuOverlay.style.display === 'none' || menuOverlay.style.display === '';
+        menuOverlay.style.display = isHidden ? 'flex' : 'none';
+        
+        if (isHidden) {
+            updateMenuUI();
+        }
+    }
+
+    function updateMenuUI() {
+        const invList = document.getElementById('rp-inventory-list');
+        const charList = document.getElementById('rp-chars-list');
+        
+        invList.innerHTML = state.inventory.length ? '' : '<span style="color:#888">Empty</span>';
+        state.inventory.forEach(item => {
+            const tag = document.createElement('div');
+            tag.className = 'rp-tag';
+            tag.textContent = item;
+            invList.appendChild(tag);
+        });
+
+        charList.innerHTML = state.metCharacters.size ? '' : '<span style="color:#888">None</span>';
+        state.metCharacters.forEach(charId => {
+            const char = state.characters[charId];
+            if (char) {
+                const tag = document.createElement('div');
+                tag.className = 'rp-tag';
+                tag.style.borderColor = char.color;
+                tag.style.color = char.color;
+                tag.textContent = char.name;
+                charList.appendChild(tag);
+            }
+        });
+    }
+
     // --- Engine Logic ---
     function processLine() {
         if (!state.script[state.label] || state.index >= state.script[state.label].length) {
@@ -141,19 +219,17 @@ const RenPy = (function() {
             const cmd = parts[0];
 
             if (cmd === 'scene') {
-                // scene bg_name
                 const img = parts[1];
                 bgLayer.style.backgroundImage = state.images[img] ? `url('${state.images[img]}')` : 'none';
-                if (!state.images[img]) bgLayer.style.backgroundColor = img; // Fallback to color
+                if (!state.images[img]) bgLayer.style.backgroundColor = img; 
                 state.index++;
                 processLine();
             } 
             else if (cmd === 'show') {
-                // show char_id [at pos]
                 const charId = parts[1];
-                const charImg = state.images[charId] || null;
+                state.metCharacters.add(charId); // Track character
                 
-                // Remove existing if same ID base (simplified)
+                const charImg = state.images[charId] || null;
                 const existing = document.getElementById(`rp-char-${charId}`);
                 if (existing) existing.remove();
 
@@ -164,11 +240,10 @@ const RenPy = (function() {
                     img.id = `rp-char-${charId}`;
                     charLayer.appendChild(img);
                 } else {
-                    // Emoji/Text fallback
                     const div = document.createElement('div');
                     div.className = 'rp-char';
                     div.id = `rp-char-${charId}`;
-                    div.textContent = charId; // Placeholder
+                    div.textContent = charId; 
                     div.style.fontSize = '10rem';
                     charLayer.appendChild(div);
                 }
@@ -188,15 +263,29 @@ const RenPy = (function() {
                 state.index = 0;
                 processLine();
             }
+            else if (cmd === 'add_item') {
+                // add_item Item Name (can contain spaces)
+                const item = line.substring(9).trim();
+                if (!state.inventory.includes(item)) {
+                    state.inventory.push(item);
+                    // Optional: Notification
+                }
+                state.index++;
+                processLine();
+            }
+            else if (cmd === 'remove_item') {
+                const item = line.substring(12).trim();
+                state.inventory = state.inventory.filter(i => i !== item);
+                state.index++;
+                processLine();
+            }
             else {
-                // Character Say: "e 'text'"
-                // Check if first part is a defined character
+                // Character Say
                 if (state.characters[cmd]) {
-                    // Extract text (everything after first space)
+                    state.metCharacters.add(cmd); // Track character if they speak
                     const text = line.substring(line.indexOf(' ') + 1).replace(/^['"]|['"]$/g, '');
                     showDialogue(state.characters[cmd], text);
                 } else {
-                    // Narrator
                     showDialogue(null, line.replace(/^['"]|['"]$/g, ''));
                 }
             }
@@ -264,6 +353,7 @@ const RenPy = (function() {
         define,
         image,
         script,
-        run
+        run,
+        toggleMenu
     };
 })();
