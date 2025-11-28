@@ -252,7 +252,13 @@ function update() {
     if (dx !== 0 || dy !== 0) {
         if (player.direction !== newDir) {
             player.direction = newDir;
-            player.turnTimer = 5; // 5 frames delay to allow turning without moving
+            // If running (B held), turn immediately (no delay)
+            if (keys.b) {
+                player.turnTimer = 0;
+                attemptMove(dx, dy);
+            } else {
+                player.turnTimer = 5; // 5 frames delay to allow turning without moving
+            }
         } else {
             if (player.turnTimer > 0) {
                 player.turnTimer--;
