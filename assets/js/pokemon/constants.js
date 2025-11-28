@@ -1,5 +1,6 @@
 // Configurazione gioco
 const TILE_SIZE = 32;
+const MAP_SIZE = 20;
 const VISIBLE_TILES = 10;
 const WALK_SPEED = 2;
 const RUN_SPEED = 4;
