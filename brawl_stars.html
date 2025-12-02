@@ -48,7 +48,7 @@
 
         .hp-container {
             position: absolute;
-            top: 60px;
+            top: 70px;
             left: 50%;
             transform: translateX(-50%);
             width: 300px;
@@ -58,10 +58,29 @@
             border: 2px solid rgba(255,255,255,0.3);
             overflow: hidden;
         }
+        .shield-container {
+            position: absolute;
+            top: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 15px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+            display: none; /* Hidden initially */
+        }
         #hp-bar {
             width: 100%;
             height: 100%;
             background: #e74c3c;
+            transition: width 0.2s;
+        }
+        #shield-bar {
+            width: 100%;
+            height: 100%;
+            background: #3498db;
             transition: width 0.2s;
         }
         
@@ -111,6 +130,9 @@
 
     <div class="ui-layer">
         <div class="score-board">Score: <span id="scoreVal">0</span></div>
+        <div class="shield-container" id="shield-container">
+            <div id="shield-bar"></div>
+        </div>
         <div class="hp-container">
             <div id="hp-bar"></div>
         </div>
@@ -174,7 +196,7 @@
     // Entities
     const player = { 
         x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2, radius: 15, speed: 300, color: '#3498db', 
-        hp: 100, maxHp: 100, invulnTimer: 0,
+        hp: 100, maxHp: 100, shield: 0, maxShield: 100, invulnTimer: 0,
         weapon: { ...WEAPONS.Fists, currentAmmo: Infinity },
         frame: 0,
         frameTimer: 0,
@@ -194,6 +216,142 @@
     let enemies = [];
     let particles = [];
     let groundWeapons = [];
+    let powerups = [];
+
+    // Zone Logic
+    let zone = {
+        x: 0, y: 0, radius: 0,
+        targetX: 0, targetY: 0,
+        startRadius: 0,
+        timer: 0,
+        duration: 180 // 3 minutes to shrink
+    };
+
+    function spawnPlayerRandomly() {
+        let x, y, attempts = 0;
+        do {
+            x = Math.random() * MAP_WIDTH;
+            y = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(x, y) && attempts < 100);
+        player.x = x;
+        player.y = y;
+    }
+
+    function initZone() {
+        zone.startRadius = Math.max(MAP_WIDTH, MAP_HEIGHT) * 0.8;
+        zone.radius = zone.startRadius;
+        zone.x = MAP_WIDTH / 2;
+        zone.y = MAP_HEIGHT / 2;
+        
+        // Pick a random safe spot for the final zone
+        let tx, ty, attempts = 0;
+        do {
+            tx = Math.random() * MAP_WIDTH;
+            ty = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(tx, ty) && attempts < 100);
+        
+        zone.targetX = tx;
+        zone.targetY = ty;
+        zone.timer = 0;
+    }
+
+    function updateZone(dt) {
+        if (!gameRunning) return;
+        
+        zone.timer += dt;
+        const progress = Math.min(zone.timer / zone.duration, 1);
+        
+        // Shrink radius to 0
+        zone.radius = zone.startRadius * (1 - progress);
+        
+        // Move center towards target
+        zone.x = (MAP_WIDTH / 2) + (zone.targetX - (MAP_WIDTH / 2)) * progress;
+        zone.y = (MAP_HEIGHT / 2) + (zone.targetY - (MAP_HEIGHT / 2)) * progress;
+
+        // Check Player Damage
+        const dx = player.x - zone.x;
+        const dy = player.y - zone.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        if (dist > zone.radius) {
+            // Outside Zone - Take Damage
+            if (player.invulnTimer <= 0) {
+                takeDamage(10 * dt); // Continuous damage
+                createParticles(player.x, player.y, '#e74c3c');
+            }
+        }
+    }
+
+    function spawnPowerup() {
+        let x, y, attempts = 0;
+        do {
+            x = Math.random() * MAP_WIDTH;
+            y = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(x, y) && attempts < 10);
+        
+        if (attempts >= 10) return;
+
+        const type = Math.random() < 0.5 ? 'health' : 'shield';
+        powerups.push({ x, y, type, radius: 20, floatOffset: 0 });
+    }
+
+    function checkPowerupCollisions() {
+        for (let i = powerups.length - 1; i >= 0; i--) {
+            const p = powerups[i];
+            p.floatOffset = Math.sin(Date.now() / 200) * 5;
+            
+            const dx = player.x - p.x;
+            const dy = player.y - p.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < player.radius + p.radius) {
+                // Collect
+                if (p.type === 'health') {
+                    player.hp = Math.min(player.hp + 50, player.maxHp);
+                    updateHealthUI();
+                    createParticles(player.x, player.y, '#2ecc71');
+                } else if (p.type === 'shield') {
+                    player.shield = 100;
+                    updateHealthUI();
+                    createParticles(player.x, player.y, '#3498db');
+                }
+                powerups.splice(i, 1);
+            }
+        }
+    }
+
+    function takeDamage(amount) {
+        if (player.shield > 0) {
+            player.shield -= amount;
+            if (player.shield < 0) {
+                player.hp += player.shield; // Apply overflow damage to HP
+                player.shield = 0;
+            }
+        } else {
+            player.hp -= amount;
+        }
+        
+        updateHealthUI();
+        
+        if (player.hp <= 0) {
+            gameOver();
+        }
+    }
+
+    function updateHealthUI() {
+        document.getElementById('hp-bar').style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+        
+        const shieldContainer = document.getElementById('shield-container');
+        if (player.shield > 0) {
+            shieldContainer.style.display = 'block';
+            document.getElementById('shield-bar').style.width = Math.max(0, (player.shield / player.maxShield) * 100) + '%';
+        } else {
+            shieldContainer.style.display = 'none';
+        }
+    }
     
     // Input State
     const input = {
@@ -207,6 +365,8 @@
     let enemySpawnTimer = 0;
     const WEAPON_SPAWN_RATE = 1.5;
     let weaponSpawnTimer = WEAPON_SPAWN_RATE;
+    const POWERUP_SPAWN_RATE = 10;
+    let powerupSpawnTimer = POWERUP_SPAWN_RATE;
 
     function resize() {
         width = window.innerWidth;
@@ -414,6 +574,16 @@
     function update(dt) {
         if (!gameRunning) return;
 
+        updateZone(dt);
+        checkPowerupCollisions();
+
+        // Powerup Spawning
+        powerupSpawnTimer -= dt;
+        if (powerupSpawnTimer <= 0) {
+            spawnPowerup();
+            powerupSpawnTimer = POWERUP_SPAWN_RATE;
+        }
+
         // Player Invulnerability
         if (player.invulnTimer > 0) {
             player.invulnTimer -= dt;
@@ -573,16 +743,9 @@
             // Collision with Player (Damage)
             if (dist < player.radius + e.radius) {
                 if (player.invulnTimer <= 0) {
-                    player.hp -= 20;
+                    takeDamage(20);
                     player.invulnTimer = 1.0; // 1 sec invuln
                     createParticles(player.x, player.y, '#e74c3c');
-                    
-                    // Update HP Bar
-                    document.getElementById('hp-bar').style.width = player.hp + '%';
-                    
-                    if (player.hp <= 0) {
-                        gameOver();
-                    }
                 }
             }
 
@@ -758,6 +921,46 @@
             }
         }
 
+        // Zone (Fire Wall)
+        ctx.save();
+        ctx.beginPath();
+        // Outer huge rectangle
+        ctx.rect(camera.x - 100, camera.y - 100, width/ZOOM + 200, height/ZOOM + 200);
+        // Inner circle (hole)
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
+        ctx.fill();
+        
+        // Zone Border
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#e74c3c';
+        ctx.stroke();
+        ctx.restore();
+
+        // Powerups
+        powerups.forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y + p.floatOffset);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = p.type === 'health' ? '#2ecc71' : '#3498db';
+            
+            ctx.fillStyle = p.type === 'health' ? '#2ecc71' : '#3498db';
+            ctx.fillRect(-15, -15, 30, 30);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-15, -15, 30, 30);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(p.type === 'health' ? '+' : 'S', 0, 1);
+            ctx.restore();
+        });
+
         // Ground Weapons
         groundWeapons.forEach(w => {
             ctx.save();
@@ -853,6 +1056,15 @@
 
         ctx.restore(); // End Zoom/Camera
 
+        // Damage Overlay (Fire Effect)
+        const zdx = player.x - zone.x;
+        const zdy = player.y - zone.y;
+        const zdist = Math.sqrt(zdx*zdx + zdy*zdy);
+        if (zdist > zone.radius) {
+             ctx.fillStyle = 'rgba(231, 76, 60, 0.2)';
+             ctx.fillRect(0, 0, width, height);
+        }
+
         // UI
         drawJoystick(input.move, 'left');
         drawJoystick(input.aim, 'right');
@@ -917,16 +1129,18 @@
     function resetGame() {
         score = 0;
         document.getElementById('scoreVal').textContent = '0';
-        player.x = MAP_WIDTH / 2;
-        player.y = MAP_HEIGHT / 2;
+        spawnPlayerRandomly();
+        initZone();
         player.hp = 100;
+        player.shield = 0;
+        updateHealthUI();
         player.invulnTimer = 0;
-        document.getElementById('hp-bar').style.width = '100%';
         player.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
         enemies = [];
         bullets = [];
         particles = [];
         groundWeapons = [];
+        powerups = [];
         gameRunning = true;
         document.getElementById('gameOverScreen').style.display = 'none';
         lastTime = performance.now();
@@ -939,6 +1153,8 @@
     });
 
     // Start
+    spawnPlayerRandomly();
+    initZone();
     requestAnimationFrame(loop);
 
 </script>
