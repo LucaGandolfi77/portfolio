@@ -45,6 +45,25 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             pointer-events: none;
         }
+
+        .hp-container {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+        }
+        #hp-bar {
+            width: 100%;
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.2s;
+        }
         
         #gameOverScreen {
             display: none;
@@ -59,6 +78,7 @@
             justify-content: center;
             align-items: center;
             pointer-events: auto;
+            z-index: 2000; /* High z-index to ensure clickable */
         }
         button {
             padding: 15px 30px;
@@ -69,6 +89,10 @@
             border-radius: 8px;
             cursor: pointer;
             margin-top: 20px;
+            pointer-events: auto;
+        }
+        button:hover {
+            background: #c0392b;
         }
         .tutorial {
             position: absolute;
@@ -87,6 +111,9 @@
 
     <div class="ui-layer">
         <div class="score-board">Score: <span id="scoreVal">0</span></div>
+        <div class="hp-container">
+            <div id="hp-bar"></div>
+        </div>
         
         <div class="tutorial">
             <span>Left Stick: Move</span> &nbsp;&nbsp;&nbsp;&nbsp; <span>Right Stick: Shoot</span>
@@ -100,8 +127,8 @@
     <div id="gameOverScreen">
         <h1>GAME OVER</h1>
         <p>Score: <span id="finalScore">0</span></p>
-        <button onclick="resetGame()">Play Again</button>
-        <button onclick="window.location.href='index.html'" style="background:#34495e; margin-top:10px;">Exit</button>
+        <button id="btn-retry">Play Again</button>
+        <button id="btn-exit" style="background:#34495e; margin-top:10px;">Exit</button>
     </div>
 
 <script>
@@ -114,13 +141,14 @@
     let score = 0;
     let lastTime = 0;
 
-    // Map & Camera
+    // Config
+    const ZOOM = 0.6;
     const MAP_WIDTH = 2000;
     const MAP_HEIGHT = 2000;
     const TILE_SIZE = 50;
     const COLS = Math.floor(MAP_WIDTH / TILE_SIZE);
     const ROWS = Math.floor(MAP_HEIGHT / TILE_SIZE);
-    let map = []; // 0: Grass, 1: Wall, 2: Water
+    let map = []; // 0: Grass, 1: Wall
     let camera = { x: 0, y: 0 };
 
     function initMap() {
@@ -132,18 +160,6 @@
             // Keep center clear
             if (Math.abs(c - COLS/2) < 6 && Math.abs(r - ROWS/2) < 6) continue;
             map[r * COLS + c] = 1; 
-        }
-        // Add water pools
-        for(let i=0; i<20; i++) {
-            let c = Math.floor(Math.random() * (COLS-5));
-            let r = Math.floor(Math.random() * (ROWS-5));
-            if (Math.abs(c - COLS/2) < 6 && Math.abs(r - ROWS/2) < 6) continue;
-            
-            for(let y=0; y<5; y++) {
-                for(let x=0; x<5; x++) {
-                    if(Math.random() > 0.2) map[(r+y) * COLS + (c+x)] = 2;
-                }
-            }
         }
     }
     initMap();
@@ -157,7 +173,7 @@
 
     function isSolid(x, y) {
         const t = getTileAt(x, y);
-        return t === 1 || t === 2; // Wall or Water
+        return t === 1; // Wall
     }
 
     function checkCollision(x, y, radius) {
@@ -187,7 +203,8 @@
 
     // Entities
     const player = { 
-        x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2, radius: 20, speed: 300, color: '#3498db', hp: 100, maxHp: 100,
+        x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2, radius: 15, speed: 300, color: '#3498db', 
+        hp: 100, maxHp: 100, invulnTimer: 0,
         weapon: { ...WEAPONS.Fists, currentAmmo: Infinity },
         frame: 0,
         frameTimer: 0,
@@ -201,7 +218,7 @@
     enemySprite.src = 'assets/sprites/enemy_sheet.png';
     
     const SPRITE_SIZE = 64; // Source size
-    const DRAW_SIZE = 64;   // Destination size
+    const DRAW_SIZE = 48;   // Destination size
 
     let bullets = [];
     let enemies = [];
@@ -216,7 +233,7 @@
     };
 
     // Config
-    const ENEMY_SPAWN_RATE = 1.5;
+    const ENEMY_SPAWN_RATE = 0.8;
     let enemySpawnTimer = 0;
     const WEAPON_SPAWN_RATE = 5.0;
     let weaponSpawnTimer = WEAPON_SPAWN_RATE;
@@ -344,13 +361,13 @@
     function spawnEnemy() {
         const side = Math.floor(Math.random() * 4); // 0:top, 1:right, 2:bottom, 3:left
         let x, y;
-        const buffer = 50;
+        const buffer = 100;
         
         // Spawn relative to camera view, but outside
+        const viewW = width / ZOOM;
+        const viewH = height / ZOOM;
         const viewX = camera.x;
         const viewY = camera.y;
-        const viewW = width;
-        const viewH = height;
 
         if (side === 0) { x = viewX + Math.random() * viewW; y = viewY - buffer; }
         else if (side === 1) { x = viewX + viewW + buffer; y = viewY + Math.random() * viewH; }
@@ -362,7 +379,7 @@
 
         // Ensure not too close to player (Safety check)
         const distToPlayer = Math.sqrt((x - player.x) ** 2 + (y - player.y) ** 2);
-        if (distToPlayer < 400) return;
+        if (distToPlayer < 500) return;
 
         // Determine Type
         const isTank = Math.random() < 0.25; // 25% chance for Tank
@@ -373,13 +390,13 @@
             type = 'tank';
             speed = 60 + Math.random() * 20; // Slow
             hp = 100 + (score * 10);         // High HP
-            radius = 25;
+            radius = 20;
             row = 1; // 2nd row in sprite sheet
         } else {
             type = 'normal';
             speed = 120 + Math.random() * 40 + (score * 2); // Fast
             hp = 30 + (score * 5);                          // Low HP
-            radius = 18;
+            radius = 15;
             row = 0; // 1st row
         }
 
@@ -393,7 +410,9 @@
             type: type,
             row: row,
             frame: 0,
-            frameTimer: 0
+            frameTimer: 0,
+            state: 'chase',
+            attackTimer: 0
         });
     }
 
@@ -424,6 +443,11 @@
 
     function update(dt) {
         if (!gameRunning) return;
+
+        // Player Invulnerability
+        if (player.invulnTimer > 0) {
+            player.invulnTimer -= dt;
+        }
 
         // Player Movement (Touch)
         let dx = 0, dy = 0;
@@ -473,11 +497,13 @@
         player.x = Math.max(player.radius, Math.min(MAP_WIDTH - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(MAP_HEIGHT - player.radius, player.y));
 
-        // Update Camera
-        camera.x = player.x - width / 2;
-        camera.y = player.y - height / 2;
-        camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - width));
-        camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - height));
+        // Update Camera (Zoomed)
+        const viewW = width / ZOOM;
+        const viewH = height / ZOOM;
+        camera.x = player.x - viewW / 2;
+        camera.y = player.y - viewH / 2;
+        camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - viewW));
+        camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - viewH));
 
         // Weapon Spawning
         weaponSpawnTimer -= dt;
@@ -541,13 +567,31 @@
             const dy = player.y - e.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            // Move towards player
-            let ex = (dx / dist) * e.speed * dt;
-            let ey = (dy / dist) * e.speed * dt;
-            
-            // Simple Enemy Collision (Slide)
-            if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
-            if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+            // AI Logic
+            if (e.state === 'chase') {
+                if (dist < 40) { // Close enough to attack
+                    e.state = 'attack';
+                    e.attackTimer = 0.5; // Windup
+                } else {
+                    let ex = (dx / dist) * e.speed * dt;
+                    let ey = (dy / dist) * e.speed * dt;
+                    if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
+                    if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+                }
+            } else if (e.state === 'attack') {
+                e.attackTimer -= dt;
+                if (e.attackTimer <= 0) {
+                    // Lunge!
+                    const lungeSpeed = 400;
+                    e.x += (dx / dist) * lungeSpeed * dt * 5; // Burst move
+                    e.y += (dy / dist) * lungeSpeed * dt * 5;
+                    e.state = 'cooldown';
+                    e.attackTimer = 1.0;
+                }
+            } else if (e.state === 'cooldown') {
+                e.attackTimer -= dt;
+                if (e.attackTimer <= 0) e.state = 'chase';
+            }
 
             // Animation
             e.frameTimer += dt;
@@ -556,9 +600,20 @@
                 e.frameTimer = 0;
             }
 
-            // Collision with Player
+            // Collision with Player (Damage)
             if (dist < player.radius + e.radius) {
-                gameOver();
+                if (player.invulnTimer <= 0) {
+                    player.hp -= 20;
+                    player.invulnTimer = 1.0; // 1 sec invuln
+                    createParticles(player.x, player.y, '#e74c3c');
+                    
+                    // Update HP Bar
+                    document.getElementById('hp-bar').style.width = player.hp + '%';
+                    
+                    if (player.hp <= 0) {
+                        gameOver();
+                    }
+                }
             }
 
             // Collision with Bullets
@@ -673,19 +728,22 @@
     }
 
     function draw() {
-        // Clear
         ctx.fillStyle = '#2c3e50';
         ctx.fillRect(0, 0, width, height);
 
         ctx.save();
+        
+        // Apply Zoom
+        ctx.scale(ZOOM, ZOOM);
         ctx.translate(-camera.x, -camera.y);
 
         // Draw Map
-        // Optimization: Only draw visible tiles
+        const viewW = width / ZOOM;
+        const viewH = height / ZOOM;
         const startCol = Math.floor(camera.x / TILE_SIZE);
-        const endCol = startCol + (width / TILE_SIZE) + 1;
+        const endCol = startCol + (viewW / TILE_SIZE) + 1;
         const startRow = Math.floor(camera.y / TILE_SIZE);
-        const endRow = startRow + (height / TILE_SIZE) + 1;
+        const endRow = startRow + (viewH / TILE_SIZE) + 1;
 
         for (let r = startRow; r <= endRow; r++) {
             for (let c = startCol; c <= endCol; c++) {
@@ -695,73 +753,55 @@
                 const y = r * TILE_SIZE;
 
                 if (tile === 0) {
-                    // Grass
                     ctx.fillStyle = '#27ae60';
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                    // Grid line
                     ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                     ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 } else if (tile === 1) {
-                    // Wall
                     ctx.fillStyle = '#7f8c8d';
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                    // 3D effect
                     ctx.fillStyle = '#95a5a6';
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 10);
-                } else if (tile === 2) {
-                    // Water
-                    ctx.fillStyle = '#3498db';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                 }
             }
         }
 
-        // Draw Ground Weapons
+        // Ground Weapons
         groundWeapons.forEach(w => {
             ctx.save();
             ctx.translate(w.x, w.y + w.floatOffset);
-            
-            // Glow
             ctx.shadowBlur = 15;
             ctx.shadowColor = w.data.color;
-            
-            // Icon
             ctx.fillStyle = '#2c3e50';
             ctx.beginPath();
             ctx.arc(0, 0, w.radius, 0, Math.PI*2);
             ctx.fill();
-            
             ctx.strokeStyle = w.data.color;
             ctx.lineWidth = 3;
             ctx.stroke();
-            
             ctx.shadowBlur = 0;
-            
-            // Name
             ctx.fillStyle = 'white';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(w.data.name, 0, w.radius + 18);
-            
             ctx.restore();
         });
 
-        // Draw Player
+        // Player
         ctx.save();
         ctx.translate(player.x, player.y);
         
-        // Determine Rotation Angle
+        // Invulnerability Blink
+        if (player.invulnTimer > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
+            ctx.globalAlpha = 0.5;
+        }
+
         let angle = 0;
         if (input.aim.active && (Math.abs(input.aim.x) > 0.1 || Math.abs(input.aim.y) > 0.1)) {
             angle = Math.atan2(input.aim.y, input.aim.x);
         } else if (player.isMoving) {
-            // If not aiming, face movement direction
-            // We need to reconstruct movement vector from input or last movement
-            // Using input.move is easiest
-            if (input.move.active) {
-                angle = Math.atan2(input.move.y, input.move.x);
-            } else {
-                // Keyboard fallback check
+            if (input.move.active) angle = Math.atan2(input.move.y, input.move.x);
+            else {
                 let kx = 0, ky = 0;
                 if (keys['KeyW'] || keys['ArrowUp']) ky = -1;
                 if (keys['KeyS'] || keys['ArrowDown']) ky = 1;
@@ -771,34 +811,11 @@
             }
         }
         
-        // Rotate
         ctx.rotate(angle);
-        
-        // Draw Sprite (Centered)
-        // Source X: player.frame * SPRITE_SIZE
-        // Source Y: 0
-        // Draw centered: -DRAW_SIZE/2
-        // Rotate 90 degrees? The sprite is drawn facing Right (East). 
-        // atan2(0,1) is 0. So facing right is 0. Correct.
-        
-        ctx.drawImage(
-            playerSprite, 
-            player.frame * SPRITE_SIZE, 0, SPRITE_SIZE, SPRITE_SIZE, 
-            -DRAW_SIZE/2, -DRAW_SIZE/2, DRAW_SIZE, DRAW_SIZE
-        );
-
-        // Aim Indicator (Optional now that we have rotation)
-        if (input.aim.active) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(20, 0); // Start from front of sprite
-            ctx.lineTo(50, 0);
-            ctx.stroke();
-        }
+        ctx.drawImage(playerSprite, player.frame * SPRITE_SIZE, 0, SPRITE_SIZE, SPRITE_SIZE, -DRAW_SIZE/2, -DRAW_SIZE/2, DRAW_SIZE, DRAW_SIZE);
         ctx.restore();
 
-        // Draw Enemies
+        // Enemies
         enemies.forEach(e => {
             ctx.save();
             ctx.translate(e.x, e.y);
@@ -809,25 +826,22 @@
             ctx.fillStyle = '#2ecc71';
             ctx.fillRect(-15, -e.radius - 10, 30 * (e.hp / e.maxHp), 4);
 
-            // Draw Sprite
-            // No rotation for enemies for now, they just face camera or wiggle
-            // Or we can rotate them towards player? Let's just draw them upright for clarity or rotate?
-            // Let's rotate them towards player
+            // Attack Windup Indicator
+            if (e.state === 'attack') {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, e.radius + 5, 0, Math.PI*2);
+                ctx.stroke();
+            }
+
             const angle = Math.atan2(player.y - e.y, player.x - e.x);
             ctx.rotate(angle);
-
-            // Draw
-            // Source Y depends on row (0 or 1)
-            ctx.drawImage(
-                enemySprite, 
-                e.frame * SPRITE_SIZE, e.row * SPRITE_SIZE, SPRITE_SIZE, SPRITE_SIZE, 
-                -e.radius * 1.5, -e.radius * 1.5, e.radius * 3, e.radius * 3
-            );
-            
+            ctx.drawImage(enemySprite, e.frame * SPRITE_SIZE, e.row * SPRITE_SIZE, SPRITE_SIZE, SPRITE_SIZE, -e.radius * 1.5, -e.radius * 1.5, e.radius * 3, e.radius * 3);
             ctx.restore();
         });
 
-        // Draw Bullets
+        // Bullets
         ctx.fillStyle = '#f1c40f';
         bullets.forEach(b => {
             ctx.beginPath();
@@ -835,7 +849,7 @@
             ctx.fill();
         });
 
-        // Draw Particles
+        // Particles
         particles.forEach(p => {
             ctx.globalAlpha = p.alpha;
             ctx.fillStyle = p.color;
@@ -845,13 +859,12 @@
             ctx.globalAlpha = 1;
         });
 
-        ctx.restore(); // End Camera Transform
+        ctx.restore(); // End Zoom/Camera
 
-        // Draw Joysticks (Visual Feedback)
+        // UI
         drawJoystick(input.move, 'left');
         drawJoystick(input.aim, 'right');
 
-        // Draw UI (Weapon Info)
         ctx.fillStyle = 'white';
         ctx.font = 'bold 18px Arial';
         ctx.textAlign = 'left';
@@ -914,6 +927,9 @@
         document.getElementById('scoreVal').textContent = '0';
         player.x = MAP_WIDTH / 2;
         player.y = MAP_HEIGHT / 2;
+        player.hp = 100;
+        player.invulnTimer = 0;
+        document.getElementById('hp-bar').style.width = '100%';
         player.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
         enemies = [];
         bullets = [];
@@ -923,6 +939,12 @@
         document.getElementById('gameOverScreen').style.display = 'none';
         lastTime = performance.now();
     }
+
+    // Button Listeners
+    document.getElementById('btn-retry').addEventListener('click', resetGame);
+    document.getElementById('btn-exit').addEventListener('click', () => {
+        window.location.href = 'index.html';
+    });
 
     // Start
     requestAnimationFrame(loop);
