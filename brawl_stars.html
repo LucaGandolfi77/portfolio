@@ -114,11 +114,99 @@
     let score = 0;
     let lastTime = 0;
 
+    // Map & Camera
+    const MAP_WIDTH = 2000;
+    const MAP_HEIGHT = 2000;
+    const TILE_SIZE = 50;
+    const COLS = Math.floor(MAP_WIDTH / TILE_SIZE);
+    const ROWS = Math.floor(MAP_HEIGHT / TILE_SIZE);
+    let map = []; // 0: Grass, 1: Wall, 2: Water
+    let camera = { x: 0, y: 0 };
+
+    function initMap() {
+        map = new Array(COLS * ROWS).fill(0);
+        // Add random obstacles (Walls)
+        for(let i=0; i<400; i++) {
+            const c = Math.floor(Math.random() * COLS);
+            const r = Math.floor(Math.random() * ROWS);
+            // Keep center clear
+            if (Math.abs(c - COLS/2) < 6 && Math.abs(r - ROWS/2) < 6) continue;
+            map[r * COLS + c] = 1; 
+        }
+        // Add water pools
+        for(let i=0; i<20; i++) {
+            let c = Math.floor(Math.random() * (COLS-5));
+            let r = Math.floor(Math.random() * (ROWS-5));
+            if (Math.abs(c - COLS/2) < 6 && Math.abs(r - ROWS/2) < 6) continue;
+            
+            for(let y=0; y<5; y++) {
+                for(let x=0; x<5; x++) {
+                    if(Math.random() > 0.2) map[(r+y) * COLS + (c+x)] = 2;
+                }
+            }
+        }
+    }
+    initMap();
+
+    function getTileAt(x, y) {
+        const c = Math.floor(x / TILE_SIZE);
+        const r = Math.floor(y / TILE_SIZE);
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return 1; // Out of bounds is wall
+        return map[r * COLS + c];
+    }
+
+    function isSolid(x, y) {
+        const t = getTileAt(x, y);
+        return t === 1 || t === 2; // Wall or Water
+    }
+
+    function checkCollision(x, y, radius) {
+        // Check 4 points around the circle
+        if (isSolid(x + radius, y)) return true;
+        if (isSolid(x - radius, y)) return true;
+        if (isSolid(x, y + radius)) return true;
+        if (isSolid(x, y - radius)) return true;
+        return false;
+    }
+
+    // Weapon Definitions
+    const WEAPONS = {
+        Fists: { name: 'Fists', damage: 15, delay: 0.3, range: 100, ammo: Infinity, count: 1, spread: 0, speed: 0, color: '#f1c40f', type: 'melee' },
+        Peacemaker: { name: 'Peacemaker', damage: 7, delay: 0.5, range: 400, ammo: 30, count: 1, spread: 0.05, speed: 600, color: '#bdc3c7', type: 'gun' },
+        AssaultRifle: { name: 'Assault Rifle', damage: 8, delay: 0.2, range: 500, ammo: 30, count: 1, spread: 0.1, speed: 700, color: '#7f8c8d', type: 'gun' },
+        SMG: { name: 'SMG', damage: 6, delay: 0.15, range: 450, ammo: 40, count: 1, spread: 0.25, speed: 700, color: '#95a5a6', type: 'gun' },
+        Shotgun: { name: 'Shotgun', damage: 8, delay: 1.4, range: 250, ammo: 8, count: 4, spread: 0.4, speed: 550, color: '#34495e', type: 'gun' },
+        Sniper: { name: 'Sniper', damage: 25, delay: 0.83, range: 800, ammo: 5, count: 1, spread: 0, speed: 1000, color: '#2c3e50', type: 'gun' },
+        DoubleBarrel: { name: 'Double-Barrel', damage: 10, delay: 0.66, range: 350, ammo: 10, count: 2, spread: 0.15, speed: 600, color: '#5d6d7e', type: 'gun' },
+        Scar: { name: 'Scar', damage: 12, delay: 0.35, range: 500, ammo: 25, count: 1, spread: 0.05, speed: 750, color: '#d35400', type: 'gun' },
+        Kar99: { name: 'Kar99', damage: 40, delay: 1.77, range: 800, ammo: 5, count: 1, spread: 0, speed: 1000, color: '#8e44ad', type: 'gun' },
+        Minigun: { name: 'Minigun', damage: 12, delay: 0.08, range: 500, ammo: 100, count: 1, spread: 0.3, speed: 700, color: '#c0392b', type: 'gun' },
+        Bazooka: { name: 'Bazooka', damage: 75, delay: 2.0, range: 600, ammo: 3, count: 1, spread: 0, speed: 400, radius: 10, explosive: true, color: '#27ae60', type: 'gun' },
+        Quadzooka: { name: 'Quadzooka', damage: 22, delay: 0.5, range: 500, ammo: 12, count: 1, spread: 0.1, speed: 450, radius: 8, explosive: true, color: '#16a085', type: 'gun' }
+    };
+
     // Entities
-    const player = { x: 0, y: 0, radius: 20, speed: 300, color: '#3498db', hp: 100, maxHp: 100 };
+    const player = { 
+        x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2, radius: 20, speed: 300, color: '#3498db', hp: 100, maxHp: 100,
+        weapon: { ...WEAPONS.Fists, currentAmmo: Infinity },
+        frame: 0,
+        frameTimer: 0,
+        isMoving: false
+    };
+    
+    // Sprites
+    const playerSprite = new Image();
+    playerSprite.src = 'assets/sprites/player_sheet.png';
+    const enemySprite = new Image();
+    enemySprite.src = 'assets/sprites/enemy_sheet.png';
+    
+    const SPRITE_SIZE = 64; // Source size
+    const DRAW_SIZE = 64;   // Destination size
+
     let bullets = [];
     let enemies = [];
     let particles = [];
+    let groundWeapons = [];
     
     // Input State
     const input = {
@@ -128,22 +216,16 @@
     };
 
     // Config
-    const SHOOT_DELAY = 0.2; // Seconds
-    const BULLET_SPEED = 600;
     const ENEMY_SPAWN_RATE = 1.5;
     let enemySpawnTimer = 0;
+    const WEAPON_SPAWN_RATE = 5.0;
+    let weaponSpawnTimer = WEAPON_SPAWN_RATE;
 
     function resize() {
         width = window.innerWidth;
         height = window.innerHeight;
         canvas.width = width;
         canvas.height = height;
-        
-        // Reset player pos if out of bounds or init
-        if (player.x === 0 && player.y === 0) {
-            player.x = width / 2;
-            player.y = height / 2;
-        }
     }
     window.addEventListener('resize', resize);
     resize();
@@ -264,18 +346,79 @@
         let x, y;
         const buffer = 50;
         
-        if (side === 0) { x = Math.random() * width; y = -buffer; }
-        else if (side === 1) { x = width + buffer; y = Math.random() * height; }
-        else if (side === 2) { x = Math.random() * width; y = height + buffer; }
-        else { x = -buffer; y = Math.random() * height; }
+        // Spawn relative to camera view, but outside
+        const viewX = camera.x;
+        const viewY = camera.y;
+        const viewW = width;
+        const viewH = height;
+
+        if (side === 0) { x = viewX + Math.random() * viewW; y = viewY - buffer; }
+        else if (side === 1) { x = viewX + viewW + buffer; y = viewY + Math.random() * viewH; }
+        else if (side === 2) { x = viewX + Math.random() * viewW; y = viewY + viewH + buffer; }
+        else { x = viewX - buffer; y = viewY + Math.random() * viewH; }
+
+        // Ensure valid spawn (not in wall)
+        if (isSolid(x, y)) return; // Skip if invalid
+
+        // Ensure not too close to player (Safety check)
+        const distToPlayer = Math.sqrt((x - player.x) ** 2 + (y - player.y) ** 2);
+        if (distToPlayer < 400) return;
+
+        // Determine Type
+        const isTank = Math.random() < 0.25; // 25% chance for Tank
+        
+        let type, speed, hp, radius, row;
+        
+        if (isTank) {
+            type = 'tank';
+            speed = 60 + Math.random() * 20; // Slow
+            hp = 100 + (score * 10);         // High HP
+            radius = 25;
+            row = 1; // 2nd row in sprite sheet
+        } else {
+            type = 'normal';
+            speed = 120 + Math.random() * 40 + (score * 2); // Fast
+            hp = 30 + (score * 5);                          // Low HP
+            radius = 18;
+            row = 0; // 1st row
+        }
 
         enemies.push({
             x: x,
             y: y,
+            radius: radius,
+            speed: speed,
+            hp: hp,
+            maxHp: hp,
+            type: type,
+            row: row,
+            frame: 0,
+            frameTimer: 0
+        });
+    }
+
+    function spawnWeapon() {
+        const keys = Object.keys(WEAPONS);
+        const spawnableKeys = keys.filter(k => k !== 'Fists');
+        const randomKey = spawnableKeys[Math.floor(Math.random() * spawnableKeys.length)];
+        const template = WEAPONS[randomKey];
+        
+        let x, y;
+        let attempts = 0;
+        do {
+            x = Math.random() * MAP_WIDTH;
+            y = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(x, y) && attempts < 10);
+
+        if (attempts >= 10) return;
+
+        groundWeapons.push({
+            x: x,
+            y: y,
             radius: 15,
-            speed: 100 + Math.random() * 50 + (score * 2), // Get faster
-            hp: 30 + (score * 5),
-            color: '#e74c3c'
+            data: template,
+            floatOffset: 0
         });
     }
 
@@ -283,47 +426,89 @@
         if (!gameRunning) return;
 
         // Player Movement (Touch)
+        let dx = 0, dy = 0;
         if (input.move.active) {
-            player.x += input.move.x * player.speed * dt;
-            player.y += input.move.y * player.speed * dt;
-        }
-        
-        // Player Movement (Keyboard Fallback)
-        if (!input.move.active) {
-            let dx = 0, dy = 0;
-            if (keys['KeyW'] || keys['ArrowUp']) dy = -1;
-            if (keys['KeyS'] || keys['ArrowDown']) dy = 1;
-            if (keys['KeyA'] || keys['ArrowLeft']) dx = -1;
-            if (keys['KeyD'] || keys['ArrowRight']) dx = 1;
+            dx = input.move.x * player.speed * dt;
+            dy = input.move.y * player.speed * dt;
+        } else {
+            // Keyboard
+            let kx = 0, ky = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) ky = -1;
+            if (keys['KeyS'] || keys['ArrowDown']) ky = 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) kx = -1;
+            if (keys['KeyD'] || keys['ArrowRight']) kx = 1;
             
-            if (dx !== 0 || dy !== 0) {
-                const len = Math.sqrt(dx*dx + dy*dy);
-                player.x += (dx/len) * player.speed * dt;
-                player.y += (dy/len) * player.speed * dt;
+            if (kx !== 0 || ky !== 0) {
+                const len = Math.sqrt(kx*kx + ky*ky);
+                dx = (kx/len) * player.speed * dt;
+                dy = (ky/len) * player.speed * dt;
             }
         }
 
-        // Clamp Player
-        player.x = Math.max(player.radius, Math.min(width - player.radius, player.x));
-        player.y = Math.max(player.radius, Math.min(height - player.radius, player.y));
+        // Apply Movement with Collision (X axis)
+        let nextX = player.x + dx;
+        if (!checkCollision(nextX, player.y, player.radius)) {
+            player.x = nextX;
+        }
+
+        // Apply Movement with Collision (Y axis)
+        let nextY = player.y + dy;
+        if (!checkCollision(player.x, nextY, player.radius)) {
+            player.y = nextY;
+        }
+
+        // Animation State
+        player.isMoving = (dx !== 0 || dy !== 0);
+        if (player.isMoving) {
+            player.frameTimer += dt;
+            if (player.frameTimer > 0.1) { // 100ms per frame
+                player.frame = (player.frame + 1) % 4;
+                player.frameTimer = 0;
+            }
+        } else {
+            player.frame = 0; // Idle
+        }
+
+        // Clamp Player to Map
+        player.x = Math.max(player.radius, Math.min(MAP_WIDTH - player.radius, player.x));
+        player.y = Math.max(player.radius, Math.min(MAP_HEIGHT - player.radius, player.y));
+
+        // Update Camera
+        camera.x = player.x - width / 2;
+        camera.y = player.y - height / 2;
+        camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - width));
+        camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - height));
+
+        // Weapon Spawning
+        weaponSpawnTimer -= dt;
+        if (weaponSpawnTimer <= 0) {
+            spawnWeapon();
+            weaponSpawnTimer = WEAPON_SPAWN_RATE + Math.random() * 5;
+        }
+
+        // Weapon Pickup
+        for (let i = groundWeapons.length - 1; i >= 0; i--) {
+            const w = groundWeapons[i];
+            w.floatOffset = Math.sin(Date.now() / 200) * 5;
+            
+            const dx = player.x - w.x;
+            const dy = player.y - w.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < player.radius + w.radius) {
+                player.weapon = { ...w.data, currentAmmo: w.data.ammo };
+                groundWeapons.splice(i, 1);
+                createParticles(player.x, player.y, '#fff');
+            }
+        }
 
         // Shooting
         input.shootTimer -= dt;
-        // Auto shoot if aiming stick is pushed
         const isAiming = input.aim.active && (Math.abs(input.aim.x) > 0.1 || Math.abs(input.aim.y) > 0.1);
-        // Or mouse click
         const isMouseShooting = isMouseDown && !('ontouchstart' in window);
 
         if ((isAiming || isMouseShooting) && input.shootTimer <= 0) {
-            bullets.push({
-                x: player.x,
-                y: player.y,
-                vx: input.aim.x * BULLET_SPEED,
-                vy: input.aim.y * BULLET_SPEED,
-                radius: 5,
-                life: 2
-            });
-            input.shootTimer = SHOOT_DELAY;
+            fireWeapon();
         }
 
         // Update Bullets
@@ -332,6 +517,13 @@
             b.x += b.vx * dt;
             b.y += b.vy * dt;
             b.life -= dt;
+            
+            // Bullet Wall Collision
+            if (isSolid(b.x, b.y)) {
+                b.life = 0;
+                createParticles(b.x, b.y, '#bdc3c7');
+            }
+
             if (b.life <= 0) bullets.splice(i, 1);
         }
 
@@ -350,8 +542,19 @@
             const dist = Math.sqrt(dx*dx + dy*dy);
             
             // Move towards player
-            e.x += (dx / dist) * e.speed * dt;
-            e.y += (dy / dist) * e.speed * dt;
+            let ex = (dx / dist) * e.speed * dt;
+            let ey = (dy / dist) * e.speed * dt;
+            
+            // Simple Enemy Collision (Slide)
+            if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
+            if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+
+            // Animation
+            e.frameTimer += dt;
+            if (e.frameTimer > 0.15) {
+                e.frame = (e.frame + 1) % 4;
+                e.frameTimer = 0;
+            }
 
             // Collision with Player
             if (dist < player.radius + e.radius) {
@@ -367,15 +570,21 @@
                 
                 if (bdist < e.radius + b.radius) {
                     // Hit
-                    e.hp -= 20;
-                    bullets.splice(j, 1);
+                    e.hp -= b.damage;
+                    
+                    if (!b.explosive && !b.isMelee) {
+                        bullets.splice(j, 1);
+                    }
+                    
                     createParticles(e.x, e.y, '#fff');
                     
                     if (e.hp <= 0) {
                         enemies.splice(i, 1);
                         score++;
                         document.getElementById('scoreVal').textContent = score;
-                        createParticles(e.x, e.y, e.color);
+                        // Color based on type for particles
+                        const pColor = e.type === 'tank' ? '#8e44ad' : '#e74c3c';
+                        createParticles(e.x, e.y, pColor);
                     }
                     break;
                 }
@@ -390,6 +599,60 @@
             p.life -= dt;
             p.alpha = p.life / 0.5;
             if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function fireWeapon() {
+        const w = player.weapon;
+        
+        if (w.currentAmmo <= 0 && w.name !== 'Fists') {
+            player.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
+            return;
+        }
+
+        if (w.name !== 'Fists') {
+            w.currentAmmo--;
+        }
+
+        input.shootTimer = w.delay;
+
+        let aimAngle = Math.atan2(input.aim.y, input.aim.x);
+        
+        // Melee Logic
+        if (w.type === 'melee') {
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                vx: input.aim.x * 300,
+                vy: input.aim.y * 300,
+                radius: 15,
+                life: 0.15,
+                damage: w.damage,
+                color: 'transparent',
+                isMelee: true
+            });
+            createParticles(player.x + input.aim.x * 30, player.y + input.aim.y * 30, '#f1c40f');
+            return;
+        }
+
+        // Gun Logic
+        for (let i = 0; i < w.count; i++) {
+            const spread = (Math.random() - 0.5) * w.spread;
+            const angle = aimAngle + spread;
+            const vx = Math.cos(angle) * w.speed;
+            const vy = Math.sin(angle) * w.speed;
+            
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                vx: vx,
+                vy: vy,
+                radius: w.radius || 5,
+                life: w.range / w.speed,
+                damage: w.damage,
+                explosive: w.explosive || false,
+                color: w.color
+            });
         }
     }
 
@@ -414,47 +677,154 @@
         ctx.fillStyle = '#2c3e50';
         ctx.fillRect(0, 0, width, height);
 
-        // Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        ctx.lineWidth = 1;
-        const gridSize = 50;
-        for (let x = 0; x < width; x += gridSize) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+
+        // Draw Map
+        // Optimization: Only draw visible tiles
+        const startCol = Math.floor(camera.x / TILE_SIZE);
+        const endCol = startCol + (width / TILE_SIZE) + 1;
+        const startRow = Math.floor(camera.y / TILE_SIZE);
+        const endRow = startRow + (height / TILE_SIZE) + 1;
+
+        for (let r = startRow; r <= endRow; r++) {
+            for (let c = startCol; c <= endCol; c++) {
+                if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+                const tile = map[r * COLS + c];
+                const x = c * TILE_SIZE;
+                const y = r * TILE_SIZE;
+
+                if (tile === 0) {
+                    // Grass
+                    ctx.fillStyle = '#27ae60';
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    // Grid line
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                } else if (tile === 1) {
+                    // Wall
+                    ctx.fillStyle = '#7f8c8d';
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    // 3D effect
+                    ctx.fillStyle = '#95a5a6';
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 10);
+                } else if (tile === 2) {
+                    // Water
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                }
+            }
         }
-        for (let y = 0; y < height; y += gridSize) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
-        }
+
+        // Draw Ground Weapons
+        groundWeapons.forEach(w => {
+            ctx.save();
+            ctx.translate(w.x, w.y + w.floatOffset);
+            
+            // Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = w.data.color;
+            
+            // Icon
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.arc(0, 0, w.radius, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.strokeStyle = w.data.color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0;
+            
+            // Name
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(w.data.name, 0, w.radius + 18);
+            
+            ctx.restore();
+        });
 
         // Draw Player
         ctx.save();
         ctx.translate(player.x, player.y);
-        // Body
-        ctx.fillStyle = player.color;
-        ctx.beginPath();
-        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-        ctx.fill();
-        // Aim Indicator
+        
+        // Determine Rotation Angle
+        let angle = 0;
+        if (input.aim.active && (Math.abs(input.aim.x) > 0.1 || Math.abs(input.aim.y) > 0.1)) {
+            angle = Math.atan2(input.aim.y, input.aim.x);
+        } else if (player.isMoving) {
+            // If not aiming, face movement direction
+            // We need to reconstruct movement vector from input or last movement
+            // Using input.move is easiest
+            if (input.move.active) {
+                angle = Math.atan2(input.move.y, input.move.x);
+            } else {
+                // Keyboard fallback check
+                let kx = 0, ky = 0;
+                if (keys['KeyW'] || keys['ArrowUp']) ky = -1;
+                if (keys['KeyS'] || keys['ArrowDown']) ky = 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) kx = -1;
+                if (keys['KeyD'] || keys['ArrowRight']) kx = 1;
+                if (kx !== 0 || ky !== 0) angle = Math.atan2(ky, kx);
+            }
+        }
+        
+        // Rotate
+        ctx.rotate(angle);
+        
+        // Draw Sprite (Centered)
+        // Source X: player.frame * SPRITE_SIZE
+        // Source Y: 0
+        // Draw centered: -DRAW_SIZE/2
+        // Rotate 90 degrees? The sprite is drawn facing Right (East). 
+        // atan2(0,1) is 0. So facing right is 0. Correct.
+        
+        ctx.drawImage(
+            playerSprite, 
+            player.frame * SPRITE_SIZE, 0, SPRITE_SIZE, SPRITE_SIZE, 
+            -DRAW_SIZE/2, -DRAW_SIZE/2, DRAW_SIZE, DRAW_SIZE
+        );
+
+        // Aim Indicator (Optional now that we have rotation)
         if (input.aim.active) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(input.aim.x * 50, input.aim.y * 50);
+            ctx.moveTo(20, 0); // Start from front of sprite
+            ctx.lineTo(50, 0);
             ctx.stroke();
         }
         ctx.restore();
 
         // Draw Enemies
         enemies.forEach(e => {
-            ctx.fillStyle = e.color;
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            
             // HP Bar
             ctx.fillStyle = 'red';
-            ctx.fillRect(e.x - 10, e.y - 25, 20, 4);
+            ctx.fillRect(-15, -e.radius - 10, 30, 4);
             ctx.fillStyle = '#2ecc71';
-            ctx.fillRect(e.x - 10, e.y - 25, 20 * (e.hp / (30 + score*5)), 4);
+            ctx.fillRect(-15, -e.radius - 10, 30 * (e.hp / e.maxHp), 4);
+
+            // Draw Sprite
+            // No rotation for enemies for now, they just face camera or wiggle
+            // Or we can rotate them towards player? Let's just draw them upright for clarity or rotate?
+            // Let's rotate them towards player
+            const angle = Math.atan2(player.y - e.y, player.x - e.x);
+            ctx.rotate(angle);
+
+            // Draw
+            // Source Y depends on row (0 or 1)
+            ctx.drawImage(
+                enemySprite, 
+                e.frame * SPRITE_SIZE, e.row * SPRITE_SIZE, SPRITE_SIZE, SPRITE_SIZE, 
+                -e.radius * 1.5, -e.radius * 1.5, e.radius * 3, e.radius * 3
+            );
+            
+            ctx.restore();
         });
 
         // Draw Bullets
@@ -475,9 +845,22 @@
             ctx.globalAlpha = 1;
         });
 
+        ctx.restore(); // End Camera Transform
+
         // Draw Joysticks (Visual Feedback)
         drawJoystick(input.move, 'left');
         drawJoystick(input.aim, 'right');
+
+        // Draw UI (Weapon Info)
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'left';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`Weapon: ${player.weapon.name}`, 20, 40);
+        const ammoText = player.weapon.currentAmmo === Infinity ? '∞' : player.weapon.currentAmmo;
+        ctx.fillText(`Ammo: ${ammoText}`, 20, 65);
+        ctx.shadowBlur = 0;
     }
 
     function drawJoystick(stick, side) {
@@ -529,11 +912,13 @@
     function resetGame() {
         score = 0;
         document.getElementById('scoreVal').textContent = '0';
-        player.x = width / 2;
-        player.y = height / 2;
+        player.x = MAP_WIDTH / 2;
+        player.y = MAP_HEIGHT / 2;
+        player.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
         enemies = [];
         bullets = [];
         particles = [];
+        groundWeapons = [];
         gameRunning = true;
         document.getElementById('gameOverScreen').style.display = 'none';
         lastTime = performance.now();
