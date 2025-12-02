@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Universal Reader — Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <style>
+        :root { --bg: #0f1724; --card: #1a2639; --accent: #00d4ff; --text: #e2e8f0; --text-muted: #94a3b8; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        h1 { margin: 0; font-size: 1.5rem; color: white; }
+        .back-link { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+        
+        .controls-area { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-muted); font-size: 0.9rem; }
+        
+        textarea { width: 100%; height: 150px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; padding: 12px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+        textarea:focus { outline: none; border-color: var(--accent); }
+        
+        .file-upload { position: relative; overflow: hidden; display: inline-block; }
+        .btn { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+        
+        .tts-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
+        select { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px; border-radius: 6px; max-width: 200px; }
+        
+        #viewer { flex: 1; background: white; color: black; border-radius: 8px; overflow: hidden; min-height: 400px; display: none; position: relative; }
+        #viewer.active { display: block; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .tab { background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
+        .tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        .hidden { display: none; }
+        
+        /* EPUB specific overrides */
+        .epub-container { height: 100%; }
+        
+        @media (max-width: 600px) {
+            .tts-controls { flex-direction: column; align-items: stretch; }
+            select { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <a href="technology.html" class="back-link">← Back to Technology</a>
+        <h1>Universal Reader</h1>
+    </header>
+
+    <div class="controls-area">
+        <div class="tabs">
+            <button class="tab active" onclick="switchMode('text')">Paste Text</button>
+            <button class="tab" onclick="switchMode('epub')">Upload EPUB</button>
+        </div>
+
+        <div id="text-mode" class="mode-content">
+            <div class="input-group">
+                <label for="text-input">Paste your text here:</label>
+                <textarea id="text-input" placeholder="Paste text to read..."></textarea>
+            </div>
+        </div>
+
+        <div id="epub-mode" class="mode-content hidden">
+            <div class="input-group">
+                <label for="file-input">Choose an EPUB file:</label>
+                <input type="file" id="file-input" accept=".epub" style="color: white;">
+            </div>
+        </div>
+
+        <div class="tts-controls">
+            <select id="voice-select"><option value="">Loading voices...</option></select>
+            <button class="btn" id="play-btn">▶ Play</button>
+            <button class="btn btn-secondary" id="pause-btn">⏸ Pause</button>
+            <button class="btn btn-secondary" id="stop-btn">⏹ Stop</button>
+        </div>
+    </div>
+
+    <div id="viewer"></div>
+</div>
+
+<script>
+    // State
+    let currentMode = 'text';
+    let book = null;
+    let rendition = null;
+    let synth = window.speechSynthesis;
+    let voices = [];
+    let currentUtterance = null;
+    let isPaused = false;
+
+    // DOM Elements
+    const textInput = document.getElementById('text-input');
+    const fileInput = document.getElementById('file-input');
+    const voiceSelect = document.getElementById('voice-select');
+    const playBtn = document.getElementById('play-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const viewer = document.getElementById('viewer');
+
+    // Initialize Voices
+    function loadVoices() {
+        voices = synth.getVoices();
+        voiceSelect.innerHTML = '';
+        voices.forEach((voice, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${voice.name} (${voice.lang})`;
+            if (voice.default) option.selected = true;
+            voiceSelect.appendChild(option);
+        });
+    }
+    
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    loadVoices();
+
+    // Mode Switching
+    window.switchMode = (mode) => {
+        currentMode = mode;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.mode-content').forEach(c => c.classList.add('hidden'));
+        
+        if (mode === 'text') {
+            document.querySelector('.tab:nth-child(1)').classList.add('active');
+            document.getElementById('text-mode').classList.remove('hidden');
+            viewer.classList.remove('active');
+            stopReading();
+        } else {
+            document.querySelector('.tab:nth-child(2)').classList.add('active');
+            document.getElementById('epub-mode').classList.remove('hidden');
+            viewer.classList.add('active');
+            stopReading();
+        }
+    };
+
+    // EPUB Handling
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (window.FileReader && file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (book) { book.destroy(); }
+                book = ePub(e.target.result);
+                rendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "scrolled-doc" });
+                rendition.display();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    });
+
+    // TTS Logic
+    function getTextToRead() {
+        if (currentMode === 'text') {
+            return Promise.resolve(textInput.value);
+        } else if (currentMode === 'epub' && rendition) {
+            // Get current visible text from EPUB
+            // This is complex in epub.js, simplifying to read current chapter text
+            // A robust implementation would need to handle pagination and chapter navigation
+            // For this demo, we'll try to get text from the current location
+            const currentLocation = rendition.currentLocation();
+            if (currentLocation && currentLocation.start) {
+                 return book.getRange(currentLocation.start.cfi).then(range => {
+                     return range.toString();
+                 });
+            }
+            // Fallback: try to get text from the whole chapter if possible, or just alert
+            return Promise.resolve("Please load an EPUB and navigate to a page.");
+        }
+        return Promise.resolve("");
+    }
+
+    // Improved EPUB Text Extraction for TTS
+    // We will hook into the rendition to get text. 
+    // Note: Reading a whole book is hard. We will read the current chapter/section.
+    
+    playBtn.addEventListener('click', () => {
+        if (isPaused) {
+            synth.resume();
+            isPaused = false;
+            return;
+        }
+        
+        stopReading();
+
+        if (currentMode === 'text') {
+            const text = textInput.value;
+            if (text) speak(text);
+        } else if (currentMode === 'epub' && book) {
+            // Get text from the current chapter/section
+            const visible = rendition.currentLocation();
+            if(visible && visible.start) {
+                // Get the spine item (chapter)
+                const item = book.spine.get(visible.start.index);
+                item.load(book.load.bind(book)).then(contents => {
+                    // Extract text from the chapter content
+                    // contents is usually a Document object
+                    let text = "";
+                    if (contents.body) {
+                        text = contents.body.innerText || contents.body.textContent;
+                    } else {
+                        text = contents.innerText || contents.textContent;
+                    }
+                    speak(text);
+                });
+            }
+        }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+        if (synth.speaking && !isPaused) {
+            synth.pause();
+            isPaused = true;
+        }
+    });
+
+    stopBtn.addEventListener('click', stopReading);
+
+    function stopReading() {
+        synth.cancel();
+        isPaused = false;
+    }
+
+    function speak(text) {
+        if (!text) return;
+        
+        // Chunking text because some browsers stop after a few seconds of long text
+        // Simple chunking by punctuation
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+        
+        // For simplicity in this demo, we just feed the whole text. 
+        // Chrome has a bug where it stops after ~15 seconds if the text is too long.
+        // A production reader would queue sentences.
+        
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        const selectedVoiceIndex = voiceSelect.value;
+        if (selectedVoiceIndex) {
+            currentUtterance.voice = voices[selectedVoiceIndex];
+        }
+        
+        // Fix for Chrome long text bug: resume periodically
+        const resumeInfinity = () => {
+            window.speechSynthesis.resume();
+            timeoutResumeInfinity = setTimeout(resumeInfinity, 10000);
+        }
+        let timeoutResumeInfinity;
+        
+        currentUtterance.onstart = () => {
+            resumeInfinity();
+        };
+        
+        currentUtterance.onend = () => {
+            clearTimeout(timeoutResumeInfinity);
+            isPaused = false;
+        };
+        
+        currentUtterance.onerror = () => {
+            clearTimeout(timeoutResumeInfinity);
+            isPaused = false;
+        };
+
+        synth.speak(currentUtterance);
+    }
+
+</script>
+</body>
+</html>
