@@ -45,8 +45,8 @@ function initMap() {
                 }
             }
 
-            // Random Obstacles (15% chance)
-            if (Math.random() < 0.15) {
+            // Random Obstacles (8% chance)
+            if (Math.random() < 0.08) {
                 map[r * COLS + c] = wall;
             } else {
                 map[r * COLS + c] = floor;
