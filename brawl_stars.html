@@ -84,6 +84,43 @@
             transition: width 0.2s;
         }
         
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(44, 62, 80, 1);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        .mode-btn {
+            width: 200px;
+            margin: 10px;
+            padding: 20px;
+            font-size: 24px;
+            background: #3498db;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .mode-btn:active {
+            transform: scale(0.95);
+        }
+        .mode-desc {
+            font-size: 14px;
+            color: #bdc3c7;
+            margin-bottom: 20px;
+            max-width: 300px;
+            text-align: center;
+        }
+
         #gameOverScreen {
             display: none;
             position: absolute;
@@ -144,6 +181,16 @@
         <!-- Touch Zones for Joysticks -->
         <div id="stick-left" class="joystick-zone"></div>
         <div id="stick-right" class="joystick-zone"></div>
+    </div>
+
+    <div id="startScreen">
+        <h1>BRAWL ARENA</h1>
+        
+        <button class="mode-btn" onclick="startGame('npc')">VS NPC</button>
+        <div class="mode-desc">Survive waves of zombies and tanks!</div>
+
+        <button class="mode-btn" style="background: #8e44ad;" onclick="startGame('bot')">VS BOT</button>
+        <div class="mode-desc">Battle Royale: 20 Bots, Looting, Zone Damage. Be the last one standing!</div>
     </div>
 
     <div id="gameOverScreen">
@@ -367,6 +414,154 @@
     let weaponSpawnTimer = WEAPON_SPAWN_RATE;
     const POWERUP_SPAWN_RATE = 10;
     let powerupSpawnTimer = POWERUP_SPAWN_RATE;
+    
+    let gameMode = 'npc'; // 'npc' or 'bot'
+
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('startScreen').style.display = 'none';
+        resetGame();
+    }
+
+    function spawnBot() {
+        let x, y, attempts = 0;
+        do {
+            x = Math.random() * MAP_WIDTH;
+            y = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(x, y) && attempts < 100);
+        
+        enemies.push({
+            x: x, y: y, radius: 15, speed: 100 + Math.random() * 50,
+            hp: 100, maxHp: 100,
+            type: 'bot',
+            weapon: { ...WEAPONS.Fists, currentAmmo: Infinity },
+            shootTimer: 0,
+            target: null,
+            state: 'idle',
+            frame: 0, frameTimer: 0, row: 0 // Use normal sprite row
+        });
+    }
+
+    function updateBotAI(bot, dt) {
+        // Zone Damage
+        const dx = bot.x - zone.x;
+        const dy = bot.y - zone.y;
+        const distToZone = Math.sqrt(dx*dx + dy*dy);
+        if (distToZone > zone.radius) {
+            bot.hp -= 10 * dt;
+            // Will be cleaned up in main loop if dies
+        }
+
+        bot.shootTimer -= dt;
+
+        // Find Target (Player or other Bot)
+        let target = null;
+        let minDist = Infinity;
+
+        // Check Player
+        const dPlayer = Math.sqrt((player.x - bot.x)**2 + (player.y - bot.y)**2);
+        if (dPlayer < 600) {
+            target = player;
+            minDist = dPlayer;
+        }
+
+        // Check other Bots
+        enemies.forEach(other => {
+            if (other === bot) return;
+            const d = Math.sqrt((other.x - bot.x)**2 + (other.y - bot.y)**2);
+            if (d < 600 && d < minDist) {
+                target = other;
+                minDist = d;
+            }
+        });
+
+        // Behavior
+        if (bot.weapon.name === 'Fists') {
+            // Look for weapon
+            let nearestWeapon = null;
+            let minWDist = Infinity;
+            groundWeapons.forEach(w => {
+                const d = Math.sqrt((w.x - bot.x)**2 + (w.y - bot.y)**2);
+                if (d < minWDist) {
+                    minWDist = d;
+                    nearestWeapon = w;
+                }
+            });
+
+            if (nearestWeapon && minWDist < 500) {
+                // Move to weapon
+                moveTo(bot, nearestWeapon.x, nearestWeapon.y, dt);
+                // Pickup logic
+                if (minWDist < bot.radius + nearestWeapon.radius) {
+                    bot.weapon = { ...nearestWeapon.data, currentAmmo: nearestWeapon.data.ammo };
+                    // Remove weapon from ground
+                    const idx = groundWeapons.indexOf(nearestWeapon);
+                    if (idx > -1) groundWeapons.splice(idx, 1);
+                }
+            } else if (target) {
+                // Attack with fists
+                moveTo(bot, target.x, target.y, dt);
+                if (minDist < 50 && bot.shootTimer <= 0) {
+                    fireWeapon(bot, target.x - bot.x, target.y - bot.y);
+                }
+            } else {
+                // Wander
+                wander(bot, dt);
+            }
+        } else {
+            // Has Weapon
+            if (target) {
+                // Move to range
+                if (minDist > 300) {
+                    moveTo(bot, target.x, target.y, dt);
+                } else {
+                    // Strafe / Stop?
+                    // Just stop to shoot for now
+                }
+                
+                // Shoot
+                if (bot.shootTimer <= 0) {
+                    // Aim with some error
+                    const aimX = (target.x - bot.x) + (Math.random()-0.5)*50;
+                    const aimY = (target.y - bot.y) + (Math.random()-0.5)*50;
+                    fireWeapon(bot, aimX, aimY);
+                }
+            } else {
+                wander(bot, dt);
+            }
+        }
+    }
+
+    function moveTo(bot, tx, ty, dt) {
+        const dx = tx - bot.x;
+        const dy = ty - bot.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 0) {
+            const moveX = (dx/dist) * bot.speed * dt;
+            const moveY = (dy/dist) * bot.speed * dt;
+            if (!checkCollision(bot.x + moveX, bot.y, bot.radius)) bot.x += moveX;
+            if (!checkCollision(bot.x, bot.y + moveY, bot.radius)) bot.y += moveY;
+            bot.isMoving = true;
+        }
+    }
+
+    function wander(bot, dt) {
+        // Simple random walk
+        if (Math.random() < 0.02) {
+            bot.wanderAngle = Math.random() * Math.PI * 2;
+        }
+        if (bot.wanderAngle === undefined) bot.wanderAngle = 0;
+        
+        const moveX = Math.cos(bot.wanderAngle) * bot.speed * 0.5 * dt;
+        const moveY = Math.sin(bot.wanderAngle) * bot.speed * 0.5 * dt;
+        
+        if (!checkCollision(bot.x + moveX, bot.y, bot.radius)) bot.x += moveX;
+        else bot.wanderAngle += Math.PI; // Bounce
+        
+        if (!checkCollision(bot.x, bot.y + moveY, bot.radius)) bot.y += moveY;
+        else bot.wanderAngle += Math.PI;
+    }
 
     function resize() {
         width = window.innerWidth;
@@ -674,7 +869,7 @@
         const isMouseShooting = isMouseDown && !('ontouchstart' in window);
 
         if ((isAiming || isMouseShooting) && input.shootTimer <= 0) {
-            fireWeapon();
+            fireWeapon(player, input.aim.x, input.aim.y);
         }
 
         // Update Bullets
@@ -690,47 +885,85 @@
                 createParticles(b.x, b.y, '#bdc3c7');
             }
 
+            // Bullet Player Collision
+            if (b.owner !== player) {
+                const dx = player.x - b.x;
+                const dy = player.y - b.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < player.radius + b.radius) {
+                    takeDamage(b.damage);
+                    createParticles(player.x, player.y, '#e74c3c');
+                    if (!b.explosive && !b.isMelee) b.life = 0;
+                }
+            }
+
             if (b.life <= 0) bullets.splice(i, 1);
         }
 
-        // Spawn Enemies
-        enemySpawnTimer -= dt;
-        if (enemySpawnTimer <= 0) {
-            spawnEnemy();
-            enemySpawnTimer = ENEMY_SPAWN_RATE;
+        // Spawn Enemies (NPC Mode)
+        if (gameMode === 'npc') {
+            enemySpawnTimer -= dt;
+            if (enemySpawnTimer <= 0) {
+                spawnEnemy();
+                enemySpawnTimer = ENEMY_SPAWN_RATE;
+            }
+        } else if (gameMode === 'bot') {
+            // Check Win Condition
+            if (enemies.length === 0) {
+                // Win!
+                gameRunning = false;
+                document.getElementById('gameOverScreen').style.display = 'flex';
+                document.querySelector('#gameOverScreen h1').textContent = 'VICTORY!';
+                document.getElementById('finalScore').textContent = 'Last Man Standing';
+            }
         }
 
         // Update Enemies
         for (let i = enemies.length - 1; i >= 0; i--) {
             const e = enemies[i];
-            const dx = player.x - e.x;
-            const dy = player.y - e.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
             
-            // AI Logic
-            if (e.state === 'chase') {
-                if (dist < 40) { // Close enough to attack
-                    e.state = 'attack';
-                    e.attackTimer = 0.5; // Windup
-                } else {
-                    let ex = (dx / dist) * e.speed * dt;
-                    let ey = (dy / dist) * e.speed * dt;
-                    if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
-                    if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+            if (e.type === 'bot') {
+                updateBotAI(e, dt);
+            } else {
+                // Existing NPC Logic
+                const dx = player.x - e.x;
+                const dy = player.y - e.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // AI Logic
+                if (e.state === 'chase') {
+                    if (dist < 40) { // Close enough to attack
+                        e.state = 'attack';
+                        e.attackTimer = 0.5; // Windup
+                    } else {
+                        let ex = (dx / dist) * e.speed * dt;
+                        let ey = (dy / dist) * e.speed * dt;
+                        if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
+                        if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+                    }
+                } else if (e.state === 'attack') {
+                    e.attackTimer -= dt;
+                    if (e.attackTimer <= 0) {
+                        // Lunge!
+                        const lungeSpeed = 400;
+                        e.x += (dx / dist) * lungeSpeed * dt * 5; // Burst move
+                        e.y += (dy / dist) * lungeSpeed * dt * 5;
+                        e.state = 'cooldown';
+                        e.attackTimer = 1.0;
+                    }
+                } else if (e.state === 'cooldown') {
+                    e.attackTimer -= dt;
+                    if (e.attackTimer <= 0) e.state = 'chase';
                 }
-            } else if (e.state === 'attack') {
-                e.attackTimer -= dt;
-                if (e.attackTimer <= 0) {
-                    // Lunge!
-                    const lungeSpeed = 400;
-                    e.x += (dx / dist) * lungeSpeed * dt * 5; // Burst move
-                    e.y += (dy / dist) * lungeSpeed * dt * 5;
-                    e.state = 'cooldown';
-                    e.attackTimer = 1.0;
+
+                // Collision with Player (Damage)
+                if (dist < player.radius + e.radius) {
+                    if (player.invulnTimer <= 0) {
+                        takeDamage(20);
+                        player.invulnTimer = 1.0; // 1 sec invuln
+                        createParticles(player.x, player.y, '#e74c3c');
+                    }
                 }
-            } else if (e.state === 'cooldown') {
-                e.attackTimer -= dt;
-                if (e.attackTimer <= 0) e.state = 'chase';
             }
 
             // Animation
@@ -740,18 +973,11 @@
                 e.frameTimer = 0;
             }
 
-            // Collision with Player (Damage)
-            if (dist < player.radius + e.radius) {
-                if (player.invulnTimer <= 0) {
-                    takeDamage(20);
-                    player.invulnTimer = 1.0; // 1 sec invuln
-                    createParticles(player.x, player.y, '#e74c3c');
-                }
-            }
-
             // Collision with Bullets
             for (let j = bullets.length - 1; j >= 0; j--) {
                 const b = bullets[j];
+                if (b.owner === e) continue; // Don't hit self
+
                 const bdx = b.x - e.x;
                 const bdy = b.y - e.y;
                 const bdist = Math.sqrt(bdx*bdx + bdy*bdy);
@@ -768,8 +994,10 @@
                     
                     if (e.hp <= 0) {
                         enemies.splice(i, 1);
-                        score++;
-                        document.getElementById('scoreVal').textContent = score;
+                        if (gameMode === 'npc') {
+                            score++;
+                            document.getElementById('scoreVal').textContent = score;
+                        }
                         // Color based on type for particles
                         const pColor = e.type === 'tank' ? '#8e44ad' : '#e74c3c';
                         createParticles(e.x, e.y, pColor);
@@ -790,11 +1018,11 @@
         }
     }
 
-    function fireWeapon() {
-        const w = player.weapon;
+    function fireWeapon(entity, aimX, aimY) {
+        const w = entity.weapon;
         
         if (w.currentAmmo <= 0 && w.name !== 'Fists') {
-            player.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
+            entity.weapon = { ...WEAPONS.Fists, currentAmmo: Infinity };
             return;
         }
 
@@ -802,24 +1030,29 @@
             w.currentAmmo--;
         }
 
-        input.shootTimer = w.delay;
+        if (entity === player) {
+            input.shootTimer = w.delay;
+        } else {
+            entity.shootTimer = w.delay;
+        }
 
-        let aimAngle = Math.atan2(input.aim.y, input.aim.x);
+        let aimAngle = Math.atan2(aimY, aimX);
         
         // Melee Logic
         if (w.type === 'melee') {
             bullets.push({
-                x: player.x,
-                y: player.y,
-                vx: input.aim.x * 300,
-                vy: input.aim.y * 300,
+                x: entity.x,
+                y: entity.y,
+                vx: aimX * 300,
+                vy: aimY * 300,
                 radius: 15,
                 life: 0.15,
                 damage: w.damage,
                 color: 'transparent',
-                isMelee: true
+                isMelee: true,
+                owner: entity
             });
-            createParticles(player.x + input.aim.x * 30, player.y + input.aim.y * 30, '#f1c40f');
+            createParticles(entity.x + aimX * 30, entity.y + aimY * 30, '#f1c40f');
             return;
         }
 
@@ -831,15 +1064,16 @@
             const vy = Math.sin(angle) * w.speed;
             
             bullets.push({
-                x: player.x,
-                y: player.y,
+                x: entity.x,
+                y: entity.y,
                 vx: vx,
                 vy: vy,
                 radius: w.radius || 5,
                 life: w.range / w.speed,
                 damage: w.damage,
                 explosive: w.explosive || false,
-                color: w.color
+                color: w.color,
+                owner: entity
             });
         }
     }
@@ -1199,6 +1433,12 @@
         gameRunning = true;
         document.getElementById('gameOverScreen').style.display = 'none';
         lastTime = performance.now();
+
+        if (gameMode === 'bot') {
+            for (let i = 0; i < 20; i++) spawnBot();
+            // Spawn extra weapons for bots
+            for (let i = 0; i < 30; i++) spawnWeapon();
+        }
     }
 
     // Button Listeners
@@ -1211,6 +1451,7 @@
     initPatterns();
     spawnPlayerRandomly();
     initZone();
+    gameRunning = false; // Wait for start screen
     requestAnimationFrame(loop);
 
 </script>
