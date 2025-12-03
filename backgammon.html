@@ -277,27 +277,19 @@
         </div>
 
         <div class="controls">
+            <div style="margin-bottom: 10px;">
+                <label style="margin-right: 10px;">Mode:</label>
+                <select id="gameMode" onchange="resetGame()" style="padding: 5px; border-radius: 5px;">
+                    <option value="pvp">Player vs Player</option>
+                    <option value="pvc">Player vs Computer</option>
+                </select>
+            </div>
             <button class="btn" id="roll-btn" onclick="rollDice()" data-i18n="games.backgammon.roll">Roll Dice</button>
             <button class="btn" onclick="resetGame()" style="background: #444;" data-i18n="games.backgammon.reset">Reset</button>
         </div>
     </div>
 
     <script>
-        // Game State
-        // Points 0-23. 
-        // White moves 23 -> 0. Black moves 0 -> 23.
-        // Wait, standard setup:
-        // White: 2 on 23, 5 on 12, 3 on 7, 5 on 5. (Indices: 23, 12, 7, 5) -> Moves towards 0.
-        // Black: 2 on 0, 5 on 11, 3 on 16, 5 on 18. (Indices: 0, 11, 16, 18) -> Moves towards 23.
-        
-        let board = Array(24).fill(null).map(() => ({ count: 0, color: null }));
-        let bar = { w: 0, b: 0 };
-        let off = { w: 0, b: 0 };
-        let turn = 'w'; // 'w' or 'b'
-        let dice = [];
-        let movesLeft = []; // Array of values
-        let selectedPoint = null; // index or 'bar'
-
         const els = {
             quadTL: document.getElementById('quad-tl'),
             quadTR: document.getElementById('quad-tr'),
@@ -308,8 +300,19 @@
             turn: document.getElementById('turn-indicator'),
             rollBtn: document.getElementById('roll-btn'),
             offW: document.getElementById('off-white'),
-            offB: document.getElementById('off-black')
+            offB: document.getElementById('off-black'),
+            mode: document.getElementById('gameMode')
         };
+
+        let board = [];
+        let bar = { w: 0, b: 0 };
+        let off = { w: 0, b: 0 };
+        let turn = 'w';
+        let dice = [];
+        let movesLeft = [];
+        let selectedPoint = null;
+        let gameMode = 'pvp';
+        let isComputerThinking = false;
 
         function initGame() {
             board = Array(24).fill(null).map(() => ({ count: 0, color: null }));
@@ -319,6 +322,8 @@
             dice = [];
             movesLeft = [];
             selectedPoint = null;
+            isComputerThinking = false;
+            gameMode = els.mode.value;
 
             // Setup White
             board[23] = { count: 2, color: 'w' };
@@ -334,9 +339,12 @@
 
             renderBoard();
             updateStatus();
+            els.rollBtn.disabled = false;
         }
 
         function rollDice() {
+            if (isComputerThinking) return;
+            
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
             dice = [d1, d2];
@@ -349,19 +357,56 @@
 
             els.rollBtn.disabled = true;
             renderDice();
-            renderBoard(); // Update highlights
+            renderBoard();
+            
+            if (!canMoveAny()) {
+                setTimeout(() => {
+                    alert("No valid moves available.");
+                    endTurn();
+                }, 1000);
+            } else if (gameMode === 'pvc' && turn === 'b') {
+                isComputerThinking = true;
+                setTimeout(makeComputerMove, 1000);
+            }
+        }
+
+        function makeComputerMove() {
+            if (movesLeft.length === 0) {
+                endTurn();
+                return;
+            }
+
+            // Simple AI: Find all valid moves, pick one
+            let possibleMoves = [];
+            
+            // Check bar first
+            if (bar.b > 0) {
+                const targets = getValidMoves('bar');
+                targets.forEach(t => possibleMoves.push({ from: 'bar', to: t }));
+            } else {
+                for (let i = 0; i < 24; i++) {
+                    if (board[i].count > 0 && board[i].color === 'b') {
+                        const targets = getValidMoves(i);
+                        targets.forEach(t => possibleMoves.push({ from: i, to: t }));
+                    }
+                }
+            }
+
+            if (possibleMoves.length > 0) {
+                // Prioritize hitting or bearing off
+                const hitMove = possibleMoves.find(m => m.to !== 'off' && board[m.to].count === 1 && board[m.to].color === 'w');
+                const bearOffMove = possibleMoves.find(m => m.to === 'off');
+                
+                const move = hitMove || bearOffMove || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                
+                executeMove(move.from, move.to);
+            } else {
+                endTurn();
+            }
         }
 
         function renderDice() {
             els.dice.innerHTML = '';
-            dice.forEach((d, i) => {
-                // Check if this die value is still available in movesLeft
-                // This is tricky because duplicates. We just show all initial dice
-                // and maybe dim them if used?
-                // Simplified: Just show movesLeft as dice
-            });
-            
-            // Better: Show movesLeft as the dice to use
             movesLeft.forEach(val => {
                 const d = document.createElement('div');
                 d.className = 'die';
@@ -371,47 +416,20 @@
         }
 
         function getPointEl(index) {
-            // Map index to quadrant
-            // 12-17: TL (Left to Right? No, standard board numbering goes around)
-            // TL: 12, 13, 14, 15, 16, 17 (Indices) -> Visual: 13-18
-            // Let's stick to visual layout:
-            // TL: 12-17. TR: 18-23.
-            // BL: 11-6. BR: 5-0.
-            
-            // Wait, indices 0-23.
-            // 0 is BR rightmost. 5 is BR leftmost.
-            // 6 is BL rightmost. 11 is BL leftmost.
-            // 12 is TL leftmost. 17 is TL rightmost.
-            // 18 is TR leftmost. 23 is TR rightmost.
-            
-            // We need to generate the points in the correct order for the flex container.
-            // Top halves: Left to Right.
-            // TL (12-17): 12,13,14,15,16,17
-            // TR (18-23): 18,19,20,21,22,23
-            
-            // Bottom halves: Left to Right.
-            // BL (11-6): 11,10,9,8,7,6
-            // BR (5-0): 5,4,3,2,1,0
-            
-            // But we are generating them dynamically in renderBoard.
             return document.querySelector(`.point[data-index="${index}"]`);
         }
 
         function renderBoard() {
-            // Clear quadrants
             [els.quadTL, els.quadTR, els.quadBL, els.quadBR].forEach(el => el.innerHTML = '');
             els.bar.innerHTML = '';
 
-            // Helper to create point
             const createPoint = (idx) => {
                 const p = document.createElement('div');
                 p.className = 'point';
                 p.dataset.index = idx;
                 
-                // Checkers
                 const pt = board[idx];
                 if (pt.count > 0) {
-                    // Limit visual checkers to maybe 5-6 to avoid overflow
                     const showCount = Math.min(pt.count, 6);
                     for (let i = 0; i < showCount; i++) {
                         const c = document.createElement('div');
@@ -427,23 +445,16 @@
                     }
                 }
 
-                // Highlight if selected or valid target
                 if (selectedPoint === idx) p.classList.add('highlight');
-                
                 p.onclick = () => handlePointClick(idx);
                 return p;
             };
 
-            // Top Left: 12-17
             for (let i = 12; i <= 17; i++) els.quadTL.appendChild(createPoint(i));
-            // Top Right: 18-23
             for (let i = 18; i <= 23; i++) els.quadTR.appendChild(createPoint(i));
-            // Bottom Left: 11-6
             for (let i = 11; i >= 6; i--) els.quadBL.appendChild(createPoint(i));
-            // Bottom Right: 5-0
             for (let i = 5; i >= 0; i--) els.quadBR.appendChild(createPoint(i));
 
-            // Bar
             if (bar.w > 0) {
                 const c = document.createElement('div');
                 c.className = 'checker white';
@@ -463,16 +474,13 @@
                 els.bar.appendChild(c);
             }
 
-            // Off
             els.offW.textContent = `W: ${off.w}`;
             els.offB.textContent = `B: ${off.b}`;
             
-            // Highlight valid moves if selected
             if (selectedPoint !== null) {
                 const moves = getValidMoves(selectedPoint);
                 moves.forEach(targetIdx => {
                     if (targetIdx === 'off') {
-                        // Highlight off board area
                         if (turn === 'w') els.offW.style.background = 'var(--highlight)';
                         else els.offB.style.background = 'var(--highlight)';
                     } else {
@@ -487,33 +495,25 @@
         }
 
         function handleBarClick(color) {
+            if (isComputerThinking) return;
             if (turn !== color) return;
             if (movesLeft.length === 0) return;
-            
             selectedPoint = 'bar';
             renderBoard();
         }
 
         function handlePointClick(index) {
+            if (isComputerThinking) return;
             if (movesLeft.length === 0) return;
 
-            // If we have a selection, try to move
             if (selectedPoint !== null) {
                 const moves = getValidMoves(selectedPoint);
                 if (moves.includes(index)) {
                     executeMove(selectedPoint, index);
                     return;
                 }
-                // If clicking off-board area is handled separately? 
-                // Actually bearing off is usually clicking the point then the off area, 
-                // or just clicking the point if the die allows exact bear off.
-                // Let's handle bear off by clicking the point then clicking the off-box?
-                // Or just auto-bear off if clicked again?
-                // Let's stick to: Click Source -> Click Target.
             }
 
-            // Select source
-            // Must enter from bar if pieces on bar
             if (bar[turn] > 0) {
                 selectedPoint = 'bar';
                 renderBoard();
@@ -530,11 +530,11 @@
             }
         }
 
-        // Handle clicking off-board areas for bearing off
         els.offW.onclick = () => handleOffClick('w');
         els.offB.onclick = () => handleOffClick('b');
 
         function handleOffClick(color) {
+            if (isComputerThinking) return;
             if (turn !== color) return;
             if (selectedPoint === null) return;
             
@@ -545,70 +545,31 @@
         }
 
         function getValidMoves(source) {
-            // Source is index or 'bar'
             const targets = [];
-            const direction = turn === 'w' ? -1 : 1; // White moves to 0, Black to 23
-            
-            // Unique dice values to try
+            const direction = turn === 'w' ? -1 : 1;
             const uniqueDice = [...new Set(movesLeft)];
 
             uniqueDice.forEach(die => {
                 let targetIdx;
-                
                 if (source === 'bar') {
-                    // White enters at 23 (24-die), Black enters at 0 (die-1)
-                    // Wait, indices:
-                    // White enters into Black home (19-23)? No.
-                    // White moves 23 -> 0. Enters at 23? No, enters at 24 (virtual) -> 23..18.
-                    // Indices: 23 is top right. 0 is bottom right.
-                    // White moves 23 -> 0.
-                    // White enters at "24". Target = 24 - die.
-                    // Black moves 0 -> 23.
-                    // Black enters at "-1". Target = -1 + die = die - 1.
-                    
                     if (turn === 'w') targetIdx = 24 - die;
                     else targetIdx = die - 1;
                 } else {
                     targetIdx = source + (die * direction);
                 }
 
-                // Check bounds
                 if (targetIdx < 0 || targetIdx > 23) {
-                    // Bearing off logic
                     if (canBearOff(turn)) {
-                        // Exact match?
-                        if (turn === 'w' && targetIdx === -1) targets.push('off'); // Exact bear off from 0 with 1? No.
-                        // White bears off from 0-5.
-                        // If source is 2, die is 3 -> target -1. Valid bear off.
-                        // If source is 5, die is 6 -> target -1. Valid.
-                        // Logic:
-                        // 1. Exact bear off: source - die == -1 (White) or source + die == 24 (Black).
-                        // 2. Higher die bear off: If no pieces on higher points, can bear off from highest point.
-                        
-                        // Simplified: Allow bear off if target is off board AND exact or greater die?
-                        // Let's just check if target is off board.
-                        
-                        // White (moves to -1): targetIdx < 0
-                        // Black (moves to 24): targetIdx > 23
-                        
                         if ((turn === 'w' && targetIdx < 0) || (turn === 'b' && targetIdx > 23)) {
-                            // Check if this is a valid bear off move
-                            // Exact:
                             if ((turn === 'w' && source - die === -1) || (turn === 'b' && source + die === 24)) {
                                 targets.push('off');
                             } else {
-                                // Not exact. Allowed only if no pieces on higher points.
-                                // White: Higher points are indices > source (up to 5).
-                                // Black: Higher points are indices < source (down to 18).
-                                const isHighest = checkIsHighest(source);
-                                if (isHighest) targets.push('off');
+                                if (checkIsHighest(source)) targets.push('off');
                             }
                         }
                     }
                 } else {
-                    // Normal move
                     const pt = board[targetIdx];
-                    // Valid if empty, own color, or only 1 opponent (hit)
                     if (pt.count === 0 || pt.color === turn || pt.count === 1) {
                         targets.push(targetIdx);
                     }
@@ -619,13 +580,11 @@
 
         function checkIsHighest(source) {
             if (turn === 'w') {
-                // Check 5 down to source+1
                 for (let i = 5; i > source; i--) {
                     if (board[i].count > 0 && board[i].color === 'w') return false;
                 }
                 return true;
             } else {
-                // Check 18 up to source-1
                 for (let i = 18; i < source; i++) {
                     if (board[i].count > 0 && board[i].color === 'b') return false;
                 }
@@ -634,11 +593,7 @@
         }
 
         function canBearOff(player) {
-            // All pieces must be in home board
-            // White home: 0-5. Black home: 18-23.
-            // Check bar
             if (bar[player] > 0) return false;
-            
             for (let i = 0; i < 24; i++) {
                 if (board[i].count > 0 && board[i].color === player) {
                     if (player === 'w' && i > 5) return false;
@@ -649,46 +604,26 @@
         }
 
         function executeMove(from, to) {
-            // Calculate die used
             let dieUsed = 0;
             if (from === 'bar') {
                 if (turn === 'w') dieUsed = 24 - to;
                 else dieUsed = to + 1;
             } else if (to === 'off') {
-                // Find the die that allows this
-                // If exact match exists in movesLeft, use it.
-                // Else use the max die that is greater than needed?
-                // Simplified: Just find a die that works.
-                // Distance needed:
                 const dist = turn === 'w' ? from + 1 : 24 - from;
                 if (movesLeft.includes(dist)) dieUsed = dist;
-                else {
-                    // Must be larger die
-                    dieUsed = Math.max(...movesLeft);
-                }
+                else dieUsed = Math.max(...movesLeft);
             } else {
                 dieUsed = Math.abs(from - to);
             }
 
-            // Remove die from movesLeft
             const dieIdx = movesLeft.indexOf(dieUsed);
             if (dieIdx > -1) movesLeft.splice(dieIdx, 1);
             else {
-                // Fallback for bear-off with larger die
-                // Remove the largest die?
-                // Or the first die larger than needed?
-                // Let's just remove the first one that works logic-wise
-                // Re-calculate valid moves to find which die generated this 'to'
-                // This is getting complicated.
-                // Simple approach: Remove the first die that matches dieUsed.
-                // If not found (bear off case), remove max die.
                 const max = Math.max(...movesLeft);
                 const idx = movesLeft.indexOf(max);
                 if (idx > -1) movesLeft.splice(idx, 1);
             }
 
-            // Move logic
-            // Remove from source
             if (from === 'bar') {
                 bar[turn]--;
             } else {
@@ -696,13 +631,11 @@
                 if (board[from].count === 0) board[from].color = null;
             }
 
-            // Add to target
             if (to === 'off') {
                 off[turn]++;
             } else {
                 const pt = board[to];
                 if (pt.count === 1 && pt.color !== turn) {
-                    // Hit!
                     bar[pt.color]++;
                     pt.count = 1;
                     pt.color = turn;
@@ -716,34 +649,30 @@
             renderDice();
             renderBoard();
 
-            // Check win
             if (off[turn] === 15) {
-                alert(`${turn === 'w' ? 'White' : 'Black'} Wins!`);
-                initGame();
+                setTimeout(() => {
+                    alert(`${turn === 'w' ? 'White' : 'Black'} Wins!`);
+                    initGame();
+                }, 100);
                 return;
             }
 
-            // End turn if no moves
             if (movesLeft.length === 0) {
                 endTurn();
             } else {
-                // Check if any moves are possible with remaining dice
-                // If not, end turn
                 if (!canMoveAny()) {
                     setTimeout(() => {
-                        alert("No valid moves available.");
+                        if (!isComputerThinking) alert("No valid moves available.");
                         endTurn();
                     }, 500);
+                } else if (gameMode === 'pvc' && turn === 'b') {
+                    setTimeout(makeComputerMove, 800);
                 }
             }
         }
 
         function canMoveAny() {
-            // Check bar
-            if (bar[turn] > 0) {
-                return getValidMoves('bar').length > 0;
-            }
-            // Check all points
+            if (bar[turn] > 0) return getValidMoves('bar').length > 0;
             for (let i = 0; i < 24; i++) {
                 if (board[i].count > 0 && board[i].color === turn) {
                     if (getValidMoves(i).length > 0) return true;
@@ -757,8 +686,14 @@
             movesLeft = [];
             dice = [];
             els.rollBtn.disabled = false;
+            isComputerThinking = false;
             updateStatus();
             renderDice();
+            
+            if (gameMode === 'pvc' && turn === 'b') {
+                els.rollBtn.disabled = true;
+                setTimeout(rollDice, 1000);
+            }
         }
 
         function updateStatus() {

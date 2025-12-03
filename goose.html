@@ -304,10 +304,27 @@
             nextTurn();
         }
 
-        async function movePlayer(player, targetPos) {
-            player.pos = targetPos;
-            renderPlayers();
-            await new Promise(r => setTimeout(r, 600));
+        async function movePlayer(player, targetPos, isJump = false) {
+            const start = player.pos;
+            const end = targetPos;
+            const direction = end > start ? 1 : -1;
+            
+            if (isJump) {
+                // Jump animation (slower slide)
+                player.pos = targetPos;
+                renderPlayers();
+                await new Promise(r => setTimeout(r, 800));
+            } else {
+                // Step by step animation for dice roll
+                let current = start;
+                while (current !== end) {
+                    current += direction;
+                    player.pos = current;
+                    renderPlayers();
+                    // Play sound?
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
         }
 
         async function checkSpecial(player, lastRoll) {
@@ -321,7 +338,7 @@
                 if (nextPos > 63) {
                     nextPos = 63 - (nextPos - 63);
                 }
-                await movePlayer(player, nextPos);
+                await movePlayer(player, nextPos, true); // Treat goose move as a jump/slide
                 // Recursive check for double goose
                 await checkSpecial(player, lastRoll);
                 return;
@@ -333,7 +350,7 @@
                 if (special.jump) {
                     statusEl.textContent += `Jumping to ${special.jump}.`;
                     await new Promise(r => setTimeout(r, 800));
-                    await movePlayer(player, special.jump);
+                    await movePlayer(player, special.jump, true);
                     // Check if jump lands on something special (e.g. Maze -> 39 -> Goose? No 39 is not goose)
                 } else if (special.skip) {
                     player.skip = special.skip;

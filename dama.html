@@ -57,7 +57,7 @@
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             width: 100%;
-            max-width: min(95vw, 80vh);
+            max-width: 98vmin;
             aspect-ratio: 1;
             border: 5px solid #5c4033;
             user-select: none;
@@ -67,9 +67,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: calc(min(95vw, 80vh) / 10);
+            font-size: 8vmin;
             cursor: pointer;
             position: relative;
+            aspect-ratio: 1;
         }
         .square.light { background-color: var(--board-light); }
         .square.dark { background-color: var(--board-dark); }
@@ -150,6 +151,13 @@
         <div class="board" id="board"></div>
         <div class="captured" id="captured-white"></div>
         <div class="controls">
+            <div style="margin-bottom: 10px;">
+                <label style="margin-right: 10px;">Mode:</label>
+                <select id="gameMode" onchange="resetGame()" style="padding: 5px; border-radius: 5px;">
+                    <option value="pvp">Player vs Player</option>
+                    <option value="pvc">Player vs Computer</option>
+                </select>
+            </div>
             <button class="btn" onclick="resetGame()" data-i18n="games.dama.reset">Reset Game</button>
         </div>
     </div>
@@ -159,25 +167,21 @@
         const statusEl = document.getElementById('status');
         const capturedWhiteEl = document.getElementById('captured-white');
         const capturedBlackEl = document.getElementById('captured-black');
+        const modeSelect = document.getElementById('gameMode');
 
         let board = [];
         let turn = 'w'; // 'w' (white) or 'b' (black)
         let selectedSquare = null;
         let validMoves = [];
         let capturedCount = { w: 0, b: 0 };
-        let mustJump = false; // If true, player must perform a jump move
+        let gameMode = 'pvp';
+        let isComputerThinking = false;
 
         function initBoard() {
-            // 8x8 board
-            // 0: empty, {color: 'w', king: false}: white piece
             board = Array(8).fill(null).map(() => Array(8).fill(null));
-
-            // Place pieces on dark squares
-            // Rows 0-2: Black (b)
-            // Rows 5-7: White (w)
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    if ((row + col) % 2 !== 0) { // Dark squares
+                    if ((row + col) % 2 !== 0) {
                         if (row < 3) board[row][col] = { color: 'b', king: false };
                         else if (row > 4) board[row][col] = { color: 'w', king: false };
                     }
@@ -218,20 +222,14 @@
         }
 
         function updateStatus() {
-            const wTurn = getNested(currentTranslations, 'games.dama.whiteTurn') || "White's Turn";
-            const bTurn = getNested(currentTranslations, 'games.dama.blackTurn') || "Black's Turn";
-            const wWin = getNested(currentTranslations, 'games.dama.whiteWins') || "White Wins!";
-            const bWin = getNested(currentTranslations, 'games.dama.blackWins') || "Black Wins!";
-
-            if (capturedCount.b >= 12) statusEl.textContent = wWin;
-            else if (capturedCount.w >= 12) statusEl.textContent = bWin;
-            else statusEl.textContent = turn === 'w' ? wTurn : bTurn;
+            if (capturedCount.b >= 12) statusEl.textContent = "White Wins!";
+            else if (capturedCount.w >= 12) statusEl.textContent = "Black Wins!";
+            else statusEl.textContent = turn === 'w' ? "White's Turn" : "Black's Turn";
         }
 
         function renderCaptured() {
             capturedWhiteEl.innerHTML = '';
             capturedBlackEl.innerHTML = '';
-            
             for(let i=0; i<capturedCount.w; i++) {
                 const p = document.createElement('div');
                 p.className = 'captured-piece white';
@@ -245,44 +243,32 @@
         }
 
         function handleSquareClick(row, col) {
-            const piece = board[row][col];
+            if (isComputerThinking && gameMode === 'pvc' && turn === 'b') return;
 
-            // If clicking a highlighted move
+            const piece = board[row][col];
             const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+            
             if (move) {
                 executeMove(move);
                 return;
             }
 
-            // If clicking own piece
             if (piece && piece.color === turn) {
-                // If we are in a multi-jump sequence, we might be restricted
-                // For simplicity, we'll recalculate all valid moves for the player
-                // and enforce mandatory jumps if any exist globally.
-                
                 const allMoves = getAllValidMoves(turn);
                 const jumpsExist = allMoves.some(m => m.isJump);
-                
-                // Get moves for this specific piece
                 let moves = getPieceMoves(row, col, piece);
-                
-                // If jumps exist globally, filter this piece's moves to only jumps
-                if (jumpsExist) {
-                    moves = moves.filter(m => m.isJump);
-                }
+                if (jumpsExist) moves = moves.filter(m => m.isJump);
 
                 if (moves.length > 0) {
                     selectedSquare = { row, col };
                     validMoves = moves;
                     renderBoard();
                 } else {
-                    // Selected piece has no valid moves (or no jumps when jumps are required)
                     selectedSquare = null;
                     validMoves = [];
                     renderBoard();
                 }
             } else {
-                // Clicking empty square or opponent piece (invalid)
                 selectedSquare = null;
                 validMoves = [];
                 renderBoard();
@@ -291,14 +277,131 @@
 
         function executeMove(move) {
             const piece = board[move.fromRow][move.fromCol];
-            
-            // Move piece
             board[move.toRow][move.toCol] = piece;
             board[move.fromRow][move.fromCol] = null;
 
-            // Handle capture
             if (move.isJump) {
+                const capturedPiece = board[move.jumpRow][move.jumpCol];
+                capturedCount[capturedPiece.color]++;
                 board[move.jumpRow][move.jumpCol] = null;
+            }
+
+            // King promotion
+            if ((piece.color === 'w' && move.toRow === 0) || (piece.color === 'b' && move.toRow === 7)) {
+                piece.king = true;
+            }
+
+            // Multi-jump logic
+            if (move.isJump) {
+                const followUpMoves = getPieceMoves(move.toRow, move.toCol, piece).filter(m => m.isJump);
+                if (followUpMoves.length > 0) {
+                    selectedSquare = { row: move.toRow, col: move.toCol };
+                    validMoves = followUpMoves;
+                    renderBoard();
+                    
+                    // If AI, continue jumping
+                    if (gameMode === 'pvc' && turn === 'b') {
+                        setTimeout(() => executeMove(followUpMoves[0]), 500);
+                    }
+                    return;
+                }
+            }
+
+            turn = turn === 'w' ? 'b' : 'w';
+            selectedSquare = null;
+            validMoves = [];
+            renderBoard();
+
+            if (gameMode === 'pvc' && turn === 'b') {
+                isComputerThinking = true;
+                setTimeout(makeComputerMove, 800);
+            }
+        }
+
+        function makeComputerMove() {
+            const allMoves = getAllValidMoves('b');
+            if (allMoves.length === 0) return; // Game over or stuck
+
+            const jumps = allMoves.filter(m => m.isJump);
+            let move;
+            if (jumps.length > 0) {
+                move = jumps[Math.floor(Math.random() * jumps.length)];
+            } else {
+                move = allMoves[Math.floor(Math.random() * allMoves.length)];
+            }
+
+            // Select piece visually (optional)
+            selectedSquare = { row: move.fromRow, col: move.fromCol };
+            renderBoard();
+            
+            setTimeout(() => {
+                executeMove(move);
+                isComputerThinking = false;
+            }, 400);
+        }
+
+        function getAllValidMoves(color) {
+            let moves = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece && piece.color === color) {
+                        moves = moves.concat(getPieceMoves(r, c, piece));
+                    }
+                }
+            }
+            // If jumps exist, filter
+            const jumps = moves.filter(m => m.isJump);
+            return jumps.length > 0 ? jumps : moves;
+        }
+
+        function getPieceMoves(row, col, piece) {
+            const moves = [];
+            const dirs = [];
+            if (piece.color === 'w' || piece.king) dirs.push([-1, -1], [-1, 1]); // Up
+            if (piece.color === 'b' || piece.king) dirs.push([1, -1], [1, 1]);   // Down
+
+            dirs.forEach(([dr, dc]) => {
+                const r = row + dr;
+                const c = col + dc;
+
+                if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                    if (!board[r][c]) {
+                        // Move
+                        moves.push({ fromRow: row, fromCol: col, toRow: r, toCol: c, isJump: false });
+                    } else if (board[r][c].color !== piece.color) {
+                        // Jump
+                        const jr = r + dr;
+                        const jc = c + dc;
+                        if (jr >= 0 && jr < 8 && jc >= 0 && jc < 8 && !board[jr][jc]) {
+                            moves.push({ fromRow: row, fromCol: col, toRow: jr, toCol: jc, isJump: true, jumpRow: r, jumpCol: c });
+                        }
+                    }
+                }
+            });
+            return moves;
+        }
+
+        function resetGame() {
+            gameMode = modeSelect.value;
+            turn = 'w';
+            capturedCount = { w: 0, b: 0 };
+            selectedSquare = null;
+            validMoves = [];
+            isComputerThinking = false;
+            initBoard();
+            renderBoard();
+        }
+
+        // Helper for i18n (simplified)
+        function getNested(obj, path) {
+            return path.split('.').reduce((o, k) => (o || {})[k], obj);
+        }
+        
+        // Init
+        initBoard();
+        renderBoard();
+    </script>                board[move.jumpRow][move.jumpCol] = null;
                 if (turn === 'w') capturedCount.b++;
                 else capturedCount.w++;
             }

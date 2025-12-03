@@ -150,6 +150,12 @@
         <div class="score top" id="topScore">0</div>
         <div class="score bottom" id="bottomScore">0</div>
         <div class="instructions">Touch & Drag to play</div>
+        <div style="position: absolute; top: 20px; right: 20px; z-index: 1000;">
+            <select id="gameMode" style="padding: 5px; border-radius: 5px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                <option value="pvp">PvP (2 Players)</option>
+                <option value="pvc">PvC (vs Computer)</option>
+            </select>
+        </div>
     </div>
 
     <script>
@@ -159,13 +165,21 @@
                 this.ctx = this.canvas.getContext('2d');
                 this.topScoreEl = document.getElementById('topScore');
                 this.bottomScoreEl = document.getElementById('bottomScore');
+                this.modeSelect = document.getElementById('gameMode');
                 
                 this.resizeCanvas();
                 window.addEventListener('resize', () => this.resizeCanvas());
                 
+                this.modeSelect.addEventListener('change', () => this.setMode());
+
                 this.initGame();
                 this.setupControls();
                 this.gameLoop();
+            }
+
+            setMode() {
+                this.gameMode = this.modeSelect.value;
+                this.initGame();
             }
 
             resizeCanvas() {
@@ -178,6 +192,9 @@
             initGame() {
                 this.topScore = 0;
                 this.bottomScore = 0;
+                this.topScoreEl.textContent = '0';
+                this.bottomScoreEl.textContent = '0';
+                this.gameMode = this.modeSelect.value;
                 
                 // Players
                 this.playerRadius = 30;
@@ -186,7 +203,8 @@
                     y: this.height / 4,
                     radius: this.playerRadius,
                     color: '#ff4d4d', // Red
-                    glowColor: 'rgba(255, 77, 77, 0.5)'
+                    glowColor: 'rgba(255, 77, 77, 0.5)',
+                    vx: 0, vy: 0
                 };
                 
                 this.bottomPlayer = {
@@ -194,7 +212,8 @@
                     y: (this.height * 3) / 4,
                     radius: this.playerRadius,
                     color: '#00d4ff', // Cyan
-                    glowColor: 'rgba(0, 212, 255, 0.5)'
+                    glowColor: 'rgba(0, 212, 255, 0.5)',
+                    vx: 0, vy: 0
                 };
 
                 // Puck
@@ -237,6 +256,7 @@
                     
                     const player = this.getPlayerAt(x, y);
                     if (player) {
+                        if (this.gameMode === 'pvc' && player === this.topPlayer) continue;
                         this.touches.set(touch.identifier, player);
                     }
                 }
@@ -268,7 +288,11 @@
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 
-                this.isDragging = this.getPlayerAt(x, y);
+                const player = this.getPlayerAt(x, y);
+                if (player) {
+                    if (this.gameMode === 'pvc' && player === this.topPlayer) return;
+                    this.isDragging = player;
+                }
             }
 
             handleMouseMove(e) {
@@ -324,9 +348,48 @@
             }
 
             update() {
+                if (this.gameMode === 'pvc') {
+                    this.updateAI();
+                }
                 this.updateBall();
                 this.checkCollisions();
                 this.checkGoals();
+            }
+
+            updateAI() {
+                const ai = this.topPlayer;
+                const ball = this.ball;
+                
+                // Target position
+                let targetX = ball.x;
+                let targetY = this.height / 4; // Default defense line
+
+                // If ball is in top half, attack
+                if (ball.y < this.height / 2) {
+                    targetY = ball.y;
+                    // Don't go behind the ball if it's moving towards goal
+                    if (ball.y < ai.y && ball.vy < 0) {
+                        // Ball is behind AI moving up? Move aside or try to hit?
+                        // Simple: just track x
+                    }
+                } else {
+                    // Ball in bottom half, stay defensive
+                    targetX = this.width / 2;
+                    targetY = this.height / 6;
+                }
+
+                // Smooth movement
+                const speed = 8; // AI Speed
+                const dx = targetX - ai.x;
+                const dy = targetY - ai.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist > 0) {
+                    const moveX = (dx / dist) * Math.min(dist, speed);
+                    const moveY = (dy / dist) * Math.min(dist, speed);
+                    
+                    this.movePlayer(ai, ai.x + moveX, ai.y + moveY);
+                }
             }
 
             updateBall() {
