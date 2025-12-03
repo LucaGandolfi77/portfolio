@@ -597,7 +597,7 @@ function createBubbles() {
         'Pianoforte': 'Pianoforte: learned pieces and practice. Music shapes my rhythm.',
         'Musica': 'Music is central: composing, listening, and inspiration.',
         'Poesie': 'Poesie: I write and read poems to capture moments.',
-        'Fisica Quantistica': 'Fascinated by quantum physics and its weird beauty.',
+        'Fisica Quantistica': 'Fascinated by quantum physics? <br><a href="quantum_lab.html" class="btn btn-sm btn-primary" style="margin-top:8px;display:inline-block;text-decoration:none;font-size:0.8rem;">⚛️ Enter Quantum Lab</a>',
         'Tecnologia': 'Technology: building practical solutions with elegant code.',
         'Storia': 'Storia: history shapes perspective and context.'
     };
@@ -616,7 +616,7 @@ function createBubbles() {
             wrap.querySelectorAll('.bubble').forEach(bb=> bb.setAttribute('aria-pressed','false'));
             b.setAttribute('aria-pressed','true');
             panel.style.opacity = '0';
-            setTimeout(()=>{ panel.textContent = desc[k] || ''; panel.style.opacity = '1'; }, 160);
+            setTimeout(()=>{ panel.innerHTML = desc[k] || ''; panel.style.opacity = '1'; }, 160);
         });
         b.addEventListener('keydown',(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); b.click(); } });
         wrap.appendChild(b);
