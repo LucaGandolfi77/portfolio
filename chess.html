@@ -129,6 +129,13 @@
         <div class="board" id="board"></div>
         <div class="captured" id="captured-white"></div>
         <div class="controls">
+            <div style="margin-bottom: 10px;">
+                <label style="margin-right: 10px;">Mode:</label>
+                <select id="gameMode" onchange="resetGame()" style="padding: 5px; border-radius: 5px;">
+                    <option value="pvp">Player vs Player</option>
+                    <option value="pvc">Player vs Computer</option>
+                </select>
+            </div>
             <button class="btn" onclick="resetGame()" data-i18n="games.chess.reset">Reset Game</button>
         </div>
     </div>
@@ -138,6 +145,7 @@
         const statusEl = document.getElementById('status');
         const capturedWhiteEl = document.getElementById('captured-white');
         const capturedBlackEl = document.getElementById('captured-black');
+        const modeSelect = document.getElementById('gameMode');
 
         const PIECES = {
             w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
@@ -149,8 +157,12 @@
         let selectedSquare = null;
         let validMoves = [];
         let capturedPieces = { w: [], b: [] };
+        let gameMode = 'pvp';
+        let isComputerThinking = false;
 
         function initBoard() {
+            gameMode = modeSelect.value;
+            isComputerThinking = false;
             // 8x8 board, null for empty
             // lowercase for black, uppercase for white in internal logic? 
             // Let's use objects: { type: 'p', color: 'w' }
@@ -220,6 +232,8 @@
         }
 
         function handleSquareClick(row, col) {
+            if (isComputerThinking && gameMode === 'pvc' && turn === 'b') return;
+
             const piece = board[row][col];
 
             // If a square is selected and clicked square is a valid move
@@ -261,6 +275,45 @@
             selectedSquare = null;
             validMoves = [];
             renderBoard();
+
+            if (gameMode === 'pvc' && turn === 'b') {
+                isComputerThinking = true;
+                setTimeout(makeComputerMove, 500);
+            }
+        }
+
+        function makeComputerMove() {
+            // Simple AI: Random move, prioritize capture
+            let allMoves = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === 'b') {
+                        const moves = getValidMoves(r, c, p);
+                        moves.forEach(m => {
+                            allMoves.push({ from: {r, c}, to: m });
+                        });
+                    }
+                }
+            }
+
+            if (allMoves.length === 0) {
+                alert("Checkmate or Stalemate!");
+                return;
+            }
+
+            // Prioritize captures
+            const captures = allMoves.filter(m => board[m.to.row][m.to.col] !== null);
+            let move;
+            if (captures.length > 0) {
+                move = captures[Math.floor(Math.random() * captures.length)];
+            } else {
+                move = allMoves[Math.floor(Math.random() * allMoves.length)];
+            }
+
+            selectedSquare = { row: move.from.r, col: move.from.c };
+            executeMove(move.to);
+            isComputerThinking = false;
         }
 
         function getValidMoves(row, col, piece) {

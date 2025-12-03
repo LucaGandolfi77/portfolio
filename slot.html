@@ -81,28 +81,31 @@
             gap: 5px;
             justify-content: center;
             margin-bottom: 30px;
-        }
-
-        .reel {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(0, 0, 0, 0.3));
-            border: 2px solid rgba(255, 215, 0, 0.4);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            font-weight: 700;
-            position: relative;
-            overflow: hidden;
-            box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.1);
+            width: 100%;
         }
 
         .reel-col {
             display: flex;
             flex-direction: column;
             gap: 5px;
+            flex: 1;
+        }
+
+        .reel {
+            width: 100%;
+            aspect-ratio: 1;
+            height: auto;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(0, 0, 0, 0.3));
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 700;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.1);
         }
 
         .reel.spinning {
@@ -458,15 +461,15 @@
         function updateMessage(key, className = '') {
             const msgEl = document.getElementById('gameMessage');
             msgEl.textContent = getTranslation(key);
-            msgEl.className = 'message-area ' + className;
-        }
-
         function getRandomSymbol() {
             // Weighted random for RTP control
             const rand = Math.random();
             if (rand < 0.45) return SYMBOLS[Math.floor(Math.random() * 3)]; // Common fruits
             if (rand < 0.75) return SYMBOLS[Math.floor(Math.random() * 3) + 3]; // Medium fruits
             if (rand < 0.90) return SYMBOLS[Math.floor(Math.random() * 2) + 6]; // High fruits
+            if (rand < 0.98) return SYMBOLS[Math.floor(Math.random() * 3) + 8]; // Rares
+            return '🎁'; // Bonus (2% chance per cell)
+        }   if (rand < 0.90) return SYMBOLS[Math.floor(Math.random() * 2) + 6]; // High fruits
             if (rand < 0.96) return SYMBOLS[Math.floor(Math.random() * 3) + 8]; // Rares
             return '🎁'; // Bonus (4% chance per cell)
         }
@@ -568,9 +571,6 @@
             } else {
                 updateMessage('games.slot.lose', 'lose');
             }
-            updateStats();
-        }
-
         function triggerBonus() {
             const modal = document.getElementById('bonusModal');
             const content = document.getElementById('bonusContent');
@@ -578,19 +578,57 @@
             const btn = document.getElementById('closeBonusBtn');
             
             modal.style.display = 'flex';
-            content.innerHTML = '🎁';
-            result.textContent = 'Opening...';
+            content.innerHTML = '<div style="display:flex; gap:20px;"><div class="chest" style="font-size:4rem; cursor:pointer;">📦</div><div class="chest" style="font-size:4rem; cursor:pointer;">📦</div><div class="chest" style="font-size:4rem; cursor:pointer;">📦</div></div>';
+            result.textContent = 'Pick a chest!';
             btn.style.display = 'none';
 
-            setTimeout(() => {
-                const bonusWin = bet * (Math.floor(Math.random() * 50) + 10);
-                content.innerHTML = '💰';
-                result.textContent = `YOU WON $${bonusWin}!`;
-                balance += bonusWin;
-                wins++;
-                updateStats();
-                btn.style.display = 'block';
-                
+            const chests = content.querySelectorAll('.chest');
+            chests.forEach(chest => {
+                chest.onclick = () => {
+                    if (chest.classList.contains('opened')) return;
+                    
+                    // Disable all chests
+                    chests.forEach(c => {
+                        c.onclick = null;
+                        c.style.cursor = 'default';
+                    });
+
+                    // Animation sequence
+                    let shake = 0;
+                    const shakeInterval = setInterval(() => {
+                        chest.style.transform = `rotate(${Math.sin(shake++) * 10}deg)`;
+                    }, 50);
+
+                    setTimeout(() => {
+                        clearInterval(shakeInterval);
+                        chest.style.transform = 'none';
+                        chest.textContent = '💰';
+                        chest.classList.add('opened');
+                        
+                        const bonusWin = bet * (Math.floor(Math.random() * 50) + 20);
+                        result.textContent = `YOU WON $${bonusWin}!`;
+                        result.style.color = '#00ff88';
+                        result.style.textShadow = '0 0 10px #00ff88';
+                        
+                        balance += bonusWin;
+                        wins++;
+                        updateStats();
+                        
+                        // Reveal others
+                        chests.forEach(c => {
+                            if (!c.classList.contains('opened')) {
+                                c.textContent = '💨';
+                                c.style.opacity = '0.5';
+                            }
+                        });
+
+                        setTimeout(() => {
+                            btn.style.display = 'block';
+                        }, 1000);
+                    }, 1500);
+                };
+            });
+        }       
                 // Confetti or animation could go here
             }, 2000);
         }
