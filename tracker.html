@@ -122,6 +122,25 @@
             min-width: 30px;
             text-align: center;
         }
+        #language-container {
+            width: auto;
+            margin: 0 auto 10px auto;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 16px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+        #lang-select {
+            background: transparent;
+            color: white;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -141,6 +160,13 @@
             <input type="range" id="filter-slider" min="0" max="100" value="50">
             <span class="slider-label">+</span>
         </div>
+        <div id="language-container">
+            <span style="color:white;font-size:12px">Language:</span>
+            <select id="lang-select" onchange="updateLanguage()">
+                <option value="en-US">English</option>
+                <option value="it-IT">Italiano</option>
+            </select>
+        </div>
         <div id="filters-scroll">
             <button onclick="setFilter('normal')" id="btn-normal" class="filter-btn active">Normal</button>
             <button onclick="setFilter('bw')" id="btn-bw" class="filter-btn">B&W</button>
@@ -155,6 +181,7 @@
             <button onclick="setFilter('pixelate')" id="btn-pixelate" class="filter-btn">Pixelate</button>
             <button onclick="setFilter('invert')" id="btn-invert" class="filter-btn">Invert</button>
             <button onclick="setFilter('sepia')" id="btn-sepia" class="filter-btn">Sepia</button>
+            <button onclick="setFilter('subtitles')" id="btn-subtitles" class="filter-btn">Subtitles</button>
         </div>
         <div id="actions-bar">
             <button class="icon-btn" onclick="switchCamera()">🔄</button>
@@ -178,6 +205,13 @@
         let currentSegmentation = null;
         const sliderContainer = document.getElementById('slider-container');
         const slider = document.getElementById('filter-slider');
+        
+        // Subtitles variables
+        let recognition = null;
+        let currentSubtitle = "";
+        let subtitleTimeout;
+        const languageContainer = document.getElementById('language-container');
+        const langSelect = document.getElementById('lang-select');
 
         // Load Scripts with Progress
         async function loadScripts() {
@@ -283,6 +317,62 @@
             await initCamera();
         }
 
+        function startSubtitles() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Speech Recognition not supported in this browser.");
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!recognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            currentSubtitle = event.results[i][0].transcript;
+                            // Clear after 5 seconds
+                            clearTimeout(subtitleTimeout);
+                            subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 5000);
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                            currentSubtitle = interimTranscript;
+                        }
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Speech recognition error", event.error);
+                };
+                
+                recognition.onend = () => {
+                    if (currentFilter === 'subtitles') {
+                        try { recognition.start(); } catch(e){}
+                    }
+                };
+            }
+            
+            recognition.lang = langSelect.value;
+            try { recognition.start(); } catch(e) { console.log("Already started"); }
+        }
+
+        function stopSubtitles() {
+            if (recognition) {
+                recognition.stop();
+                currentSubtitle = "";
+            }
+        }
+
+        function updateLanguage() {
+            if (recognition && currentFilter === 'subtitles') {
+                recognition.stop(); // onend will restart it with new lang
+                recognition.lang = langSelect.value;
+            }
+        }
+
         async function setFilter(filter) {
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -297,6 +387,15 @@
                 if (filter === 'pixelate') slider.value = 20; // Default pixel size
             } else {
                 sliderContainer.style.display = 'none';
+            }
+
+            // Subtitles Logic
+            if (filter === 'subtitles') {
+                languageContainer.style.display = 'flex';
+                startSubtitles();
+            } else {
+                languageContainer.style.display = 'none';
+                stopSubtitles();
             }
 
             if (filter === 'objects') {
@@ -575,6 +674,31 @@
 
                 ctx.restore();
                 
+                if (currentFilter === 'subtitles' && currentSubtitle) {
+                    ctx.save();
+                    ctx.font = 'bold 24px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    
+                    const text = currentSubtitle;
+                    const x = canvas.width / 2;
+                    const y = canvas.height - 50;
+                    const padding = 10;
+                    
+                    const metrics = ctx.measureText(text);
+                    const textWidth = metrics.width;
+                    const textHeight = 30; // approx
+                    
+                    // Background
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.fillRect(x - textWidth/2 - padding, y - textHeight - padding, textWidth + padding*2, textHeight + padding*2);
+                    
+                    // Text
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(text, x, y);
+                    ctx.restore();
+                }
+
                 if (currentFilter === 'objects') {
                     ctx.font = 'bold 16px Inter';
                     ctx.lineWidth = 4;
