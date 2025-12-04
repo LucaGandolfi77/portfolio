@@ -209,6 +209,7 @@
         // Subtitles variables
         let recognition = null;
         let currentSubtitle = "";
+        let subtitleStatus = "";
         let subtitleTimeout;
         const languageContainer = document.getElementById('language-container');
         const langSelect = document.getElementById('lang-select');
@@ -319,17 +320,28 @@
 
         function startSubtitles() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("Speech Recognition not supported in this browser.");
+                subtitleStatus = "Not Supported";
+                alert("Speech Recognition not supported in this browser (Try Chrome on Android or Desktop).");
                 return;
             }
             
+            // Check for HTTPS
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                 console.warn("Speech Recognition usually requires HTTPS.");
+            }
+
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!recognition) {
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
                 
+                recognition.onstart = () => {
+                    subtitleStatus = "Listening...";
+                };
+
                 recognition.onresult = (event) => {
+                    subtitleStatus = "Listening...";
                     let interimTranscript = '';
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
@@ -346,17 +358,32 @@
 
                 recognition.onerror = (event) => {
                     console.error("Speech recognition error", event.error);
+                    if (event.error === 'not-allowed') {
+                        subtitleStatus = "Mic Blocked";
+                        alert("Microphone access denied. Please allow microphone access.");
+                    } else if (event.error === 'no-speech') {
+                        // ignore
+                    } else {
+                        subtitleStatus = "Error: " + event.error;
+                    }
                 };
                 
                 recognition.onend = () => {
                     if (currentFilter === 'subtitles') {
-                        try { recognition.start(); } catch(e){}
+                        try { recognition.start(); } catch(e){ subtitleStatus = "Stopped"; }
+                    } else {
+                        subtitleStatus = "";
                     }
                 };
             }
             
             recognition.lang = langSelect.value;
-            try { recognition.start(); } catch(e) { console.log("Already started"); }
+            try { 
+                recognition.start(); 
+                subtitleStatus = "Starting...";
+            } catch(e) { 
+                console.log("Already started"); 
+            }
         }
 
         function stopSubtitles() {
@@ -674,28 +701,33 @@
 
                 ctx.restore();
                 
-                if (currentFilter === 'subtitles' && currentSubtitle) {
+                if (currentFilter === 'subtitles') {
                     ctx.save();
-                    ctx.font = 'bold 24px Inter';
+                    // Scale font based on width
+                    const fontSize = Math.max(24, Math.floor(canvas.width / 25));
+                    ctx.font = `bold ${fontSize}px Inter`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
                     
-                    const text = currentSubtitle;
-                    const x = canvas.width / 2;
-                    const y = canvas.height - 50;
-                    const padding = 10;
+                    const text = currentSubtitle || subtitleStatus;
                     
-                    const metrics = ctx.measureText(text);
-                    const textWidth = metrics.width;
-                    const textHeight = 30; // approx
-                    
-                    // Background
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                    ctx.fillRect(x - textWidth/2 - padding, y - textHeight - padding, textWidth + padding*2, textHeight + padding*2);
-                    
-                    // Text
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(text, x, y);
+                    if (text) {
+                        const x = canvas.width / 2;
+                        const y = canvas.height - (canvas.height * 0.1);
+                        const padding = fontSize / 2;
+                        
+                        const metrics = ctx.measureText(text);
+                        const textWidth = metrics.width;
+                        const textHeight = fontSize * 1.2;
+                        
+                        // Background
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                        ctx.fillRect(x - textWidth/2 - padding, y - textHeight - padding + (fontSize*0.2), textWidth + padding*2, textHeight + padding);
+                        
+                        // Text
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(text, x, y);
+                    }
                     ctx.restore();
                 }
 
