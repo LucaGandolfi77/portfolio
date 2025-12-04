@@ -120,6 +120,7 @@
             <button onclick="setFilter('edges')" id="btn-edges" class="filter-btn">Edges</button>
             <button onclick="setFilter('objects')" id="btn-objects" class="filter-btn">Objects</button>
             <button onclick="setFilter('face')" id="btn-face" class="filter-btn">Face</button>
+            <button onclick="setFilter('tracker')" id="btn-tracker" class="filter-btn">AI Tracker</button>
         </div>
         <div id="actions-bar">
             <button class="icon-btn" onclick="switchCamera()">🔄</button>
@@ -138,7 +139,7 @@
         let predictions = [];
         let isModelLoading = false;
         let facingMode = 'environment';
-        let cocoSsd = null; // Will be loaded dynamically
+        let trackedObject = null;
 
         // Load Scripts with Progress
         async function loadScripts() {
@@ -146,7 +147,9 @@
                 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
-                'assets/js/face_tracker.js'
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
+                'assets/js/face_tracker.js',
+                'assets/js/ai_tracker.js'
             ];
             
             const progressBar = document.getElementById('progress-bar');
@@ -282,8 +285,70 @@
                 } else {
                     detectLoop();
                 }
+            } else if (filter === 'tracker') {
+                if (!model && !isModelLoading) {
+                    const btn = document.getElementById('btn-tracker');
+                    btn.innerText = 'Loading...';
+                    isModelLoading = true;
+                    try {
+                        if (!cocoSsd) cocoSsd = window.cocoSsd;
+                        model = await cocoSsd.load();
+                        await window.AITracker.load();
+                        btn.innerText = 'Click Object';
+                        detectLoop();
+                    } catch (err) {
+                        console.error(err);
+                        btn.innerText = 'Error';
+                    } finally {
+                        isModelLoading = false;
+                    }
+                } else {
+                    detectLoop();
+                }
             }
         }
+
+        // Handle clicks for tracking
+        canvas.addEventListener('click', async (e) => {
+            if (currentFilter !== 'tracker' || !model) return;
+
+            const rect = canvas.getBoundingClientRect();
+            // Calculate click coordinates relative to canvas
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let clickX = (e.clientX - rect.left) * scaleX;
+            const clickY = (e.clientY - rect.top) * scaleY;
+
+            // Handle mirroring
+            if (facingMode === 'user') {
+                clickX = canvas.width - clickX;
+            }
+
+            // Find object under click
+            // We need fresh predictions
+            const preds = await model.detect(video);
+            
+            const clickedObj = preds.find(p => {
+                const [x, y, w, h] = p.bbox;
+                return clickX >= x && clickX <= x + w &&
+                       clickY >= y && clickY <= y + h;
+            });
+
+            if (clickedObj) {
+                document.getElementById('btn-tracker').innerText = 'Tracking ' + clickedObj.class;
+                await window.AITracker.setTarget(video, clickedObj.bbox);
+            } else {
+                document.getElementById('btn-tracker').innerText = 'No Object Found';
+                setTimeout(() => {
+                     if (window.AITracker.targetEmbedding) {
+                         document.getElementById('btn-tracker').innerText = 'Tracking';
+                     } else {
+                         document.getElementById('btn-tracker').innerText = 'Click Object';
+                     }
+                }, 1000);
+            }
+        });
 
         async function detectLoop() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -303,6 +368,24 @@
                         console.error(e);
                     }
                     if (currentFilter === 'face') {
+                        requestAnimationFrame(detectLoop);
+                    }
+                } else if (currentFilter === 'tracker' && model && window.AITracker) {
+                    try {
+                        // 1. Detect all objects
+                        const allObjects = await model.detect(video);
+                        
+                        // 2. If we have a target, find it among detections
+                        if (window.AITracker.targetEmbedding) {
+                            trackedObject = await window.AITracker.track(video, allObjects);
+                        } else {
+                            // Just show all candidates so user knows what to click
+                            predictions = allObjects;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    if (currentFilter === 'tracker') {
                         requestAnimationFrame(detectLoop);
                     }
                 }
@@ -358,6 +441,45 @@
                         window.FaceTracker.draw(ctx, predictions);
                     }
                     ctx.restore();
+                } else if (currentFilter === 'tracker') {
+                    ctx.font = 'bold 16px Inter';
+                    ctx.lineWidth = 4;
+
+                    // If tracking a specific object
+                    if (window.AITracker && window.AITracker.targetEmbedding && trackedObject) {
+                        let [x, y, width, height] = trackedObject.bbox;
+                        
+                        if (facingMode === 'user') x = canvas.width - x - width;
+
+                        // Red Box for Tracked Object
+                        ctx.strokeStyle = '#ff0000';
+                        ctx.strokeRect(x, y, width, height);
+                        
+                        ctx.fillStyle = '#ff0000';
+                        const text = `TRACKING: ${trackedObject.class}`;
+                        const textWidth = ctx.measureText(text).width;
+                        ctx.fillRect(x, y > 25 ? y - 25 : 0, textWidth + 10, 25);
+                        
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(text, x + 5, y > 25 ? y - 7 : 18);
+                    } 
+                    // If waiting for selection, show candidates faintly
+                    else if (!window.AITracker.targetEmbedding) {
+                        predictions.forEach(prediction => {
+                            let [x, y, width, height] = prediction.bbox;
+                            if (facingMode === 'user') x = canvas.width - x - width;
+
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                            ctx.strokeRect(x, y, width, height);
+                        });
+                        
+                        // Instruction text
+                        ctx.fillStyle = 'white';
+                        ctx.font = '20px Inter';
+                        ctx.textAlign = 'center';
+                        ctx.fillText("Tap an object to track it", canvas.width/2, canvas.height - 100);
+                        ctx.textAlign = 'left';
+                    }
                 } else if (currentFilter !== 'normal') {
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
