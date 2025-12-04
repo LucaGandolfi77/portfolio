@@ -143,6 +143,22 @@
     </div>
 
     <script>
+        // Global Error Handler for Mobile Debugging
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const div = document.createElement('div');
+            div.style.position = 'fixed';
+            div.style.top = '0';
+            div.style.left = '0';
+            div.style.width = '100%';
+            div.style.background = 'rgba(255,0,0,0.8)';
+            div.style.color = 'white';
+            div.style.padding = '10px';
+            div.style.zIndex = '9999';
+            div.innerText = `Error: ${msg} at line ${lineNo}`;
+            document.body.appendChild(div);
+            return false;
+        };
+
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -155,6 +171,7 @@
         let trackedObject = null;
         let bodyPixNet = null;
         let currentSegmentation = null;
+        let cocoSsd = null; // Explicitly declare
         const sliderContainer = document.getElementById('slider-container');
         const slider = document.getElementById('filter-slider');
 
@@ -208,25 +225,34 @@
                     audio: false 
                 };
 
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Camera API not available (HTTPS required?)");
+                }
+
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                video.play();
-                requestAnimationFrame(draw);
+                // Ensure video plays (iOS requirement)
+                video.onloadedmetadata = () => {
+                    video.play().catch(e => console.error("Play error:", e));
+                    requestAnimationFrame(draw);
+                };
             } catch (err) {
                 console.error("Error accessing camera:", err);
+                alert(`Camera Error: ${err.message}`);
+                
                 // Fallback for PC if environment fails
                 if (facingMode === 'environment') {
                     console.log("Retrying with default camera...");
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                         video.srcObject = stream;
-                        video.play();
-                        requestAnimationFrame(draw);
+                        video.onloadedmetadata = () => {
+                            video.play().catch(e => console.error("Play error:", e));
+                            requestAnimationFrame(draw);
+                        };
                     } catch (e) {
-                        alert("Could not access camera.");
+                        alert(`Fallback Error: ${e.message}`);
                     }
-                } else {
-                    alert("Could not access camera.");
                 }
             }
         }
