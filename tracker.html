@@ -21,22 +21,6 @@
             object-fit: cover; 
             display: block;
         }
-        #loader-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 2000;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            color: #00d4ff; font-family: 'Inter', sans-serif;
-            transition: opacity 0.5s;
-        }
-        .progress-container {
-            width: 80%; max-width: 300px; height: 4px;
-            background: rgba(255,255,255,0.2);
-            margin-top: 20px; border-radius: 2px; overflow: hidden;
-        }
-        #progress-bar {
-            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
-        }
         #controls-container {
             position: absolute; bottom: 0; left: 0; width: 100%;
             z-index: 10; padding-bottom: max(20px, env(safe-area-inset-bottom));
@@ -125,11 +109,6 @@
     </style>
 </head>
 <body>
-    <div id="loader-overlay">
-        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
-        <div class="progress-container"><div id="progress-bar"></div></div>
-    </div>
-
     <a href="technology.html" class="back-btn">← Back</a>
     <div id="flash"></div>
     <video id="video" playsinline style="display:none" autoplay muted></video>
@@ -179,55 +158,35 @@
         const sliderContainer = document.getElementById('slider-container');
         const slider = document.getElementById('filter-slider');
 
-        // Load Scripts with Progress
-        async function loadScripts() {
-            const scripts = [
-                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
-                'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
-                'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
-                'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
-                'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
-                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                'assets/js/face_tracker.js',
-                'assets/js/ai_tracker.js',
-                'assets/js/hand_tracker.js'
-            ];
-            
-            const progressBar = document.getElementById('progress-bar');
-            const timeLeft = document.getElementById('time-left');
-            let loaded = 0;
-            
-            try {
-                for (let i = 0; i < scripts.length; i++) {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = scripts[i];
-                        script.onload = () => {
-                            loaded++;
-                            const percent = (loaded / scripts.length) * 100;
-                            progressBar.style.width = percent + '%';
-                            timeLeft.textContent = Math.round(100 - percent) + '% left';
-                            resolve();
-                        };
-                        script.onerror = () => reject(new Error(`Failed to load ${scripts[i]}`));
-                        document.body.appendChild(script);
-                    });
+        const SCRIPTS = {
+            tfjs: 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
+            cocoSsd: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
+            blazeface: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
+            mobilenet: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
+            bodyPix: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
+            hands: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+            faceTracker: 'assets/js/face_tracker.js',
+            aiTracker: 'assets/js/ai_tracker.js',
+            handTracker: 'assets/js/hand_tracker.js'
+        };
+
+        const loadedScripts = new Set();
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                if (loadedScripts.has(src)) {
+                    resolve();
+                    return;
                 }
-                
-                // Wait a bit for evaluation
-                setTimeout(() => {
-                    document.getElementById('loader-overlay').style.opacity = 0;
-                    setTimeout(() => {
-                        document.getElementById('loader-overlay').style.display = 'none';
-                    }, 500);
-                    // Initialize global cocoSsd variable from window
-                    if (window.cocoSsd) cocoSsd = window.cocoSsd;
-                }, 500);
-            } catch (e) {
-                console.error(e);
-                document.querySelector('.loader-text').innerText = "Error loading libraries. Check connection.";
-                progressBar.style.backgroundColor = 'red';
-            }
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    loadedScripts.add(src);
+                    resolve();
+                };
+                script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                document.body.appendChild(script);
+            });
         }
 
         // Initialize Camera
@@ -300,6 +259,8 @@
                     btn.innerText = 'Loading Model...';
                     isModelLoading = true;
                     try {
+                        await loadScript(SCRIPTS.tfjs);
+                        await loadScript(SCRIPTS.cocoSsd);
                         if (!cocoSsd) cocoSsd = window.cocoSsd; // Ensure it's available
                         model = await cocoSsd.load();
                         btn.innerText = 'Objects';
@@ -319,6 +280,9 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
+                        await loadScript(SCRIPTS.tfjs);
+                        await loadScript(SCRIPTS.blazeface);
+                        await loadScript(SCRIPTS.faceTracker);
                         await window.FaceTracker.load();
                         btn.innerText = 'Face';
                         detectLoop();
@@ -337,6 +301,8 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
+                        await loadScript(SCRIPTS.hands);
+                        await loadScript(SCRIPTS.handTracker);
                         await window.HandTracker.load();
                         btn.innerText = 'Hands';
                         detectLoop();
@@ -355,6 +321,10 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
+                        await loadScript(SCRIPTS.tfjs);
+                        await loadScript(SCRIPTS.cocoSsd);
+                        await loadScript(SCRIPTS.mobilenet);
+                        await loadScript(SCRIPTS.aiTracker);
                         if (!cocoSsd) cocoSsd = window.cocoSsd;
                         model = await cocoSsd.load();
                         await window.AITracker.load();
@@ -375,6 +345,8 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
+                        await loadScript(SCRIPTS.tfjs);
+                        await loadScript(SCRIPTS.bodyPix);
                         if (window.bodyPix) {
                             bodyPixNet = await window.bodyPix.load();
                             btn.innerText = 'Segment';
@@ -921,7 +893,7 @@
         }
 
         // Start
-        loadScripts();
+        // loadScripts(); // Removed initial loading
         initCamera();
     </script>
 </body>
