@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Camera Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
         body { 
             margin: 0; 
@@ -23,49 +21,61 @@
             object-fit: cover; 
             display: block;
         }
-        #controls {
-            position: absolute; 
-            bottom: 30px; 
-            left: 0; 
-            width: 100%;
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
-            gap: 15px;
-            padding-bottom: env(safe-area-inset-bottom);
-            z-index: 10;
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #00d4ff; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
         }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
+        }
+        #controls-container {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            z-index: 10; padding-bottom: max(20px, env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        #filters-scroll {
+            display: flex; gap: 10px; overflow-x: auto; 
+            padding: 10px 20px;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE 10+ */
+            justify-content: flex-start;
+        }
+        #filters-scroll::-webkit-scrollbar { display: none; }
         .filter-btn {
-            background: rgba(0, 0, 0, 0.5); 
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white; 
-            padding: 8px 16px; 
-            border-radius: 20px;
-            font-size: 14px; 
-            backdrop-filter: blur(5px);
-            cursor: pointer;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 16px; border-radius: 20px;
+            font-size: 13px; backdrop-filter: blur(5px);
+            white-space: nowrap; cursor: pointer;
             transition: all 0.2s;
         }
-        .filter-btn.active { 
-            background: #00d4ff; 
-            color: #000; 
-            border-color: #00d4ff; 
-            font-weight: 600;
+        .filter-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; font-weight: 600; }
+        #actions-bar {
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 0 20px;
         }
         #shutter {
-            width: 70px; 
-            height: 70px; 
-            border-radius: 50%;
-            background: white; 
-            border: 4px solid rgba(255,255,255,0.3);
-            padding: 0;
-            cursor: pointer;
-            transition: transform 0.1s;
-            margin: 0 10px;
+            width: 70px; height: 70px; border-radius: 50%;
+            background: white; border: 4px solid rgba(255,255,255,0.3);
+            cursor: pointer; transition: transform 0.1s;
         }
-        #shutter:active { 
-            transform: scale(0.9); 
-            background: #ddd;
+        #shutter:active { transform: scale(0.9); background: #ddd; }
+        .icon-btn {
+            background: rgba(255,255,255,0.1); border: none;
+            color: white; width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer; backdrop-filter: blur(4px);
         }
         .back-btn {
             position: absolute;
@@ -92,18 +102,29 @@
     </style>
 </head>
 <body>
+    <div id="loader-overlay">
+        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
     <a href="technology.html" class="back-btn">← Back</a>
     <div id="flash"></div>
     <video id="video" playsinline style="display:none" autoplay muted></video>
     <canvas id="canvas"></canvas>
     
-    <div id="controls">
-        <button onclick="setFilter('normal')" id="btn-normal" class="filter-btn active">Normal</button>
-        <button onclick="setFilter('bw')" id="btn-bw" class="filter-btn">B&W</button>
-        <button id="shutter" onclick="takePhoto()" aria-label="Take Photo"></button>
-        <button onclick="setFilter('contrast')" id="btn-contrast" class="filter-btn">Contrast</button>
-        <button onclick="setFilter('edges')" id="btn-edges" class="filter-btn">Edges</button>
-        <button onclick="setFilter('objects')" id="btn-objects" class="filter-btn">Objects</button>
+    <div id="controls-container">
+        <div id="filters-scroll">
+            <button onclick="setFilter('normal')" id="btn-normal" class="filter-btn active">Normal</button>
+            <button onclick="setFilter('bw')" id="btn-bw" class="filter-btn">B&W</button>
+            <button onclick="setFilter('contrast')" id="btn-contrast" class="filter-btn">Contrast</button>
+            <button onclick="setFilter('edges')" id="btn-edges" class="filter-btn">Edges</button>
+            <button onclick="setFilter('objects')" id="btn-objects" class="filter-btn">Objects</button>
+        </div>
+        <div id="actions-bar">
+            <button class="icon-btn" onclick="switchCamera()">🔄</button>
+            <button id="shutter" onclick="takePhoto()" aria-label="Take Photo"></button>
+            <div style="width:44px"></div> <!-- Spacer -->
+        </div>
     </div>
 
     <script>
@@ -115,25 +136,104 @@
         let model = null;
         let predictions = [];
         let isModelLoading = false;
+        let facingMode = 'environment';
+        let cocoSsd = null; // Will be loaded dynamically
+
+        // Load Scripts with Progress
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            // Wait a bit for evaluation
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                }, 500);
+                // Initialize global cocoSsd variable from window
+                cocoSsd = window.cocoSsd;
+            }, 500);
+        }
 
         // Initialize Camera
         async function initCamera() {
+            if (animationId) cancelAnimationFrame(animationId);
+            
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                // Stop existing tracks
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = { 
                     video: { 
-                        facingMode: 'environment',
+                        facingMode: facingMode,
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }, 
                     audio: false 
-                });
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 video.play();
                 requestAnimationFrame(draw);
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                alert("Could not access camera. Please ensure you have granted permission.");
+                // Fallback for PC if environment fails
+                if (facingMode === 'environment') {
+                    console.log("Retrying with default camera...");
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        video.srcObject = stream;
+                        video.play();
+                        requestAnimationFrame(draw);
+                    } catch (e) {
+                        alert("Could not access camera.");
+                    }
+                } else {
+                    alert("Could not access camera.");
+                }
             }
+        }
+
+        async function switchCamera() {
+            facingMode = facingMode === 'user' ? 'environment' : 'user';
+            await initCamera();
         }
 
         async function setFilter(filter) {
@@ -145,9 +245,10 @@
                 if (!model && !isModelLoading) {
                     const btn = document.getElementById('btn-objects');
                     const originalText = btn.innerText;
-                    btn.innerText = 'Loading...';
+                    btn.innerText = 'Loading Model...';
                     isModelLoading = true;
                     try {
+                        if (!cocoSsd) cocoSsd = window.cocoSsd; // Ensure it's available
                         model = await cocoSsd.load();
                         btn.innerText = 'Objects';
                         detectLoop();
@@ -181,14 +282,26 @@
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
+                // Mirror if user facing
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
                 
                 if (currentFilter === 'objects') {
                     ctx.font = 'bold 16px Inter';
                     ctx.lineWidth = 4;
                     predictions.forEach(prediction => {
-                        const [x, y, width, height] = prediction.bbox;
+                        let [x, y, width, height] = prediction.bbox;
                         
+                        // Adjust bbox for mirrored user camera
+                        if (facingMode === 'user') {
+                            x = canvas.width - x - width;
+                        }
+
                         // Box
                         ctx.strokeStyle = '#00d4ff';
                         ctx.strokeRect(x, y, width, height);
@@ -268,6 +381,7 @@
         }
 
         // Start
+        loadScripts();
         initCamera();
     </script>
 </body>
