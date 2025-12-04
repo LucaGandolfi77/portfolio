@@ -99,6 +99,29 @@
             z-index: 100;
             transition: opacity 0.1s;
         }
+        #slider-container {
+            width: 80%;
+            max-width: 300px;
+            margin: 0 auto 10px auto;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+        #filter-slider {
+            width: 100%;
+            accent-color: #00d4ff;
+            cursor: pointer;
+        }
+        .slider-label {
+            color: white;
+            font-size: 12px;
+            min-width: 30px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -113,6 +136,11 @@
     <canvas id="canvas"></canvas>
     
     <div id="controls-container">
+        <div id="slider-container">
+            <span class="slider-label">-</span>
+            <input type="range" id="filter-slider" min="0" max="100" value="50">
+            <span class="slider-label">+</span>
+        </div>
         <div id="filters-scroll">
             <button onclick="setFilter('normal')" id="btn-normal" class="filter-btn active">Normal</button>
             <button onclick="setFilter('bw')" id="btn-bw" class="filter-btn">B&W</button>
@@ -140,6 +168,8 @@
         let isModelLoading = false;
         let facingMode = 'environment';
         let trackedObject = null;
+        const sliderContainer = document.getElementById('slider-container');
+        const slider = document.getElementById('filter-slider');
 
         // Load Scripts with Progress
         async function loadScripts() {
@@ -246,6 +276,15 @@
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${filter}`).classList.add('active');
+
+            // Slider Logic
+            if (filter === 'contrast' || filter === 'edges') {
+                sliderContainer.style.display = 'flex';
+                if (filter === 'contrast') slider.value = 50;
+                if (filter === 'edges') slider.value = 50;
+            } else {
+                sliderContainer.style.display = 'none';
+            }
 
             if (filter === 'objects') {
                 if (!model && !isModelLoading) {
@@ -492,7 +531,9 @@
                             data[i + 2] = avg; // B
                         }
                     } else if (currentFilter === 'contrast') {
-                        const factor = 2.0; // Contrast factor
+                        // Map 0-100 to 0.0-5.0 (default 2.5)
+                        const val = parseInt(slider.value);
+                        const factor = (val / 20); 
                         for (let i = 0; i < data.length; i += 4) {
                             data[i] = factor * (data[i] - 128) + 128;
                             data[i + 1] = factor * (data[i + 1] - 128) + 128;
@@ -504,6 +545,10 @@
                         const height = canvas.height;
                         const input = new Uint8ClampedArray(data); // Copy input
                         
+                        // Map 0-100 to threshold 100-10 (inverted)
+                        const val = parseInt(slider.value);
+                        const threshold = Math.max(5, 100 - val);
+
                         for (let y = 1; y < height - 1; y++) {
                             for (let x = 1; x < width - 1; x++) {
                                 const i = (y * width + x) * 4;
@@ -519,7 +564,7 @@
                                 // Invert for black lines on white or keep white lines on black
                                 // Let's do green matrix style lines
                                 data[i] = 0;
-                                data[i + 1] = val > 50 ? 255 : 0;
+                                data[i + 1] = val > threshold ? 255 : 0;
                                 data[i + 2] = 0;
                             }
                         }
