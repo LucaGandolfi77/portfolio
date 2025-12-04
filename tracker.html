@@ -197,43 +197,37 @@
             const timeLeft = document.getElementById('time-left');
             let loaded = 0;
             
-            for (let i = 0; i < scripts.length; i++) {
-                await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('GET', scripts[i]);
-                    xhr.onprogress = (e) => {
-                        if (e.lengthComputable) {
-                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+            try {
+                for (let i = 0; i < scripts.length; i++) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = scripts[i];
+                        script.onload = () => {
+                            loaded++;
+                            const percent = (loaded / scripts.length) * 100;
                             progressBar.style.width = percent + '%';
                             timeLeft.textContent = Math.round(100 - percent) + '% left';
-                        }
-                    };
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            const script = document.createElement('script');
-                            script.text = xhr.responseText;
-                            document.body.appendChild(script);
-                            loaded++;
-                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
                             resolve();
-                        } else {
-                            reject();
-                        }
-                    };
-                    xhr.onerror = reject;
-                    xhr.send();
-                });
-            }
-            
-            // Wait a bit for evaluation
-            setTimeout(() => {
-                document.getElementById('loader-overlay').style.opacity = 0;
+                        };
+                        script.onerror = () => reject(new Error(`Failed to load ${scripts[i]}`));
+                        document.body.appendChild(script);
+                    });
+                }
+                
+                // Wait a bit for evaluation
                 setTimeout(() => {
-                    document.getElementById('loader-overlay').style.display = 'none';
+                    document.getElementById('loader-overlay').style.opacity = 0;
+                    setTimeout(() => {
+                        document.getElementById('loader-overlay').style.display = 'none';
+                    }, 500);
+                    // Initialize global cocoSsd variable from window
+                    if (window.cocoSsd) cocoSsd = window.cocoSsd;
                 }, 500);
-                // Initialize global cocoSsd variable from window
-                cocoSsd = window.cocoSsd;
-            }, 500);
+            } catch (e) {
+                console.error(e);
+                document.querySelector('.loader-text').innerText = "Error loading libraries. Check connection.";
+                progressBar.style.backgroundColor = 'red';
+            }
         }
 
         // Initialize Camera
