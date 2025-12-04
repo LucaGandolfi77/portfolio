@@ -21,6 +21,22 @@
             object-fit: cover; 
             display: block;
         }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #00d4ff; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
+        }
         #controls-container {
             position: absolute; bottom: 0; left: 0; width: 100%;
             z-index: 10; padding-bottom: max(20px, env(safe-area-inset-bottom));
@@ -109,6 +125,11 @@
     </style>
 </head>
 <body>
+    <div id="loader-overlay">
+        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
     <a href="technology.html" class="back-btn">← Back</a>
     <div id="flash"></div>
     <video id="video" playsinline style="display:none" autoplay muted></video>
@@ -143,22 +164,6 @@
     </div>
 
     <script>
-        // Global Error Handler for Mobile Debugging
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            const div = document.createElement('div');
-            div.style.position = 'fixed';
-            div.style.top = '0';
-            div.style.left = '0';
-            div.style.width = '100%';
-            div.style.background = 'rgba(255,0,0,0.8)';
-            div.style.color = 'white';
-            div.style.padding = '10px';
-            div.style.zIndex = '9999';
-            div.innerText = `Error: ${msg} at line ${lineNo}`;
-            document.body.appendChild(div);
-            return false;
-        };
-
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -171,39 +176,64 @@
         let trackedObject = null;
         let bodyPixNet = null;
         let currentSegmentation = null;
-        let cocoSsd = null; // Explicitly declare
         const sliderContainer = document.getElementById('slider-container');
         const slider = document.getElementById('filter-slider');
 
-        const SCRIPTS = {
-            tfjs: 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
-            cocoSsd: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
-            blazeface: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
-            mobilenet: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
-            bodyPix: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
-            hands: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-            faceTracker: 'assets/js/face_tracker.js',
-            aiTracker: 'assets/js/ai_tracker.js',
-            handTracker: 'assets/js/hand_tracker.js'
-        };
-
-        const loadedScripts = new Set();
-
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                if (loadedScripts.has(src)) {
-                    resolve();
-                    return;
-                }
-                const script = document.createElement('script');
-                script.src = src;
-                script.onload = () => {
-                    loadedScripts.add(src);
-                    resolve();
-                };
-                script.onerror = () => reject(new Error(`Failed to load ${src}`));
-                document.body.appendChild(script);
-            });
+        // Load Scripts with Progress
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/face_tracker.js',
+                'assets/js/ai_tracker.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            // Wait a bit for evaluation
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                }, 500);
+                // Initialize global cocoSsd variable from window
+                cocoSsd = window.cocoSsd;
+            }, 500);
         }
 
         // Initialize Camera
@@ -225,34 +255,25 @@
                     audio: false 
                 };
 
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("Camera API not available (HTTPS required?)");
-                }
-
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                // Ensure video plays (iOS requirement)
-                video.onloadedmetadata = () => {
-                    video.play().catch(e => console.error("Play error:", e));
-                    requestAnimationFrame(draw);
-                };
+                video.play();
+                requestAnimationFrame(draw);
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                alert(`Camera Error: ${err.message}`);
-                
                 // Fallback for PC if environment fails
                 if (facingMode === 'environment') {
                     console.log("Retrying with default camera...");
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                         video.srcObject = stream;
-                        video.onloadedmetadata = () => {
-                            video.play().catch(e => console.error("Play error:", e));
-                            requestAnimationFrame(draw);
-                        };
+                        video.play();
+                        requestAnimationFrame(draw);
                     } catch (e) {
-                        alert(`Fallback Error: ${e.message}`);
+                        alert("Could not access camera.");
                     }
+                } else {
+                    alert("Could not access camera.");
                 }
             }
         }
@@ -285,8 +306,6 @@
                     btn.innerText = 'Loading Model...';
                     isModelLoading = true;
                     try {
-                        await loadScript(SCRIPTS.tfjs);
-                        await loadScript(SCRIPTS.cocoSsd);
                         if (!cocoSsd) cocoSsd = window.cocoSsd; // Ensure it's available
                         model = await cocoSsd.load();
                         btn.innerText = 'Objects';
@@ -306,9 +325,6 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
-                        await loadScript(SCRIPTS.tfjs);
-                        await loadScript(SCRIPTS.blazeface);
-                        await loadScript(SCRIPTS.faceTracker);
                         await window.FaceTracker.load();
                         btn.innerText = 'Face';
                         detectLoop();
@@ -327,8 +343,6 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
-                        await loadScript(SCRIPTS.hands);
-                        await loadScript(SCRIPTS.handTracker);
                         await window.HandTracker.load();
                         btn.innerText = 'Hands';
                         detectLoop();
@@ -347,10 +361,6 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
-                        await loadScript(SCRIPTS.tfjs);
-                        await loadScript(SCRIPTS.cocoSsd);
-                        await loadScript(SCRIPTS.mobilenet);
-                        await loadScript(SCRIPTS.aiTracker);
                         if (!cocoSsd) cocoSsd = window.cocoSsd;
                         model = await cocoSsd.load();
                         await window.AITracker.load();
@@ -371,8 +381,6 @@
                     btn.innerText = 'Loading...';
                     isModelLoading = true;
                     try {
-                        await loadScript(SCRIPTS.tfjs);
-                        await loadScript(SCRIPTS.bodyPix);
                         if (window.bodyPix) {
                             bodyPixNet = await window.bodyPix.load();
                             btn.innerText = 'Segment';
@@ -450,7 +458,6 @@
                         predictions = await window.FaceTracker.detect(video);
                     } catch (e) {
                         console.error(e);
-                        predictions = [];
                     }
                     if (currentFilter === 'face') {
                         requestAnimationFrame(detectLoop);
@@ -518,32 +525,10 @@
                     const w = canvas.width * size;
                     const h = canvas.height * size;
                     
-                    // Temporarily disable the global transform to handle pixelation manually
-                    ctx.restore();
-                    ctx.save();
-
-                    // Draw small version
-                    if (facingMode === 'user') {
-                        ctx.save();
-                        ctx.translate(w, 0);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(video, 0, 0, w, h);
-                        ctx.restore();
-                    } else {
-                        ctx.drawImage(video, 0, 0, w, h);
-                    }
-                    
-                    // Scale up
                     ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(video, 0, 0, w, h);
                     ctx.drawImage(canvas, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
                     ctx.imageSmoothingEnabled = true;
-
-                    // Re-apply global transform for consistency if needed later (though we overwrote canvas)
-                    if (facingMode === 'user') {
-                        ctx.translate(canvas.width, 0);
-                        ctx.scale(-1, 1);
-                    }
-
                 } else if (currentFilter === 'blur') {
                     const val = parseInt(slider.value);
                     const blurPx = (val / 100) * 20; // 0 to 20px
@@ -558,19 +543,10 @@
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const pixelData = imageData.data;
                     const mask = currentSegmentation.data; // 0 or 1
-                    const width = canvas.width;
                     
                     for (let i = 0; i < mask.length; i++) {
-                        let maskIndex = i;
-                        // Flip mask index if user facing
-                        if (facingMode === 'user') {
-                            const x = i % width;
-                            const y = Math.floor(i / width);
-                            maskIndex = y * width + (width - 1 - x);
-                        }
-
                         // If mask is 0 (background), make it black
-                        if (mask[maskIndex] === 0) {
+                        if (mask[i] === 0) {
                             pixelData[i * 4] = 0;     // R
                             pixelData[i * 4 + 1] = 0; // G
                             pixelData[i * 4 + 2] = 0; // B
@@ -582,164 +558,6 @@
                     // Default draw
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 }
-
-                ctx.restore();
-                
-                if (currentFilter === 'objects') {
-                    ctx.font = 'bold 16px Inter';
-                    ctx.lineWidth = 4;
-                    predictions.forEach(prediction => {
-                        let [x, y, width, height] = prediction.bbox;
-                        
-                        // Adjust bbox for mirrored user camera
-                        if (facingMode === 'user') {
-                            x = canvas.width - x - width;
-                        }
-
-                        // Box
-                        ctx.strokeStyle = '#00d4ff';
-                        ctx.strokeRect(x, y, width, height);
-                        
-                        // Label background
-                        ctx.fillStyle = '#00d4ff';
-                        const text = `${prediction.class} ${Math.round(prediction.score * 100)}%`;
-                        const textWidth = ctx.measureText(text).width;
-                        ctx.fillRect(x, y > 25 ? y - 25 : 0, textWidth + 10, 25);
-                        
-                        // Label text
-                        ctx.fillStyle = '#000000';
-                        ctx.fillText(text, x + 5, y > 25 ? y - 7 : 18);
-                    });
-                } else if (currentFilter === 'face') {
-                    ctx.save();
-                    if (facingMode === 'user') {
-                        ctx.translate(canvas.width, 0);
-                        ctx.scale(-1, 1);
-                    }
-                    if (window.FaceTracker && predictions.length > 0) {
-                        window.FaceTracker.draw(ctx, predictions);
-                    }
-                    ctx.restore();
-                } else if (currentFilter === 'hands') {
-                    ctx.save();
-                    if (facingMode === 'user') {
-                        ctx.translate(canvas.width, 0);
-                        ctx.scale(-1, 1);
-                    }
-                    if (window.HandTracker) {
-                        window.HandTracker.draw(ctx, canvas.width, canvas.height);
-                    }
-                    ctx.restore();
-                } else if (currentFilter === 'tracker') {
-                    ctx.font = 'bold 16px Inter';
-                    ctx.lineWidth = 4;
-
-                    // If tracking a specific object
-                    if (window.AITracker && window.AITracker.targetEmbedding && trackedObject) {
-                        let [x, y, width, height] = trackedObject.bbox;
-                        
-                        if (facingMode === 'user') x = canvas.width - x - width;
-
-                        // Red Box for Tracked Object
-                        ctx.strokeStyle = '#ff0000';
-                        ctx.strokeRect(x, y, width, height);
-                        
-                        ctx.fillStyle = '#ff0000';
-                        const text = `TRACKING: ${trackedObject.class}`;
-                        const textWidth = ctx.measureText(text).width;
-                        ctx.fillRect(x, y > 25 ? y - 25 : 0, textWidth + 10, 25);
-                        
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillText(text, x + 5, y > 25 ? y - 7 : 18);
-                    } 
-                    // If waiting for selection, show candidates faintly
-                    else if (!window.AITracker.targetEmbedding) {
-                        predictions.forEach(prediction => {
-                            let [x, y, width, height] = prediction.bbox;
-                            if (facingMode === 'user') x = canvas.width - x - width;
-
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                            ctx.strokeRect(x, y, width, height);
-                        });
-                        
-                        // Instruction text
-                        ctx.fillStyle = 'white';
-                        ctx.font = '20px Inter';
-                        ctx.textAlign = 'center';
-                        ctx.fillText("Tap an object to track it", canvas.width/2, canvas.height - 100);
-                        ctx.textAlign = 'left';
-                    }
-                } else if (currentFilter !== 'normal') {
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const data = imageData.data;
-                    
-                    if (currentFilter === 'bw') {
-                        for (let i = 0; i < data.length; i += 4) {
-                            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                            data[i] = avg;     // R
-                            data[i + 1] = avg; // G
-                            data[i + 2] = avg; // B
-                        }
-                    } else if (currentFilter === 'contrast') {
-                        // Map 0-100 to 0.0-5.0 (default 2.5)
-                        const val = parseInt(slider.value);
-                        const factor = (val / 20); 
-                        for (let i = 0; i < data.length; i += 4) {
-                            data[i] = factor * (data[i] - 128) + 128;
-                            data[i + 1] = factor * (data[i + 1] - 128) + 128;
-                            data[i + 2] = factor * (data[i + 2] - 128) + 128;
-                        }
-                    } else if (currentFilter === 'edges') {
-                        // Simple edge detection (Sobel-like approximation for performance)
-                        const width = canvas.width;
-                        const height = canvas.height;
-                        const input = new Uint8ClampedArray(data); // Copy input
-                        
-                        // Map 0-100 to threshold 100-10 (inverted)
-                        const val = parseInt(slider.value);
-                        const threshold = Math.max(5, 100 - val);
-
-                        for (let y = 1; y < height - 1; y++) {
-                            for (let x = 1; x < width - 1; x++) {
-                                const i = (y * width + x) * 4;
-                                
-                                // Compare with right and bottom neighbors
-                                const right = ((y * width + (x + 1)) * 4);
-                                const bottom = (((y + 1) * width + x) * 4);
-                                
-                                const diffH = Math.abs(input[i] - input[right]);
-                                const diffV = Math.abs(input[i] - input[bottom]);
-                                const val = (diffH + diffV) * 2; // Amplify edges
-                                
-                                // Invert for black lines on white or keep white lines on black
-                                // Let's do green matrix style lines
-                                data[i] = 0;
-                                data[i + 1] = val > threshold ? 255 : 0;
-                                data[i + 2] = 0;
-                            }
-                        }
-                    } else if (currentFilter === 'invert') {
-                        for (let i = 0; i < data.length; i += 4) {
-                            data[i] = 255 - data[i];
-                            data[i + 1] = 255 - data[i + 1];
-                            data[i + 2] = 255 - data[i + 2];
-                        }
-                    } else if (currentFilter === 'sepia') {
-                        for (let i = 0; i < data.length; i += 4) {
-                            const r = data[i];
-                            const g = data[i + 1];
-                            const b = data[i + 2];
-                            data[i] = (r * 0.393) + (g * 0.769) + (b * 0.189);
-                            data[i + 1] = (r * 0.349) + (g * 0.686) + (b * 0.168);
-                            data[i + 2] = (r * 0.272) + (g * 0.534) + (b * 0.131);
-                        }
-                    }
-                    
-                    ctx.putImageData(imageData, 0, 0);
-                }
-            }
-            animationId = requestAnimationFrame(draw);
-        }
 
                 ctx.restore();
                 
@@ -919,7 +737,7 @@
         }
 
         // Start
-        // loadScripts(); // Removed initial loading
+        loadScripts();
         initCamera();
     </script>
 </body>
