@@ -149,6 +149,11 @@
             <button onclick="setFilter('objects')" id="btn-objects" class="filter-btn">Objects</button>
             <button onclick="setFilter('face')" id="btn-face" class="filter-btn">Face</button>
             <button onclick="setFilter('tracker')" id="btn-tracker" class="filter-btn">AI Tracker</button>
+            <button onclick="setFilter('segment')" id="btn-segment" class="filter-btn">Segment</button>
+            <button onclick="setFilter('blur')" id="btn-blur" class="filter-btn">Blur</button>
+            <button onclick="setFilter('pixelate')" id="btn-pixelate" class="filter-btn">Pixelate</button>
+            <button onclick="setFilter('invert')" id="btn-invert" class="filter-btn">Invert</button>
+            <button onclick="setFilter('sepia')" id="btn-sepia" class="filter-btn">Sepia</button>
         </div>
         <div id="actions-bar">
             <button class="icon-btn" onclick="switchCamera()">🔄</button>
@@ -168,16 +173,19 @@
         let isModelLoading = false;
         let facingMode = 'environment';
         let trackedObject = null;
+        let bodyPixNet = null;
+        let currentSegmentation = null;
         const sliderContainer = document.getElementById('slider-container');
         const slider = document.getElementById('filter-slider');
 
         // Load Scripts with Progress
         async function loadScripts() {
             const scripts = [
-                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
+                'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
                 'assets/js/face_tracker.js',
                 'assets/js/ai_tracker.js'
             ];
@@ -278,10 +286,12 @@
             document.getElementById(`btn-${filter}`).classList.add('active');
 
             // Slider Logic
-            if (filter === 'contrast' || filter === 'edges') {
+            if (['contrast', 'edges', 'blur', 'pixelate'].includes(filter)) {
                 sliderContainer.style.display = 'flex';
                 if (filter === 'contrast') slider.value = 50;
                 if (filter === 'edges') slider.value = 50;
+                if (filter === 'blur') slider.value = 20; // Default blur
+                if (filter === 'pixelate') slider.value = 20; // Default pixel size
             } else {
                 sliderContainer.style.display = 'none';
             }
@@ -335,6 +345,28 @@
                         await window.AITracker.load();
                         btn.innerText = 'Click Object';
                         detectLoop();
+                    } catch (err) {
+                        console.error(err);
+                        btn.innerText = 'Error';
+                    } finally {
+                        isModelLoading = false;
+                    }
+                } else {
+                    detectLoop();
+                }
+            } else if (filter === 'segment') {
+                if (!bodyPixNet && !isModelLoading) {
+                    const btn = document.getElementById('btn-segment');
+                    btn.innerText = 'Loading...';
+                    isModelLoading = true;
+                    try {
+                        if (window.bodyPix) {
+                            bodyPixNet = await window.bodyPix.load();
+                            btn.innerText = 'Segment';
+                            detectLoop();
+                        } else {
+                            throw new Error("BodyPix not found");
+                        }
                     } catch (err) {
                         console.error(err);
                         btn.innerText = 'Error';
@@ -427,6 +459,19 @@
                     if (currentFilter === 'tracker') {
                         requestAnimationFrame(detectLoop);
                     }
+                } else if (currentFilter === 'segment' && bodyPixNet) {
+                    try {
+                        currentSegmentation = await bodyPixNet.segmentPerson(video, {
+                            internalResolution: 'medium',
+                            segmentationThreshold: 0.7,
+                            maxDetections: 1
+                        });
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    if (currentFilter === 'segment') {
+                        requestAnimationFrame(detectLoop);
+                    }
                 }
             }
         }
@@ -442,7 +487,48 @@
                     ctx.translate(canvas.width, 0);
                     ctx.scale(-1, 1);
                 }
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Special drawing for Pixelate and Blur to avoid double draw
+                if (currentFilter === 'pixelate') {
+                    const val = parseInt(slider.value);
+                    const size = Math.max(0.01, val / 100); // 0.01 to 1.0
+                    const w = canvas.width * size;
+                    const h = canvas.height * size;
+                    
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(video, 0, 0, w, h);
+                    ctx.drawImage(canvas, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
+                    ctx.imageSmoothingEnabled = true;
+                } else if (currentFilter === 'blur') {
+                    const val = parseInt(slider.value);
+                    const blurPx = (val / 100) * 20; // 0 to 20px
+                    ctx.filter = `blur(${blurPx}px)`;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    ctx.filter = 'none';
+                } else if (currentFilter === 'segment' && currentSegmentation) {
+                    // Draw video first
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Apply mask
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const pixelData = imageData.data;
+                    const mask = currentSegmentation.data; // 0 or 1
+                    
+                    for (let i = 0; i < mask.length; i++) {
+                        // If mask is 0 (background), make it black
+                        if (mask[i] === 0) {
+                            pixelData[i * 4] = 0;     // R
+                            pixelData[i * 4 + 1] = 0; // G
+                            pixelData[i * 4 + 2] = 0; // B
+                            // Alpha remains 255
+                        }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                } else {
+                    // Default draw
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                }
+
                 ctx.restore();
                 
                 if (currentFilter === 'objects') {
@@ -570,6 +656,27 @@
                         }
                     }
                     
+                    ctx.putImageData(imageData, 0, 0);
+                } else if (currentFilter === 'invert') {
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        data[i] = 255 - data[i];
+                        data[i + 1] = 255 - data[i + 1];
+                        data[i + 2] = 255 - data[i + 2];
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                } else if (currentFilter === 'sepia') {
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        data[i] = (r * 0.393) + (g * 0.769) + (b * 0.189);
+                        data[i + 1] = (r * 0.349) + (g * 0.686) + (b * 0.168);
+                        data[i + 2] = (r * 0.272) + (g * 0.534) + (b * 0.131);
+                    }
                     ctx.putImageData(imageData, 0, 0);
                 }
             }
