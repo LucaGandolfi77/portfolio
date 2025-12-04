@@ -39,44 +39,53 @@
         }
         #controls-container {
             position: absolute; bottom: 0; left: 0; width: 100%;
-            z-index: 10; padding-bottom: max(20px, env(safe-area-inset-bottom));
-            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-            display: flex; flex-direction: column; gap: 15px;
+            z-index: 10; padding-bottom: max(30px, env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            display: flex; flex-direction: column; gap: 20px;
+            align-items: center;
         }
         #filters-scroll {
-            display: flex; gap: 10px; overflow-x: auto; 
-            padding: 10px 20px;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none;  /* IE 10+ */
-            justify-content: flex-start;
+            display: flex; gap: 20px; overflow-x: auto; 
+            padding: 10px 50%; /* Center the active item */
+            width: 100%;
+            box-sizing: border-box;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            scroll-snap-type: x mandatory;
+            align-items: center;
         }
         #filters-scroll::-webkit-scrollbar { display: none; }
         .filter-btn {
             flex-shrink: 0;
-            background: rgba(255, 255, 255, 0.1); 
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white; padding: 8px 16px; border-radius: 20px;
-            font-size: 13px; backdrop-filter: blur(5px);
-            white-space: nowrap; cursor: pointer;
-            transition: all 0.2s;
-        }
-        .filter-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; font-weight: 600; }
-        #actions-bar {
-            display: flex; justify-content: space-around; align-items: center;
-            padding: 0 20px;
-        }
-        #shutter {
-            width: 70px; height: 70px; border-radius: 50%;
-            background: white; border: 4px solid rgba(255,255,255,0.3);
-            cursor: pointer; transition: transform 0.1s;
-        }
-        #shutter:active { transform: scale(0.9); background: #ddd; }
-        .icon-btn {
-            background: rgba(255,255,255,0.1); border: none;
-            color: white; width: 44px; height: 44px; border-radius: 50%;
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2); 
+            border: 2px solid rgba(255,255,255,0.5);
+            color: white; 
+            font-size: 10px; 
+            backdrop-filter: blur(5px);
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px; cursor: pointer; backdrop-filter: blur(4px);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            scroll-snap-align: center;
+            text-align: center;
+            overflow: hidden;
+            white-space: normal;
+            line-height: 1.1;
         }
+        .filter-btn.active { 
+            width: 70px; height: 70px;
+            background: rgba(255, 255, 255, 0.9);
+            color: black; 
+            border: 4px solid white; 
+            font-weight: 700; 
+            font-size: 12px;
+            transform: translateY(-10px);
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+        /* Hide the old actions bar */
+        #actions-bar { display: none; }
+        
         .back-btn {
             position: absolute;
             top: 20px;
@@ -123,8 +132,11 @@
             text-align: center;
         }
         #language-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
             width: auto;
-            margin: 0 auto 10px auto;
+            margin: 0;
             display: none;
             align-items: center;
             gap: 10px;
@@ -132,6 +144,7 @@
             padding: 8px 16px;
             border-radius: 20px;
             backdrop-filter: blur(4px);
+            z-index: 20;
         }
         #lang-select {
             background: transparent;
@@ -213,6 +226,11 @@
         let subtitleTimeout;
         const languageContainer = document.getElementById('language-container');
         const langSelect = document.getElementById('lang-select');
+        
+        // Gestures variables
+        let lastTap = 0;
+        let initialPinchDistance = null;
+        let currentZoom = 1;
 
         // Load Scripts with Progress
         async function loadScripts() {
@@ -285,13 +303,28 @@
                     video: { 
                         facingMode: facingMode,
                         width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        height: { ideal: 720 },
+                        zoom: true // Request zoom capability
                     }, 
                     audio: false 
                 };
 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
+                
+                // Check zoom capabilities
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                
+                // Reset zoom
+                currentZoom = 1;
+                if (capabilities.zoom) {
+                    // Use native zoom if available
+                    try {
+                        await track.applyConstraints({ advanced: [{ zoom: 1 }] });
+                    } catch(e) {}
+                }
+
                 video.play();
                 requestAnimationFrame(draw);
             } catch (err) {
@@ -312,6 +345,67 @@
                 }
             }
         }
+
+        // Gestures
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+            } else if (e.touches.length === 1) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 300 && tapLength > 0) {
+                    switchCamera();
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            }
+        });
+
+        canvas.addEventListener('touchmove', async (e) => {
+            if (e.touches.length === 2 && initialPinchDistance) {
+                const dist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+                
+                const delta = dist - initialPinchDistance;
+                // Sensitivity
+                const zoomChange = delta * 0.01; 
+                
+                let newZoom = currentZoom + zoomChange;
+                newZoom = Math.max(1, Math.min(newZoom, 5)); // Clamp 1x to 5x
+                
+                // Apply Zoom
+                if (video.srcObject) {
+                    const track = video.srcObject.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                    
+                    if (capabilities.zoom) {
+                        // Native Zoom
+                        const min = capabilities.zoom.min;
+                        const max = capabilities.zoom.max;
+                        // Map 1-5 to min-max
+                        const nativeZoom = min + ((newZoom - 1) / 4) * (max - min);
+                        try {
+                            await track.applyConstraints({ advanced: [{ zoom: nativeZoom }] });
+                            currentZoom = newZoom;
+                        } catch(err) {}
+                    } else {
+                        // CSS/Canvas Scale Fallback (Visual only)
+                        currentZoom = newZoom;
+                    }
+                }
+                
+                initialPinchDistance = dist;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            initialPinchDistance = null;
+        });
 
         async function switchCamera() {
             facingMode = facingMode === 'user' ? 'environment' : 'user';
@@ -404,6 +498,9 @@
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${filter}`).classList.add('active');
+            
+            // Scroll active into view
+            document.getElementById(`btn-${filter}`).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
             // Slider Logic
             if (['contrast', 'edges', 'blur', 'pixelate'].includes(filter)) {
@@ -641,6 +738,16 @@
                 
                 // Mirror if user facing
                 ctx.save();
+                
+                // Apply Digital Zoom if native not supported
+                const track = video.srcObject.getVideoTracks()[0];
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                if (!capabilities.zoom && currentZoom > 1) {
+                    ctx.translate(canvas.width/2, canvas.height/2);
+                    ctx.scale(currentZoom, currentZoom);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
+                }
+
                 if (facingMode === 'user') {
                     ctx.translate(canvas.width, 0);
                     ctx.scale(-1, 1);
@@ -893,12 +1000,20 @@
             flash.style.opacity = 1;
             setTimeout(() => flash.style.opacity = 0, 100);
 
+            // If current filter is active button, it acts as shutter
             // Save image
             const link = document.createElement('a');
             link.download = `tracker-photo-${Date.now()}.png`;
             link.href = canvas.toDataURL();
             link.click();
         }
+
+        // Add click listener to active filter to take photo
+        document.getElementById('filters-scroll').addEventListener('click', (e) => {
+            if (e.target.classList.contains('active') || e.target.parentElement.classList.contains('active')) {
+                takePhoto();
+            }
+        });
 
         // Start
         loadScripts();
