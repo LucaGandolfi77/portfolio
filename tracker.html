@@ -148,6 +148,7 @@
             <button onclick="setFilter('edges')" id="btn-edges" class="filter-btn">Edges</button>
             <button onclick="setFilter('objects')" id="btn-objects" class="filter-btn">Objects</button>
             <button onclick="setFilter('face')" id="btn-face" class="filter-btn">Face</button>
+            <button onclick="setFilter('hands')" id="btn-hands" class="filter-btn">Hands</button>
             <button onclick="setFilter('tracker')" id="btn-tracker" class="filter-btn">AI Tracker</button>
             <button onclick="setFilter('segment')" id="btn-segment" class="filter-btn">Segment</button>
             <button onclick="setFilter('blur')" id="btn-blur" class="filter-btn">Blur</button>
@@ -186,8 +187,10 @@
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet',
                 'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix',
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
                 'assets/js/face_tracker.js',
-                'assets/js/ai_tracker.js'
+                'assets/js/ai_tracker.js',
+                'assets/js/hand_tracker.js'
             ];
             
             const progressBar = document.getElementById('progress-bar');
@@ -334,6 +337,24 @@
                 } else {
                     detectLoop();
                 }
+            } else if (filter === 'hands') {
+                if (!isModelLoading) {
+                    const btn = document.getElementById('btn-hands');
+                    btn.innerText = 'Loading...';
+                    isModelLoading = true;
+                    try {
+                        await window.HandTracker.load();
+                        btn.innerText = 'Hands';
+                        detectLoop();
+                    } catch (err) {
+                        console.error(err);
+                        btn.innerText = 'Error';
+                    } finally {
+                        isModelLoading = false;
+                    }
+                } else {
+                    detectLoop();
+                }
             } else if (filter === 'tracker') {
                 if (!model && !isModelLoading) {
                     const btn = document.getElementById('btn-tracker');
@@ -439,6 +460,15 @@
                         console.error(e);
                     }
                     if (currentFilter === 'face') {
+                        requestAnimationFrame(detectLoop);
+                    }
+                } else if (currentFilter === 'hands' && window.HandTracker) {
+                    try {
+                        await window.HandTracker.detect(video);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    if (currentFilter === 'hands') {
                         requestAnimationFrame(detectLoop);
                     }
                 } else if (currentFilter === 'tracker' && model && window.AITracker) {
@@ -564,6 +594,16 @@
                     }
                     if (window.FaceTracker) {
                         window.FaceTracker.draw(ctx, predictions);
+                    }
+                    ctx.restore();
+                } else if (currentFilter === 'hands') {
+                    ctx.save();
+                    if (facingMode === 'user') {
+                        ctx.translate(canvas.width, 0);
+                        ctx.scale(-1, 1);
+                    }
+                    if (window.HandTracker) {
+                        window.HandTracker.draw(ctx, canvas.width, canvas.height);
                     }
                     ctx.restore();
                 } else if (currentFilter === 'tracker') {
