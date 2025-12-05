@@ -735,8 +735,7 @@
                         currentSegmentation = await bodyPixNet.segmentPerson(video, {
                             internalResolution: 'medium',
                             segmentationThreshold: 0.7,
-                            maxDetections: 1,
-                            flipHorizontal: facingMode === 'user'
+                            maxDetections: 1
                         });
                     } catch (e) {
                         console.error(e);
@@ -827,14 +826,27 @@
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const pixelData = imageData.data;
                     const mask = currentSegmentation.data; // 0 or 1
+                    const width = canvas.width;
+                    const height = canvas.height;
                     
-                    for (let i = 0; i < mask.length; i++) {
-                        // If mask is 0 (background), make it black
-                        if (mask[i] === 0) {
-                            pixelData[i * 4] = 0;     // R
-                            pixelData[i * 4 + 1] = 0; // G
-                            pixelData[i * 4 + 2] = 0; // B
-                            // Alpha remains 255
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const i = y * width + x;
+                            // If user facing, the canvas is mirrored, but the mask (from BodyPix without flip) is normal.
+                            // We need to map the mirrored canvas pixel (x) to the corresponding mask pixel.
+                            // Canvas pixel x (from left) corresponds to Video pixel (width - 1 - x).
+                            // So we need the mask value at (width - 1 - x).
+                            
+                            const maskIndex = (facingMode === 'user') 
+                                ? (y * width + (width - 1 - x)) 
+                                : i;
+                                
+                            if (mask[maskIndex] === 0) {
+                                const pIdx = i * 4;
+                                pixelData[pIdx] = 0;     // R
+                                pixelData[pIdx + 1] = 0; // G
+                                pixelData[pIdx + 2] = 0; // B
+                            }
                         }
                     }
                     ctx.putImageData(imageData, 0, 0);
