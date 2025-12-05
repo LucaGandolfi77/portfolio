@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hand Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            font-family: 'Inter', sans-serif;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #00d4ff; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
+        }
+        #controls-container {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            z-index: 10; padding-bottom: max(30px, env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            display: flex; flex-direction: column; gap: 20px;
+            align-items: center;
+        }
+        #filters-scroll {
+            display: flex; justify-content: center; width: 100%;
+        }
+        .filter-btn {
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            color: black; 
+            border: 4px solid white; 
+            font-weight: 700; 
+            font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+        }
+        #score-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 20;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <a href="technology.html" class="back-btn">← Back</a>
+    <div id="score-container">Score: <span id="score">0</span></div>
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let currentFilter = 'hands';
+        let animationId;
+        let isModelLoading = false;
+        let facingMode = 'environment';
+        
+        // Gestures variables
+        let lastTap = 0;
+        let initialPinchDistance = null;
+        let currentZoom = 1;
+
+        // Game State
+        let fruits = [];
+        let score = 0;
+        let lastSpawnTime = 0;
+        const fruitEmojis = ['🍎', '🍌', '🍇', '🍊', '🍓', '🍑', '🍍'];
+
+        function spawnFruit() {
+            const x = Math.random() * (canvas.width - 50) + 25;
+            const emoji = fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)];
+            fruits.push({
+                x: x,
+                y: -50,
+                emoji: emoji,
+                speed: 3 + Math.random() * 4,
+                size: 40
+            });
+        }
+
+        function updateGame() {
+            const now = Date.now();
+            if (now - lastSpawnTime > 800) { // Spawn every 800ms
+                spawnFruit();
+                lastSpawnTime = now;
+            }
+
+            // Move fruits
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                let fruit = fruits[i];
+                fruit.y += fruit.speed;
+
+                // Remove if off screen
+                if (fruit.y > canvas.height + 50) {
+                    fruits.splice(i, 1);
+                    continue;
+                }
+
+                // Check collision
+                if (window.HandTracker && window.HandTracker.results && window.HandTracker.results.multiHandLandmarks) {
+                    let popped = false;
+                    for (const landmarks of window.HandTracker.results.multiHandLandmarks) {
+                        // Check Index finger tip (8)
+                        const indexTip = landmarks[8];
+                        if (indexTip) {
+                            // Convert normalized coordinates to canvas coordinates
+                            let handX = indexTip.x * canvas.width;
+                            let handY = indexTip.y * canvas.height;
+
+                            // Mirror if user facing
+                            if (facingMode === 'user') {
+                                handX = canvas.width - handX;
+                            }
+
+                            const dist = Math.hypot(handX - fruit.x, handY - fruit.y);
+                            if (dist < fruit.size + 20) { // Hitbox
+                                popped = true;
+                                break; 
+                            }
+                        }
+                    }
+                    
+                    if (popped) {
+                        score += 10;
+                        document.getElementById('score').innerText = score;
+                        fruits.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        function drawGame() {
+            ctx.save();
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 4;
+            
+            for (const fruit of fruits) {
+                ctx.fillText(fruit.emoji, fruit.x, fruit.y);
+            }
+            ctx.restore();
+        }
+
+        // Load Scripts with Progress
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            // Wait a bit for evaluation
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                    // Auto-load hands model
+                    initHandTracker();
+                }, 500);
+            }, 500);
+        }
+
+        // Initialize Camera
+        async function initCamera() {
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            try {
+                // Stop existing tracks
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = { 
+                    video: { 
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        zoom: true // Request zoom capability
+                    }, 
+                    audio: false 
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                // Check zoom capabilities
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                
+                // Reset zoom
+                currentZoom = 1;
+                if (capabilities.zoom) {
+                    // Use native zoom if available
+                    try {
+                        await track.applyConstraints({ advanced: [{ zoom: 1 }] });
+                    } catch(e) {}
+                }
+
+                video.play();
+                requestAnimationFrame(draw);
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                // Fallback for PC if environment fails
+                if (facingMode === 'environment') {
+                    console.log("Retrying with default camera...");
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        video.srcObject = stream;
+                        video.play();
+                        requestAnimationFrame(draw);
+                    } catch (e) {
+                        alert("Could not access camera.");
+                    }
+                } else {
+                    alert("Could not access camera.");
+                }
+            }
+        }
+
+        // Gestures
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+            } else if (e.touches.length === 1) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 300 && tapLength > 0) {
+                    switchCamera();
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            }
+        });
+
+        canvas.addEventListener('touchmove', async (e) => {
+            if (e.touches.length === 2 && initialPinchDistance) {
+                const dist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+                
+                const delta = dist - initialPinchDistance;
+                // Sensitivity
+                const zoomChange = delta * 0.01; 
+                
+                let newZoom = currentZoom + zoomChange;
+                newZoom = Math.max(1, Math.min(newZoom, 5)); // Clamp 1x to 5x
+                
+                // Apply Zoom
+                if (video.srcObject) {
+                    const track = video.srcObject.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                    
+                    if (capabilities.zoom) {
+                        // Native Zoom
+                        const min = capabilities.zoom.min;
+                        const max = capabilities.zoom.max;
+                        // Map 1-5 to min-max
+                        const nativeZoom = min + ((newZoom - 1) / 4) * (max - min);
+                        try {
+                            await track.applyConstraints({ advanced: [{ zoom: nativeZoom }] });
+                            currentZoom = newZoom;
+                        } catch(err) {}
+                    } else {
+                        // CSS/Canvas Scale Fallback (Visual only)
+                        currentZoom = newZoom;
+                    }
+                }
+                
+                initialPinchDistance = dist;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            initialPinchDistance = null;
+        });
+
+        async function switchCamera() {
+            facingMode = facingMode === 'user' ? 'environment' : 'user';
+            await initCamera();
+        }
+
+        async function initHandTracker() {
+            if (!isModelLoading) {
+                isModelLoading = true;
+                try {
+                    await window.HandTracker.load();
+                    detectLoop();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    isModelLoading = false;
+                }
+            }
+        }
+
+        async function detectLoop() {
+            const isReady = video.readyState === video.HAVE_ENOUGH_DATA;
+
+            if (window.HandTracker) {
+                if (isReady) {
+                    try {
+                        await window.HandTracker.detect(video);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                requestAnimationFrame(detectLoop);
+            }
+        }
+
+        function draw() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Mirror if user facing
+                ctx.save();
+                
+                // Apply Digital Zoom if native not supported
+                const track = video.srcObject.getVideoTracks()[0];
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                if (!capabilities.zoom && currentZoom > 1) {
+                    ctx.translate(canvas.width/2, canvas.height/2);
+                    ctx.scale(currentZoom, currentZoom);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
+                }
+
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+
+                // Default draw
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                ctx.restore();
+                
+                // Update and Draw Game
+                updateGame();
+                drawGame();
+                
+                // Draw Hands
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                if (window.HandTracker) {
+                    window.HandTracker.draw(ctx, canvas.width, canvas.height);
+                }
+                ctx.restore();
+            }
+            animationId = requestAnimationFrame(draw);
+        }
+
+        // Start
+        loadScripts();
+        initCamera();
+    </script>
+</body>
+</html>

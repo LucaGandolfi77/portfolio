@@ -11,13 +11,31 @@
             background: #000; 
             overflow: hidden; 
             font-family: 'Inter', sans-serif;
-            touch-action: none; /* Prevent pull-to-refresh on mobile */
+            touch-action: none; 
+        }
+        #video-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror the video */
         }
         canvas { 
-            display: block; 
-            width: 100vw; 
-            height: 100vh; 
-            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%; 
+            z-index: 1;
+            pointer-events: none;
         }
         #ui-layer {
             position: absolute;
@@ -31,6 +49,7 @@
             justify-content: space-between;
             padding: 20px;
             box-sizing: border-box;
+            z-index: 2;
         }
         #score-board {
             color: #00d4ff;
@@ -108,12 +127,16 @@
         <div id="status">Loading AI...</div>
     </div>
 
-    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <div id="video-container">
+        <video id="video" playsinline autoplay muted></video>
+    </div>
     <canvas id="canvas"></canvas>
 
-    <!-- Load TensorFlow.js and Posenet -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <!-- Load MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <script>
         const video = document.getElementById('video');
@@ -123,55 +146,54 @@
         const statusEl = document.getElementById('status');
         const startScreen = document.getElementById('start-screen');
 
-        let net = null;
+        let hands = null;
+        let camera = null;
         let isGameRunning = false;
         let score = 0;
         let particles = [];
         let targets = [];
-        let poses = [];
+        let detectedHands = [];
         let lastFrameTime = 0;
         let spawnTimer = 0;
         let difficulty = 1;
 
         // Game Configuration
         const TARGET_RADIUS = 30;
-        const HIT_RADIUS = 40; // Hand radius
+        const HIT_RADIUS = 40; 
         
-        async function loadModel() {
-            statusEl.innerText = "Loading Model...";
-            net = await posenet.load({
-                architecture: 'MobileNetV1',
-                outputStride: 16,
-                inputResolution: { width: 640, height: 480 },
-                multiplier: 0.75
-            });
-            statusEl.innerText = "Model Loaded";
+        function onResults(results) {
+            detectedHands = results.multiHandLandmarks;
         }
 
-        async function setupCamera() {
-            statusEl.innerText = "Accessing Camera...";
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'user',
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                },
-                audio: false
+        async function loadModel() {
+            statusEl.innerText = "Loading AI...";
+            hands = new Hands({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }});
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
             });
-            video.srcObject = stream;
-            
-            return new Promise((resolve) => {
-                video.onloadedmetadata = () => {
-                    resolve(video);
-                };
-            });
+            hands.onResults(onResults);
+            statusEl.innerText = "AI Loaded";
         }
 
         async function startGame() {
             startScreen.style.display = 'none';
-            if (!net) await loadModel();
-            await setupCamera();
-            video.play();
+            if (!hands) await loadModel();
+            
+            statusEl.innerText = "Starting Camera...";
+            
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    await hands.send({image: video});
+                },
+                width: 640,
+                height: 480
+            });
+            await camera.start();
             
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -207,16 +229,10 @@
             }
         }
 
-        async function gameLoop() {
-            if (!isGameRunning) return;
-
-            // 1. Pose Detection
-            if (video.readyState === 4) {
-                // Use default flipHorizontal: false, we handle mirroring manually
-                const pose = await net.estimateSinglePose(video, {
-                    flipHorizontal: false
-                });
-                poses = [pose];
+        function gameLoop() {
+            if (!isGameRunning) {
+                requestAnimationFrame(gameLoop);
+                return;
             }
 
             // 2. Update Game State
@@ -229,18 +245,14 @@
             if (spawnTimer > 2.0 / difficulty) {
                 createTarget();
                 spawnTimer = 0;
-                difficulty += 0.01; // Slowly increase difficulty
+                difficulty += 0.01; 
             }
 
             // Update targets
             targets.forEach(t => {
                 t.x += t.vx;
                 t.y += t.vy;
-                
-                // Bounce off walls
                 if (t.x < t.radius || t.x > canvas.width - t.radius) t.vx *= -1;
-                
-                // Remove if off screen
                 if (t.y > canvas.height + t.radius) t.active = false;
             });
 
@@ -252,63 +264,63 @@
             });
             particles = particles.filter(p => p.life > 0);
 
+            // Calculate Scaling to match object-fit: cover
+            // We need to know how the video is being displayed
+            const videoWidth = video.videoWidth || 640;
+            const videoHeight = video.videoHeight || 480;
+            const screenWidth = canvas.width;
+            const screenHeight = canvas.height;
+
+            const videoRatio = videoWidth / videoHeight;
+            const screenRatio = screenWidth / screenHeight;
+
+            let drawWidth, drawHeight, startX, startY;
+
+            if (screenRatio > videoRatio) {
+                // Screen is wider than video -> Video fits width, cropped height
+                drawWidth = screenWidth;
+                drawHeight = screenWidth / videoRatio;
+                startX = 0;
+                startY = (screenHeight - drawHeight) / 2;
+            } else {
+                // Screen is taller than video -> Video fits height, cropped width
+                drawHeight = screenHeight;
+                drawWidth = screenHeight * videoRatio;
+                startX = (screenWidth - drawWidth) / 2;
+                startY = 0;
+            }
+
             // Collision Detection
-            if (poses.length > 0) {
-                const pose = poses[0];
-                const keypoints = pose.keypoints.filter(k => k.score > 0.4); 
-                
-                // Scale coordinates from video to canvas
-                // IMPORTANT: videoWidth/Height might be different from display size
-                // We need to map video coordinates to canvas coordinates
-                // Canvas covers the screen (object-fit: cover equivalent)
-                
-                const videoRatio = video.videoWidth / video.videoHeight;
-                const canvasRatio = canvas.width / canvas.height;
-                
-                let scale, offsetX, offsetY;
-                
-                if (canvasRatio > videoRatio) {
-                    // Canvas is wider than video - fit width
-                    scale = canvas.width / video.videoWidth;
-                    offsetX = 0;
-                    offsetY = (canvas.height - video.videoHeight * scale) / 2;
-                } else {
-                    // Canvas is taller than video - fit height
-                    scale = canvas.height / video.videoHeight;
-                    offsetX = (canvas.width - video.videoWidth * scale) / 2;
-                    offsetY = 0;
-                }
-
-                // We are interested in wrists (9, 10)
-                const hands = keypoints.filter(k => k.part === 'leftWrist' || k.part === 'rightWrist');
-
+            if (detectedHands && detectedHands.length > 0) {
                 targets.forEach(t => {
                     if (!t.active) return;
                     
-                    hands.forEach(hand => {
-                        // Manual Mirroring: x = width - x
-                        const rawX = video.videoWidth - hand.position.x;
-                        const rawY = hand.position.y;
-
-                        // Filter out edge artifacts
-                        if (rawX < 5 || rawY < 5 || rawX > video.videoWidth - 5 || rawY > video.videoHeight - 5) return;
-
-                        const hx = rawX * scale + offsetX;
-                        const hy = rawY * scale + offsetY;
-                        
-                        const dx = hx - t.x;
-                        const dy = hy - t.y;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        
-                        if (dist < t.radius + HIT_RADIUS) {
-                            t.active = false;
-                            score += 10;
-                            scoreEl.innerText = score;
-                            createExplosion(t.x, t.y, t.color);
+                    detectedHands.forEach(handLandmarks => {
+                        // Check Index Finger Tip (8) and Wrist (0)
+                        [0, 8].forEach(idx => {
+                            const pt = handLandmarks[idx];
                             
-                            // Haptic feedback if available
-                            if (navigator.vibrate) navigator.vibrate(50);
-                        }
+                            // Map normalized coordinates to screen coordinates
+                            // Note: Video is mirrored via CSS transform: scaleX(-1)
+                            // MediaPipe returns unmirrored coordinates (0 is left of camera view)
+                            // If we display mirrored, visual left is camera right.
+                            // So we need to mirror the X coordinate: (1 - pt.x)
+                            
+                            const x = (1 - pt.x) * drawWidth + startX;
+                            const y = pt.y * drawHeight + startY;
+                            
+                            const dx = x - t.x;
+                            const dy = y - t.y;
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            
+                            if (dist < t.radius + HIT_RADIUS) {
+                                t.active = false;
+                                score += 10;
+                                scoreEl.innerText = score;
+                                createExplosion(t.x, t.y, t.color);
+                                if (navigator.vibrate) navigator.vibrate(50);
+                            }
+                        });
                     });
                 });
             }
@@ -316,115 +328,68 @@
             targets = targets.filter(t => t.active);
 
             // 3. Draw
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Video (Stylized)
-            ctx.save();
-            // Mirror video
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            
-            // Draw video with high contrast/threshold effect for "Kinect" look
-            ctx.globalAlpha = 0.3;
-            
-            // Draw image to cover canvas (simulating object-fit: cover)
-            const videoRatio = video.videoWidth / video.videoHeight;
-            const canvasRatio = canvas.width / canvas.height;
-            let drawW, drawH, startX, startY;
-            
-            if (canvasRatio > videoRatio) {
-                drawW = canvas.width;
-                drawH = canvas.width / videoRatio;
-                startX = 0;
-                startY = (canvas.height - drawH) / 2;
-            } else {
-                drawH = canvas.height;
-                drawW = canvas.height * videoRatio;
-                startX = (canvas.width - drawW) / 2;
-                startY = 0;
-            }
-            
-            ctx.drawImage(video, startX, startY, drawW, drawH);
-            ctx.globalAlpha = 1.0;
-            ctx.restore();
-
-            // Draw Skeleton/Body
-            if (poses.length > 0) {
-                const pose = poses[0];
-                
-                if (video.videoWidth > 0 && video.videoHeight > 0) {
-                    // Re-calculate scale for drawing
-                    let scale, offsetX, offsetY;
-                    if (canvasRatio > videoRatio) {
-                        scale = canvas.width / video.videoWidth;
-                        offsetX = 0;
-                        offsetY = (canvas.height - video.videoHeight * scale) / 2;
-                    } else {
-                        scale = canvas.height / video.videoHeight;
-                        offsetX = (canvas.width - video.videoWidth * scale) / 2;
-                        offsetY = 0;
-                    }
-
+            // Draw Hands
+            if (detectedHands && detectedHands.length > 0) {
+                detectedHands.forEach(handLandmarks => {
                     // Draw connections
-                    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(pose.keypoints, 0.3);
-                    
                     ctx.save();
                     ctx.strokeStyle = '#00d4ff';
                     ctx.lineWidth = 4;
-                    adjacentKeyPoints.forEach(keypoints => {
-                        const x1 = (video.videoWidth - keypoints[0].position.x) * scale + offsetX;
-                        const y1 = keypoints[0].position.y * scale + offsetY;
-                        const x2 = (video.videoWidth - keypoints[1].position.x) * scale + offsetX;
-                        const y2 = keypoints[1].position.y * scale + offsetY;
-
-                        ctx.beginPath();
-                        ctx.moveTo(x1, y1);
-                        ctx.lineTo(x2, y2);
-                        ctx.stroke();
-                    });
+                    
+                    if (window.HAND_CONNECTIONS) {
+                        for (const connection of window.HAND_CONNECTIONS) {
+                            const p1 = handLandmarks[connection[0]];
+                            const p2 = handLandmarks[connection[1]];
+                            
+                            const x1 = (1 - p1.x) * drawWidth + startX;
+                            const y1 = p1.y * drawHeight + startY;
+                            const x2 = (1 - p2.x) * drawWidth + startX;
+                            const y2 = p2.y * drawHeight + startY;
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.stroke();
+                        }
+                    }
                     ctx.restore();
 
-                    // Draw joints & Hands
-                    pose.keypoints.forEach(keypoint => {
-                        const threshold = (keypoint.part === 'leftWrist' || keypoint.part === 'rightWrist') ? 0.2 : 0.4;
+                    // Draw Joints
+                    for (const pt of handLandmarks) {
+                        const x = (1 - pt.x) * drawWidth + startX;
+                        const y = pt.y * drawHeight + startY;
                         
-                        if (keypoint.score > threshold) {
-                            const rawX = video.videoWidth - keypoint.position.x;
-                            const rawY = keypoint.position.y;
-
-                            if (rawX < 5 || rawY < 5 || rawX > video.videoWidth - 5 || rawY > video.videoHeight - 5) return;
-
-                            const x = rawX * scale + offsetX;
-                            const y = rawY * scale + offsetY;
-                            
-                            // Draw Joint
-                            ctx.beginPath();
-                            ctx.arc(x, y, 6, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#fff';
-                            ctx.fill();
-                            
-                            // Draw Hand Highlight
-                            if (keypoint.part === 'leftWrist' || keypoint.part === 'rightWrist') {
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.arc(x, y, HIT_RADIUS, 0, 2 * Math.PI);
-                                ctx.strokeStyle = '#00d4ff';
-                                ctx.lineWidth = 4;
-                                ctx.stroke();
-                                
-                                ctx.beginPath();
-                                ctx.arc(x, y, 20, 0, 2 * Math.PI);
-                                ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                                ctx.fill();
-                                ctx.restore();
-                            }
-                        }
+                        ctx.beginPath();
+                        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#fff';
+                        ctx.fill();
+                    }
+                    
+                    // Highlight Index and Wrist
+                    [0, 8].forEach(idx => {
+                        const pt = handLandmarks[idx];
+                        const x = (1 - pt.x) * drawWidth + startX;
+                        const y = pt.y * drawHeight + startY;
+                        
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(x, y, HIT_RADIUS, 0, 2 * Math.PI);
+                        ctx.strokeStyle = '#00d4ff';
+                        ctx.lineWidth = 4;
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
+                        ctx.fill();
+                        ctx.restore();
                     });
-                }
+                });
             }
 
-            // Draw Targets
+            // Draw Targets & Particles
             targets.forEach(t => {
                 ctx.beginPath();
                 ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
@@ -435,7 +400,6 @@
                 ctx.stroke();
             });
 
-            // Draw Particles
             particles.forEach(p => {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
@@ -448,13 +412,11 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Handle resize
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         });
 
-        // Preload model
         loadModel();
 
     </script>
