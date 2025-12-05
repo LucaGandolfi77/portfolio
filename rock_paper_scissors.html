@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rock Paper Scissors vs AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            font-family: 'Inter', sans-serif;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #00d4ff; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+        }
+        #game-ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px 20px;
+            box-sizing: border-box;
+        }
+        #score-board {
+            display: flex;
+            gap: 40px;
+            font-size: 24px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.3);
+            padding: 10px 30px;
+            border-radius: 30px;
+            backdrop-filter: blur(4px);
+        }
+        #main-display {
+            text-align: center;
+        }
+        #status-text {
+            font-size: 48px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+        #ai-move {
+            font-size: 100px;
+            height: 120px;
+            display: block;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+        }
+        #controls {
+            pointer-events: auto;
+            margin-bottom: 40px;
+        }
+        .btn {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
+        }
+        .btn:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        #gesture-hint {
+            position: absolute;
+            bottom: 120px;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <a href="technology.html" class="back-btn">← Back</a>
+    
+    <div id="game-ui">
+        <div id="score-board">
+            <div>YOU: <span id="player-score">0</span></div>
+            <div>AI: <span id="ai-score">0</span></div>
+        </div>
+
+        <div id="main-display">
+            <div id="ai-move"></div>
+            <div id="status-text">Ready?</div>
+        </div>
+
+        <div id="gesture-hint">Detected: <span id="current-gesture">None</span></div>
+
+        <div id="controls">
+            <button id="start-btn" class="btn" onclick="startGame()">START ROUND</button>
+        </div>
+    </div>
+
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        let animationId;
+        let isModelLoading = false;
+        let facingMode = 'user';
+        
+        // Game State
+        let gameState = 'idle'; // idle, countdown, result
+        let playerScore = 0;
+        let aiScore = 0;
+        let currentGesture = 'None';
+        let countdownTimer = null;
+
+        const MOVES = ['rock', 'paper', 'scissors'];
+        const EMOJIS = { 'rock': '✊', 'paper': '✋', 'scissors': '✌️', 'none': '' };
+
+        // Load Scripts with Progress
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            // Wait a bit for evaluation
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                    initHandTracker();
+                }, 500);
+            }, 500);
+        }
+
+        // Initialize Camera
+        async function initCamera() {
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            try {
+                const constraints = { 
+                    video: { 
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }, 
+                    audio: false 
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.play();
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    requestAnimationFrame(draw);
+                };
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                alert("Could not access camera.");
+            }
+        }
+
+        async function initHandTracker() {
+            if (!isModelLoading) {
+                isModelLoading = true;
+                try {
+                    await window.HandTracker.load();
+                    detectLoop();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    isModelLoading = false;
+                }
+            }
+        }
+
+        async function detectLoop() {
+            const isReady = video.readyState === video.HAVE_ENOUGH_DATA;
+
+            if (window.HandTracker) {
+                if (isReady) {
+                    try {
+                        await window.HandTracker.detect(video);
+                        processGestures();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                requestAnimationFrame(detectLoop);
+            }
+        }
+
+        function processGestures() {
+            if (!window.HandTracker.results || !window.HandTracker.results.multiHandLandmarks) {
+                currentGesture = 'None';
+                updateGestureDisplay();
+                return;
+            }
+            
+            const landmarks = window.HandTracker.results.multiHandLandmarks[0]; // Use first hand
+            if (!landmarks) {
+                currentGesture = 'None';
+                updateGestureDisplay();
+                return;
+            }
+
+            // Finger states
+            const indexTip = landmarks[8].y;
+            const indexPip = landmarks[6].y;
+            const middleTip = landmarks[12].y;
+            const middlePip = landmarks[10].y;
+            const ringTip = landmarks[16].y;
+            const ringPip = landmarks[14].y;
+            const pinkyTip = landmarks[20].y;
+            const pinkyPip = landmarks[18].y;
+
+            const isIndexOpen = indexTip < indexPip;
+            const isMiddleOpen = middleTip < middlePip;
+            const isRingOpen = ringTip < ringPip;
+            const isPinkyOpen = pinkyTip < pinkyPip;
+
+            // Logic
+            if (!isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+                currentGesture = 'rock';
+            } else if (isIndexOpen && isMiddleOpen && isRingOpen && isPinkyOpen) {
+                currentGesture = 'paper';
+            } else if (isIndexOpen && isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+                currentGesture = 'scissors';
+            } else {
+                currentGesture = 'Unknown';
+            }
+            
+            updateGestureDisplay();
+        }
+
+        function updateGestureDisplay() {
+            const el = document.getElementById('current-gesture');
+            el.innerText = currentGesture.toUpperCase();
+            el.style.color = (currentGesture !== 'None' && currentGesture !== 'Unknown') ? '#00d4ff' : 'rgba(255,255,255,0.7)';
+        }
+
+        function startGame() {
+            if (gameState === 'countdown') return;
+            
+            const btn = document.getElementById('start-btn');
+            btn.disabled = true;
+            document.getElementById('ai-move').innerText = '';
+            
+            gameState = 'countdown';
+            let count = 3;
+            
+            const statusEl = document.getElementById('status-text');
+            statusEl.innerText = count;
+            
+            countdownTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    statusEl.innerText = count;
+                } else {
+                    clearInterval(countdownTimer);
+                    statusEl.innerText = "SHOOT!";
+                    resolveRound();
+                }
+            }, 1000);
+        }
+
+        function resolveRound() {
+            // 1. Get Player Move
+            const playerMove = (currentGesture === 'rock' || currentGesture === 'paper' || currentGesture === 'scissors') 
+                                ? currentGesture 
+                                : null;
+
+            // 2. Get AI Move
+            const aiMove = MOVES[Math.floor(Math.random() * MOVES.length)];
+            document.getElementById('ai-move').innerText = EMOJIS[aiMove];
+
+            // 3. Determine Winner
+            const statusEl = document.getElementById('status-text');
+            
+            if (!playerMove) {
+                statusEl.innerText = "No Move Detected!";
+                statusEl.style.color = '#ff5555';
+            } else {
+                if (playerMove === aiMove) {
+                    statusEl.innerText = "DRAW!";
+                    statusEl.style.color = '#ffff00';
+                } else if (
+                    (playerMove === 'rock' && aiMove === 'scissors') ||
+                    (playerMove === 'paper' && aiMove === 'rock') ||
+                    (playerMove === 'scissors' && aiMove === 'paper')
+                ) {
+                    statusEl.innerText = "YOU WIN!";
+                    statusEl.style.color = '#00ff00';
+                    playerScore++;
+                } else {
+                    statusEl.innerText = "AI WINS!";
+                    statusEl.style.color = '#ff5555';
+                    aiScore++;
+                }
+            }
+
+            // Update Score
+            document.getElementById('player-score').innerText = playerScore;
+            document.getElementById('ai-score').innerText = aiScore;
+
+            // Reset UI after delay
+            setTimeout(() => {
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').innerText = "PLAY AGAIN";
+                gameState = 'idle';
+                statusEl.style.color = 'white';
+            }, 2000);
+        }
+
+        function draw() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Ensure canvas size matches video
+                if (canvas.width !== video.videoWidth) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                }
+
+                // Draw Video
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // Draw Hand Landmarks
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                if (window.HandTracker) {
+                    window.HandTracker.draw(ctx, canvas.width, canvas.height);
+                }
+                ctx.restore();
+            }
+            animationId = requestAnimationFrame(draw);
+        }
+
+        // Start
+        loadScripts();
+        initCamera();
+    </script>
+</body>
+</html>

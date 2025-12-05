@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Drums</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #1a1a1a; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            font-family: 'Inter', sans-serif;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #ff0055; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #ff0055; transition: width 0.2s;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+        }
+        #start-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .btn {
+            background: #ff0055;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="loader-text">Setting up Drum Kit... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <div id="start-overlay">
+        <h1>Virtual Drums</h1>
+        <p>Use your hands to hit the pads!</p>
+        <button class="btn" onclick="startAudio()">START ROCKING</button>
+    </div>
+
+    <a href="technology.html" class="back-btn">← Back</a>
+    
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let audioCtx;
+        let isAudioStarted = false;
+        let isModelLoading = false;
+
+        // Drum Zones Configuration
+        // Coordinates are percentages (0.0 to 1.0)
+        const DRUM_PADS = [
+            { id: 'crash', label: 'CRASH', x: 0.15, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'crash' },
+            { id: 'ride', label: 'RIDE', x: 0.85, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'ride' },
+            { id: 'hihat', label: 'HI-HAT', x: 0.1, y: 0.5, r: 0.1, color: '#ffff00', sound: 'hihat' },
+            { id: 'tom1', label: 'TOM 1', x: 0.35, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom1' },
+            { id: 'tom2', label: 'TOM 2', x: 0.65, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom2' },
+            { id: 'snare', label: 'SNARE', x: 0.3, y: 0.7, r: 0.12, color: '#ff0055', sound: 'snare' },
+            { id: 'floor', label: 'FLOOR', x: 0.7, y: 0.7, r: 0.12, color: '#00d4ff', sound: 'floor' },
+            { id: 'kick', label: 'KICK', x: 0.5, y: 0.85, r: 0.12, color: '#ffffff', sound: 'kick' }
+        ];
+
+        // State to track if a hand is currently inside a pad to prevent machine-gun triggering
+        // Map<HandIndex, Set<PadId>>
+        const activeCollisions = new Map();
+
+        // Audio Synthesis
+        const DrumSynth = {
+            ctx: null,
+            
+            init: function() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+
+            play: function(type) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+
+                switch(type) {
+                    case 'kick':
+                        this.playKick(t);
+                        break;
+                    case 'snare':
+                        this.playSnare(t);
+                        break;
+                    case 'hihat':
+                        this.playHiHat(t);
+                        break;
+                    case 'crash':
+                        this.playCrash(t);
+                        break;
+                    case 'ride':
+                        this.playRide(t);
+                        break;
+                    case 'tom1':
+                        this.playTom(t, 200);
+                        break;
+                    case 'tom2':
+                        this.playTom(t, 150);
+                        break;
+                    case 'floor':
+                        this.playTom(t, 100);
+                        break;
+                }
+            },
+
+            playKick: function(t) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+                
+                gain.gain.setValueAtTime(1, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+
+                osc.start(t);
+                osc.stop(t + 0.5);
+            },
+
+            playSnare: function(t) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer();
+                const noiseFilter = this.ctx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 1000;
+                const noiseGain = this.ctx.createGain();
+                
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(this.ctx.destination);
+
+                noiseGain.gain.setValueAtTime(1, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                noise.start(t);
+
+                const osc = this.ctx.createOscillator();
+                osc.type = 'triangle';
+                const oscGain = this.ctx.createGain();
+                osc.connect(oscGain);
+                oscGain.connect(this.ctx.destination);
+                
+                osc.frequency.setValueAtTime(100, t);
+                oscGain.gain.setValueAtTime(0.7, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                osc.start(t);
+                osc.stop(t + 0.2);
+            },
+
+            playHiHat: function(t) {
+                const fund = 40;
+                const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+                const bandpass = this.ctx.createBiquadFilter();
+                bandpass.type = "bandpass";
+                bandpass.frequency.value = 10000;
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = "highpass";
+                hp.frequency.value = 7000;
+                
+                const gain = this.ctx.createGain();
+                
+                ratios.forEach(ratio => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = "square";
+                    osc.frequency.value = fund * ratio;
+                    osc.connect(bandpass);
+                    osc.start(t);
+                    osc.stop(t + 0.05);
+                });
+
+                bandpass.connect(hp);
+                hp.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                gain.gain.setValueAtTime(0.3, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            },
+
+            playTom: function(t, freq) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.frequency.setValueAtTime(freq, t);
+                osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.4);
+                
+                gain.gain.setValueAtTime(1, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+                osc.start(t);
+                osc.stop(t + 0.4);
+            },
+
+            playCrash: function(t) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 2000;
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                gain.gain.setValueAtTime(0.8, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+                noise.start(t);
+                noise.stop(t + 1.5);
+            },
+
+            playRide: function(t) {
+                // Similar to hi-hat but longer ring
+                const fund = 60;
+                const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+                const bandpass = this.ctx.createBiquadFilter();
+                bandpass.type = "bandpass";
+                bandpass.frequency.value = 8000;
+                
+                const gain = this.ctx.createGain();
+                
+                ratios.forEach(ratio => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = "square";
+                    osc.frequency.value = fund * ratio;
+                    osc.connect(bandpass);
+                    osc.start(t);
+                    osc.stop(t + 0.8);
+                });
+
+                bandpass.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+            },
+
+            noiseBuffer: function() {
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                return buffer;
+            }
+        };
+
+        function startAudio() {
+            DrumSynth.init();
+            document.getElementById('start-overlay').style.display = 'none';
+            isAudioStarted = true;
+            loadScripts();
+        }
+
+        // Load Scripts
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                    initHandTracker();
+                }, 500);
+            }, 500);
+        }
+
+        async function initHandTracker() {
+            if (!isModelLoading) {
+                isModelLoading = true;
+                try {
+                    await window.HandTracker.load();
+                    initCamera();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    isModelLoading = false;
+                }
+            }
+        }
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                video.play();
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    detectLoop();
+                    requestAnimationFrame(draw);
+                };
+            } catch (err) {
+                console.error("Camera error:", err);
+            }
+        }
+
+        async function detectLoop() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && window.HandTracker) {
+                await window.HandTracker.detect(video);
+                checkCollisions();
+            }
+            requestAnimationFrame(detectLoop);
+        }
+
+        function checkCollisions() {
+            if (!window.HandTracker.results || !window.HandTracker.results.multiHandLandmarks) return;
+
+            const hands = window.HandTracker.results.multiHandLandmarks;
+            
+            hands.forEach((landmarks, handIndex) => {
+                if (!activeCollisions.has(handIndex)) {
+                    activeCollisions.set(handIndex, new Set());
+                }
+                const currentCollisions = activeCollisions.get(handIndex);
+                
+                // Use Index Finger Tip (8) and Wrist (0) as triggers? Just Index Tip for precision.
+                const tip = landmarks[8];
+                
+                // Convert to screen coords (mirrored)
+                const x = 1.0 - tip.x; 
+                const y = tip.y;
+
+                // Check against all pads
+                DRUM_PADS.forEach(pad => {
+                    // Simple circle collision
+                    // Aspect ratio correction for circle distance? 
+                    // Let's just use normalized distance for simplicity, assuming roughly square aspect or forgiving hitboxes
+                    const dx = x - pad.x;
+                    const dy = y - pad.y;
+                    // Adjust x for aspect ratio to make circles actually circular? 
+                    // canvas.width/canvas.height usually ~1.77. 
+                    // dist^2 = (dx * aspect)^2 + dy^2
+                    const aspect = canvas.width / canvas.height;
+                    const dist = Math.sqrt((dx * aspect) * (dx * aspect) + dy * dy);
+                    
+                    // Use pad.r as vertical radius reference
+                    if (dist < pad.r) {
+                        if (!currentCollisions.has(pad.id)) {
+                            // New Hit!
+                            triggerDrum(pad);
+                            currentCollisions.add(pad.id);
+                        }
+                    } else {
+                        if (currentCollisions.has(pad.id)) {
+                            // Left the pad
+                            currentCollisions.delete(pad.id);
+                            pad.active = false; // Visual reset
+                        }
+                    }
+                });
+            });
+        }
+
+        function triggerDrum(pad) {
+            if (isAudioStarted) {
+                DrumSynth.play(pad.sound);
+            }
+            pad.active = true;
+            pad.hitTime = Date.now();
+        }
+
+        function draw() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Mirror video
+                ctx.save();
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // Draw Pads
+                DRUM_PADS.forEach(pad => {
+                    const cx = pad.x * canvas.width;
+                    const cy = pad.y * canvas.height;
+                    // Radius in pixels (based on height to keep consistent size)
+                    const r = pad.r * canvas.height;
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    
+                    if (pad.active && (Date.now() - pad.hitTime < 150)) {
+                        ctx.fillStyle = pad.color;
+                        ctx.globalAlpha = 0.6;
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = 'white';
+                    } else {
+                        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                        ctx.globalAlpha = 0.4;
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = pad.color;
+                    }
+                    
+                    ctx.stroke();
+
+                    // Label
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 16px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pad.label, cx, cy);
+                });
+
+                // Draw Hands
+                if (window.HandTracker && window.HandTracker.results) {
+                    ctx.save();
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    window.HandTracker.draw(ctx, canvas.width, canvas.height);
+                    ctx.restore();
+                }
+            }
+            requestAnimationFrame(draw);
+        }
+    </script>
+</body>
+</html>

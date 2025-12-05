@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Puppeteer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #1a1a1a; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            font-family: 'Inter', sans-serif;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #ff6b6b; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #ff6b6b; transition: width 0.2s;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 20;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .mode-btn {
+            background: transparent;
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: #ff6b6b;
+            border-color: #ff6b6b;
+            color: black;
+        }
+        #instructions {
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="loader-text">Summoning Puppets... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <a href="technology.html" class="back-btn">← Back</a>
+    
+    <div id="instructions">
+        <h2>Make a "C" shape with your hand!</h2>
+        <p>Open and close your thumb and index finger to talk.</p>
+    </div>
+
+    <div id="controls">
+        <button class="mode-btn active" onclick="setMode('sock')">🧦 Socky</button>
+        <button class="mode-btn" onclick="setMode('monster')">👾 Monster</button>
+        <button class="mode-btn" onclick="setMode('robot')">🤖 Robo</button>
+    </div>
+
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let animationId;
+        let isModelLoading = false;
+        let currentMode = 'sock';
+        
+        // Puppet State
+        let eyeOffset = { x: 0, y: 0 };
+        let blinkState = 0; // 0 = open, 1 = closed
+
+        // Load Scripts
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                    initHandTracker();
+                }, 500);
+            }, 500);
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        async function initHandTracker() {
+            if (!isModelLoading) {
+                isModelLoading = true;
+                try {
+                    await window.HandTracker.load();
+                    initCamera();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    isModelLoading = false;
+                }
+            }
+        }
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                video.play();
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    detectLoop();
+                    requestAnimationFrame(draw);
+                };
+            } catch (err) {
+                console.error("Camera error:", err);
+            }
+        }
+
+        async function detectLoop() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && window.HandTracker) {
+                await window.HandTracker.detect(video);
+            }
+            requestAnimationFrame(detectLoop);
+        }
+
+        function draw() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Mirror video
+                ctx.save();
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                if (window.HandTracker && window.HandTracker.results && window.HandTracker.results.multiHandLandmarks) {
+                    const landmarks = window.HandTracker.results.multiHandLandmarks[0];
+                    if (landmarks) {
+                        drawPuppet(landmarks);
+                    }
+                }
+                ctx.restore();
+            }
+            
+            // Update eye animation
+            if (Math.random() < 0.02) blinkState = 1;
+            if (blinkState > 0) blinkState -= 0.1;
+            if (blinkState < 0) blinkState = 0;
+
+            animationId = requestAnimationFrame(draw);
+        }
+
+        function drawPuppet(landmarks) {
+            const thumbTip = landmarks[4];
+            const indexTip = landmarks[8];
+            const indexMCP = landmarks[5];
+            const middleMCP = landmarks[9];
+            const wrist = landmarks[0];
+
+            // Scale coordinates to canvas
+            const w = canvas.width;
+            const h = canvas.height;
+
+            const tTip = { x: thumbTip.x * w, y: thumbTip.y * h };
+            const iTip = { x: indexTip.x * w, y: indexTip.y * h };
+            const iMCP = { x: indexMCP.x * w, y: indexMCP.y * h };
+            const mMCP = { x: middleMCP.x * w, y: middleMCP.y * h };
+            const wr = { x: wrist.x * w, y: wrist.y * h };
+
+            // Calculate orientation angle based on wrist to middle finger knuckle
+            const dx = mMCP.x - wr.x;
+            const dy = mMCP.y - wr.y;
+            const angle = Math.atan2(dy, dx) - Math.PI / 2;
+
+            // Mouth calculations
+            const mouthCenter = { x: (tTip.x + iTip.x) / 2, y: (tTip.y + iTip.y) / 2 };
+            const mouthDist = Math.hypot(tTip.x - iTip.x, tTip.y - iTip.y);
+            const isOpen = mouthDist > 30; // Threshold
+
+            ctx.save();
+            
+            // --- RENDER PUPPET ---
+            
+            if (currentMode === 'sock') {
+                // Googly Eyes on Knuckles
+                drawGooglyEye(iMCP, 20, angle);
+                drawGooglyEye(mMCP, 20, angle);
+
+                // Mouth
+                ctx.translate(mouthCenter.x, mouthCenter.y);
+                ctx.rotate(angle);
+                
+                // Lips
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, mouthDist/1.5 + 10, 15, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                // Inner Mouth (Void)
+                ctx.fillStyle = '#330000';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, mouthDist/1.5, Math.max(5, mouthDist/3), 0, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Tongue
+                if (isOpen) {
+                    ctx.fillStyle = '#ff4444';
+                    ctx.beginPath();
+                    ctx.arc(0, mouthDist/3, 10, 0, Math.PI, false);
+                    ctx.fill();
+                }
+
+            } else if (currentMode === 'monster') {
+                // Green Skin tint (optional, maybe too complex to mask properly, so just add features)
+                
+                // Three Eyes
+                const midEye = { x: (iMCP.x + mMCP.x)/2, y: (iMCP.y + mMCP.y)/2 - 20 };
+                drawMonsterEye(iMCP, 15, angle);
+                drawMonsterEye(mMCP, 15, angle);
+                drawMonsterEye(midEye, 20, angle);
+
+                // Spiky Mouth
+                ctx.translate(mouthCenter.x, mouthCenter.y);
+                ctx.rotate(angle);
+                
+                ctx.fillStyle = '#2d5a27'; // Dark green lips
+                ctx.beginPath();
+                ctx.ellipse(0, 0, mouthDist/1.2 + 10, 20, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, mouthDist/1.2, Math.max(5, mouthDist/2.5), 0, 0, Math.PI*2);
+                ctx.fill();
+
+                // Teeth
+                if (isOpen) {
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    // Top teeth
+                    for(let i=-20; i<=20; i+=10) {
+                        ctx.moveTo(i, -10);
+                        ctx.lineTo(i+5, 5);
+                        ctx.lineTo(i+10, -10);
+                    }
+                    // Bottom teeth
+                    for(let i=-20; i<=20; i+=10) {
+                        ctx.moveTo(i, 10);
+                        ctx.lineTo(i+5, -5);
+                        ctx.lineTo(i+10, 10);
+                    }
+                    ctx.fill();
+                }
+
+            } else if (currentMode === 'robot') {
+                // Robot Eyes (Glowing Rectangles)
+                drawRobotEye(iMCP, angle);
+                drawRobotEye(mMCP, angle);
+
+                // Mechanical Jaw
+                ctx.translate(mouthCenter.x, mouthCenter.y);
+                ctx.rotate(angle);
+
+                // Metal plates
+                ctx.fillStyle = '#777';
+                ctx.fillRect(-30, -25, 60, 10); // Top jaw
+                ctx.fillRect(-30, 15, 60, 10);  // Bottom jaw
+
+                // Connectors
+                ctx.strokeStyle = '#555';
+                ctx.lineWidth = 4;
+                if (isOpen) {
+                    ctx.beginPath();
+                    ctx.moveTo(-25, -15); ctx.lineTo(-25, 15);
+                    ctx.moveTo(25, -15); ctx.lineTo(25, 15);
+                    ctx.stroke();
+                    
+                    // Laser in mouth?
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawGooglyEye(pos, size, angle) {
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            ctx.rotate(angle);
+            
+            // White
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#ddd';
+            ctx.stroke();
+
+            // Pupil (moves with gravity/random)
+            const pupilOffset = Math.sin(Date.now() / 500) * 5;
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            if (blinkState > 0.5) {
+                // Blink
+                ctx.moveTo(-size, 0);
+                ctx.lineTo(size, 0);
+                ctx.stroke();
+            } else {
+                ctx.arc(pupilOffset, 5, size/3, 0, Math.PI*2);
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawMonsterEye(pos, size, angle) {
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            ctx.rotate(angle);
+            
+            // Yellow Sclera
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Slit Pupil
+            ctx.fillStyle = '#d50000';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size/4, size/1.5, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawRobotEye(pos, angle) {
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            ctx.rotate(angle);
+            
+            // Glow
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00d4ff';
+            
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillRect(-15, -10, 30, 20);
+            
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        loadScripts();
+    </script>
+</body>
+</html>

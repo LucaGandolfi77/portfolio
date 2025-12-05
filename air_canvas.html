@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Air Canvas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            font-family: 'Inter', sans-serif;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+        }
+        #loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #00d4ff; font-family: 'Inter', sans-serif;
+            transition: opacity 0.5s;
+        }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            margin-top: 20px; border-radius: 2px; overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+        }
+        #toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .color-btn.active {
+            transform: scale(1.2);
+            border-color: #00d4ff;
+        }
+        .action-btn {
+            background: white;
+            color: black;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        #status {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
+        <div class="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <a href="technology.html" class="back-btn">← Back</a>
+    
+    <div id="toolbar">
+        <div class="color-btn active" style="background: #00d4ff;" onclick="setColor('#00d4ff')"></div>
+        <div class="color-btn" style="background: #ff0055;" onclick="setColor('#ff0055')"></div>
+        <div class="color-btn" style="background: #ffff00;" onclick="setColor('#ffff00')"></div>
+        <div class="color-btn" style="background: #00ff00;" onclick="setColor('#00ff00')"></div>
+        <button class="action-btn" onclick="clearCanvas()">Clear</button>
+    </div>
+
+    <div id="status">Point index finger to draw</div>
+
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        // Off-screen canvas for the drawing layer
+        const drawingCanvas = document.createElement('canvas');
+        const drawingCtx = drawingCanvas.getContext('2d');
+
+        let animationId;
+        let isModelLoading = false;
+        let facingMode = 'user'; // Default to user for drawing
+        
+        // Drawing State
+        let currentColor = '#00d4ff';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        function setColor(color) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                if (btn.style.background.includes(hexToRgb(color)) || btn.style.background === color) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        // Helper to match computed style colors
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : null;
+        }
+
+        function clearCanvas() {
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
+
+        // Load Scripts with Progress
+        async function loadScripts() {
+            const scripts = [
+                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'assets/js/hand_tracker.js'
+            ];
+            
+            const progressBar = document.getElementById('progress-bar');
+            const timeLeft = document.getElementById('time-left');
+            let loaded = 0;
+            
+            for (let i = 0; i < scripts.length; i++) {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', scripts[i]);
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const script = document.createElement('script');
+                            script.text = xhr.responseText;
+                            document.body.appendChild(script);
+                            loaded++;
+                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    };
+                    xhr.onerror = reject;
+                    xhr.send();
+                });
+            }
+            
+            // Wait a bit for evaluation
+            setTimeout(() => {
+                document.getElementById('loader-overlay').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loader-overlay').style.display = 'none';
+                    initHandTracker();
+                }, 500);
+            }, 500);
+        }
+
+        // Initialize Camera
+        async function initCamera() {
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            try {
+                const constraints = { 
+                    video: { 
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }, 
+                    audio: false 
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.play();
+                
+                // Wait for video to be ready to set canvas size
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    drawingCanvas.width = video.videoWidth;
+                    drawingCanvas.height = video.videoHeight;
+                    requestAnimationFrame(draw);
+                };
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                alert("Could not access camera.");
+            }
+        }
+
+        async function initHandTracker() {
+            if (!isModelLoading) {
+                isModelLoading = true;
+                try {
+                    await window.HandTracker.load();
+                    detectLoop();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    isModelLoading = false;
+                }
+            }
+        }
+
+        async function detectLoop() {
+            const isReady = video.readyState === video.HAVE_ENOUGH_DATA;
+
+            if (window.HandTracker) {
+                if (isReady) {
+                    try {
+                        await window.HandTracker.detect(video);
+                        processGestures();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                requestAnimationFrame(detectLoop);
+            }
+        }
+
+        function processGestures() {
+            if (!window.HandTracker.results || !window.HandTracker.results.multiHandLandmarks) return;
+            
+            const landmarks = window.HandTracker.results.multiHandLandmarks[0]; // Use first hand
+            if (!landmarks) {
+                isDrawing = false;
+                return;
+            }
+
+            // Check fingers status (Tip y < PIP y means extended for fingers pointing up)
+            // Note: Coordinates are normalized (0-1). Y increases downwards.
+            
+            const indexTip = landmarks[8];
+            const indexPip = landmarks[6];
+            const middleTip = landmarks[12];
+            const middlePip = landmarks[10];
+            const ringTip = landmarks[16];
+            const ringPip = landmarks[14];
+
+            const isIndexExtended = indexTip.y < indexPip.y;
+            const isMiddleExtended = middleTip.y < middlePip.y;
+            const isRingExtended = ringTip.y < ringPip.y;
+
+            // Drawing Logic: Only Index Extended
+            if (isIndexExtended && !isMiddleExtended && !isRingExtended) {
+                let x = indexTip.x * canvas.width;
+                let y = indexTip.y * canvas.height;
+
+                // Mirroring
+                if (facingMode === 'user') {
+                    x = canvas.width - x;
+                }
+
+                if (!isDrawing) {
+                    isDrawing = true;
+                    lastX = x;
+                    lastY = y;
+                } else {
+                    // Draw line
+                    drawingCtx.beginPath();
+                    drawingCtx.moveTo(lastX, lastY);
+                    drawingCtx.lineTo(x, y);
+                    drawingCtx.strokeStyle = currentColor;
+                    drawingCtx.lineWidth = 8;
+                    drawingCtx.lineCap = 'round';
+                    drawingCtx.stroke();
+                    
+                    lastX = x;
+                    lastY = y;
+                }
+                document.getElementById('status').innerText = "Drawing...";
+            } else if (isIndexExtended && isMiddleExtended) {
+                // Selection/Hover mode (Stop drawing)
+                isDrawing = false;
+                document.getElementById('status').innerText = "Hovering (Raise only index to draw)";
+            } else {
+                isDrawing = false;
+                document.getElementById('status').innerText = "Point index finger to draw";
+            }
+        }
+
+        function draw() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Ensure canvas size matches video
+                if (canvas.width !== video.videoWidth) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    // Resize drawing canvas but try to keep content? 
+                    // For simplicity, we might lose drawing on resize or need to copy.
+                    // Let's just reset for now if resolution changes.
+                    drawingCanvas.width = video.videoWidth;
+                    drawingCanvas.height = video.videoHeight;
+                }
+
+                // 1. Draw Video
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // 2. Draw Drawing Layer
+                ctx.drawImage(drawingCanvas, 0, 0);
+
+                // 3. Draw Hand Landmarks (Optional, for feedback)
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                if (window.HandTracker) {
+                    window.HandTracker.draw(ctx, canvas.width, canvas.height);
+                }
+                ctx.restore();
+            }
+            animationId = requestAnimationFrame(draw);
+        }
+
+        // Start
+        loadScripts();
+        initCamera();
+    </script>
+</body>
+</html>
