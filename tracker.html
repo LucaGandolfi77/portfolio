@@ -672,17 +672,21 @@
         });
 
         async function detectLoop() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                if (currentFilter === 'objects' && model) {
+            const isReady = video.readyState === video.HAVE_ENOUGH_DATA;
+
+            if (currentFilter === 'objects' && model) {
+                if (isReady) {
                     try {
                         predictions = await model.detect(video);
                     } catch (e) {
                         console.error(e);
                     }
-                    if (currentFilter === 'objects') {
-                        requestAnimationFrame(detectLoop);
-                    }
-                } else if (currentFilter === 'face' && window.FaceTracker) {
+                }
+                if (currentFilter === 'objects') {
+                    requestAnimationFrame(detectLoop);
+                }
+            } else if (currentFilter === 'face' && window.FaceTracker) {
+                if (isReady) {
                     try {
                         predictions = await window.FaceTracker.detect(video);
                         if (!predictions) predictions = [];
@@ -690,19 +694,23 @@
                         console.error(e);
                         predictions = [];
                     }
-                    if (currentFilter === 'face') {
-                        requestAnimationFrame(detectLoop);
-                    }
-                } else if (currentFilter === 'hands' && window.HandTracker) {
+                }
+                if (currentFilter === 'face') {
+                    requestAnimationFrame(detectLoop);
+                }
+            } else if (currentFilter === 'hands' && window.HandTracker) {
+                if (isReady) {
                     try {
                         await window.HandTracker.detect(video);
                     } catch (e) {
                         console.error(e);
                     }
-                    if (currentFilter === 'hands') {
-                        requestAnimationFrame(detectLoop);
-                    }
-                } else if (currentFilter === 'tracker' && model && window.AITracker) {
+                }
+                if (currentFilter === 'hands') {
+                    requestAnimationFrame(detectLoop);
+                }
+            } else if (currentFilter === 'tracker' && model && window.AITracker) {
+                if (isReady) {
                     try {
                         // 1. Detect all objects
                         const allObjects = await model.detect(video);
@@ -717,22 +725,25 @@
                     } catch (e) {
                         console.error(e);
                     }
-                    if (currentFilter === 'tracker') {
-                        requestAnimationFrame(detectLoop);
-                    }
-                } else if (currentFilter === 'segment' && bodyPixNet) {
+                }
+                if (currentFilter === 'tracker') {
+                    requestAnimationFrame(detectLoop);
+                }
+            } else if (currentFilter === 'segment' && bodyPixNet) {
+                if (isReady) {
                     try {
                         currentSegmentation = await bodyPixNet.segmentPerson(video, {
                             internalResolution: 'medium',
                             segmentationThreshold: 0.7,
-                            maxDetections: 1
+                            maxDetections: 1,
+                            flipHorizontal: facingMode === 'user'
                         });
                     } catch (e) {
                         console.error(e);
                     }
-                    if (currentFilter === 'segment') {
-                        requestAnimationFrame(detectLoop);
-                    }
+                }
+                if (currentFilter === 'segment') {
+                    requestAnimationFrame(detectLoop);
                 }
             }
         }
@@ -772,22 +783,42 @@
                     ctx.drawImage(video, 0, 0, w, h);
                     
                     // Draw back to full canvas
-                    // If mirrored, the small video is drawn at the top-right (physical coords)
-                    // because of the scale(-1, 1) transform.
-                    // We need to read from there.
                     let sx = 0;
                     if (facingMode === 'user') {
                         sx = canvas.width - w;
                     }
                     
+                    ctx.save();
+                    if (facingMode === 'user') {
+                        ctx.scale(-1, 1);
+                        ctx.translate(-canvas.width, 0);
+                    }
                     ctx.drawImage(canvas, sx, 0, w, h, 0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                    
                     ctx.imageSmoothingEnabled = true;
                 } else if (currentFilter === 'blur') {
                     const val = parseInt(slider.value);
-                    const blurPx = (val / 100) * 20; // 0 to 20px
-                    ctx.filter = `blur(${blurPx}px)`;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    ctx.filter = 'none';
+                    // Use downscaling for blur
+                    const scale = 1 - (val / 100) * 0.95; 
+                    const w = canvas.width * scale;
+                    const h = canvas.height * scale;
+                    
+                    // Draw small video
+                    ctx.drawImage(video, 0, 0, w, h);
+                    
+                    let sx = 0;
+                    if (facingMode === 'user') {
+                        sx = canvas.width - w;
+                    }
+                    
+                    ctx.save();
+                    if (facingMode === 'user') {
+                        ctx.scale(-1, 1);
+                        ctx.translate(-canvas.width, 0);
+                    }
+                    ctx.drawImage(canvas, sx, 0, w, h, 0, 0, canvas.width, canvas.height);
+                    ctx.restore();
                 } else if (currentFilter === 'segment' && currentSegmentation) {
                     // Draw video first
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
