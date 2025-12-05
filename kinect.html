@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kinect Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevent pull-to-refresh on mobile */
+        }
+        canvas { 
+            display: block; 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: cover;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #score-board {
+            color: #00d4ff;
+            font-size: 48px;
+            font-weight: 800;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+        #status {
+            color: white;
+            font-size: 18px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 16px;
+            border-radius: 20px;
+            align-self: center;
+            backdrop-filter: blur(4px);
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            font-size: 14px;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            color: white;
+            text-align: center;
+        }
+        button {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+            transition: transform 0.2s;
+            pointer-events: auto;
+        }
+        button:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <a href="technology.html" class="back-btn">Exit</a>
+    
+    <div id="start-screen">
+        <h1 style="font-size: 3rem; margin-bottom: 10px; color: #00d4ff;">KINECT WEB</h1>
+        <p style="max-width: 300px; line-height: 1.5; color: #a0c0e0;">
+            Use your body to play!<br>
+            Move your hands to hit the falling objects.<br>
+            Enable camera to start.
+        </p>
+        <button onclick="startGame()">START</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="score-board">0</div>
+        <div id="status">Loading AI...</div>
+    </div>
+
+    <video id="video" playsinline style="display:none" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+
+    <!-- Load TensorFlow.js and Posenet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score-board');
+        const statusEl = document.getElementById('status');
+        const startScreen = document.getElementById('start-screen');
+
+        let net = null;
+        let isGameRunning = false;
+        let score = 0;
+        let particles = [];
+        let targets = [];
+        let poses = [];
+        let lastFrameTime = 0;
+        let spawnTimer = 0;
+        let difficulty = 1;
+
+        // Game Configuration
+        const TARGET_RADIUS = 30;
+        const HIT_RADIUS = 40; // Hand radius
+        
+        async function loadModel() {
+            statusEl.innerText = "Loading Model...";
+            net = await posenet.load({
+                architecture: 'MobileNetV1',
+                outputStride: 16,
+                inputResolution: { width: 640, height: 480 },
+                multiplier: 0.75
+            });
+            statusEl.innerText = "Model Loaded";
+        }
+
+        async function setupCamera() {
+            statusEl.innerText = "Accessing Camera...";
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve(video);
+                };
+            });
+        }
+
+        async function startGame() {
+            startScreen.style.display = 'none';
+            if (!net) await loadModel();
+            await setupCamera();
+            video.play();
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            isGameRunning = true;
+            statusEl.style.display = 'none';
+            gameLoop();
+        }
+
+        function createTarget() {
+            const x = Math.random() * (canvas.width - TARGET_RADIUS * 2) + TARGET_RADIUS;
+            targets.push({
+                x: x,
+                y: -TARGET_RADIUS,
+                vx: (Math.random() - 0.5) * 2,
+                vy: 2 + Math.random() * 3 * difficulty,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                radius: TARGET_RADIUS,
+                active: true
+            });
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        async function gameLoop() {
+            if (!isGameRunning) return;
+
+            // 1. Pose Detection
+            if (video.readyState === 4) {
+                // Use default flipHorizontal: false, we handle mirroring manually
+                const pose = await net.estimateSinglePose(video, {
+                    flipHorizontal: false
+                });
+                poses = [pose];
+            }
+
+            // 2. Update Game State
+            const now = Date.now();
+            const dt = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            // Spawn targets
+            spawnTimer += dt;
+            if (spawnTimer > 2.0 / difficulty) {
+                createTarget();
+                spawnTimer = 0;
+                difficulty += 0.01; // Slowly increase difficulty
+            }
+
+            // Update targets
+            targets.forEach(t => {
+                t.x += t.vx;
+                t.y += t.vy;
+                
+                // Bounce off walls
+                if (t.x < t.radius || t.x > canvas.width - t.radius) t.vx *= -1;
+                
+                // Remove if off screen
+                if (t.y > canvas.height + t.radius) t.active = false;
+            });
+
+            // Update particles
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+            });
+            particles = particles.filter(p => p.life > 0);
+
+            // Collision Detection
+            if (poses.length > 0) {
+                const pose = poses[0];
+                const keypoints = pose.keypoints.filter(k => k.score > 0.4); 
+                
+                // Scale coordinates from video to canvas
+                // IMPORTANT: videoWidth/Height might be different from display size
+                // We need to map video coordinates to canvas coordinates
+                // Canvas covers the screen (object-fit: cover equivalent)
+                
+                const videoRatio = video.videoWidth / video.videoHeight;
+                const canvasRatio = canvas.width / canvas.height;
+                
+                let scale, offsetX, offsetY;
+                
+                if (canvasRatio > videoRatio) {
+                    // Canvas is wider than video - fit width
+                    scale = canvas.width / video.videoWidth;
+                    offsetX = 0;
+                    offsetY = (canvas.height - video.videoHeight * scale) / 2;
+                } else {
+                    // Canvas is taller than video - fit height
+                    scale = canvas.height / video.videoHeight;
+                    offsetX = (canvas.width - video.videoWidth * scale) / 2;
+                    offsetY = 0;
+                }
+
+                // We are interested in wrists (9, 10)
+                const hands = keypoints.filter(k => k.part === 'leftWrist' || k.part === 'rightWrist');
+
+                targets.forEach(t => {
+                    if (!t.active) return;
+                    
+                    hands.forEach(hand => {
+                        // Manual Mirroring: x = width - x
+                        const rawX = video.videoWidth - hand.position.x;
+                        const rawY = hand.position.y;
+
+                        // Filter out edge artifacts
+                        if (rawX < 5 || rawY < 5 || rawX > video.videoWidth - 5 || rawY > video.videoHeight - 5) return;
+
+                        const hx = rawX * scale + offsetX;
+                        const hy = rawY * scale + offsetY;
+                        
+                        const dx = hx - t.x;
+                        const dy = hy - t.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        if (dist < t.radius + HIT_RADIUS) {
+                            t.active = false;
+                            score += 10;
+                            scoreEl.innerText = score;
+                            createExplosion(t.x, t.y, t.color);
+                            
+                            // Haptic feedback if available
+                            if (navigator.vibrate) navigator.vibrate(50);
+                        }
+                    });
+                });
+            }
+            
+            targets = targets.filter(t => t.active);
+
+            // 3. Draw
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Video (Stylized)
+            ctx.save();
+            // Mirror video
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            
+            // Draw video with high contrast/threshold effect for "Kinect" look
+            ctx.globalAlpha = 0.3;
+            
+            // Draw image to cover canvas (simulating object-fit: cover)
+            const videoRatio = video.videoWidth / video.videoHeight;
+            const canvasRatio = canvas.width / canvas.height;
+            let drawW, drawH, startX, startY;
+            
+            if (canvasRatio > videoRatio) {
+                drawW = canvas.width;
+                drawH = canvas.width / videoRatio;
+                startX = 0;
+                startY = (canvas.height - drawH) / 2;
+            } else {
+                drawH = canvas.height;
+                drawW = canvas.height * videoRatio;
+                startX = (canvas.width - drawW) / 2;
+                startY = 0;
+            }
+            
+            ctx.drawImage(video, startX, startY, drawW, drawH);
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
+
+            // Draw Skeleton/Body
+            if (poses.length > 0) {
+                const pose = poses[0];
+                
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                    // Re-calculate scale for drawing
+                    let scale, offsetX, offsetY;
+                    if (canvasRatio > videoRatio) {
+                        scale = canvas.width / video.videoWidth;
+                        offsetX = 0;
+                        offsetY = (canvas.height - video.videoHeight * scale) / 2;
+                    } else {
+                        scale = canvas.height / video.videoHeight;
+                        offsetX = (canvas.width - video.videoWidth * scale) / 2;
+                        offsetY = 0;
+                    }
+
+                    // Draw connections
+                    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(pose.keypoints, 0.3);
+                    
+                    ctx.save();
+                    ctx.strokeStyle = '#00d4ff';
+                    ctx.lineWidth = 4;
+                    adjacentKeyPoints.forEach(keypoints => {
+                        const x1 = (video.videoWidth - keypoints[0].position.x) * scale + offsetX;
+                        const y1 = keypoints[0].position.y * scale + offsetY;
+                        const x2 = (video.videoWidth - keypoints[1].position.x) * scale + offsetX;
+                        const y2 = keypoints[1].position.y * scale + offsetY;
+
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.stroke();
+                    });
+                    ctx.restore();
+
+                    // Draw joints & Hands
+                    pose.keypoints.forEach(keypoint => {
+                        const threshold = (keypoint.part === 'leftWrist' || keypoint.part === 'rightWrist') ? 0.2 : 0.4;
+                        
+                        if (keypoint.score > threshold) {
+                            const rawX = video.videoWidth - keypoint.position.x;
+                            const rawY = keypoint.position.y;
+
+                            if (rawX < 5 || rawY < 5 || rawX > video.videoWidth - 5 || rawY > video.videoHeight - 5) return;
+
+                            const x = rawX * scale + offsetX;
+                            const y = rawY * scale + offsetY;
+                            
+                            // Draw Joint
+                            ctx.beginPath();
+                            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#fff';
+                            ctx.fill();
+                            
+                            // Draw Hand Highlight
+                            if (keypoint.part === 'leftWrist' || keypoint.part === 'rightWrist') {
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.arc(x, y, HIT_RADIUS, 0, 2 * Math.PI);
+                                ctx.strokeStyle = '#00d4ff';
+                                ctx.lineWidth = 4;
+                                ctx.stroke();
+                                
+                                ctx.beginPath();
+                                ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                                ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
+                                ctx.fill();
+                                ctx.restore();
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Draw Targets
+            targets.forEach(t => {
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+                ctx.fillStyle = t.color;
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw Particles
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Preload model
+        loadModel();
+
+    </script>
+</body>
+</html>
