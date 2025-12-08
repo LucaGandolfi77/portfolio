@@ -540,47 +540,34 @@
                 });
             }
 
-                            score += 10 * (alienSpeed); // More points for faster levels
-                            createExplosion(alien.x + alien.width/2, alien.y + alien.height/2, '#0f0');
-                            
-                            // Drop Powerup
-                            if (Math.random() < 0.1) { // 10% chance
-                                spawnPowerup(alien.x, alien.y);
-                            }
-
-                            updateUI();
-                        }
-                    }
-                });
-            }); if (rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
+            // Alien Bullets
+            alienBullets.forEach(bullet => {
+                bullet.y += BULLET_SPEED;
+                if (bullet.y > CANVAS_HEIGHT) bullet.active = false;
+                
+                if (rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
                                 player.x, player.y, player.width, player.height)) {
                     bullet.active = false;
                     hitPlayer();
                 }
-        function hitPlayer() {
-            if (player.powerups.shield) {
-                player.powerups.shield = false;
-                createExplosion(player.x + player.width/2, player.y + player.height/2, '#00f');
-                return;
-            }
+            });
+            alienBullets = alienBullets.filter(b => b.active);
 
-            createExplosion(player.x + player.width/2, player.y + player.height/2, '#fff');
-            lives--;
-            updateUI();
-            if (lives <= 0) {
-                gameOver();
-            } else {
-                // Respawn delay or invulnerability could go here
-                player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
-                // Reset powerups on death
-                player.powerups.rapidFire = false;
-                player.powerups.multiShot = false;
-            }
-        }                   bullet.active = false;
-                            score += 10 * (alienSpeed); // More points for faster levels
-                            createExplosion(alien.x + alien.width/2, alien.y + alien.height/2, '#0f0');
-                            updateUI();
+            // Collisions: Player Bullets vs Aliens
+            player.bullets.forEach(bullet => {
+                activeAliens.forEach(alien => {
+                    if (bullet.active && rectIntersect(bullet.x, bullet.y, bullet.width, bullet.height,
+                                                     alien.x, alien.y, alien.width, alien.height)) {
+                        bullet.active = false;
+                        alien.status = 0;
+                        score += 10 * (alienSpeed);
+                        createExplosion(alien.x + alien.width/2, alien.y + alien.height/2, '#0f0');
+                        
+                        // Drop Powerup
+                        if (Math.random() < 0.1) {
+                            spawnPowerup(alien.x, alien.y);
                         }
+                        updateUI();
                     }
                 });
             });
@@ -595,46 +582,31 @@
         }
 
         function hitPlayer() {
+            if (player.powerups.shield) {
+                player.powerups.shield = false;
+                createExplosion(player.x + player.width/2, player.y + player.height/2, '#00f');
+                return;
+            }
+
             createExplosion(player.x + player.width/2, player.y + player.height/2, '#fff');
             lives--;
             updateUI();
             if (lives <= 0) {
                 gameOver();
             } else {
-                // Respawn delay or invulnerability could go here
                 player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
+                player.powerups.rapidFire = false;
+                player.powerups.multiShot = false;
             }
         }
 
-            // Draw Player
-            ctx.fillStyle = player.powerups.shield ? '#00f' : '#0f0'; // Blue if shielded
-            // Simple ship shape
-            ctx.fillRect(player.x, player.y + 10, player.width, 10);
-            ctx.fillRect(player.x + 15, player.y, 10, 10);
-
-            // Draw Powerups
-            powerups.forEach(p => {
-                if (p.type === 'rapidFire') ctx.fillStyle = '#ff0'; // Yellow
-                else if (p.type === 'multiShot') ctx.fillStyle = '#0ff'; // Cyan
-                else if (p.type === 'shield') ctx.fillStyle = '#00f'; // Blue
-                
-                ctx.beginPath();
-                ctx.arc(p.x + p.width/2, p.y + p.height/2, p.width/2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Icon/Text
-                ctx.fillStyle = '#000';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                let icon = 'P';
-                if (p.type === 'rapidFire') icon = '⚡';
-                else if (p.type === 'multiShot') icon = '⫚';
-                else if (p.type === 'shield') icon = '🛡️';
-                ctx.fillText(icon, p.x + p.width/2, p.y + p.height/2);
-            });
-
-            // Draw Aliensath.random() - 0.5) * 4,
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
                     life: 20,
                     color: color
                 });
@@ -666,10 +638,32 @@
             }
 
             // Draw Player
-            ctx.fillStyle = '#0f0'; // Retro Green
+            ctx.fillStyle = player.powerups.shield ? '#00f' : '#0f0'; // Blue if shielded
             // Simple ship shape
             ctx.fillRect(player.x, player.y + 10, player.width, 10);
             ctx.fillRect(player.x + 15, player.y, 10, 10);
+
+            // Draw Powerups
+            powerups.forEach(p => {
+                if (p.type === 'rapidFire') ctx.fillStyle = '#ff0'; // Yellow
+                else if (p.type === 'multiShot') ctx.fillStyle = '#0ff'; // Cyan
+                else if (p.type === 'shield') ctx.fillStyle = '#00f'; // Blue
+                
+                ctx.beginPath();
+                ctx.arc(p.x + p.width/2, p.y + p.height/2, p.width/2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Icon/Text
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                let icon = 'P';
+                if (p.type === 'rapidFire') icon = '⚡';
+                else if (p.type === 'multiShot') icon = '⫚';
+                else if (p.type === 'shield') icon = '🛡️';
+                ctx.fillText(icon, p.x + p.width/2, p.y + p.height/2);
+            });
 
             // Draw Aliens
             aliens.forEach(alien => {

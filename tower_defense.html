@@ -129,6 +129,60 @@
         }
         .wave-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        .speed-controls {
+            display: flex;
+            gap: 5px;
+            margin-left: 20px;
+        }
+        .speed-btn {
+            padding: 5px 10px;
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .speed-btn.active { background: var(--accent); color: black; }
+
+        .upgrade-panel {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 50;
+            min-width: 200px;
+        }
+        .upgrade-title { font-weight: bold; color: var(--accent); text-align: center; }
+        .upgrade-stat { display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .upgrade-btn {
+            background: var(--success);
+            color: black;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .upgrade-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #555; color: #aaa; }
+        .sell-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
         #gameOverScreen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -184,6 +238,21 @@
             </button>
             <div style="width: 20px;"></div>
             <button class="wave-btn" id="nextWaveBtn" onclick="startNextWave()">Next Wave</button>
+            
+            <div class="speed-controls">
+                <button class="speed-btn active" onclick="setSpeed(1)" id="speed1">1x</button>
+                <button class="speed-btn" onclick="setSpeed(2)" id="speed2">2x</button>
+                <button class="speed-btn" onclick="setSpeed(4)" id="speed4">4x</button>
+            </div>
+        </div>
+
+        <div class="upgrade-panel" id="upgradePanel">
+            <div class="upgrade-title">Tower Upgrade</div>
+            <div class="upgrade-stat">Lvl: <span id="upLvl">1</span></div>
+            <div class="upgrade-stat">Dmg: <span id="upDmg">20</span></div>
+            <div class="upgrade-stat">Rng: <span id="upRng">100</span></div>
+            <button class="upgrade-btn" id="btnUpgrade" onclick="upgradeSelectedTower()">Upgrade ($<span id="upCost">50</span>)</button>
+            <button class="sell-btn" onclick="sellSelectedTower()">Sell ($<span id="sellPrice">25</span>)</button>
         </div>
 
         <div id="gameOverScreen">
@@ -209,12 +278,21 @@
         let waveEnemiesLeft = 0;
         let spawnTimer = 0;
         let lastTime = 0;
+        let gameSpeed = 1;
+        let selectedTower = null; // For upgrades
 
         // Constants
         const TOWER_TYPES = {
             basic: { name: 'Basic', cost: 50, range: 100, damage: 20, rate: 600, color: '#00d4ff' },
             sniper: { name: 'Sniper', cost: 100, range: 250, damage: 100, rate: 2000, color: '#ff00ff' },
             rapid: { name: 'Rapid', cost: 150, range: 80, damage: 8, rate: 100, color: '#ffff00' }
+        };
+
+        const ENEMY_TYPES = {
+            normal: { hp: 20, speed: 1, color: '#ff4d4d', reward: 10, radius: 10 },
+            fast: { hp: 15, speed: 2, color: '#ff9f43', reward: 15, radius: 8 },
+            tank: { hp: 60, speed: 0.6, color: '#8e44ad', reward: 25, radius: 14 },
+            boss: { hp: 200, speed: 0.4, color: '#c0392b', reward: 100, radius: 20 }
         };
 
         // Path (Simple winding path)
@@ -251,19 +329,36 @@
             projectiles = [];
             particles = [];
             isWaveActive = false;
+            selectedTower = null;
+            selectedTowerType = null;
             document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('upgradePanel').style.display = 'none';
             updateUI();
             gameLoop(0);
         }
 
         function updateUI() {
             document.getElementById('lives').textContent = lives;
-            document.getElementById('money').textContent = money;
+            document.getElementById('money').textContent = Math.floor(money);
             document.getElementById('wave').textContent = wave;
             document.getElementById('nextWaveBtn').disabled = isWaveActive;
+            
+            // Update upgrade panel if open
+            if (selectedTower) {
+                updateUpgradePanel();
+            }
+        }
+
+        function setSpeed(s) {
+            gameSpeed = s;
+            document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('speed' + s).classList.add('active');
         }
 
         function selectTower(type) {
+            selectedTower = null;
+            document.getElementById('upgradePanel').style.display = 'none';
+            
             if (selectedTowerType === type) {
                 selectedTowerType = null;
                 document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
@@ -284,21 +379,38 @@
         }
 
         function spawnEnemy() {
-            const hp = 20 + (wave * 10);
-            const speed = 1 + (wave * 0.1);
+            // Determine enemy type based on wave
+            let typeKey = 'normal';
+            const rand = Math.random();
+            
+            if (wave % 5 === 0 && waveEnemiesLeft === 1) {
+                typeKey = 'boss'; // Boss at end of every 5th wave
+            } else if (wave > 3 && rand < 0.3) {
+                typeKey = 'fast';
+            } else if (wave > 6 && rand < 0.2) {
+                typeKey = 'tank';
+            }
+
+            const type = ENEMY_TYPES[typeKey];
+            const hpMultiplier = 1 + (wave * 0.2); // HP scaling
+
             enemies.push({
                 x: path[0].x,
                 y: path[0].y,
                 pathIdx: 0,
-                hp: hp,
-                maxHp: hp,
-                speed: speed,
-                radius: 10,
+                hp: type.hp * hpMultiplier,
+                maxHp: type.hp * hpMultiplier,
+                speed: type.speed,
+                radius: type.radius,
+                color: type.color,
+                reward: type.reward,
                 frozen: 0
             });
         }
 
         function update(dt) {
+            dt *= gameSpeed; // Apply speed multiplier
+
             // Spawning
             if (isWaveActive && waveEnemiesLeft > 0) {
                 spawnTimer -= dt;
@@ -378,8 +490,8 @@
                     if (p.target.hp <= 0 && enemies.includes(p.target)) {
                         const idx = enemies.indexOf(p.target);
                         if (idx > -1) {
+                            money += enemies[idx].reward; // Reward from enemy type
                             enemies.splice(idx, 1);
-                            money += 10; // Reward
                             updateUI();
                         }
                     }
@@ -459,13 +571,13 @@
 
             // Draw Enemies
             enemies.forEach(e => {
-                ctx.fillStyle = '#ff4d4d';
+                ctx.fillStyle = e.color || '#ff4d4d';
                 ctx.beginPath();
                 ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // HP Bar
-                const hpPct = e.hp / e.maxHp;
+                const hpPct = Math.max(0, e.hp / e.maxHp);
                 ctx.fillStyle = 'red';
                 ctx.fillRect(e.x - 10, e.y - 20, 20, 4);
                 ctx.fillStyle = '#00ff88';
@@ -487,6 +599,19 @@
                 ctx.fillRect(p.x, p.y, 3, 3);
                 ctx.globalAlpha = 1;
             });
+
+            // Draw Selected Tower Range (Upgrade Mode)
+            if (selectedTower) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(selectedTower.x, selectedTower.y, selectedTower.range, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Highlight box
+                ctx.strokeStyle = '#00ff88';
+                ctx.strokeRect(selectedTower.x - 18, selectedTower.y - 18, 36, 36);
+            }
 
             // Draw Placement Preview
             if (selectedTowerType && mouseX > 0) {
@@ -514,38 +639,99 @@
         });
 
         canvas.addEventListener('click', () => {
-            if (!selectedTowerType) return;
-            
-            const type = TOWER_TYPES[selectedTowerType];
-            if (money >= type.cost) {
-                // Check collision with path (simple distance check to path segments)
-                // For now, just check distance to path points (imperfect but ok for simple)
-                // Better: Check distance to line segments
-                let onPath = false;
-                for(let i=0; i<path.length-1; i++) {
-                    const p1 = path[i];
-                    const p2 = path[i+1];
-                    // Distance from point to line segment
-                    const dist = distToSegment(mouseX, mouseY, p1.x, p1.y, p2.x, p2.y);
-                    if (dist < 30) { onPath = true; break; }
-                }
+            // If placing a tower
+            if (selectedTowerType) {
+                const type = TOWER_TYPES[selectedTowerType];
+                if (money >= type.cost) {
+                    let onPath = false;
+                    for(let i=0; i<path.length-1; i++) {
+                        const p1 = path[i];
+                        const p2 = path[i+1];
+                        const dist = distToSegment(mouseX, mouseY, p1.x, p1.y, p2.x, p2.y);
+                        if (dist < 30) { onPath = true; break; }
+                    }
 
-                if (!onPath) {
-                    towers.push({
-                        x: mouseX,
-                        y: mouseY,
-                        ...type,
-                        cooldown: 0
-                    });
-                    money -= type.cost;
-                    updateUI();
-                    selectedTowerType = null;
-                    document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
-                } else {
-                    // Show error?
+                    if (!onPath) {
+                        towers.push({
+                            x: mouseX,
+                            y: mouseY,
+                            ...type,
+                            level: 1,
+                            cooldown: 0
+                        });
+                        money -= type.cost;
+                        updateUI();
+                        selectedTowerType = null;
+                        document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+                    }
+                }
+                return;
+            }
+
+            // If clicking existing tower (Selection for upgrade)
+            let clickedTower = null;
+            for (let t of towers) {
+                const dist = Math.sqrt((mouseX - t.x)**2 + (mouseY - t.y)**2);
+                if (dist < 20) {
+                    clickedTower = t;
+                    break;
                 }
             }
+
+            if (clickedTower) {
+                selectedTower = clickedTower;
+                document.getElementById('upgradePanel').style.display = 'flex';
+                updateUpgradePanel();
+            } else {
+                selectedTower = null;
+                document.getElementById('upgradePanel').style.display = 'none';
+            }
+            updateUI(); // Redraw to show selection ring
         });
+
+        function updateUpgradePanel() {
+            if (!selectedTower) return;
+            
+            const cost = Math.floor(selectedTower.cost * 0.5 * selectedTower.level);
+            const sellPrice = Math.floor(selectedTower.cost * 0.5); // Simple sell logic
+            
+            document.getElementById('upLvl').textContent = selectedTower.level;
+            document.getElementById('upDmg').textContent = Math.floor(selectedTower.damage);
+            document.getElementById('upRng').textContent = Math.floor(selectedTower.range);
+            document.getElementById('upCost').textContent = cost;
+            document.getElementById('sellPrice').textContent = sellPrice;
+            
+            const btn = document.getElementById('btnUpgrade');
+            btn.disabled = money < cost;
+        }
+
+        function upgradeSelectedTower() {
+            if (!selectedTower) return;
+            const cost = Math.floor(selectedTower.cost * 0.5 * selectedTower.level);
+            
+            if (money >= cost) {
+                money -= cost;
+                selectedTower.level++;
+                selectedTower.damage *= 1.2; // +20% damage
+                selectedTower.range *= 1.1;  // +10% range
+                selectedTower.rate *= 0.9;   // -10% cooldown (faster)
+                updateUpgradePanel();
+                updateUI();
+            }
+        }
+
+        function sellSelectedTower() {
+            if (!selectedTower) return;
+            const sellPrice = Math.floor(selectedTower.cost * 0.5);
+            money += sellPrice;
+            
+            const idx = towers.indexOf(selectedTower);
+            if (idx > -1) towers.splice(idx, 1);
+            
+            selectedTower = null;
+            document.getElementById('upgradePanel').style.display = 'none';
+            updateUI();
+        }
 
         function distToSegment(x, y, x1, y1, x2, y2) {
             const A = x - x1;
