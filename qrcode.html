@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title data-i18n="qrcode.page.title">QR Code Reader — Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root{--bg:#07101b;--card:#0b1220;--accent:#00d4ff}
+        html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#07101b,#0f1724);color:#e8f6ff}
+        .wrap{max-width:800px;margin:36px auto;padding:28px;text-align:center;}
+        .lang-top-left{position:fixed;top:12px;left:12px;z-index:1002}
+        .lang-top-left select{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.06);color:white;padding:6px 8px;border-radius:6px}
+        a.back{color:var(--accent);text-decoration:none;font-weight:600;display:inline-block;margin-bottom:20px;}
+        
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+        }
+        
+        .result-container {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: none;
+        }
+        
+        .result-text {
+            font-size: 1.1rem;
+            word-break: break-all;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+        
+        .btn {
+            background: var(--accent);
+            color: #002;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.1s;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        .hint {
+            color: #9fbcd8;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        /* Hide html5-qrcode default elements we don't want or style them */
+        #reader__dashboard_section_csr span { display: none; }
+        
+        @media(max-width:768px){
+            .lang-top-left select{min-height:44px;min-width:100px;padding:8px 12px;font-size:0.9rem}
+            .wrap{padding:20px;margin:24px auto}
+        }
+    </style>
+</head>
+<body>
+    <div class="lang-top-left">
+        <select id="langSelect" aria-label="Select language">
+            <option value="en">🇬🇧 EN</option>
+            <option value="it">🇮🇹 IT</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="zh">🇨🇳 中</option>
+            <option value="ru">🇷🇺 RU</option>
+            <option value="de">🇩🇪 DE</option>
+            <option value="ja">🇯🇵 日本</option>
+            <option value="sv">🇸🇪 SV</option>
+            <option value="ar">🇸🇦 AR</option>
+            <option value="he">🇮🇱 HE</option>
+        </select>
+    </div>
+
+    <div class="wrap">
+        <a class="back" href="technology.html">← <span data-i18n="page.back">Back to portfolio</span></a>
+        <h1 data-i18n="qrcode.page.heading">QR Code Reader</h1>
+        <p data-i18n="qrcode.page.lead">Scan QR codes instantly. Double tap the camera view to switch cameras.</p>
+
+        <div class="controls">
+            <button id="startBtn" class="btn">Start Camera</button>
+            <button id="stopBtn" class="btn" style="display:none; background: #ff4444; color: white;">Stop Camera</button>
+        </div>
+
+        <div id="reader"></div>
+        <div class="hint">Double tap video to switch camera</div>
+
+        <div id="result" class="result-container">
+            <div id="resultText" class="result-text"></div>
+            <button id="copyBtn" class="btn">Copy Result</button>
+        </div>
+    </div>
+
+    <script>
+        const html5QrCode = new Html5Qrcode("reader");
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resultContainer = document.getElementById('result');
+        const resultText = document.getElementById('resultText');
+        const copyBtn = document.getElementById('copyBtn');
+        const readerDiv = document.getElementById('reader');
+        
+        let currentCameraId = null;
+        let cameras = [];
+        let isScanning = false;
+        let isSwitching = false;
+
+        // Initialize
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length) {
+                cameras = devices;
+                // Prefer back camera if available
+                const backCamera = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('environment'));
+                currentCameraId = backCamera ? backCamera.id : cameras[0].id;
+            }
+        }).catch(err => {
+            console.error("Error getting cameras", err);
+            resultText.textContent = "Error accessing camera. Please ensure you have granted permission.";
+            resultContainer.style.display = 'block';
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (!currentCameraId && cameras.length > 0) {
+                currentCameraId = cameras[0].id;
+            }
+            
+            if (currentCameraId) {
+                startScanning(currentCameraId);
+            } else {
+                alert("No camera found!");
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopScanning();
+        });
+
+        function startScanning(cameraId) {
+            html5QrCode.start(
+                cameraId, 
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                },
+                (decodedText, decodedResult) => {
+                    // Success callback
+                    console.log(`Scan result: ${decodedText}`, decodedResult);
+                    resultText.textContent = decodedText;
+                    resultContainer.style.display = 'block';
+                    
+                    // Optional: Stop scanning after success? 
+                    // Let's keep scanning but maybe vibrate
+                    if (navigator.vibrate) navigator.vibrate(200);
+                },
+                (errorMessage) => {
+                    // Error callback - ignore for now as it triggers on every frame without QR
+                }
+            ).then(() => {
+                isScanning = true;
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                readerDiv.style.display = 'block';
+            }).catch((err) => {
+                console.error("Error starting scanner", err);
+            });
+        }
+
+        function stopScanning() {
+            html5QrCode.stop().then(() => {
+                isScanning = false;
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+            }).catch((err) => {
+                console.error("Failed to stop scanning", err);
+            });
+        }
+
+        // Double tap to switch camera
+        let lastTap = 0;
+        readerDiv.addEventListener('click', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0) {
+                // Double tap detected
+                switchCamera();
+                e.preventDefault();
+            }
+            lastTap = currentTime;
+        });
+
+        function switchCamera() {
+            if (cameras.length < 2 || !isScanning || isSwitching) return;
+
+            isSwitching = true;
+            const currentIndex = cameras.findIndex(c => c.id === currentCameraId);
+            const nextIndex = (currentIndex + 1) % cameras.length;
+            const nextCameraId = cameras[nextIndex].id;
+
+            html5QrCode.stop().then(() => {
+                currentCameraId = nextCameraId;
+                startScanning(nextCameraId);
+                isSwitching = false;
+            }).catch(err => {
+                console.error("Error switching camera", err);
+                isSwitching = false;
+            });
+        }
+
+        copyBtn.addEventListener('click', () => {
+            const text = resultText.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = "Copied!";
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        });
+
+        // Translations
+        const translations = {
+            en: {
+                "qrcode.page.heading": "QR Code Reader",
+                "qrcode.page.lead": "Scan QR codes instantly. Double tap the camera view to switch cameras.",
+                "page.back": "Back to portfolio"
+            },
+            it: {
+                "qrcode.page.heading": "Lettore QR Code",
+                "qrcode.page.lead": "Scansiona codici QR istantaneamente. Doppio tocco sul video per cambiare fotocamera.",
+                "page.back": "Torna al portfolio"
+            },
+            // Add other languages as needed
+        };
+
+        const langSelect = document.getElementById('langSelect');
+        langSelect.addEventListener('change', (e) => {
+            const lang = e.target.value;
+            updateLanguage(lang);
+        });
+
+        function updateLanguage(lang) {
+            const t = translations[lang] || translations['en'];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.textContent = t[key];
+            });
+        }
+    </script>
+</body>
+</html>
