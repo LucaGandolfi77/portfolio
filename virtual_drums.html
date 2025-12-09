@@ -311,13 +311,15 @@
             DrumSynth.init();
             document.getElementById('start-overlay').style.display = 'none';
             isAudioStarted = true;
-            loadScripts();
+            initCamera();
         }
+
+        // Start loading immediately
+        window.addEventListener('load', loadScripts);
 
         // Load Scripts
         async function loadScripts() {
             const scripts = [
-                // Removed tfjs as it's not needed for MediaPipe Hands standalone
                 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
                 'assets/js/hand_tracker.js'
             ];
@@ -331,12 +333,11 @@
                     await new Promise((resolve, reject) => {
                         const script = document.createElement('script');
                         script.src = scripts[i];
-                        script.crossOrigin = "anonymous"; // Add crossOrigin
+                        script.crossOrigin = "anonymous";
                         script.onload = () => {
                             loaded++;
-                            const percent = (loaded / scripts.length) * 100;
+                            const percent = (loaded / scripts.length) * 50; // First 50% is script loading
                             progressBar.style.width = percent + '%';
-                            timeLeft.textContent = Math.round(100 - percent) + '% left';
                             resolve();
                         };
                         script.onerror = (e) => {
@@ -348,12 +349,18 @@
                         document.body.appendChild(script);
                     });
                 }
+
+                // Initialize Model
+                timeLeft.textContent = "Initializing AI Model...";
+                if (window.HandTracker) {
+                    await window.HandTracker.load();
+                    progressBar.style.width = '100%';
+                }
                 
                 setTimeout(() => {
                     document.getElementById('loader-overlay').style.opacity = 0;
                     setTimeout(() => {
                         document.getElementById('loader-overlay').style.display = 'none';
-                        initHandTracker();
                     }, 500);
                 }, 500);
             } catch (error) {
@@ -362,19 +369,7 @@
             }
         }
 
-        async function initHandTracker() {
-            if (!isModelLoading) {
-                isModelLoading = true;
-                try {
-                    await window.HandTracker.load();
-                    initCamera();
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    isModelLoading = false;
-                }
-            }
-        }
+        // Removed initHandTracker as we do it in steps now
 
         async function initCamera() {
             try {

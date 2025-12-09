@@ -8,15 +8,17 @@
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; text-shadow: 1px 1px 2px black; font-weight: bold; }
-        #game-over {
+        .modal-screen {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(0,0,0,0.85); color: white; padding: 40px; text-align: center;
             display: none; border-radius: 15px; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            min-width: 300px;
         }
         button { 
             padding: 12px 24px; font-size: 1.2rem; cursor: pointer; 
             background: #ff9800; border: none; border-radius: 5px; color: white; font-weight: bold;
             transition: transform 0.1s;
+            margin-top: 20px;
         }
         button:hover { transform: scale(1.05); background: #f57c00; }
         #controls-hint {
@@ -44,19 +46,23 @@
         }
         .btn-area {
             position: absolute;
-            bottom: 20px;
-            width: 80px; height: 80px;
+            width: 60px; height: 60px;
             background: rgba(255,255,255,0.2);
             border-radius: 50%;
             pointer-events: auto;
             display: flex; align-items: center; justify-content: center;
             color: white; font-weight: bold;
             border: 2px solid rgba(255,255,255,0.4);
+            font-size: 0.8rem;
         }
-        #btn-up { left: 20px; bottom: 110px; }
-        #btn-down { left: 20px; bottom: 20px; }
-        #btn-fire { right: 20px; bottom: 40px; background: rgba(255,50,50,0.3); border-color: rgba(255,100,100,0.5); width: 90px; height: 90px; }
-        #btn-turbo { right: 120px; bottom: 20px; width: 60px; height: 60px; font-size: 0.8rem; }
+        /* D-Pad style on left */
+        #btn-up { left: 80px; bottom: 100px; }
+        #btn-down { left: 80px; bottom: 20px; }
+        #btn-left { left: 20px; bottom: 60px; }
+        #btn-right { left: 140px; bottom: 60px; }
+        
+        /* Actions on right */
+        #btn-fire { right: 30px; bottom: 40px; background: rgba(255,50,50,0.3); border-color: rgba(255,100,100,0.5); width: 80px; height: 80px; font-size: 1rem; }
 
         @media (max-width: 768px) {
             .mobile-controls { display: block; }
@@ -69,22 +75,36 @@
     
     <div id="ui">
         <h2 style="margin:0 0 10px 0">Sky Ace</h2>
-        <div style="font-size: 1.2rem;">Score: <span id="score">0</span></div>
+        <div style="font-size: 1.2rem;">Level: <span id="level-display">1</span></div>
+        <div style="font-size: 1rem;">Enemies: <span id="enemies-left">0</span></div>
         <div style="font-size: 1rem; margin-top:5px;">Health: <span id="health" style="color:#4caf50">100</span>%</div>
     </div>
 
-    <div id="controls-hint">UP/DOWN to Fly • SPACE to Shoot • SHIFT for Turbo</div>
+    <div id="controls-hint">ARROWS to Fly • SPACE to Shoot</div>
 
-    <div id="game-over">
-        <h2 style="font-size: 2.5rem; margin-bottom: 10px;">MISSION FAILED</h2>
-        <p style="font-size: 1.2rem; margin-bottom: 30px;">Final Score: <span id="final-score">0</span></p>
+    <div id="game-over" class="modal-screen">
+        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #ff4d4d;">MISSION FAILED</h2>
+        <p style="font-size: 1.2rem;">You were shot down.</p>
         <button onclick="location.reload()">Retry Mission</button>
+    </div>
+
+    <div id="level-complete" class="modal-screen">
+        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #4caf50;">MISSION ACCOMPLISHED</h2>
+        <p style="font-size: 1.2rem;">Area Cleared!</p>
+        <button onclick="nextLevel()">Start Next Mission</button>
+    </div>
+    
+    <div id="game-win" class="modal-screen">
+        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #ffd700;">VICTORY!</h2>
+        <p style="font-size: 1.2rem;">You are the Sky Ace!</p>
+        <button onclick="location.reload()">Play Again</button>
     </div>
 
     <div class="mobile-controls">
         <div id="btn-up" class="btn-area">UP</div>
         <div id="btn-down" class="btn-area">DOWN</div>
-        <div id="btn-turbo" class="btn-area">TURBO</div>
+        <div id="btn-left" class="btn-area">LEFT</div>
+        <div id="btn-right" class="btn-area">RIGHT</div>
         <div id="btn-fire" class="btn-area">FIRE</div>
     </div>
 
@@ -95,36 +115,36 @@
         const ctx = canvas.getContext('2d');
 
         // Game State
-        let score = 0;
+        let level = 1;
+        let worldWidth = 0;
+        let cameraX = 0;
         let gameOver = false;
-        let gameTime = 0;
-        let scrollSpeed = 3;
-        let groundOffset = 0;
-
+        let gamePaused = false;
+        
         // Entities
         const player = {
             x: 100,
             y: 200,
             width: 50,
             height: 20,
+            vx: 0,
             vy: 0,
-            speed: 5,
+            speed: 6,
             angle: 0,
             health: 100,
-            color: '#fff',
             reload: 0
         };
 
-        const enemies = [];
-        const projectiles = [];
-        const particles = [];
-        const clouds = [];
+        let enemies = [];
+        let projectiles = [];
+        let particles = [];
+        let clouds = [];
 
         // Input
         const keys = {
-            ArrowUp: false, ArrowDown: false,
-            w: false, s: false,
-            " ": false, Shift: false
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+            w: false, s: false, a: false, d: false,
+            " ": false
         };
 
         function resize() {
@@ -141,39 +161,82 @@
         // Mobile Input
         const bindTouch = (id, key) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
-            el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+            if(el) {
+                el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
+                el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+            }
         };
         bindTouch('btn-up', 'ArrowUp');
         bindTouch('btn-down', 'ArrowDown');
+        bindTouch('btn-left', 'ArrowLeft');
+        bindTouch('btn-right', 'ArrowRight');
         bindTouch('btn-fire', ' ');
-        bindTouch('btn-turbo', 'Shift');
 
-        // Init Clouds
-        for(let i=0; i<10; i++) {
-            clouds.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * (canvas.height/2),
-                w: 60 + Math.random() * 100,
-                speed: 0.5 + Math.random() * 1
-            });
+        function initLevel(lvl) {
+            level = lvl;
+            gameOver = false;
+            gamePaused = false;
+            
+            // Level Config
+            worldWidth = 3000 + (lvl * 2000); // Lvl 1: 5000, Lvl 2: 7000
+            const enemyCount = 10 + (lvl * 10);
+            
+            // Reset Player
+            player.x = 100;
+            player.y = canvas.height / 2;
+            player.vx = 0;
+            player.vy = 0;
+            player.health = 100;
+            player.angle = 0;
+            
+            // Reset Entities
+            enemies = [];
+            projectiles = [];
+            particles = [];
+            cameraX = 0;
+            
+            // Spawn Enemies
+            for(let i=0; i<enemyCount; i++) {
+                spawnEnemy(i, enemyCount);
+            }
+            
+            // Init Clouds
+            clouds = [];
+            for(let i=0; i<30; i++) {
+                clouds.push({
+                    x: Math.random() * worldWidth,
+                    y: Math.random() * (canvas.height/2),
+                    w: 60 + Math.random() * 100,
+                    speed: 0.2 + Math.random() * 0.5
+                });
+            }
+
+            // UI
+            document.querySelectorAll('.modal-screen').forEach(el => el.style.display = 'none');
+            updateUI();
         }
 
-        function spawnEnemy() {
-            const type = Math.random() > 0.7 ? 'air' : 'ground';
+        function spawnEnemy(index, total) {
+            const type = Math.random() > 0.6 ? 'air' : 'ground';
+            // Spread enemies across the map, starting from x=800
+            const minX = 800;
+            const maxX = worldWidth - 200;
+            const x = minX + Math.random() * (maxX - minX);
+            
             let enemy = {
-                x: canvas.width + 50,
+                x: x,
                 y: 0,
                 w: 40,
                 h: 30,
-                hp: 1,
+                hp: level === 1 ? 2 : 4, // Harder in lvl 2
                 type: type,
                 color: type === 'ground' ? '#556b2f' : '#8b0000',
-                reload: 100 + Math.random() * 100
+                reload: Math.random() * 200,
+                fireRate: level === 1 ? 150 : 100
             };
 
             if (type === 'ground') {
-                enemy.y = canvas.height - 60; // On ground
+                enemy.y = canvas.height - 60;
                 enemy.w = 50;
                 enemy.h = 30;
             } else {
@@ -184,37 +247,62 @@
             enemies.push(enemy);
         }
 
-        function update() {
-            if (gameOver) return;
-            gameTime++;
+        function nextLevel() {
+            if (level < 2) {
+                initLevel(level + 1);
+            } else {
+                // Game Win
+                document.getElementById('game-win').style.display = 'block';
+            }
+        }
 
-            // --- Player ---
+        function updateUI() {
+            document.getElementById('level-display').innerText = level;
+            document.getElementById('enemies-left').innerText = enemies.length;
+            document.getElementById('health').innerText = Math.floor(player.health);
+        }
+
+        function update() {
+            if (gameOver || gamePaused) return;
+
+            // --- Player Movement ---
+            let targetVx = 0;
             let targetVy = 0;
             let targetAngle = 0;
-            let speedMult = 1;
 
-            if (keys.Shift) speedMult = 2;
+            if (keys.ArrowUp || keys.w) targetVy = -player.speed;
+            if (keys.ArrowDown || keys.s) targetVy = player.speed;
+            if (keys.ArrowLeft || keys.a) targetVx = -player.speed;
+            if (keys.ArrowRight || keys.d) targetVx = player.speed;
 
-            if (keys.ArrowUp || keys.w) {
-                targetVy = -player.speed * speedMult;
-                targetAngle = -0.3;
-            } else if (keys.ArrowDown || keys.s) {
-                targetVy = player.speed * speedMult;
-                targetAngle = 0.3;
-            }
-
-            // Smooth movement
+            // Physics
+            player.vx += (targetVx - player.vx) * 0.1;
             player.vy += (targetVy - player.vy) * 0.1;
+            
+            player.x += player.vx;
             player.y += player.vy;
+
+            // Angle based on velocity
+            targetAngle = player.vy * 0.05;
             player.angle += (targetAngle - player.angle) * 0.1;
 
             // Bounds
-            if (player.y < 20) player.y = 20;
-            if (player.y > canvas.height - 80) {
-                player.y = canvas.height - 80;
-                // Crash damage if hitting ground fast?
-                if (player.vy > 3) damagePlayer(10);
+            if (player.y < 20) player.y = 20; // Ceiling
+            if (player.y > canvas.height - 60) { // Floor
+                player.y = canvas.height - 60;
+                if (player.vy > 4) damagePlayer(10); // Crash
             }
+            if (player.x < 50) player.x = 50;
+            if (player.x > worldWidth - 50) player.x = worldWidth - 50;
+
+            // Camera Follow
+            // Center camera on player, but clamp to world bounds
+            let targetCamX = player.x - canvas.width / 3;
+            if (targetCamX < 0) targetCamX = 0;
+            if (targetCamX > worldWidth - canvas.width) targetCamX = worldWidth - canvas.width;
+            
+            // Smooth camera
+            cameraX += (targetCamX - cameraX) * 0.1;
 
             // Shooting
             if (player.reload > 0) player.reload--;
@@ -222,71 +310,57 @@
                 projectiles.push({
                     x: player.x + 20,
                     y: player.y + 5,
-                    vx: Math.cos(player.angle) * 15,
-                    vy: Math.sin(player.angle) * 15,
+                    vx: Math.cos(player.angle) * 15 + player.vx,
+                    vy: Math.sin(player.angle) * 15 + player.vy,
                     owner: 'player',
-                    life: 100
+                    life: 100,
+                    color: '#fff'
                 });
-                player.reload = 8; // Fire rate
+                player.reload = 10;
             }
 
-            // --- World ---
-            scrollSpeed = keys.Shift ? 8 : 4;
-            groundOffset = (groundOffset + scrollSpeed) % 100;
-
-            // Clouds
-            clouds.forEach(c => {
-                c.x -= c.speed + (keys.Shift ? 2 : 0);
-                if (c.x < -c.w) {
-                    c.x = canvas.width + Math.random() * 200;
-                    c.y = Math.random() * (canvas.height/2);
-                }
-            });
-
-            // Enemies
-            if (gameTime % 60 === 0) spawnEnemy();
-
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                let e = enemies[i];
-                e.x -= scrollSpeed;
-                
-                // Enemy Logic
+            // --- Enemies ---
+            enemies.forEach(e => {
+                // AI: Air enemies move slightly
                 if (e.type === 'air') {
-                    e.x -= 2; // Fly towards player
+                    // Bobbing
+                    e.y += Math.sin(Date.now() / 500) * 0.5;
+                    
+                    // Move towards player if close
+                    const dist = Math.abs(player.x - e.x);
+                    if (dist < 600) {
+                        if (e.x > player.x + 200) e.x -= 1;
+                        if (e.x < player.x - 200) e.x += 1;
+                    }
                 }
 
                 // Shooting
-                if (e.x < canvas.width && e.x > 0) {
+                const dist = Math.sqrt((player.x - e.x)**2 + (player.y - e.y)**2);
+                if (dist < 800) { // Range
                     e.reload--;
                     if (e.reload <= 0) {
-                        // Aim at player
                         const angle = Math.atan2(player.y - e.y, player.x - e.x);
                         projectiles.push({
                             x: e.x,
                             y: e.y,
-                            vx: Math.cos(angle) * 5,
-                            vy: Math.sin(angle) * 5,
+                            vx: Math.cos(angle) * 6,
+                            vy: Math.sin(angle) * 6,
                             owner: 'enemy',
                             life: 200,
                             color: '#ff0'
                         });
-                        e.reload = 150;
+                        e.reload = e.fireRate;
                     }
                 }
+            });
 
-                if (e.x < -100) enemies.splice(i, 1);
-            }
-
-            // Projectiles
+            // --- Projectiles ---
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 p.x += p.vx;
                 p.y += p.vy;
                 p.life--;
 
-                // Gravity for player bullets to simulate "bombing" feel if aiming down?
-                // No, user said "puntarli" (aim at them). Straight shot is better for aiming.
-                
                 let hit = false;
                 
                 // Ground collision
@@ -297,15 +371,21 @@
 
                 if (!hit) {
                     if (p.owner === 'player') {
-                        enemies.forEach((e, idx) => {
+                        for (let j = enemies.length - 1; j >= 0; j--) {
+                            let e = enemies[j];
                             if (checkRectCollide(p.x, p.y, 5, 5, e.x, e.y, e.w, e.h)) {
                                 hit = true;
-                                createExplosion(e.x + e.w/2, e.y + e.h/2, '#ffaa00', 15);
-                                enemies.splice(idx, 1);
-                                score += 100;
-                                document.getElementById('score').innerText = score;
+                                e.hp--;
+                                createExplosion(p.x, p.y, '#ffaa00', 5);
+                                if (e.hp <= 0) {
+                                    createExplosion(e.x + e.w/2, e.y + e.h/2, '#ff4400', 20);
+                                    enemies.splice(j, 1);
+                                    updateUI();
+                                    checkWin();
+                                }
+                                break;
                             }
-                        });
+                        }
                     } else {
                         // Enemy bullet hitting player
                         if (checkRectCollide(p.x, p.y, 5, 5, player.x - 20, player.y - 10, 40, 20)) {
@@ -316,7 +396,7 @@
                     }
                 }
 
-                if (hit || p.life <= 0 || p.x > canvas.width || p.x < 0) {
+                if (hit || p.life <= 0) {
                     projectiles.splice(i, 1);
                 }
             }
@@ -331,13 +411,23 @@
             }
         }
 
+        function checkWin() {
+            if (enemies.length === 0) {
+                gamePaused = true;
+                if (level === 1) {
+                    document.getElementById('level-complete').style.display = 'block';
+                } else {
+                    document.getElementById('game-win').style.display = 'block';
+                }
+            }
+        }
+
         function damagePlayer(amount) {
             player.health -= amount;
-            document.getElementById('health').innerText = player.health;
+            updateUI();
             if (player.health <= 0) {
                 gameOver = true;
                 document.getElementById('game-over').style.display = 'block';
-                document.getElementById('final-score').innerText = score;
             }
         }
 
@@ -363,7 +453,10 @@
             ctx.fillStyle = '#87CEEB';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Clouds
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            // Clouds (Parallax)
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
             clouds.forEach(c => {
                 ctx.beginPath();
@@ -375,29 +468,35 @@
 
             // Ground
             ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-            // Ground details (scrolling)
+            ctx.fillRect(0, canvas.height - 40, worldWidth, 40);
+            
+            // Ground details
             ctx.fillStyle = '#006400';
-            for(let i=0; i<canvas.width + 100; i+=100) {
-                ctx.fillRect(i - groundOffset, canvas.height - 40, 20, 40);
+            for(let i=0; i<worldWidth; i+=100) {
+                ctx.fillRect(i, canvas.height - 40, 20, 40);
             }
+            
+            // World Borders
+            ctx.fillStyle = 'rgba(255,0,0,0.3)';
+            ctx.fillRect(-10, 0, 10, canvas.height); // Left wall
+            ctx.fillRect(worldWidth, 0, 10, canvas.height); // Right wall
 
             // Enemies
             enemies.forEach(e => {
                 ctx.fillStyle = e.color;
                 if (e.type === 'ground') {
-                    // Tank shape
+                    // Tank
                     ctx.fillRect(e.x, e.y, e.w, e.h);
                     ctx.fillStyle = '#000';
-                    ctx.beginPath(); ctx.arc(e.x + e.w/2, e.y, 10, 0, Math.PI, true); ctx.fill(); // Turret
-                    // Gun barrel aiming at player
+                    ctx.beginPath(); ctx.arc(e.x + e.w/2, e.y, 10, 0, Math.PI, true); ctx.fill();
+                    // Turret
                     const angle = Math.atan2(player.y - e.y, player.x - e.x);
                     ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
                     ctx.beginPath(); ctx.moveTo(e.x + e.w/2, e.y); 
                     ctx.lineTo(e.x + e.w/2 + Math.cos(angle)*20, e.y + Math.sin(angle)*20);
                     ctx.stroke();
                 } else {
-                    // Plane shape
+                    // Plane
                     ctx.beginPath();
                     ctx.moveTo(e.x, e.y);
                     ctx.lineTo(e.x + e.w, e.y + e.h/2);
@@ -411,6 +510,9 @@
             ctx.translate(player.x, player.y);
             ctx.rotate(player.angle);
             
+            // Flip if moving left?
+            if (player.vx < -0.1) ctx.scale(-1, 1);
+
             // Body
             ctx.fillStyle = '#fff';
             ctx.beginPath();
@@ -428,11 +530,11 @@
             ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
 
             // Engine flame
-            if (keys.Shift) {
+            if (Math.abs(player.vx) > 2) {
                 ctx.fillStyle = '#ffaa00';
                 ctx.beginPath();
                 ctx.moveTo(-20, 0);
-                ctx.lineTo(-40 - Math.random()*20, 0);
+                ctx.lineTo(-30 - Math.random()*10, 0);
                 ctx.stroke();
             }
 
@@ -451,6 +553,8 @@
                 ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
                 ctx.globalAlpha = 1;
             });
+
+            ctx.restore();
         }
 
         function loop() {
@@ -459,6 +563,8 @@
             requestAnimationFrame(loop);
         }
 
+        // Start Game
+        initLevel(1);
         loop();
 
     </script>

@@ -280,6 +280,7 @@
         let lastTime = 0;
         let gameSpeed = 1;
         let selectedTower = null; // For upgrades
+        let spawnQueue = []; // Queue of enemies to spawn
 
         // Constants
         const TOWER_TYPES = {
@@ -289,10 +290,10 @@
         };
 
         const ENEMY_TYPES = {
-            normal: { hp: 20, speed: 1, color: '#ff4d4d', reward: 10, radius: 10 },
-            fast: { hp: 15, speed: 2, color: '#ff9f43', reward: 15, radius: 8 },
-            tank: { hp: 60, speed: 0.6, color: '#8e44ad', reward: 25, radius: 14 },
-            boss: { hp: 200, speed: 0.4, color: '#c0392b', reward: 100, radius: 20 }
+            normal: { hp: 20, speed: 1, color: '#ff4d4d', reward: 10, radius: 10, cost: 1 },
+            fast: { hp: 15, speed: 2, color: '#ff9f43', reward: 15, radius: 8, cost: 2 },
+            tank: { hp: 60, speed: 0.6, color: '#8e44ad', reward: 25, radius: 14, cost: 3 },
+            boss: { hp: 200, speed: 0.4, color: '#c0392b', reward: 100, radius: 20, cost: 0 } // Boss is special
         };
 
         // Path (Simple winding path)
@@ -328,6 +329,7 @@
             towers = [];
             projectiles = [];
             particles = [];
+            spawnQueue = [];
             isWaveActive = false;
             selectedTower = null;
             selectedTowerType = null;
@@ -373,24 +375,56 @@
             if (isWaveActive) return;
             wave++;
             isWaveActive = true;
-            waveEnemiesLeft = 5 + Math.floor(wave * 1.5);
+            
+            // Generate Wave
+            spawnQueue = [];
+            
+            // Boss every 5 waves
+            if (wave % 5 === 0) {
+                spawnQueue.push('boss');
+            }
+
+            // Points system
+            let points = wave * 5;
+            
+            // Fill queue based on points
+            while (points > 0) {
+                let options = ['normal'];
+                if (wave >= 3) options.push('fast');
+                if (wave >= 5) options.push('tank');
+                
+                // Filter by cost
+                options = options.filter(t => ENEMY_TYPES[t].cost <= points);
+                
+                if (options.length === 0) break;
+                
+                const type = options[Math.floor(Math.random() * options.length)];
+                spawnQueue.push(type);
+                points -= ENEMY_TYPES[type].cost;
+            }
+            
+            // Shuffle non-boss enemies (Boss is at index 0, so it spawns last if we pop)
+            // Wait, if we push Boss first, it's at index 0.
+            // If we push others after, they are at 1, 2, 3...
+            // If we pop(), we take from end (others first).
+            // So Boss (index 0) is last. Correct.
+            // We only shuffle the part after index 0 if boss exists, or all if no boss.
+            
+            const startIndex = (wave % 5 === 0) ? 1 : 0;
+            // Simple shuffle for the rest
+            for (let i = spawnQueue.length - 1; i > startIndex; i--) {
+                const j = Math.floor(Math.random() * (i - startIndex + 1)) + startIndex;
+                [spawnQueue[i], spawnQueue[j]] = [spawnQueue[j], spawnQueue[i]];
+            }
+
             spawnTimer = 0;
             updateUI();
         }
 
         function spawnEnemy() {
-            // Determine enemy type based on wave
-            let typeKey = 'normal';
-            const rand = Math.random();
+            if (spawnQueue.length === 0) return;
             
-            if (wave % 5 === 0 && waveEnemiesLeft === 1) {
-                typeKey = 'boss'; // Boss at end of every 5th wave
-            } else if (wave > 3 && rand < 0.3) {
-                typeKey = 'fast';
-            } else if (wave > 6 && rand < 0.2) {
-                typeKey = 'tank';
-            }
-
+            const typeKey = spawnQueue.pop();
             const type = ENEMY_TYPES[typeKey];
             const hpMultiplier = 1 + (wave * 0.2); // HP scaling
 
@@ -412,14 +446,13 @@
             dt *= gameSpeed; // Apply speed multiplier
 
             // Spawning
-            if (isWaveActive && waveEnemiesLeft > 0) {
+            if (isWaveActive && spawnQueue.length > 0) {
                 spawnTimer -= dt;
                 if (spawnTimer <= 0) {
                     spawnEnemy();
-                    waveEnemiesLeft--;
                     spawnTimer = 1000; // 1 sec interval
                 }
-            } else if (isWaveActive && waveEnemiesLeft === 0 && enemies.length === 0) {
+            } else if (isWaveActive && spawnQueue.length === 0 && enemies.length === 0) {
                 isWaveActive = false;
                 updateUI();
             }
@@ -435,7 +468,10 @@
                     const dy = target.y - e.y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    if (dist < e.speed) {
+                    // Scale movement speed by gameSpeed
+                    const moveSpeed = e.speed * gameSpeed;
+
+                    if (dist < moveSpeed) {
                         e.x = target.x;
                         e.y = target.y;
                         e.pathIdx++;
@@ -447,8 +483,8 @@
                             continue;
                         }
                     } else {
-                        e.x += (dx / dist) * e.speed;
-                        e.y += (dy / dist) * e.speed;
+                        e.x += (dx / dist) * moveSpeed;
+                        e.y += (dy / dist) * moveSpeed;
                     }
                 }
             }
