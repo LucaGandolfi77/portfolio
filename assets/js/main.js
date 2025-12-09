@@ -872,15 +872,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Timeline Events ---
     const timelineEvents = [
-        { year: 2003, title: '🎂 Nascita', description: 'Sono nato il 12 febbraio 2003 a Fidenza, provincia di Parma, Italia.' },
-        { year: 2007, title: '🏫 Scuola Elementare', description: 'Inizio il mio percorso scolastico con grande entusiasmo e curiosità.' },
-        { year: 2012, title: '📚 Scuola Media', description: 'Anni formativi dove comincio ad interessarmi di tecnologia e informatica.' },
-        { year: 2017, title: '💻 Primo Approccio alla Programmazione', description: 'Scopro la programmazione durante gli studi liceali, inizia la mia passione per il coding.' },
-        { year: 2021, title: '🎓 Diploma al Liceo', description: 'Ottengo il diploma al Liceo Scientifico con orientamento in Informatica.' },
-        { year: 2021, title: '🚀 Inizio Università', description: 'Mi iscrivo all\'Università per studiare Ingegneria Informatica. Cominciano nuove sfide!' },
-        { year: 2022, title: '🔧 Primo Progetto Professionale', description: 'Realizo il mio primo progetto reale con JavaScript, HTML e CSS. Una grande soddisfazione!' },
-        { year: 2023, title: '📱 Sviluppo Mobile & Web', description: 'Espando le mie competenze in React, Node.js e sviluppo full-stack. Nascono i primi progetti personali.' },
-        { year: 2024, title: '🌟 Portfolio e Freelancing', description: 'Lancio il mio portfolio personale e inizio a lavorare come freelancer su vari progetti.' },
+        { year: 1994, title: '🎂 Nascita', description: 'Sono nato il 28 aprile 1994 a Parma, Italia.' },
+        { year: 2000, title: '🏫 Scuola Elementare', description: 'Inizio il mio percorso scolastico con grande entusiasmo e curiosità.' },
+        { year: 2005, title: '📚 Scuola Media', description: 'Anni formativi dove comincio ad interessarmi di tecnologia e informatica.' },
+        { year: 2011, title: '💻 Primo Approccio alla Programmazione', description: 'Scopro la programmazione durante gli studi liceali, inizia la mia passione per il coding.' },
+        { year: 2013, title: '🎓 Diploma al Liceo', description: 'Ottengo il diploma al Liceo Scientifico con orientamento in Informatica.' },
+        { year: 2013, title: '🚀 Inizio Università', description: 'Mi iscrivo all\'Università per studiare Ingegneria Informatica. Cominciano nuove sfide!' },
+        { year: 2014, title: '🔧 Primo Progetto Professionale', description: 'Realizzo il mio primo progetto reale con JavaScript, HTML e CSS. Una grande soddisfazione!' },
+        { year: 2016, title: '📱 Sviluppo Mobile & Web', description: 'Espando le mie competenze in React, Node.js e sviluppo full-stack. Nascono i primi progetti personali.' },
+        { year: 2018, title: '🎓 Diploma di Laurea', description: 'Ottengo la Laurea in Ingegneria Informatica, Elettronica e delle Telecomunicazioni.' },
+        { year: 2020, title: '🌟 Portfolio e Freelancing', description: 'Lancio il mio portfolio personale e inizio a lavorare come freelancer su vari progetti utilizzando l\'AI.' },
+        { year: 2021, title: '🔧 Inizio Lavoro in Consulenza', description: 'Trovo il mio primo lavoro in Consulenza in una multinazionale nel settore Aerospazio e Difesa.' },
         { year: 2025, title: '🎯 Oggi - Presente', description: 'Continuo a crescere come sviluppatore, cercando sempre nuove sfide e opportunità di apprendimento.' }
     ];
 
