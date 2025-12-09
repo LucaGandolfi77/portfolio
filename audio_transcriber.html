@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Audio Transcriber AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: #0a0a0a; 
+            color: white; 
+            font-family: 'Inter', system-ui, sans-serif; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; background: linear-gradient(45deg, #00d4ff, #00ff9d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); }
+        .btn-primary { background: #00d4ff; color: #000; border: none; font-weight: 600; }
+        .btn-primary:hover { background: #33ddff; transform: translateY(-1px); }
+        .btn-primary:disabled { background: #555; color: #888; cursor: not-allowed; transform: none; }
+
+        .upload-area {
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            background: rgba(255,255,255,0.02);
+            cursor: pointer;
+        }
+        .upload-area:hover { border-color: #00d4ff; background: rgba(0, 212, 255, 0.05); }
+        .upload-area.dragover { border-color: #00ff9d; background: rgba(0, 255, 157, 0.05); }
+
+        .file-info { margin-top: 10px; color: #00d4ff; font-size: 0.9rem; display: none; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: inherit;
+            outline: none;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .result-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 300px;
+            background: transparent;
+            border: none;
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+
+        .status-bar {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #aaa;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .result-area:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: #00d4ff; color: black; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Audio Transcriber AI</h1>
+            <a href="index.html#projects" class="btn">Exit</a>
+        </div>
+
+        <div class="upload-area" id="drop-zone">
+            <div style="font-size: 3rem; margin-bottom: 10px;">📁</div>
+            <p>Click or Drag & Drop audio/video file here</p>
+            <p style="font-size: 0.8rem; color: #666;">Supports .mp3, .wav, .ogg, .mp4, .m4a</p>
+            <input type="file" id="file-input" accept="audio/*,video/*" style="display: none;">
+            <div class="file-info" id="file-info"></div>
+        </div>
+
+        <div class="controls">
+            <select id="language-select">
+                <option value="italian">Italiano (Italian)</option>
+                <option value="english">English</option>
+                <option value="multilingual">Auto Detect / Other</option>
+            </select>
+            <button id="transcribe-btn" class="btn btn-primary" disabled>Start Transcription</button>
+        </div>
+
+        <div class="status-bar" id="status-bar">
+            <div class="spinner" id="spinner"></div>
+            <span id="status-text">Initializing AI model...</span>
+        </div>
+
+        <div class="result-area">
+            <button class="copy-btn" onclick="copyText()">Copy</button>
+            <textarea id="result-text" placeholder="Transcription will appear here..." readonly></textarea>
+        </div>
+    </div>
+
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+
+        // Configure environment
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInfo = document.getElementById('file-info');
+        const transcribeBtn = document.getElementById('transcribe-btn');
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const resultText = document.getElementById('result-text');
+        const spinner = document.getElementById('spinner');
+        const langSelect = document.getElementById('language-select');
+
+        let transcriber = null;
+        let selectedFile = null;
+
+        // Drag & Drop handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            fileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileInfo.style.display = 'block';
+            transcribeBtn.disabled = false;
+        }
+
+        // Initialize Model
+        async function initModel() {
+            if (!transcriber) {
+                updateStatus('Loading AI Model (Whisper)... this may take a moment first time.', true);
+                try {
+                    // Use quantized whisper-tiny for speed in browser
+                    transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+                    updateStatus('Model loaded!', false);
+                    setTimeout(() => statusBar.style.display = 'none', 2000);
+                } catch (err) {
+                    console.error(err);
+                    updateStatus('Error loading model: ' + err.message, false);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function updateStatus(text, isLoading) {
+            statusBar.style.display = 'flex';
+            statusText.textContent = text;
+            spinner.style.display = isLoading ? 'block' : 'none';
+        }
+
+        transcribeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            transcribeBtn.disabled = true;
+            resultText.value = '';
+            
+            const ready = await initModel();
+            if (!ready) {
+                transcribeBtn.disabled = false;
+                return;
+            }
+
+            updateStatus('Processing audio... (this can take a while for large files)', true);
+
+            try {
+                // Read file as ArrayBuffer then convert to AudioBuffer
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Resample to 16000Hz if necessary (Whisper expects 16k)
+                let audioData;
+                if (audioBuffer.sampleRate !== 16000) {
+                    const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(offlineCtx.destination);
+                    source.start(0);
+                    const resampled = await offlineCtx.startRendering();
+                    audioData = resampled.getChannelData(0);
+                } else {
+                    audioData = audioBuffer.getChannelData(0);
+                }
+                
+                // Run transcription
+                // Determine language code
+                let lang = langSelect.value;
+                let generateOptions = {
+                    task: 'transcribe',
+                    chunk_length_s: 30,
+                    stride_length_s: 5
+                };
+
+                if (lang === 'italian') generateOptions.language = 'italian';
+                if (lang === 'english') generateOptions.language = 'english';
+                // if multilingual, let it auto-detect
+
+                const output = await transcriber(audioData, generateOptions);
+
+                resultText.value = output.text;
+                updateStatus('Transcription complete!', false);
+            } catch (err) {
+                console.error(err);
+                updateStatus('Error during transcription: ' + err.message, false);
+                resultText.value = "Error: " + err.message;
+            } finally {
+                transcribeBtn.disabled = false;
+            }
+        });
+
+        window.copyText = () => {
+            resultText.select();
+            document.execCommand('copy');
+            const btn = document.querySelector('.copy-btn');
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = original, 2000);
+        };
+    </script>
+</body>
+</html>
