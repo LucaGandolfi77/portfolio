@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fruit Eater - FaceMesh Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .mirrored {
+            transform: scaleX(-1);
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00d4ff;
+            font-family: sans-serif;
+            font-size: 1.2rem;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: sans-serif;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        .info-text {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            font-family: sans-serif;
+            font-size: 1rem;
+            z-index: 20;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        #score-board {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            color: #ffd700;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            z-index: 30;
+            text-shadow: 2px 2px 0 #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <div id="loading">Loading FaceMesh Model...</div>
+        <div class="info-text">Catch the fruits with your mouth! 🍎</div>
+        <div id="score-board">0</div>
+        <video id="input_video" playsinline webkit-playsinline muted autoplay></video>
+        <canvas id="output_canvas"></canvas>
+        
+        <div class="controls">
+            <button class="btn" onclick="window.location.href='index.html#projects'">Exit</button>
+            <button class="btn" onclick="restartGame()">Restart</button>
+            <button class="btn" onclick="toggleCamera()">Switch Camera</button>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const container = document.getElementById('container');
+        const loading = document.getElementById('loading');
+        const scoreElement = document.getElementById('score-board');
+
+        let faceMesh;
+        let camera;
+        let isFrontCamera = true;
+        let lastTap = 0;
+
+        // Game State
+        let score = 0;
+        let fruits = [];
+        const fruitEmojis = ['🍎', '🍌', '🍇', '🍊', '🍓', '🍒', '🍑', '🍍', '🥝', '🍉'];
+        
+        class Fruit {
+            constructor(width, height) {
+                this.x = Math.random() * (width - 60) + 30;
+                this.y = -50;
+                this.size = 50;
+                this.speed = Math.random() * 4 + 3; // Speed between 3 and 7
+                this.emoji = fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)];
+                this.eaten = false;
+                this.points = 10;
+            }
+            
+            update() {
+                this.y += this.speed;
+            }
+            
+            draw(ctx) {
+                ctx.font = `${this.size}px Arial`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(this.emoji, this.x, this.y);
+            }
+        }
+
+        function restartGame() {
+            score = 0;
+            fruits = [];
+            scoreElement.textContent = score;
+        }
+
+        function toggleCamera() {
+            isFrontCamera = !isFrontCamera;
+            loading.style.display = 'block';
+            loading.textContent = 'Switching Camera...';
+            startCamera();
+        }
+
+        function onResults(results) {
+            loading.style.display = 'none';
+            
+            // Resize canvas to match video display size
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // Draw video frame
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            // Game Logic
+            if (Math.random() < 0.02) { // Spawn rate
+                fruits.push(new Fruit(canvasElement.width, canvasElement.height));
+            }
+
+            let mouthCenter = null;
+
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                const landmarks = results.multiFaceLandmarks[0];
+                
+                // Draw minimal face mesh for feedback
+                drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#FF3030', lineWidth: 2});
+                drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: '#E0E0E0', lineWidth: 1});
+
+                // Calculate Mouth Center (Upper lip 13, Lower lip 14)
+                const upperLip = landmarks[13];
+                const lowerLip = landmarks[14];
+                
+                // Coordinates are normalized [0,1]
+                const x = (upperLip.x + lowerLip.x) / 2 * canvasElement.width;
+                const y = (upperLip.y + lowerLip.y) / 2 * canvasElement.height;
+                mouthCenter = { x, y };
+
+                // Visual indicator for mouth
+                canvasCtx.beginPath();
+                canvasCtx.arc(x, y, 10, 0, 2 * Math.PI);
+                canvasCtx.fillStyle = "rgba(255, 255, 0, 0.5)";
+                canvasCtx.fill();
+            }
+
+            // Update and Draw Fruits
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                let f = fruits[i];
+                f.update();
+                f.draw(canvasCtx);
+
+                // Collision Detection
+                if (mouthCenter && !f.eaten) {
+                    const dx = f.x - mouthCenter.x;
+                    const dy = f.y - mouthCenter.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    // Hit radius (fruit size + mouth tolerance)
+                    if (dist < 60) { 
+                        f.eaten = true;
+                        score += f.points;
+                        scoreElement.textContent = score;
+                        
+                        // Visual feedback
+                        canvasCtx.font = "40px Arial";
+                        canvasCtx.fillStyle = "#00ff00";
+                        canvasCtx.fillText("+10", f.x, f.y - 20);
+                    }
+                }
+
+                // Remove off-screen or eaten fruits
+                if (f.y > canvasElement.height + 50 || f.eaten) {
+                    fruits.splice(i, 1);
+                }
+            }
+            
+            canvasCtx.restore();
+        }
+
+        async function setupFaceMesh() {
+            faceMesh = new FaceMesh({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }});
+            
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            faceMesh.onResults(onResults);
+        }
+
+        function startCamera() {
+            if (camera) {
+                camera.stop();
+            }
+
+            // Update mirroring classes
+            if (isFrontCamera) {
+                videoElement.classList.add('mirrored');
+                canvasElement.classList.add('mirrored');
+            } else {
+                videoElement.classList.remove('mirrored');
+                canvasElement.classList.remove('mirrored');
+            }
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await faceMesh.send({image: videoElement});
+                },
+                width: 1280,
+                height: 720,
+                facingMode: isFrontCamera ? 'user' : 'environment'
+            });
+            
+            camera.start();
+        }
+
+        // Double tap/click handler
+        container.addEventListener('click', (e) => {
+            // Prevent double tap from zooming on some devices
+            // e.preventDefault(); 
+        });
+
+        // Initialize
+        setupFaceMesh().then(() => {
+            startCamera();
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
