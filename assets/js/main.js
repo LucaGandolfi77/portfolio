@@ -554,8 +554,8 @@ function createParticles(count = 50) {
 function createStarsAndLights() {
     const particlesContainer = document.getElementById('particles');
     
-    // Create stars
-    for (let i = 0; i < 40; i++) {
+    // Create stars (Increased count)
+    for (let i = 0; i < 100; i++) {
         const star = document.createElement('div');
         star.className = 'star';
         star.style.left = Math.random() * 100 + '%';
@@ -566,8 +566,8 @@ function createStarsAndLights() {
         particlesContainer.appendChild(star);
     }
     
-    // Create lights
-    for (let i = 0; i < 15; i++) {
+    // Create lights (Increased count)
+    for (let i = 0; i < 30; i++) {
         const light = document.createElement('div');
         light.className = 'light';
         light.style.left = Math.random() * 100 + '%';
@@ -576,6 +576,17 @@ function createStarsAndLights() {
         light.style.animationDuration = (Math.random() * 3 + 4) + 's';
         light.style.setProperty('--drift-delay', (Math.random() * 6) + 's');
         particlesContainer.appendChild(light);
+    }
+
+    // Create sparkles (New effect)
+    for (let i = 0; i < 50; i++) {
+        const sparkle = document.createElement('div');
+        sparkle.className = 'sparkle';
+        sparkle.style.left = Math.random() * 100 + '%';
+        sparkle.style.top = Math.random() * 100 + '%';
+        sparkle.style.animationDelay = Math.random() * 2 + 's';
+        sparkle.style.animationDuration = (Math.random() * 1 + 1) + 's';
+        particlesContainer.appendChild(sparkle);
     }
 }
 
