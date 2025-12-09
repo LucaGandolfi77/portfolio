@@ -203,12 +203,23 @@
 
         <div class="controls">
             <select id="model-select">
-                <option value="Xenova/whisper-tiny" selected>Model: Tiny (Fastest, ~40MB)</option>
-                <option value="Xenova/whisper-base">Model: Base (Balanced, ~75MB)</option>
-                <option value="Xenova/whisper-small">Model: Small (High Quality, ~250MB)</option>
-                <option value="Xenova/whisper-medium">Model: Medium (Very High Quality, ~1.5GB)</option>
-                <option value="Xenova/whisper-large-v3">Model: Large v3 (Best Quality, ~3GB)</option>
+                <optgroup label="Local Models (Free, No Key Required, Runs in Browser)">
+                    <option value="Xenova/whisper-tiny" selected>Whisper Tiny (Fastest, ~40MB)</option>
+                    <option value="Xenova/whisper-base">Whisper Base (Balanced, ~75MB)</option>
+                    <option value="Xenova/whisper-small">Whisper Small (High Quality, ~250MB)</option>
+                    <option value="Xenova/whisper-medium">Whisper Medium (Very High Quality, ~1.5GB)</option>
+                    <option value="Xenova/whisper-large-v3">Whisper Large v3 (Best Quality, ~3GB)</option>
+                </optgroup>
+                <optgroup label="Cloud Models (API Key Required, Advanced Analysis)">
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Multimodal, Fast)</option>
+                </optgroup>
             </select>
+            
+            <div id="api-key-section" style="display:none; width: 100%; margin-bottom: 10px;">
+                <input type="password" id="api-key-input" placeholder="Enter Gemini API Key" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; box-sizing: border-box;">
+                <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#00d4ff">Google AI Studio</a></div>
+            </div>
+
             <select id="language-select">
                 <option value="italian">Italiano (Italian)</option>
                 <option value="english">English</option>
@@ -254,10 +265,23 @@
         const spinner = document.getElementById('spinner');
         const langSelect = document.getElementById('language-select');
         const modelSelect = document.getElementById('model-select');
+        const apiKeySection = document.getElementById('api-key-section');
+        const apiKeyInput = document.getElementById('api-key-input');
 
         let transcriber = null;
         let currentModelId = null;
         let selectedFile = null;
+
+        // Toggle API Key input
+        modelSelect.addEventListener('change', () => {
+            if (modelSelect.value.startsWith('gemini')) {
+                apiKeySection.style.display = 'block';
+                langSelect.style.display = 'none'; // Gemini handles language automatically
+            } else {
+                apiKeySection.style.display = 'none';
+                langSelect.style.display = 'block';
+            }
+        });
 
         // Drag & Drop handlers
         dropZone.addEventListener('click', () => fileInput.click());
@@ -292,6 +316,8 @@
                 const pPercent = document.getElementById('progress-percent');
                 const pSize = document.getElementById('progress-size');
                 
+                let lastUpdate = 0;
+
                 try {
                     // Use quantized whisper model
                     transcriber = await pipeline('automatic-speech-recognition', modelId, {
@@ -300,16 +326,22 @@
                                 updateStatus(`Downloading ${data.file}...`, true);
                                 pContainer.style.display = 'block';
                                 pInfo.style.display = 'flex';
+                                lastUpdate = 0;
                             } else if (data.status === 'progress') {
-                                const percent = data.progress.toFixed(1);
-                                const loaded = (data.loaded / 1024 / 1024).toFixed(2);
-                                const total = (data.total / 1024 / 1024).toFixed(2);
-                                
-                                pBar.style.width = percent + '%';
-                                pPercent.textContent = percent + '%';
-                                pSize.textContent = `${loaded} / ${total} MB`;
+                                const now = Date.now();
+                                if (now - lastUpdate >= 1000) {
+                                    const percent = data.progress.toFixed(1);
+                                    const loaded = (data.loaded / 1024 / 1024).toFixed(2);
+                                    const total = (data.total / 1024 / 1024).toFixed(2);
+                                    
+                                    pBar.style.width = percent + '%';
+                                    pPercent.textContent = percent + '%';
+                                    pSize.textContent = `${loaded} / ${total} MB`;
+                                    lastUpdate = now;
+                                }
                             } else if (data.status === 'done') {
                                 pBar.style.width = '100%';
+                                pPercent.textContent = '100%';
                             }
                         }
                     });
@@ -345,6 +377,88 @@
             transcribeBtn.disabled = true;
             resultText.value = '';
             
+            const modelId = modelSelect.value;
+
+            // Handle Gemini Model
+            if (modelId.startsWith('gemini')) {
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    alert('Please enter a valid Gemini API Key.');
+                    transcribeBtn.disabled = false;
+                    return;
+                }
+
+                updateStatus('Uploading and processing with Gemini... (This may take a moment)', true);
+
+                try {
+                    // Convert file to Base64
+                    const reader = new FileReader();
+                    reader.readAsDataURL(selectedFile);
+                    reader.onload = async () => {
+                        const base64Data = reader.result.split(',')[1];
+                        const mimeType = selectedFile.type || 'audio/mp3'; // Default fallback
+
+                        const prompt = `
+                            Process the audio file and generate a detailed transcription.
+                            Requirements:
+                            1. Identify distinct speakers (e.g., Speaker 1, Speaker 2, or names if context allows).
+                            2. Provide accurate timestamps for each segment (Format: MM:SS).
+                            3. Detect the primary language of each segment.
+                            4. If the segment is in a language different than English, also provide the English translation.
+                            5. Identify the primary emotion of the speaker in this segment. You MUST choose exactly one of the following: Happy, Sad, Angry, Neutral.
+                            6. Provide a brief summary of the entire audio at the beginning.
+                            
+                            Format the output as a readable text report.
+                        `;
+
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                        
+                        const payload = {
+                            contents: [{
+                                parts: [
+                                    { text: prompt },
+                                    { inlineData: { mimeType: mimeType, data: base64Data } }
+                                ]
+                            }]
+                        };
+
+                        try {
+                            const response = await fetch(url, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            const data = await response.json();
+                            
+                            if (data.error) {
+                                throw new Error(data.error.message);
+                            }
+
+                            const text = data.candidates[0].content.parts[0].text;
+                            resultText.value = text;
+                            updateStatus('Gemini processing complete!', false);
+                        } catch (err) {
+                            console.error(err);
+                            updateStatus('Gemini Error: ' + err.message, false);
+                            resultText.value = "Error: " + err.message;
+                        } finally {
+                            transcribeBtn.disabled = false;
+                        }
+                    };
+                    reader.onerror = (err) => {
+                        updateStatus('Error reading file: ' + err, false);
+                        transcribeBtn.disabled = false;
+                    };
+                    return; // Exit function, waiting for FileReader callback
+                } catch (err) {
+                    updateStatus('Error preparing file: ' + err.message, false);
+                    transcribeBtn.disabled = false;
+                    return;
+                }
+            }
+
+            // Handle Local Whisper Models
             const ready = await initModel();
             if (!ready) {
                 transcribeBtn.disabled = false;
