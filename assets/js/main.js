@@ -1022,3 +1022,145 @@ function autoCollapse(selector, threshold = 150) {
     });
 }
 
+
+/* Command Palette Logic */
+const commands = [
+    // Navigation
+    { id: 'nav-home', title: 'Go to Home', desc: 'Scroll to top', icon: '🏠', action: () => window.scrollTo({top: 0, behavior: 'smooth'}) },
+    { id: 'nav-about', title: 'Go to About', desc: 'About me section', icon: '👤', action: () => document.getElementById('about').scrollIntoView({behavior: 'smooth'}) },
+    { id: 'nav-skills', title: 'Go to Skills', desc: 'Technical skills', icon: '💻', action: () => document.getElementById('skills').scrollIntoView({behavior: 'smooth'}) },
+    { id: 'nav-projects', title: 'Go to Projects', desc: 'My projects', icon: '🚀', action: () => document.getElementById('projects').scrollIntoView({behavior: 'smooth'}) },
+    { id: 'nav-contact', title: 'Go to Contact', desc: 'Get in touch', icon: '✉️', action: () => document.getElementById('contact').scrollIntoView({behavior: 'smooth'}) },
+    
+    // Themes
+    { id: 'theme-light', title: 'Theme: Light', desc: 'Switch to light mode', icon: '☀️', action: () => { applyTheme('light'); localStorage.setItem('theme', 'light'); } },
+    { id: 'theme-dark', title: 'Theme: Dark', desc: 'Switch to dark mode', icon: '🌙', action: () => { applyTheme('dark'); localStorage.setItem('theme', 'dark'); } },
+    
+    // Games
+    { id: 'game-plane', title: 'Play Sky Ace', desc: 'Side-scrolling shooter game', icon: '✈️', action: () => window.location.href = 'plane.html' },
+    { id: 'game-snake', title: 'Play Snake', desc: 'Classic Snake game', icon: '🐍', action: () => window.location.href = 'snake.html' },
+    { id: 'game-tetris', title: 'Play Tetris', desc: 'Classic Tetris game', icon: '🧱', action: () => window.location.href = 'tetris.html' },
+    { id: 'game-chess', title: 'Play Chess', desc: 'Classic Chess game', icon: '♟️', action: () => window.location.href = 'chess.html' },
+    { id: 'game-poker', title: 'Play Poker', desc: 'Texas Hold\'em', icon: '🃏', action: () => window.location.href = 'poker.html' },
+    
+    // Actions
+    { id: 'action-email', title: 'Send Email', desc: 'Open default email client', icon: '📧', action: () => window.location.href = 'mailto:l.g.gandalf@hotmail.it' },
+    { id: 'action-cv', title: 'Download CV', desc: 'Get my resume', icon: '📄', action: () => window.open('assets/CV_Gandolfi_Luca.pdf', '_blank') }
+];
+
+let selectedIndex = 0;
+let filteredCommands = [];
+
+function toggleCommandPalette() {
+    const overlay = document.getElementById('command-palette-overlay');
+    const input = document.getElementById('command-input');
+    
+    if (overlay.classList.contains('visible')) {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.style.display = 'none', 200); // Wait for transition
+    } else {
+        overlay.style.display = 'flex';
+        // Force reflow
+        overlay.offsetHeight; 
+        overlay.classList.add('visible');
+        input.value = '';
+        filterCommands('');
+        input.focus();
+    }
+}
+
+function filterCommands(query) {
+    const list = document.getElementById('command-list');
+    list.innerHTML = '';
+    
+    filteredCommands = commands.filter(cmd => 
+        cmd.title.toLowerCase().includes(query.toLowerCase()) || 
+        cmd.desc.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    selectedIndex = 0;
+    
+    filteredCommands.forEach((cmd, index) => {
+        const item = document.createElement('li');
+        item.className = `command-item ${index === 0 ? 'selected' : ''}`;
+        item.innerHTML = `
+            <span class="command-icon">${cmd.icon}</span>
+            <div class="command-info">
+                <span class="command-title">${cmd.title}</span>
+                <span class="command-desc">${cmd.desc}</span>
+            </div>
+        `;
+        item.onclick = () => {
+            cmd.action();
+            toggleCommandPalette();
+        };
+        item.onmouseenter = () => {
+            selectedIndex = index;
+            updateSelection();
+        };
+        list.appendChild(item);
+    });
+    
+    if (filteredCommands.length === 0) {
+        list.innerHTML = '<li class="command-item" style="cursor: default;">No results found</li>';
+    }
+}
+
+function updateSelection() {
+    const items = document.querySelectorAll('.command-item');
+    items.forEach((item, index) => {
+        if (index === selectedIndex) item.classList.add('selected');
+        else item.classList.remove('selected');
+    });
+    
+    // Scroll into view
+    const selected = items[selectedIndex];
+    if (selected) {
+        selected.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+// Event Listeners
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleCommandPalette();
+    }
+    
+    const overlay = document.getElementById('command-palette-overlay');
+    if (overlay && overlay.classList.contains('visible')) {
+        if (e.key === 'Escape') {
+            toggleCommandPalette();
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % filteredCommands.length;
+            updateSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = (selectedIndex - 1 + filteredCommands.length) % filteredCommands.length;
+            updateSelection();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (filteredCommands[selectedIndex]) {
+                filteredCommands[selectedIndex].action();
+                toggleCommandPalette();
+            }
+        }
+    }
+});
+
+const commandInput = document.getElementById('command-input');
+if (commandInput) {
+    commandInput.addEventListener('input', (e) => {
+        filterCommands(e.target.value);
+    });
+}
+
+const commandOverlay = document.getElementById('command-palette-overlay');
+if (commandOverlay) {
+    commandOverlay.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            toggleCommandPalette();
+        }
+    });
+}
