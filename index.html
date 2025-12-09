@@ -609,12 +609,13 @@
                     <a href="timeline.html" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px;">⏱️ <span>View Full Timeline</span></a>
                 </div>
                 <div style="flex:1;min-width:220px;">
-                    <div class="timeline-container" style="max-width:360px;">
+                    <div id="timelineContainer" class="timeline-container collapsible-container collapsed" style="max-width:360px;">
                         <div class="timeline-line"></div>
                         <div class="timeline-events" id="timelineEvents">
                             <!-- Timeline events will be added dynamically -->
                         </div>
                     </div>
+                    <button class="show-more-btn" onclick="toggleSection('timelineContainer', this)" data-i18n="common.showMore">Show More</button>
                 </div>
             </div>
         </div>
@@ -639,7 +640,17 @@
         <!-- Games Section -->
         <div class="section" data-section id="games">
             <h2 class="section-title" data-i18n="sections.games">Games & Fun</h2>
-            <div style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap">
+            <div id="gamesContainer" class="collapsible-container collapsed" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap">
+                <a href="aviator.html" class="project-card" style="min-width:220px;text-decoration:none;color:inherit;display:flex;flex-direction:column;flex:1;min-height:140px;">
+                    <div style="padding:20px;flex:1;display:flex;flex-direction:column;justify-content:space-between">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:8px;">✈️</div>
+                            <div class="project-title">Aviator</div>
+                            <div class="project-description">Bet, watch the plane fly, and cash out before it crashes!</div>
+                        </div>
+                        <div style="font-size:0.85rem;color:#64b8ff;margin-top:8px;">Simulation</div>
+                    </div>
+                </a>
                 <a href="CDD.html" class="project-card" style="min-width:220px;text-decoration:none;color:inherit;display:flex;flex-direction:column;flex:1;min-height:140px;">
                     <div style="padding:20px;flex:1;display:flex;flex-direction:column;justify-content:space-between">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
@@ -967,6 +978,7 @@
                     </div>
                 </a>
             </div>
+            <button class="show-more-btn" onclick="toggleSection('gamesContainer', this)" data-i18n="common.showMore">Show More</button>
         </div>
 
         <!-- Testimonials -->
@@ -1086,28 +1098,18 @@
             // Simple AI & Translation Database
             const translations = {
                 en: {
-                    title: "Useless Bot",
-                    placeholder: "Type here...",
-                    welcome: "Hello! Ask me anything, I'll answer... in my own way.",
+                    title: "AI Assistant",
+                    placeholder: "Ask me anything...",
+                    welcome: "Hello! I'm an AI assistant. How can I help you explore Luca's portfolio?",
                     unknown: "I don't know about that, but did you know...",
-                    keywords: {
-                        'hello': "Hi there! Ready for some useless knowledge?",
-                        'hi': "Hi there! Ready for some useless knowledge?",
-                        'who are you': "I am the Useless Bot. I serve no purpose but to distract you.",
-                        'help': "I can't help you, I'm useless! But I can tell you facts."
-                    }
+                    keywords: {}
                 },
                 it: {
-                    title: "Bot Inutile",
-                    placeholder: "Scrivi qui...",
-                    welcome: "Ciao! Chiedimi qualsiasi cosa, ti risponderò... a modo mio.",
+                    title: "Assistente AI",
+                    placeholder: "Chiedimi tutto...",
+                    welcome: "Ciao! Sono un assistente AI. Come posso aiutarti a esplorare il portfolio di Luca?",
                     unknown: "Non so nulla di ciò, ma sapevi che...",
-                    keywords: {
-                        'ciao': "Ciao! Pronto per un po' di conoscenza inutile?",
-                        'salve': "Ciao! Pronto per un po' di conoscenza inutile?",
-                        'chi sei': "Sono il Bot Inutile. Non servo a nulla se non a distrarti.",
-                        'aiuto': "Non posso aiutarti, sono inutile! Ma posso dirti dei fatti."
-                    }
+                    keywords: {}
                 },
                 fr: {
                     title: "Bot Inutile",
@@ -1226,25 +1228,44 @@
                 messages.appendChild(loadingDiv);
                 messages.scrollTop = messages.scrollHeight;
 
-                // Simple AI Logic
-                const lang = getLang();
-                const t = translations[lang] || translations['en'];
-                const lowerText = text.toLowerCase();
-                let responseText = null;
+                let responseText = "";
 
-                // Check keywords in current language
-                if (t.keywords) {
-                    for (const [key, value] of Object.entries(t.keywords)) {
-                        if (lowerText.includes(key)) {
-                            responseText = value;
-                            break;
-                        }
+                try {
+                    // Initialize history if needed
+                    if (!window.chatHistory) {
+                        const lang = getLang();
+                        const systemMsg = lang === 'it' 
+                            ? "Sei un assistente utile nel portfolio di Luca Gandolfi. Sii conciso e amichevole."
+                            : "You are a helpful assistant on Luca Gandolfi's portfolio website. Be concise and friendly.";
+                            
+                        window.chatHistory = [
+                            { role: 'system', content: systemMsg }
+                        ];
                     }
-                }
+                    
+                    window.chatHistory.push({ role: 'user', content: text });
 
-                if (!responseText) {
-                    const fact = await getUselessFact();
-                    responseText = `${t.unknown} ${fact}`;
+                    // Use Pollinations.ai (GPT-4o / Claude equivalent free API)
+                    const response = await fetch('https://text.pollinations.ai/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: window.chatHistory,
+                            model: 'openai',
+                            seed: Math.floor(Math.random() * 1000)
+                        })
+                    });
+
+                    if (response.ok) {
+                        responseText = await response.text();
+                        window.chatHistory.push({ role: 'assistant', content: responseText });
+                    } else {
+                        responseText = "Sorry, I'm having trouble connecting to the AI.";
+                    }
+
+                } catch (error) {
+                    console.error('AI Error:', error);
+                    responseText = "Connection error. Please try again.";
                 }
                 
                 messages.removeChild(loadingDiv);

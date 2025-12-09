@@ -108,14 +108,14 @@
         // Drum Zones Configuration
         // Coordinates are percentages (0.0 to 1.0)
         const DRUM_PADS = [
-            { id: 'crash', label: 'CRASH', x: 0.15, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'crash' },
-            { id: 'ride', label: 'RIDE', x: 0.85, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'ride' },
-            { id: 'hihat', label: 'HI-HAT', x: 0.1, y: 0.5, r: 0.1, color: '#ffff00', sound: 'hihat' },
-            { id: 'tom1', label: 'TOM 1', x: 0.35, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom1' },
-            { id: 'tom2', label: 'TOM 2', x: 0.65, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom2' },
-            { id: 'snare', label: 'SNARE', x: 0.3, y: 0.7, r: 0.12, color: '#ff0055', sound: 'snare' },
-            { id: 'floor', label: 'FLOOR', x: 0.7, y: 0.7, r: 0.12, color: '#00d4ff', sound: 'floor' },
-            { id: 'kick', label: 'KICK', x: 0.5, y: 0.85, r: 0.12, color: '#ffffff', sound: 'kick' }
+            { id: 'crash', label: '📀 CRASH', x: 0.15, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'crash' },
+            { id: 'ride', label: '🔔 RIDE', x: 0.85, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'ride' },
+            { id: 'hihat', label: '🥯 HI-HAT', x: 0.1, y: 0.5, r: 0.1, color: '#ffff00', sound: 'hihat' },
+            { id: 'tom1', label: '🥁 TOM 1', x: 0.35, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom1' },
+            { id: 'tom2', label: '🥁 TOM 2', x: 0.65, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom2' },
+            { id: 'snare', label: '🥡 SNARE', x: 0.3, y: 0.7, r: 0.12, color: '#ff0055', sound: 'snare' },
+            { id: 'floor', label: '🪣 FLOOR', x: 0.7, y: 0.7, r: 0.12, color: '#00d4ff', sound: 'floor' },
+            { id: 'kick', label: '🦶 KICK', x: 0.5, y: 0.85, r: 0.12, color: '#ffffff', sound: 'kick' }
         ];
 
         // State to track if a hand is currently inside a pad to prevent machine-gun triggering
@@ -317,7 +317,7 @@
         // Load Scripts
         async function loadScripts() {
             const scripts = [
-                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
+                // Removed tfjs as it's not needed for MediaPipe Hands standalone
                 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
                 'assets/js/hand_tracker.js'
             ];
@@ -326,32 +326,40 @@
             const timeLeft = document.getElementById('time-left');
             let loaded = 0;
             
-            for (let i = 0; i < scripts.length; i++) {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = scripts[i];
-                    script.onload = () => {
-                        loaded++;
-                        const percent = (loaded / scripts.length) * 100;
-                        progressBar.style.width = percent + '%';
-                        timeLeft.textContent = Math.round(100 - percent) + '% left';
-                        resolve();
-                    };
-                    script.onerror = () => {
-                        console.error('Failed to load script: ' + scripts[i]);
-                        reject();
-                    };
-                    document.body.appendChild(script);
-                });
-            }
-            
-            setTimeout(() => {
-                document.getElementById('loader-overlay').style.opacity = 0;
+            try {
+                for (let i = 0; i < scripts.length; i++) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = scripts[i];
+                        script.crossOrigin = "anonymous"; // Add crossOrigin
+                        script.onload = () => {
+                            loaded++;
+                            const percent = (loaded / scripts.length) * 100;
+                            progressBar.style.width = percent + '%';
+                            timeLeft.textContent = Math.round(100 - percent) + '% left';
+                            resolve();
+                        };
+                        script.onerror = (e) => {
+                            console.error('Failed to load script: ' + scripts[i], e);
+                            timeLeft.textContent = "Error loading resources!";
+                            timeLeft.style.color = "red";
+                            reject(new Error(`Failed to load ${scripts[i]}`));
+                        };
+                        document.body.appendChild(script);
+                    });
+                }
+                
                 setTimeout(() => {
-                    document.getElementById('loader-overlay').style.display = 'none';
-                    initHandTracker();
+                    document.getElementById('loader-overlay').style.opacity = 0;
+                    setTimeout(() => {
+                        document.getElementById('loader-overlay').style.display = 'none';
+                        initHandTracker();
+                    }, 500);
                 }, 500);
-            }, 500);
+            } catch (error) {
+                console.error("Script loading failed:", error);
+                alert("Failed to load necessary libraries. Please check your internet connection and reload.");
+            }
         }
 
         async function initHandTracker() {

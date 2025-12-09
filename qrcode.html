@@ -25,19 +25,27 @@
         }
         
         .result-container {
-            margin-top: 20px;
-            padding: 16px;
-            background: rgba(255,255,255,0.05);
+            margin: 0 auto 20px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.08);
             border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
             display: none;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            max-width: 500px;
         }
         
         .result-text {
-            font-size: 1.1rem;
+            font-size: 1rem;
             word-break: break-all;
-            margin-bottom: 12px;
+            margin-bottom: 0;
             color: var(--accent);
+            flex: 1;
+            text-align: left;
+            font-family: monospace;
         }
         
         .btn {
@@ -50,6 +58,13 @@
             cursor: pointer;
             font-size: 1rem;
             transition: transform 0.1s;
+        }
+
+        .result-container .btn {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            margin: 0;
         }
         
         .btn:active {
@@ -64,6 +79,32 @@
             color: #9fbcd8;
             font-size: 0.9rem;
             margin-top: 10px;
+        }
+
+        /* Zoom Slider */
+        .zoom-container {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 250px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 25px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .zoom-slider {
+            width: 200px;
+            height: 20px;
+            transform: rotate(-90deg);
+            cursor: pointer;
+            accent-color: var(--accent);
         }
 
         /* Hide html5-qrcode default elements we don't want or style them */
@@ -97,6 +138,11 @@
         <h1 data-i18n="qrcode.page.heading">QR Code Reader</h1>
         <p data-i18n="qrcode.page.lead">Scan QR codes instantly. Double tap the camera view to switch cameras.</p>
 
+        <div id="result" class="result-container">
+            <div id="resultText" class="result-text"></div>
+            <button id="copyBtn" class="btn">Copy</button>
+        </div>
+
         <div class="controls">
             <button id="startBtn" class="btn">Start Camera</button>
             <button id="stopBtn" class="btn" style="display:none; background: #ff4444; color: white;">Stop Camera</button>
@@ -104,11 +150,10 @@
 
         <div id="reader"></div>
         <div class="hint">Double tap video to switch camera</div>
+    </div>
 
-        <div id="result" class="result-container">
-            <div id="resultText" class="result-text"></div>
-            <button id="copyBtn" class="btn">Copy Result</button>
-        </div>
+    <div class="zoom-container">
+        <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="5" step="0.1" value="1">
     </div>
 
     <script>
@@ -119,6 +164,8 @@
         const resultText = document.getElementById('resultText');
         const copyBtn = document.getElementById('copyBtn');
         const readerDiv = document.getElementById('reader');
+        const zoomContainer = document.querySelector('.zoom-container');
+        const zoomSlider = document.getElementById('zoomSlider');
         
         let currentCameraId = null;
         let cameras = [];
@@ -136,7 +183,7 @@
         }).catch(err => {
             console.error("Error getting cameras", err);
             resultText.textContent = "Error accessing camera. Please ensure you have granted permission.";
-            resultContainer.style.display = 'block';
+            resultContainer.style.display = 'flex';
         });
 
         startBtn.addEventListener('click', () => {
@@ -167,7 +214,7 @@
                     // Success callback
                     console.log(`Scan result: ${decodedText}`, decodedResult);
                     resultText.textContent = decodedText;
-                    resultContainer.style.display = 'block';
+                    resultContainer.style.display = 'flex';
                     
                     // Optional: Stop scanning after success? 
                     // Let's keep scanning but maybe vibrate
@@ -181,6 +228,43 @@
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
                 readerDiv.style.display = 'block';
+
+                // Check zoom capabilities
+                try {
+                    // Note: getRunningTrackCameraCapabilities might not be available in all versions
+                    // If not, we can try to apply constraints blindly or check if method exists
+                    if (html5QrCode.getRunningTrackCameraCapabilities) {
+                        const capabilities = html5QrCode.getRunningTrackCameraCapabilities();
+                        const zoomCapability = capabilities.zoom;
+                        
+                        if (zoomCapability) {
+                            zoomSlider.min = zoomCapability.min;
+                            zoomSlider.max = zoomCapability.max;
+                            zoomSlider.step = zoomCapability.step;
+                            zoomSlider.value = zoomCapability.value || 1;
+                            zoomContainer.style.display = 'flex';
+                            
+                            zoomSlider.oninput = function() {
+                                html5QrCode.applyVideoConstraints({
+                                    advanced: [{ zoom: parseFloat(this.value) }]
+                                });
+                            };
+                        } else {
+                            zoomContainer.style.display = 'none';
+                        }
+                    } else {
+                        // Fallback: Show slider anyway with default values and try to apply
+                        zoomContainer.style.display = 'flex';
+                        zoomSlider.oninput = function() {
+                            html5QrCode.applyVideoConstraints({
+                                advanced: [{ zoom: parseFloat(this.value) }]
+                            }).catch(e => console.warn("Zoom not supported", e));
+                        };
+                    }
+                } catch (e) {
+                    console.warn("Error setting up zoom", e);
+                }
+
             }).catch((err) => {
                 console.error("Error starting scanner", err);
             });
@@ -191,6 +275,7 @@
                 isScanning = false;
                 startBtn.style.display = 'inline-block';
                 stopBtn.style.display = 'none';
+                zoomContainer.style.display = 'none';
             }).catch((err) => {
                 console.error("Failed to stop scanning", err);
             });

@@ -210,6 +210,7 @@
     let gameRunning = true;
     let score = 0;
     let lastTime = 0;
+    let gameMode = 'npc';
 
     // Config
     const ZOOM = 0.6;
@@ -264,6 +265,16 @@
     let particles = [];
     let groundWeapons = [];
     let powerups = [];
+
+    // Timers & Rates
+    const ENEMY_SPAWN_RATE = 2.0;
+    let enemySpawnTimer = 0;
+    
+    const WEAPON_SPAWN_RATE = 10.0;
+    let weaponSpawnTimer = 0;
+    
+    const POWERUP_SPAWN_RATE = 15.0;
+    let powerupSpawnTimer = 0;
 
     // Zone Logic
     let zone = {
@@ -571,6 +582,103 @@
             state: 'chase',
             attackTimer: 0
         });
+    }
+
+    function spawnBot() {
+        let x, y, attempts = 0;
+        do {
+            x = Math.random() * MAP_WIDTH;
+            y = Math.random() * MAP_HEIGHT;
+            attempts++;
+        } while (isSolid(x, y) && attempts < 100);
+        
+        if (attempts >= 100) return;
+
+        // Give bot a random weapon
+        const keys = Object.keys(WEAPONS);
+        const spawnableKeys = keys.filter(k => k !== 'Fists');
+        const randomKey = spawnableKeys[Math.floor(Math.random() * spawnableKeys.length)];
+        const weapon = { ...WEAPONS[randomKey], currentAmmo: Infinity };
+
+        enemies.push({
+            x: x,
+            y: y,
+            radius: 15,
+            speed: 280,
+            hp: 100,
+            maxHp: 100,
+            type: 'bot',
+            row: 0,
+            frame: 0,
+            frameTimer: 0,
+            state: 'wander',
+            weapon: weapon,
+            shootTimer: 0,
+            targetX: x,
+            targetY: y,
+            changeDirTimer: 0
+        });
+    }
+
+    function updateBotAI(bot, dt) {
+        // 1. Zone Logic
+        const dxZone = bot.x - zone.x;
+        const dyZone = bot.y - zone.y;
+        const distZone = Math.sqrt(dxZone*dxZone + dyZone*dyZone);
+        
+        let moveX = 0, moveY = 0;
+
+        if (distZone > zone.radius * 0.8) {
+            // Move to center
+            moveX = -dxZone;
+            moveY = -dyZone;
+        } else {
+            // Wander or Chase
+            let nearest = null;
+            let minDst = Infinity;
+
+            // Check player
+            const dPlayer = Math.sqrt((player.x - bot.x)**2 + (player.y - bot.y)**2);
+            if (dPlayer < 600) {
+                nearest = player;
+                minDst = dPlayer;
+            }
+            
+            if (nearest) {
+                moveX = nearest.x - bot.x;
+                moveY = nearest.y - bot.y;
+                
+                // Shoot
+                if (bot.shootTimer <= 0) {
+                    fireWeapon(bot, moveX/minDst, moveY/minDst);
+                }
+            } else {
+                // Wander
+                bot.changeDirTimer -= dt;
+                if (bot.changeDirTimer <= 0) {
+                    bot.targetX = bot.x + (Math.random() - 0.5) * 400;
+                    bot.targetY = bot.y + (Math.random() - 0.5) * 400;
+                    bot.changeDirTimer = 2.0;
+                }
+                moveX = bot.targetX - bot.x;
+                moveY = bot.targetY - bot.y;
+            }
+        }
+        
+        // Normalize and Move
+        const len = Math.sqrt(moveX*moveX + moveY*moveY);
+        if (len > 0) {
+            moveX /= len;
+            moveY /= len;
+            
+            let nextX = bot.x + moveX * bot.speed * dt;
+            if (!checkCollision(nextX, bot.y, bot.radius)) bot.x = nextX;
+            
+            let nextY = bot.y + moveY * bot.speed * dt;
+            if (!checkCollision(bot.x, nextY, bot.radius)) bot.y = nextY;
+        }
+        
+        if (bot.shootTimer > 0) bot.shootTimer -= dt;
     }
 
     function spawnWeapon() {
@@ -1255,6 +1363,12 @@
         requestAnimationFrame(loop);
     }
 
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('startScreen').style.display = 'none';
+        resetGame();
+    }
+
     function gameOver() {
         gameRunning = false;
         document.getElementById('gameOverScreen').style.display = 'flex';
@@ -1292,6 +1406,15 @@
     document.getElementById('btn-exit').addEventListener('click', () => {
         window.location.href = 'index.html';
     });
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
     // Start
     initPatterns();

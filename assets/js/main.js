@@ -99,6 +99,7 @@ if (document.readyState === 'loading') {
 // --- Translations ---
 const translations = {
     en: {
+        common: { showMore: 'Show More' },
         nav: { about: 'About Me', skills: 'Skills', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
         sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
@@ -111,6 +112,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Built with passion and technology.' }
     },
     es: {
+        common: { showMore: 'Ver más' },
         nav: { about: 'Sobre mí', skills: 'Habilidades', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', dailyQuote: 'Frase Diaria', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
         hero: { title: 'Luca Gandolfi — Ingeniero Full‑Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
         sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
@@ -147,6 +149,7 @@ const translations = {
         footer: { text: '© 2025 Лука Гандольфи. Создано с страстью и технологиями.' }
     },
     de: {
+        common: { showMore: 'Mehr anzeigen' },
         nav: { about: 'Über mich', skills: 'Fähigkeiten', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', dailyQuote: 'Zitat des Tages', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
         sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
@@ -159,6 +162,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Mit Leidenschaft und Technologie erstellt.' }
     },
     it: {
+        common: { showMore: 'Mostra altro' },
         nav: { about: 'Chi sono', skills: 'Competenze', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
         hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
         sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
@@ -171,6 +175,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Costruito con passione e tecnologia.' }
     },
     fr: {
+        common: { showMore: 'Voir plus' },
         nav: { about: 'À propos', skills: 'Compétences', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', dailyQuote: 'Citation du Jour', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
         hero: { title: 'Luca Gandolfi — Ingénieur Full‑Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez‑moi', cvBtn: 'Télécharger le CV' },
         sections: { about: 'À propos', skills: 'Compétences techniques', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
@@ -926,3 +931,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('scroll', handleScroll);
+
+// Function to toggle collapsible sections
+function toggleSection(containerId, btn) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.classList.remove('collapsed');
+        if (btn) {
+            btn.style.display = 'none';
+        }
+    }
+}
