@@ -99,7 +99,7 @@ if (document.readyState === 'loading') {
 // --- Translations ---
 const translations = {
     en: {
-        common: { showMore: 'Show More' },
+        common: { showMore: 'Show More', showLess: 'Show Less' },
         nav: { about: 'About Me', skills: 'Skills', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
         sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
@@ -112,7 +112,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Built with passion and technology.' }
     },
     es: {
-        common: { showMore: 'Ver más' },
+        common: { showMore: 'Ver más', showLess: 'Ver menos' },
         nav: { about: 'Sobre mí', skills: 'Habilidades', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', dailyQuote: 'Frase Diaria', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
         hero: { title: 'Luca Gandolfi — Ingeniero Full‑Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
         sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
@@ -125,6 +125,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Construido con pasión y tecnología.' }
     },
     zh: {
+        common: { showMore: '显示更多', showLess: '收起' },
         nav: { about: '关于我', skills: '技能', experience: '经验', achievements: '成就', projects: '项目', books: '图书', dailyQuote: '每日名言', blog: '博客', testimonials: '推荐', contact: '联系', cv: '下载简历' },
         hero: { title: '卢卡·甘多尔菲 — 全栈工程师', subtitle: '开发者 • 嵌入式系统 • 人工智能 • Web', contactBtn: '联系我', cvBtn: '下载简历' },
         sections: { about: '关于我', skills: '技术技能', experience: '工作经历', achievements: '成就与认证', contact: '个人信息', cv: '简历', social: '社交 & 联系', projects: '我的项目', testimonials: '推荐', dailyQuote: '每日励志名言' },
@@ -137,6 +138,7 @@ const translations = {
         footer: { text: '© 2025 卢卡·甘多尔菲。以热情与技术构建。' }
     },
     ru: {
+        common: { showMore: 'Показать больше', showLess: 'Свернуть' },
         nav: { about: 'Обо мне', skills: 'Навыки', experience: 'Опыт', achievements: 'Достижения', projects: 'Проекты', books: 'Книги', dailyQuote: 'Цитата дня', blog: 'Блог', testimonials: 'Отзывы', contact: 'Контакт', cv: 'Скачать CV' },
         hero: { title: 'Лука Гандольфи — Full‑Stack инженер', subtitle: 'Разработчик • Встроенные системы • ИИ • Веб', contactBtn: 'Связаться', cvBtn: 'Скачать CV' },
         sections: { about: 'Обо мне', skills: 'Технические навыки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы', dailyQuote: 'Цитата дня' },
@@ -149,7 +151,7 @@ const translations = {
         footer: { text: '© 2025 Лука Гандольфи. Создано с страстью и технологиями.' }
     },
     de: {
-        common: { showMore: 'Mehr anzeigen' },
+        common: { showMore: 'Mehr anzeigen', showLess: 'Weniger anzeigen' },
         nav: { about: 'Über mich', skills: 'Fähigkeiten', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', dailyQuote: 'Zitat des Tages', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
         sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
@@ -162,7 +164,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Mit Leidenschaft und Technologie erstellt.' }
     },
     it: {
-        common: { showMore: 'Mostra altro' },
+        common: { showMore: 'Mostra altro', showLess: 'Mostra meno' },
         nav: { about: 'Chi sono', skills: 'Competenze', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
         hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
         sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
@@ -175,7 +177,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Costruito con passione e tecnologia.' }
     },
     fr: {
-        common: { showMore: 'Voir plus' },
+        common: { showMore: 'Voir plus', showLess: 'Voir moins' },
         nav: { about: 'À propos', skills: 'Compétences', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', dailyQuote: 'Citation du Jour', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
         hero: { title: 'Luca Gandolfi — Ingénieur Full‑Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez‑moi', cvBtn: 'Télécharger le CV' },
         sections: { about: 'À propos', skills: 'Compétences techniques', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
@@ -188,6 +190,7 @@ const translations = {
         footer: { text: '© 2025 Luca Gandolfi. Construit avec passion et technologie.' }
     },
     ja: {
+        common: { showMore: 'もっと見る', showLess: '表示を減らす' },
         nav: { about: '私について', skills: 'スキル', experience: '経験', achievements: '実績', projects: 'プロジェクト', books: '書籍', dailyQuote: '今日の名言', blog: 'ブログ', testimonials: '推薦', contact: '連絡先', cv: '履歴書をダウンロード' },
         hero: { title: 'ルカ・ガンドルフィ — フルスタックエンジニア', subtitle: '開発者 • 組み込みシステム • AI • Web', contactBtn: 'お問い合わせ', cvBtn: '履歴書をダウンロード' },
         sections: { about: '私について', skills: '技術スキル', experience: '職務経歴', achievements: '実績と認定', contact: '個人情報', cv: '履歴書', social: 'ソーシャル & 連絡先', projects: '私のプロジェクト', testimonials: '推薦', dailyQuote: '今日の名言' },
@@ -743,6 +746,14 @@ document.addEventListener('DOMContentLoaded', () => {
     handleScroll(); // Also run handleScroll
     createPoems();
 
+    // Auto collapse large sections after a short delay to allow rendering
+    setTimeout(() => {
+        if (typeof autoCollapse === 'function') {
+            autoCollapse('.projects-grid', 600);
+            autoCollapse('.testimonials-container', 400);
+        }
+    }, 200);
+
     const quickSearch = document.getElementById('quickSearch');
     if (quickSearch) {
         quickSearch.addEventListener('keydown', (e) => {
@@ -936,9 +947,66 @@ window.addEventListener('scroll', handleScroll);
 function toggleSection(containerId, btn) {
     const container = document.getElementById(containerId);
     if (container) {
-        container.classList.remove('collapsed');
-        if (btn) {
-            btn.style.display = 'none';
+        const isCollapsed = container.classList.contains('collapsed');
+        const lang = document.getElementById('langSelect')?.value || 'en';
+        const t = (window.translations && window.translations[lang]) ? window.translations[lang] : (window.translations['en'] || {});
+        
+        if (isCollapsed) {
+            // Expand
+            container.classList.remove('collapsed');
+            const showLessText = (t.common && t.common.showLess) ? t.common.showLess : 'Show Less';
+            if (btn) {
+                btn.textContent = showLessText;
+                btn.setAttribute('data-i18n', 'common.showLess');
+                btn.style.display = 'block';
+            }
+        } else {
+            // Collapse
+            container.classList.add('collapsed');
+            const showMoreText = (t.common && t.common.showMore) ? t.common.showMore : 'Show More';
+            if (btn) {
+                btn.textContent = showMoreText;
+                btn.setAttribute('data-i18n', 'common.showMore');
+                btn.style.display = 'block';
+            }
+            // Optional: scroll back to top of container
+            // container.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 }
+
+function autoCollapse(selector, threshold = 400) {
+    const elements = document.querySelectorAll(selector);
+    elements.forEach(el => {
+        // Check if already processed
+        if (el.classList.contains('collapsible-container')) return;
+        
+        if (el.scrollHeight > threshold) {
+            el.classList.add('collapsible-container');
+            el.classList.add('collapsed');
+            
+            // Create button
+            const btn = document.createElement('button');
+            btn.className = 'show-more-btn';
+            
+            // Get translated text
+            const lang = document.getElementById('langSelect')?.value || 'en';
+            const t = (window.translations && window.translations[lang]) ? window.translations[lang] : (window.translations['en'] || {});
+            const showMoreText = (t.common && t.common.showMore) ? t.common.showMore : 'Show More';
+            
+            btn.textContent = showMoreText;
+            btn.setAttribute('data-i18n', 'common.showMore');
+            
+            // Add ID if missing
+            if (!el.id) {
+                el.id = 'collapse-' + Math.random().toString(36).substr(2, 9);
+            }
+            
+            btn.onclick = function() { toggleSection(el.id, this); };
+            
+            // Insert button after the element
+            el.parentNode.insertBefore(btn, el.nextSibling);
+        }
+    });
+}
+
