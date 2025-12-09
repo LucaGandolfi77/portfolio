@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Battleship Commander</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #006994; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; text-shadow: 1px 1px 2px black; }
+        #game-over {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); color: white; padding: 40px; text-align: center;
+            display: none; border-radius: 15px; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        button { 
+            padding: 12px 24px; font-size: 1.2rem; cursor: pointer; 
+            background: #ff9800; border: none; border-radius: 5px; color: white; font-weight: bold;
+            transition: transform 0.1s;
+        }
+        button:hover { transform: scale(1.05); background: #f57c00; }
+        #controls-hint {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.9); font-size: 1rem; pointer-events: none;
+            background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px;
+        }
+        #back-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.3); padding: 10px 20px;
+            border-radius: 8px; color: white; text-decoration: none;
+            font-size: 0.9rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
+        }
+        #back-btn:hover { background: rgba(0,0,0,0.5); }
+        
+        /* Mobile Controls */
+        .mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            height: 150px;
+            pointer-events: none;
+        }
+        .control-stick {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 120px; height: 120px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            pointer-events: auto;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .fire-btn {
+            position: absolute; bottom: 30px; right: 30px;
+            width: 80px; height: 80px;
+            background: rgba(255, 50, 50, 0.4);
+            border-radius: 50%;
+            pointer-events: auto;
+            border: 2px solid rgba(255, 100, 100, 0.5);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white;
+        }
+        .fire-btn:active { background: rgba(255, 50, 50, 0.7); }
+
+        @media (max-width: 768px) {
+            .mobile-controls { display: block; }
+            #controls-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" id="back-btn">Exit Game</a>
+    
+    <div id="ui">
+        <h2 style="margin:0 0 10px 0">Battleship Commander</h2>
+        <div style="font-size: 1.2rem;">Health: <span id="health" style="color:#4caf50">100</span>%</div>
+        <div style="font-size: 1.2rem;">Score: <span id="score">0</span></div>
+        <div style="font-size: 1rem; margin-top:5px; color:#ccc">Enemies: <span id="enemy-count">0</span></div>
+    </div>
+
+    <div id="controls-hint">WASD / Arrows to Move • SPACE / Click to Shoot</div>
+
+    <div id="game-over">
+        <h2 id="go-title" style="font-size: 2.5rem; margin-bottom: 10px;">GAME OVER</h2>
+        <p style="font-size: 1.2rem; margin-bottom: 30px;">Final Score: <span id="final-score">0</span></p>
+        <button onclick="location.reload()">Play Again</button>
+    </div>
+
+    <div class="mobile-controls">
+        <div id="stick-area" class="control-stick"></div>
+        <div id="fire-btn" class="fire-btn">FIRE</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game State
+        let score = 0;
+        let gameOver = false;
+        let camera = { x: 0, y: 0 };
+        
+        // World
+        const WORLD_SIZE = 3000;
+        const ISLAND_COUNT = 15;
+        const islands = [];
+
+        // Entities
+        const player = {
+            x: WORLD_SIZE / 2,
+            y: WORLD_SIZE / 2,
+            angle: 0,
+            speed: 0,
+            maxSpeed: 4,
+            turnSpeed: 0.04,
+            health: 100,
+            width: 40,
+            height: 20,
+            color: '#fff',
+            reloadTime: 0,
+            maxReload: 20
+        };
+
+        const enemies = [];
+        const projectiles = [];
+        const particles = [];
+
+        // Input
+        const keys = {
+            w: false, a: false, s: false, d: false,
+            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
+            " ": false
+        };
+        const mouse = { x: 0, y: 0, down: false };
+
+        // Resize
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Input Listeners
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+        window.addEventListener('mousedown', () => mouse.down = true);
+        window.addEventListener('mouseup', () => mouse.down = false);
+
+        // Mobile Controls
+        const stickArea = document.getElementById('stick-area');
+        const fireBtn = document.getElementById('fire-btn');
+        let touchStick = { active: false, dx: 0, dy: 0 };
+
+        stickArea.addEventListener('touchstart', e => {
+            e.preventDefault();
+            touchStick.active = true;
+            updateStick(e.touches[0]);
+        });
+        stickArea.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if(touchStick.active) updateStick(e.touches[0]);
+        });
+        stickArea.addEventListener('touchend', e => {
+            e.preventDefault();
+            touchStick.active = false;
+            touchStick.dx = 0;
+            touchStick.dy = 0;
+        });
+
+        fireBtn.addEventListener('touchstart', e => {
+            e.preventDefault();
+            keys[" "] = true;
+        });
+        fireBtn.addEventListener('touchend', e => {
+            e.preventDefault();
+            keys[" "] = false;
+        });
+
+        function updateStick(touch) {
+            const rect = stickArea.getBoundingClientRect();
+            const cx = rect.left + rect.width/2;
+            const cy = rect.top + rect.height/2;
+            const dx = touch.clientX - cx;
+            const dy = touch.clientY - cy;
+            // Normalize
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const maxDist = rect.width/2;
+            
+            touchStick.dx = dx / maxDist;
+            touchStick.dy = dy / maxDist;
+            if (dist > maxDist) {
+                touchStick.dx = (dx/dist);
+                touchStick.dy = (dy/dist);
+            }
+        }
+
+        // Initialization
+        function init() {
+            // Generate Islands
+            for(let i=0; i<ISLAND_COUNT; i++) {
+                let island;
+                let safe = false;
+                while(!safe) {
+                    island = {
+                        x: Math.random() * WORLD_SIZE,
+                        y: Math.random() * WORLD_SIZE,
+                        radius: 50 + Math.random() * 150,
+                        color: '#4caf50'
+                    };
+                    // Check distance from player spawn
+                    const d = Math.hypot(island.x - player.x, island.y - player.y);
+                    if(d > 400) safe = true;
+                }
+                islands.push(island);
+            }
+
+            // Spawn initial enemies
+            for(let i=0; i<5; i++) spawnEnemy();
+        }
+
+        function spawnEnemy() {
+            let enemy;
+            let safe = false;
+            while(!safe) {
+                enemy = {
+                    x: Math.random() * WORLD_SIZE,
+                    y: Math.random() * WORLD_SIZE,
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 0,
+                    maxSpeed: 2 + Math.random(),
+                    health: 3,
+                    width: 40,
+                    height: 20,
+                    color: '#ff5252',
+                    state: 'wander', // wander, chase
+                    reloadTime: 0,
+                    maxReload: 60 + Math.random() * 40
+                };
+                const d = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                if(d > 800) safe = true;
+            }
+            enemies.push(enemy);
+        }
+
+        // Physics & Logic
+        function update() {
+            if(gameOver) return;
+
+            // --- Player Control ---
+            let throttle = 0;
+            let turn = 0;
+
+            if (keys.w || keys.ArrowUp) throttle = 1;
+            if (keys.s || keys.ArrowDown) throttle = -0.5;
+            if (keys.a || keys.ArrowLeft) turn = -1;
+            if (keys.d || keys.ArrowRight) turn = 1;
+
+            if (touchStick.active) {
+                // Simple tank controls from stick Y
+                throttle = -touchStick.dy; 
+                turn = touchStick.dx;
+            }
+
+            // Apply Physics
+            player.speed += throttle * 0.1;
+            player.speed *= 0.98; // Friction
+            // Cap speed
+            if(player.speed > player.maxSpeed) player.speed = player.maxSpeed;
+            if(player.speed < -player.maxSpeed/2) player.speed = -player.maxSpeed/2;
+
+            // Turn only if moving (realistic ship)
+            if(Math.abs(player.speed) > 0.1) {
+                player.angle += turn * player.turnSpeed * (player.speed > 0 ? 1 : -1);
+            }
+
+            // Move
+            const nextX = player.x + Math.cos(player.angle) * player.speed;
+            const nextY = player.y + Math.sin(player.angle) * player.speed;
+
+            // Collision with Islands
+            if(!checkIslandCollision(nextX, nextY, 15)) {
+                player.x = nextX;
+                player.y = nextY;
+            } else {
+                player.speed *= -0.5; // Bounce
+            }
+
+            // World Bounds
+            player.x = Math.max(0, Math.min(WORLD_SIZE, player.x));
+            player.y = Math.max(0, Math.min(WORLD_SIZE, player.y));
+
+            // Shooting
+            if(player.reloadTime > 0) player.reloadTime--;
+            if((keys[" "] || mouse.down) && player.reloadTime <= 0) {
+                shoot(player, 'player');
+                player.reloadTime = player.maxReload;
+            }
+
+            // --- Enemies ---
+            enemies.forEach((enemy, index) => {
+                const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                
+                // AI Logic
+                let targetAngle = enemy.angle;
+                let targetSpeed = 0;
+
+                if(dist < 800) {
+                    // Chase / Engage
+                    const angleToPlayer = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                    const angleDiff = normalizeAngle(angleToPlayer - enemy.angle);
+                    
+                    if(Math.abs(angleDiff) > 0.1) {
+                        enemy.angle += Math.sign(angleDiff) * 0.03;
+                    }
+                    
+                    // Move if far, slow down to shoot if close
+                    if(dist > 300) targetSpeed = enemy.maxSpeed;
+                    else targetSpeed = enemy.maxSpeed * 0.5;
+
+                    // Shoot if aligned
+                    if(Math.abs(angleDiff) < 0.2 && enemy.reloadTime <= 0) {
+                        shoot(enemy, 'enemy');
+                        enemy.reloadTime = enemy.maxReload;
+                    }
+                } else {
+                    // Wander
+                    targetSpeed = enemy.maxSpeed * 0.5;
+                    enemy.angle += (Math.random() - 0.5) * 0.05;
+                }
+
+                // Apply Enemy Physics
+                enemy.speed += (targetSpeed - enemy.speed) * 0.05;
+                const ex = enemy.x + Math.cos(enemy.angle) * enemy.speed;
+                const ey = enemy.y + Math.sin(enemy.angle) * enemy.speed;
+
+                if(!checkIslandCollision(ex, ey, 15)) {
+                    enemy.x = ex;
+                    enemy.y = ey;
+                } else {
+                    enemy.angle += Math.PI; // Turn around
+                }
+
+                if(enemy.reloadTime > 0) enemy.reloadTime--;
+            });
+
+            // --- Projectiles ---
+            for(let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+
+                // Check collisions
+                let hit = false;
+
+                // Hit Islands
+                if(checkIslandCollision(p.x, p.y, 2)) hit = true;
+
+                // Hit Ships
+                if(!hit) {
+                    if(p.owner === 'player') {
+                        enemies.forEach((e, eIdx) => {
+                            if(checkShipHit(p, e)) {
+                                hit = true;
+                                damageEnemy(e, eIdx);
+                                createExplosion(p.x, p.y, '#ffaa00');
+                            }
+                        });
+                    } else {
+                        if(checkShipHit(p, player)) {
+                            hit = true;
+                            damagePlayer();
+                            createExplosion(p.x, p.y, '#ff0000');
+                        }
+                    }
+                }
+
+                if(hit || p.life <= 0) {
+                    projectiles.splice(i, 1);
+                } else {
+                    // Trail particle
+                    if(Math.random() > 0.5) {
+                        particles.push({
+                            x: p.x, y: p.y, vx: 0, vy: 0, life: 10, color: 'rgba(255,255,255,0.3)', size: 2
+                        });
+                    }
+                }
+            }
+
+            // --- Particles ---
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Camera Follow
+            camera.x = player.x - canvas.width / 2;
+            camera.y = player.y - canvas.height / 2;
+
+            // Clamp Camera
+            camera.x = Math.max(0, Math.min(WORLD_SIZE - canvas.width, camera.x));
+            camera.y = Math.max(0, Math.min(WORLD_SIZE - canvas.height, camera.y));
+
+            // Spawn more enemies if low
+            if(enemies.length < 3) {
+                if(Math.random() < 0.01) spawnEnemy();
+            }
+
+            // Update UI
+            document.getElementById('enemy-count').innerText = enemies.length;
+        }
+
+        function shoot(ship, owner) {
+            // Calculate cannon positions (side cannons?)
+            // Let's do a simple front cannon for now, or slightly offset
+            const speed = 10;
+            const spread = 0.1;
+            const angle = ship.angle + (Math.random() - 0.5) * spread;
+            
+            projectiles.push({
+                x: ship.x + Math.cos(ship.angle) * 20,
+                y: ship.y + Math.sin(ship.angle) * 20,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 100,
+                owner: owner
+            });
+            
+            // Recoil particle
+            createExplosion(ship.x + Math.cos(ship.angle)*20, ship.y + Math.sin(ship.angle)*20, '#fff', 5);
+        }
+
+        function checkIslandCollision(x, y, radius) {
+            for(let island of islands) {
+                const d = Math.hypot(x - island.x, y - island.y);
+                if(d < island.radius + radius) return true;
+            }
+            return false;
+        }
+
+        function checkShipHit(proj, ship) {
+            // Simple circle hit for now
+            const d = Math.hypot(proj.x - ship.x, proj.y - ship.y);
+            return d < 20;
+        }
+
+        function damageEnemy(enemy, index) {
+            enemy.health--;
+            if(enemy.health <= 0) {
+                createExplosion(enemy.x, enemy.y, '#ff5252', 20);
+                enemies.splice(index, 1);
+                score += 100;
+                document.getElementById('score').innerText = score;
+            }
+        }
+
+        function damagePlayer() {
+            player.health -= 5;
+            document.getElementById('health').innerText = player.health;
+            if(player.health <= 0) {
+                endGame();
+            }
+        }
+
+        function createExplosion(x, y, color, count=10) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    life: 20 + Math.random() * 20,
+                    color: color,
+                    size: 2 + Math.random() * 3
+                });
+            }
+        }
+
+        function normalizeAngle(a) {
+            while(a > Math.PI) a -= Math.PI*2;
+            while(a < -Math.PI) a += Math.PI*2;
+            return a;
+        }
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById('game-over').style.display = 'block';
+            document.getElementById('final-score').innerText = score;
+        }
+
+        // Rendering
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#006994';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw Grid/Water details
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 2;
+            const gridSize = 100;
+            for(let x=0; x<WORLD_SIZE; x+=gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
+            }
+            for(let y=0; y<WORLD_SIZE; y+=gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
+            }
+
+            // Draw Islands
+            islands.forEach(island => {
+                ctx.fillStyle = '#c2b280'; // Sand
+                ctx.beginPath();
+                ctx.arc(island.x, island.y, island.radius, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#4caf50'; // Grass
+                ctx.beginPath();
+                ctx.arc(island.x, island.y, island.radius * 0.8, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Draw Projectiles
+            ctx.fillStyle = '#000';
+            projectiles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Draw Particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life / 40;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw Enemies
+            enemies.forEach(e => drawShip(e, e.color));
+
+            // Draw Player
+            if(!gameOver) drawShip(player, '#fff');
+
+            ctx.restore();
+        }
+
+        function drawShip(ship, color) {
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+            ctx.rotate(ship.angle);
+
+            // Wake (water trail)
+            if(Math.abs(ship.speed) > 0.5) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-20, -5);
+                ctx.lineTo(-40 - Math.random()*10, -15);
+                ctx.moveTo(-20, 5);
+                ctx.lineTo(-40 - Math.random()*10, 15);
+                ctx.stroke();
+            }
+
+            // Hull
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 25, 10, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Deck
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 8, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Turret
+            ctx.fillStyle = '#666';
+            ctx.beginPath();
+            ctx.arc(5, 0, 6, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Barrel
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(5, 0);
+            ctx.lineTo(20, 0);
+            ctx.stroke();
+
+            // Health Bar (if enemy)
+            if(ship !== player) {
+                ctx.rotate(-ship.angle); // Reset rotation for bar
+                ctx.fillStyle = 'red';
+                ctx.fillRect(-15, -25, 30, 4);
+                ctx.fillStyle = 'lime';
+                ctx.fillRect(-15, -25, 30 * (ship.health/3), 4);
+            }
+
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        init();
+        loop();
+
+    </script>
+</body>
+</html>

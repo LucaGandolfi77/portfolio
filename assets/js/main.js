@@ -103,6 +103,11 @@ const translations = {
         nav: { about: 'About Me', skills: 'Skills', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
         sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
+        games: { 
+            plane: { title: 'Sky Ace', lead: 'Side-scrolling aerial combat.', level: 'Action' },
+            kart: { title: 'Neon Kart', lead: 'High speed racing. Drift and use Nitro!', level: 'Arcade Racing' },
+            battleship: { title: 'Battleship Commander', lead: 'Naval warfare. Command your ship and destroy enemies.', level: 'Action Strategy' }
+        },
         about: { p1: "Hello! I'm Luca, a passionate full-stack developer with a love for creating innovative digital solutions. With years of experience in web development, embedded systems and AI. I specialize in building modern, scalable applications that make a difference.", p2: 'My journey in tech started with curiosity and has evolved into a career driven by continuous learning and problem-solving. I believe in writing clean code, embracing new technologies, and creating user-centric experiences.', lifeIntro: 'I also created a short illustrated comic that tells the story of my life — a playful timeline in images.', lifeLink: 'Read my life in comics' },
         contact: { email: 'Email', phone: 'Phone', location: 'Location', specialization: 'Specialization' },
         cv: { download: 'Download CV' },
@@ -168,6 +173,11 @@ const translations = {
         nav: { about: 'Chi sono', skills: 'Competenze', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
         hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
         sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
+        games: { 
+            plane: { title: 'Sky Ace', lead: 'Combattimento aereo a scorrimento laterale.', level: 'Azione' },
+            kart: { title: 'Neon Kart', lead: 'Corse ad alta velocità. Drifta e usa il Nitro!', level: 'Arcade Racing' },
+            battleship: { title: 'Battaglia Navale', lead: 'Guerra navale. Comanda la tua nave e distruggi i nemici.', level: 'Azione Strategica' }
+        },
         about: { p1: "Ciao! Sono Luca, uno sviluppatore full-stack appassionato di creare soluzioni digitali innovative. Con anni di esperienza nello sviluppo web, sistemi embedded e IA. Mi specializzo nella costruzione di applicazioni moderne e scalabili che fanno la differenza.", p2: 'Il mio percorso nella tecnologia è iniziato con la curiosità e si è evoluto in una carriera guidata dall\'apprendimento continuo e dalla risoluzione dei problemi. Credo nel codice pulito, nell\'adozione di nuove tecnologie e nella creazione di esperienze centrate sull\'utente.', lifeIntro: 'Ho anche creato un breve fumetto illustrato che racconta la mia vita — una timeline giocosa in immagini.', lifeLink: 'Leggi la mia vita a fumetti' },
         contact: { email: 'Email', phone: 'Telefono', location: 'Posizione', specialization: 'Specializzazione' },
         cv: { download: 'Scarica CV' },

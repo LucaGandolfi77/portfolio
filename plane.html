@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sky Ace</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; text-shadow: 1px 1px 2px black; font-weight: bold; }
+        #game-over {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); color: white; padding: 40px; text-align: center;
+            display: none; border-radius: 15px; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        button { 
+            padding: 12px 24px; font-size: 1.2rem; cursor: pointer; 
+            background: #ff9800; border: none; border-radius: 5px; color: white; font-weight: bold;
+            transition: transform 0.1s;
+        }
+        button:hover { transform: scale(1.05); background: #f57c00; }
+        #controls-hint {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.9); font-size: 1rem; pointer-events: none;
+            background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px;
+        }
+        #back-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.3); padding: 10px 20px;
+            border-radius: 8px; color: white; text-decoration: none;
+            font-size: 0.9rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
+        }
+        #back-btn:hover { background: rgba(0,0,0,0.5); }
+
+        /* Mobile Controls */
+        .mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .btn-area {
+            position: absolute;
+            bottom: 20px;
+            width: 80px; height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            pointer-events: auto;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold;
+            border: 2px solid rgba(255,255,255,0.4);
+        }
+        #btn-up { left: 20px; bottom: 110px; }
+        #btn-down { left: 20px; bottom: 20px; }
+        #btn-fire { right: 20px; bottom: 40px; background: rgba(255,50,50,0.3); border-color: rgba(255,100,100,0.5); width: 90px; height: 90px; }
+        #btn-turbo { right: 120px; bottom: 20px; width: 60px; height: 60px; font-size: 0.8rem; }
+
+        @media (max-width: 768px) {
+            .mobile-controls { display: block; }
+            #controls-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" id="back-btn">Exit Game</a>
+    
+    <div id="ui">
+        <h2 style="margin:0 0 10px 0">Sky Ace</h2>
+        <div style="font-size: 1.2rem;">Score: <span id="score">0</span></div>
+        <div style="font-size: 1rem; margin-top:5px;">Health: <span id="health" style="color:#4caf50">100</span>%</div>
+    </div>
+
+    <div id="controls-hint">UP/DOWN to Fly • SPACE to Shoot • SHIFT for Turbo</div>
+
+    <div id="game-over">
+        <h2 style="font-size: 2.5rem; margin-bottom: 10px;">MISSION FAILED</h2>
+        <p style="font-size: 1.2rem; margin-bottom: 30px;">Final Score: <span id="final-score">0</span></p>
+        <button onclick="location.reload()">Retry Mission</button>
+    </div>
+
+    <div class="mobile-controls">
+        <div id="btn-up" class="btn-area">UP</div>
+        <div id="btn-down" class="btn-area">DOWN</div>
+        <div id="btn-turbo" class="btn-area">TURBO</div>
+        <div id="btn-fire" class="btn-area">FIRE</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game State
+        let score = 0;
+        let gameOver = false;
+        let gameTime = 0;
+        let scrollSpeed = 3;
+        let groundOffset = 0;
+
+        // Entities
+        const player = {
+            x: 100,
+            y: 200,
+            width: 50,
+            height: 20,
+            vy: 0,
+            speed: 5,
+            angle: 0,
+            health: 100,
+            color: '#fff',
+            reload: 0
+        };
+
+        const enemies = [];
+        const projectiles = [];
+        const particles = [];
+        const clouds = [];
+
+        // Input
+        const keys = {
+            ArrowUp: false, ArrowDown: false,
+            w: false, s: false,
+            " ": false, Shift: false
+        };
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Input Listeners
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        // Mobile Input
+        const bindTouch = (id, key) => {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
+            el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+        };
+        bindTouch('btn-up', 'ArrowUp');
+        bindTouch('btn-down', 'ArrowDown');
+        bindTouch('btn-fire', ' ');
+        bindTouch('btn-turbo', 'Shift');
+
+        // Init Clouds
+        for(let i=0; i<10; i++) {
+            clouds.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * (canvas.height/2),
+                w: 60 + Math.random() * 100,
+                speed: 0.5 + Math.random() * 1
+            });
+        }
+
+        function spawnEnemy() {
+            const type = Math.random() > 0.7 ? 'air' : 'ground';
+            let enemy = {
+                x: canvas.width + 50,
+                y: 0,
+                w: 40,
+                h: 30,
+                hp: 1,
+                type: type,
+                color: type === 'ground' ? '#556b2f' : '#8b0000',
+                reload: 100 + Math.random() * 100
+            };
+
+            if (type === 'ground') {
+                enemy.y = canvas.height - 60; // On ground
+                enemy.w = 50;
+                enemy.h = 30;
+            } else {
+                enemy.y = 50 + Math.random() * (canvas.height - 200);
+                enemy.w = 40;
+                enemy.h = 20;
+            }
+            enemies.push(enemy);
+        }
+
+        function update() {
+            if (gameOver) return;
+            gameTime++;
+
+            // --- Player ---
+            let targetVy = 0;
+            let targetAngle = 0;
+            let speedMult = 1;
+
+            if (keys.Shift) speedMult = 2;
+
+            if (keys.ArrowUp || keys.w) {
+                targetVy = -player.speed * speedMult;
+                targetAngle = -0.3;
+            } else if (keys.ArrowDown || keys.s) {
+                targetVy = player.speed * speedMult;
+                targetAngle = 0.3;
+            }
+
+            // Smooth movement
+            player.vy += (targetVy - player.vy) * 0.1;
+            player.y += player.vy;
+            player.angle += (targetAngle - player.angle) * 0.1;
+
+            // Bounds
+            if (player.y < 20) player.y = 20;
+            if (player.y > canvas.height - 80) {
+                player.y = canvas.height - 80;
+                // Crash damage if hitting ground fast?
+                if (player.vy > 3) damagePlayer(10);
+            }
+
+            // Shooting
+            if (player.reload > 0) player.reload--;
+            if (keys[" "] && player.reload <= 0) {
+                projectiles.push({
+                    x: player.x + 20,
+                    y: player.y + 5,
+                    vx: Math.cos(player.angle) * 15,
+                    vy: Math.sin(player.angle) * 15,
+                    owner: 'player',
+                    life: 100
+                });
+                player.reload = 8; // Fire rate
+            }
+
+            // --- World ---
+            scrollSpeed = keys.Shift ? 8 : 4;
+            groundOffset = (groundOffset + scrollSpeed) % 100;
+
+            // Clouds
+            clouds.forEach(c => {
+                c.x -= c.speed + (keys.Shift ? 2 : 0);
+                if (c.x < -c.w) {
+                    c.x = canvas.width + Math.random() * 200;
+                    c.y = Math.random() * (canvas.height/2);
+                }
+            });
+
+            // Enemies
+            if (gameTime % 60 === 0) spawnEnemy();
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                e.x -= scrollSpeed;
+                
+                // Enemy Logic
+                if (e.type === 'air') {
+                    e.x -= 2; // Fly towards player
+                }
+
+                // Shooting
+                if (e.x < canvas.width && e.x > 0) {
+                    e.reload--;
+                    if (e.reload <= 0) {
+                        // Aim at player
+                        const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                        projectiles.push({
+                            x: e.x,
+                            y: e.y,
+                            vx: Math.cos(angle) * 5,
+                            vy: Math.sin(angle) * 5,
+                            owner: 'enemy',
+                            life: 200,
+                            color: '#ff0'
+                        });
+                        e.reload = 150;
+                    }
+                }
+
+                if (e.x < -100) enemies.splice(i, 1);
+            }
+
+            // Projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+
+                // Gravity for player bullets to simulate "bombing" feel if aiming down?
+                // No, user said "puntarli" (aim at them). Straight shot is better for aiming.
+                
+                let hit = false;
+                
+                // Ground collision
+                if (p.y > canvas.height - 40) {
+                    createExplosion(p.x, p.y, '#8b4513');
+                    hit = true;
+                }
+
+                if (!hit) {
+                    if (p.owner === 'player') {
+                        enemies.forEach((e, idx) => {
+                            if (checkRectCollide(p.x, p.y, 5, 5, e.x, e.y, e.w, e.h)) {
+                                hit = true;
+                                createExplosion(e.x + e.w/2, e.y + e.h/2, '#ffaa00', 15);
+                                enemies.splice(idx, 1);
+                                score += 100;
+                                document.getElementById('score').innerText = score;
+                            }
+                        });
+                    } else {
+                        // Enemy bullet hitting player
+                        if (checkRectCollide(p.x, p.y, 5, 5, player.x - 20, player.y - 10, 40, 20)) {
+                            hit = true;
+                            damagePlayer(10);
+                            createExplosion(p.x, p.y, '#ff0000', 5);
+                        }
+                    }
+                }
+
+                if (hit || p.life <= 0 || p.x > canvas.width || p.x < 0) {
+                    projectiles.splice(i, 1);
+                }
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function damagePlayer(amount) {
+            player.health -= amount;
+            document.getElementById('health').innerText = player.health;
+            if (player.health <= 0) {
+                gameOver = true;
+                document.getElementById('game-over').style.display = 'block';
+                document.getElementById('final-score').innerText = score;
+            }
+        }
+
+        function checkRectCollide(x1, y1, w1, h1, x2, y2, w2, h2) {
+            return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+        }
+
+        function createExplosion(x, y, color, count=10) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    life: 20 + Math.random() * 10,
+                    color: color,
+                    size: 2 + Math.random() * 3
+                });
+            }
+        }
+
+        function draw() {
+            // Sky
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Clouds
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            clouds.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, c.w/2, 0, Math.PI*2);
+                ctx.arc(c.x + c.w*0.4, c.y - c.w*0.2, c.w*0.4, 0, Math.PI*2);
+                ctx.arc(c.x - c.w*0.4, c.y - c.w*0.2, c.w*0.4, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Ground
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+            // Ground details (scrolling)
+            ctx.fillStyle = '#006400';
+            for(let i=0; i<canvas.width + 100; i+=100) {
+                ctx.fillRect(i - groundOffset, canvas.height - 40, 20, 40);
+            }
+
+            // Enemies
+            enemies.forEach(e => {
+                ctx.fillStyle = e.color;
+                if (e.type === 'ground') {
+                    // Tank shape
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(e.x + e.w/2, e.y, 10, 0, Math.PI, true); ctx.fill(); // Turret
+                    // Gun barrel aiming at player
+                    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(e.x + e.w/2, e.y); 
+                    ctx.lineTo(e.x + e.w/2 + Math.cos(angle)*20, e.y + Math.sin(angle)*20);
+                    ctx.stroke();
+                } else {
+                    // Plane shape
+                    ctx.beginPath();
+                    ctx.moveTo(e.x, e.y);
+                    ctx.lineTo(e.x + e.w, e.y + e.h/2);
+                    ctx.lineTo(e.x, e.y + e.h);
+                    ctx.fill();
+                }
+            });
+
+            // Player
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+            
+            // Body
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(-20, -10);
+            ctx.lineTo(-20, 10);
+            ctx.fill();
+            
+            // Wings
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(-10, -20, 10, 40);
+            
+            // Cockpit
+            ctx.fillStyle = '#00d4ff';
+            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
+
+            // Engine flame
+            if (keys.Shift) {
+                ctx.fillStyle = '#ffaa00';
+                ctx.beginPath();
+                ctx.moveTo(-20, 0);
+                ctx.lineTo(-40 - Math.random()*20, 0);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // Projectiles
+            projectiles.forEach(p => {
+                ctx.fillStyle = p.color || '#fff';
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+            });
+
+            // Particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life / 20;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+
+    </script>
+</body>
+</html>

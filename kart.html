@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kart Racing - Asphalt Style</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: 'Orbitron', sans-serif;
+            touch-action: none; /* Prevent zoom/scroll on mobile */
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            color: white;
+            text-shadow: 0 0 10px #00d4ff;
+            font-size: 1.2rem;
+        }
+        .hud-bottom {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        #nitro-bar-container {
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            transform: skewX(-20deg);
+        }
+        #nitro-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ffaa00, #ff0000);
+            box-shadow: 0 0 15px #ff0000;
+            transition: width 0.1s linear;
+        }
+        #lap-time {
+            font-size: 1.5rem;
+        }
+        #speedometer {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        #controls-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            font-size: 1rem;
+            pointer-events: none;
+            animation: fadeOut 3s forwards 2s;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+        .touch-zone {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 50%;
+            pointer-events: auto;
+            /* background: rgba(255,0,0,0.1); Debugging */
+        }
+        #left-zone { left: 0; }
+        #right-zone { right: 0; }
+
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            pointer-events: auto;
+            z-index: 10;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00d4ff, #ff00cc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            font-style: italic;
+        }
+        .btn {
+            background: linear-gradient(45deg, #00d4ff, #0055ff);
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 5px;
+            transform: skewX(-10deg);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: skewX(-10deg) scale(1.05);
+            box-shadow: 0 0 20px #00d4ff;
+        }
+        .map-select {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .map-btn {
+            background: #333;
+            border: 2px solid #555;
+            padding: 10px 20px;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .map-btn.active {
+            border-color: #00d4ff;
+            color: white;
+            background: #444;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            pointer-events: auto;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" id="back-btn">← Back to Portfolio</a>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <div id="lap-counter">LAP 1/3</div>
+            <div id="lap-time">00:00.00</div>
+        </div>
+        <div id="controls-hint">
+            TAP LEFT/RIGHT TO STEER<br>
+            DOUBLE TAP FOR NITRO!
+        </div>
+        <div class="hud-bottom">
+            <div style="text-align: center;">
+                <div id="speedometer">0 KM/H</div>
+                <div id="nitro-bar-container">
+                    <div id="nitro-bar"></div>
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 5px; color: #aaa;">NITRO</div>
+            </div>
+        </div>
+        
+        <!-- Invisible touch zones for controls -->
+        <div id="left-zone" class="touch-zone"></div>
+        <div id="right-zone" class="touch-zone"></div>
+    </div>
+
+    <div id="menu-overlay">
+        <h1>Neon Kart</h1>
+        <p>Select Circuit</p>
+        <div class="map-select">
+            <button class="map-btn active" onclick="selectMap(0)">Circuit Alpha</button>
+            <button class="map-btn" onclick="selectMap(1)">Circuit Beta</button>
+            <button class="map-btn" onclick="selectMap(2)">Circuit Omega</button>
+        </div>
+        <button class="btn" onclick="startGame()">START RACE</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game State
+        let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+        let lastTime = 0;
+        let dt = 0;
+        
+        // Input State
+        const input = {
+            left: false,
+            right: false,
+            nitro: false
+        };
+
+        // Double tap detection
+        let lastTapTime = 0;
+        const DOUBLE_TAP_DELAY = 300;
+
+        // Map Definitions (Simple waypoints/track drawing)
+        // We will draw the track on an offscreen canvas to check collisions
+        let trackCanvas = document.createElement('canvas');
+        let trackCtx = trackCanvas.getContext('2d');
+        const TRACK_WIDTH = 2000;
+        const TRACK_HEIGHT = 2000;
+        trackCanvas.width = TRACK_WIDTH;
+        trackCanvas.height = TRACK_HEIGHT;
+
+        const maps = [
+            {
+                name: "Circuit Alpha",
+                draw: (ctx) => {
+                    ctx.fillStyle = '#0a3d0a'; // Grass
+                    ctx.fillRect(0, 0, TRACK_WIDTH, TRACK_HEIGHT);
+                    
+                    // Draw Road
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineWidth = 200;
+                    ctx.strokeStyle = '#333'; // Road
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(200, 200);
+                    ctx.lineTo(1000, 200);
+                    ctx.arc(1000, 500, 300, -Math.PI/2, Math.PI/2, false);
+                    ctx.lineTo(1000, 800);
+                    ctx.lineTo(1500, 800);
+                    ctx.arc(1500, 1200, 400, -Math.PI/2, Math.PI/2, false);
+                    ctx.lineTo(500, 1600);
+                    ctx.arc(500, 1200, 400, Math.PI/2, -Math.PI/2, false);
+                    ctx.lineTo(200, 800);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Draw Start Line
+                    ctx.save();
+                    ctx.translate(500, 200);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(-10, -100, 20, 200); // Checkered line simplified
+                    ctx.restore();
+                },
+                startPos: { x: 500, y: 200, angle: 0 }
+            },
+            {
+                name: "Circuit Beta",
+                draw: (ctx) => {
+                    ctx.fillStyle = '#3d2a0a'; // Dirt/Desert
+                    ctx.fillRect(0, 0, TRACK_WIDTH, TRACK_HEIGHT);
+                    
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineWidth = 180;
+                    ctx.strokeStyle = '#222';
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(300, 300);
+                    ctx.lineTo(1700, 300);
+                    ctx.lineTo(1700, 1700);
+                    ctx.lineTo(300, 1700);
+                    ctx.closePath();
+                    ctx.stroke();
+                },
+                startPos: { x: 1000, y: 300, angle: 0 }
+            },
+            {
+                name: "Circuit Omega",
+                draw: (ctx) => {
+                    ctx.fillStyle = '#001133'; // Night/Space
+                    ctx.fillRect(0, 0, TRACK_WIDTH, TRACK_HEIGHT);
+                    
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineWidth = 220;
+                    ctx.strokeStyle = '#555';
+                    
+                    ctx.beginPath();
+                    ctx.arc(1000, 1000, 800, 0, Math.PI*2);
+                    ctx.stroke();
+                    
+                    // Inner loop
+                    ctx.beginPath();
+                    ctx.arc(1000, 1000, 400, 0, Math.PI*2);
+                    ctx.stroke();
+
+                    // Connector
+                    ctx.lineWidth = 220;
+                    ctx.beginPath();
+                    ctx.moveTo(1000, 1400);
+                    ctx.lineTo(1000, 1800);
+                    ctx.stroke();
+                },
+                startPos: { x: 1000, y: 1800, angle: Math.PI }
+            }
+        ];
+
+        let currentMapIndex = 0;
+
+        // Car Physics
+        const car = {
+            x: 0,
+            y: 0,
+            angle: 0,
+            speed: 0,
+            maxSpeed: 15,
+            acceleration: 0.2,
+            friction: 0.96,
+            turnSpeed: 0.06,
+            driftFactor: 0.9,
+            nitro: 100,
+            nitroActive: false,
+            color: '#00d4ff'
+        };
+
+        // Camera
+        const camera = {
+            x: 0,
+            y: 0,
+            zoom: 1
+        };
+
+        // Particles
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Input Handling
+        const leftZone = document.getElementById('left-zone');
+        const rightZone = document.getElementById('right-zone');
+
+        function handleInputStart(side) {
+            if (side === 'left') input.left = true;
+            if (side === 'right') input.right = true;
+        }
+
+        function handleInputEnd(side) {
+            if (side === 'left') input.left = false;
+            if (side === 'right') input.right = false;
+        }
+
+        // Mouse/Touch Events
+        leftZone.addEventListener('mousedown', () => handleInputStart('left'));
+        leftZone.addEventListener('mouseup', () => handleInputEnd('left'));
+        leftZone.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart('left'); });
+        leftZone.addEventListener('touchend', (e) => { e.preventDefault(); handleInputEnd('left'); });
+
+        rightZone.addEventListener('mousedown', () => handleInputStart('right'));
+        rightZone.addEventListener('mouseup', () => handleInputEnd('right'));
+        rightZone.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart('right'); });
+        rightZone.addEventListener('touchend', (e) => { e.preventDefault(); handleInputEnd('right'); });
+
+        // Double tap for nitro (global)
+        document.addEventListener('touchstart', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            if (tapLength < DOUBLE_TAP_DELAY && tapLength > 0) {
+                toggleNitro();
+                e.preventDefault();
+            }
+            lastTapTime = currentTime;
+        });
+        
+        // Also support double click for desktop testing
+        document.addEventListener('dblclick', () => {
+            toggleNitro();
+        });
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') input.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') input.right = true;
+            if (e.key === ' ' || e.key === 'Shift') toggleNitro(true);
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') input.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') input.right = false;
+            if (e.key === ' ' || e.key === 'Shift') toggleNitro(false);
+        });
+
+        function toggleNitro(state) {
+            if (state !== undefined) {
+                input.nitro = state;
+            } else {
+                input.nitro = !input.nitro; // Toggle on double tap
+                // Auto turn off after 2 seconds if toggled via tap? No, let's keep it simple.
+                // Actually, for "Asphalt" style, usually you tap to activate.
+                if(input.nitro) setTimeout(() => input.nitro = false, 2000);
+            }
+        }
+
+        function selectMap(index) {
+            currentMapIndex = index;
+            document.querySelectorAll('.map-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+        }
+
+        function initMap() {
+            const map = maps[currentMapIndex];
+            map.draw(trackCtx);
+            car.x = map.startPos.x;
+            car.y = map.startPos.y;
+            car.angle = map.startPos.angle;
+            car.speed = 0;
+            car.nitro = 100;
+        }
+
+        function startGame() {
+            document.getElementById('menu-overlay').style.display = 'none';
+            gameState = 'PLAYING';
+            initMap();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            if (gameState !== 'PLAYING') return;
+
+            // Nitro Logic
+            let maxSpeed = car.maxSpeed;
+            if (input.nitro && car.nitro > 0) {
+                maxSpeed *= 1.5;
+                car.nitro -= 0.5;
+                car.nitroActive = true;
+                // Add particles
+                particles.push({
+                    x: car.x - Math.cos(car.angle) * 20,
+                    y: car.y - Math.sin(car.angle) * 20,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    life: 1,
+                    color: `hsl(${Math.random()*60 + 10}, 100%, 50%)`
+                });
+            } else {
+                car.nitroActive = false;
+                if (car.nitro < 100) car.nitro += 0.1;
+            }
+
+            // Steering
+            if (input.left) car.angle -= car.turnSpeed * (car.speed / maxSpeed);
+            if (input.right) car.angle += car.turnSpeed * (car.speed / maxSpeed);
+
+            // Acceleration (Auto accelerate in this style? Or press to go? 
+            // "Asphalt" usually is auto-accel or press. Let's do auto-accel for simplicity on mobile, 
+            // steering is the main challenge. Or maybe just accelerate always.)
+            // Let's make it auto-accelerate to max speed, brake if both pressed?
+            // User said: "control car turn left/right... double tap turbo". Didn't mention gas.
+            // Auto-gas is best for this simple mobile control scheme.
+            
+            car.speed += car.acceleration;
+            if (car.speed > maxSpeed) car.speed = maxSpeed;
+
+            // Friction/Drag
+            car.speed *= car.friction;
+
+            // Check off-road
+            // Sample pixel from track canvas at car position
+            try {
+                const pixel = trackCtx.getImageData(Math.floor(car.x), Math.floor(car.y), 1, 1).data;
+                // If pixel is not road color (we used dark grey #333 -> 51,51,51)
+                // We need to be careful. Let's assume road is not green/dirt.
+                // Simple check: if it's the background color.
+                // Map 0: Grass #0a3d0a (10, 61, 10)
+                // Map 1: Dirt #3d2a0a (61, 42, 10)
+                // Map 2: Space #001133 (0, 17, 51)
+                
+                // Better approach: Check if it IS the road color.
+                // Road is usually drawn last.
+                // Let's just check if it's NOT the background color?
+                // Or check if it matches road color roughly.
+                // Let's use a specific alpha or color for road in the mask.
+                // Actually, let's just slow down if "off road".
+                
+                // Heuristic: Road is usually greyish.
+                const isRoad = (pixel[0] > 40 && pixel[0] < 100 && pixel[1] > 40 && pixel[1] < 100 && pixel[2] > 40 && pixel[2] < 100);
+                
+                if (!isRoad) {
+                    car.speed *= 0.9; // Slow down significantly off-road
+                }
+            } catch(e) {}
+
+            // Move Car
+            car.x += Math.cos(car.angle) * car.speed;
+            car.y += Math.sin(car.angle) * car.speed;
+
+            // Update Camera
+            // Smooth follow
+            camera.x += (car.x - camera.x) * 0.1;
+            camera.y += (car.y - camera.y) * 0.1;
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Update UI
+            document.getElementById('speedometer').innerText = Math.floor(car.speed * 10) + " KM/H";
+            document.getElementById('nitro-bar').style.width = car.nitro + "%";
+        }
+
+        function draw() {
+            // Clear Screen
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Save context for camera transform
+            ctx.save();
+            
+            // Center camera on screen
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            // Rotate whole world opposite to car angle for "Asphalt" feel (camera behind car)
+            // Or just follow position? "Asphalt" usually has camera behind car.
+            // Let's rotate the world so car is always facing up.
+            ctx.rotate(-car.angle - Math.PI/2);
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw Track
+            ctx.drawImage(trackCanvas, 0, 0);
+
+            // Draw Particles (under car)
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3 + Math.random()*2, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw Car
+            ctx.save();
+            ctx.translate(car.x, car.y);
+            ctx.rotate(car.angle);
+            
+            // Car Body
+            ctx.fillStyle = car.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = car.color;
+            ctx.fillRect(-15, -10, 30, 20); // Main body
+            
+            // Roof/Windshield
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-5, -8, 15, 16);
+            
+            // Headlights
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 20;
+            ctx.fillRect(10, -9, 5, 4);
+            ctx.fillRect(10, 5, 5, 4);
+            
+            // Taillights
+            ctx.fillStyle = '#f00';
+            ctx.shadowColor = '#f00';
+            ctx.fillRect(-15, -9, 2, 4);
+            ctx.fillRect(-15, 5, 2, 4);
+
+            // Nitro Flame
+            if (car.nitroActive) {
+                ctx.fillStyle = '#0ff';
+                ctx.beginPath();
+                ctx.moveTo(-15, -5);
+                ctx.lineTo(-30 - Math.random()*10, 0);
+                ctx.lineTo(-15, 5);
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function gameLoop(timestamp) {
+            dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+    </script>
+</body>
+</html>
