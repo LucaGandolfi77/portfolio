@@ -121,8 +121,38 @@
             font-size: 0.9rem;
             color: #aaa;
             display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .status-row {
+            display: flex;
             align-items: center;
             gap: 10px;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #00d4ff;
+            transition: width 0.1s linear;
+        }
+        
+        .progress-info {
+            display: none;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #888;
+            width: 100%;
         }
         
         .spinner {
@@ -188,8 +218,17 @@
         </div>
 
         <div class="status-bar" id="status-bar">
-            <div class="spinner" id="spinner"></div>
-            <span id="status-text">Initializing AI model...</span>
+            <div class="status-row">
+                <div class="spinner" id="spinner"></div>
+                <span id="status-text">Initializing AI model...</span>
+            </div>
+            <div class="progress-container" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-info" id="progress-info">
+                <span id="progress-percent">0%</span>
+                <span id="progress-size">0 / 0 MB</span>
+            </div>
         </div>
 
         <div class="result-area">
@@ -199,7 +238,7 @@
     </div>
 
     <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 
         // Configure environment
         env.allowLocalModels = false;
@@ -245,15 +284,49 @@
             const modelId = modelSelect.value;
             if (!transcriber || currentModelId !== modelId) {
                 updateStatus(`Loading AI Model (${modelId})... this may take a moment.`, true);
+                
+                // Reset progress UI
+                const pContainer = document.getElementById('progress-container');
+                const pBar = document.getElementById('progress-bar');
+                const pInfo = document.getElementById('progress-info');
+                const pPercent = document.getElementById('progress-percent');
+                const pSize = document.getElementById('progress-size');
+                
                 try {
                     // Use quantized whisper model
-                    transcriber = await pipeline('automatic-speech-recognition', modelId);
+                    transcriber = await pipeline('automatic-speech-recognition', modelId, {
+                        progress_callback: (data) => {
+                            if (data.status === 'initiate') {
+                                updateStatus(`Downloading ${data.file}...`, true);
+                                pContainer.style.display = 'block';
+                                pInfo.style.display = 'flex';
+                            } else if (data.status === 'progress') {
+                                const percent = data.progress.toFixed(1);
+                                const loaded = (data.loaded / 1024 / 1024).toFixed(2);
+                                const total = (data.total / 1024 / 1024).toFixed(2);
+                                
+                                pBar.style.width = percent + '%';
+                                pPercent.textContent = percent + '%';
+                                pSize.textContent = `${loaded} / ${total} MB`;
+                            } else if (data.status === 'done') {
+                                pBar.style.width = '100%';
+                            }
+                        }
+                    });
+                    
                     currentModelId = modelId;
                     updateStatus('Model loaded!', false);
-                    setTimeout(() => statusBar.style.display = 'none', 2000);
+                    
+                    // Hide progress bar after a short delay
+                    setTimeout(() => {
+                        pContainer.style.display = 'none';
+                        pInfo.style.display = 'none';
+                        statusBar.style.display = 'none';
+                    }, 2000);
+                    
                 } catch (err) {
                     console.error(err);
-                    updateStatus('Error loading model: ' + err.message, false);
+                    updateStatus('Error loading model: ' + err.message + '. Try a smaller model or check console.', false);
                     return false;
                 }
             }

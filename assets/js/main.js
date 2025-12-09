@@ -436,13 +436,6 @@ const projects = [
         image: "./assets/project2.gif",
         link: "https://github.com/lucagandolfi/project2",
         tags: ["Python", "TensorFlow", "Flask"]
-    },
-    {
-        title: "Task Management App",
-        description: "Collaborative project management tool with real-time updates and team collaboration features",
-        image: "./assets/project3.jpg",
-        link: "https://github.com/lucagandolfi/project3",
-        tags: ["Vue.js", "Firebase", "PWA"]
     }
 ];
 
