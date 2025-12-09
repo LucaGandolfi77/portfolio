@@ -975,7 +975,7 @@ function toggleSection(containerId, btn) {
     }
 }
 
-function autoCollapse(selector, threshold = 400) {
+function autoCollapse(selector, threshold = 300) {
     const elements = document.querySelectorAll(selector);
     elements.forEach(el => {
         // Check if already processed
