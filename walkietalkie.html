@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>P2P Walkie Talkie</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .walkie-container {
+            background: #333;
+            width: 300px;
+            height: 550px;
+            border-radius: 40px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 
+                inset 5px 5px 15px rgba(255,255,255,0.1),
+                inset -5px -5px 15px rgba(0,0,0,0.5),
+                10px 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            border: 4px solid #222;
+        }
+
+        .antenna {
+            width: 20px;
+            height: 100px;
+            background: #222;
+            position: absolute;
+            top: -80px;
+            right: 40px;
+            border-radius: 10px 10px 0 0;
+            z-index: -1;
+        }
+
+        .screen {
+            width: 80%;
+            height: 100px;
+            background: #9ea768;
+            border-radius: 10px;
+            margin-top: 30px;
+            border: 4px solid #222;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'VT323', monospace;
+            color: #333;
+            text-align: center;
+            padding: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .screen-text {
+            font-weight: bold;
+            font-size: 1.2rem;
+            z-index: 2;
+        }
+
+        .frequency {
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+
+        .speaker-grill {
+            width: 80%;
+            height: 100px;
+            margin: 20px 0;
+            background: 
+                radial-gradient(circle, #111 2px, transparent 2.5px);
+            background-size: 10px 10px;
+            opacity: 0.5;
+        }
+
+        .ptt-btn {
+            width: 120px;
+            height: 120px;
+            background: #e74c3c;
+            border-radius: 50%;
+            border: none;
+            box-shadow: 
+                inset 0 5px 10px rgba(255,255,255,0.3),
+                0 5px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+            font-size: 1.2rem;
+            transition: all 0.1s;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .ptt-btn:active, .ptt-btn.active {
+            transform: scale(0.95);
+            background: #c0392b;
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .ptt-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            color: #888;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-top: auto;
+            margin-bottom: 20px;
+        }
+
+        .small-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: #555;
+            color: white;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: #222;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .hidden { display: none !important; }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #333;
+            color: white;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .noise-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAA5OTkAAABERERmZmZOTk5QUFCZmZkmj4D3AAAACHRSTlMAMwA1MzMzM7O0s14AAABPAURBVDjLY2AYBaNgFDCQAQowMIIBCTSEKQMjGFAQAxJoiFAGRjCgIAYk0BChDIxgQEEMSKAhQhkYwYCCGJBAQ4QyMIKBCgYqYBSMggEHAHRjB6Z64l5kAAAAAElFTkSuQmCC');
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .led {
+            width: 10px;
+            height: 10px;
+            background: #333;
+            border-radius: 50%;
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .led.on {
+            background: #e74c3c;
+            box-shadow: 0 0 5px #e74c3c;
+        }
+        
+        .led.rx {
+            background: #2ecc71;
+            box-shadow: 0 0 5px #2ecc71;
+        }
+
+        /* Visualizer bars */
+        .viz {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 20px;
+            margin-top: 5px;
+        }
+        .bar {
+            width: 4px;
+            background: #333;
+            height: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Connection Modal -->
+    <div id="connection-modal" class="modal">
+        <div class="modal-content">
+            <h2>P2P Walkie Talkie 📻</h2>
+            <p>Secure, peer-to-peer voice chat.</p>
+            
+            <div id="menu-main">
+                <button class="btn" onclick="setupHost()" style="width:100%; margin-bottom:10px;">Create Channel</button>
+                <button class="btn" onclick="showJoin()" style="width:100%; background:#444; color:white;">Join Channel</button>
+            </div>
+
+            <div id="menu-host" class="hidden">
+                <p>Channel Frequency (ID):</p>
+                <h1 id="host-id" style="color:#00d4ff; letter-spacing: 2px; font-family:monospace; background:#111; padding:10px; border-radius:6px;">...</h1>
+                <p style="font-size:0.8rem; color:#888;">Share this ID with your friend</p>
+                <div style="margin: 20px auto; color:#aaa;">Waiting for signal...</div>
+                <button class="btn" onclick="resetMenu()" style="background:#444; color:white;">Back</button>
+            </div>
+
+            <div id="menu-join" class="hidden">
+                <p>Enter Frequency (ID):</p>
+                <input type="text" id="join-id-input" placeholder="e.g. A1B2" style="text-transform:uppercase;">
+                <button class="btn" onclick="joinGame()" style="width:100%; margin-bottom:10px;">Tune In</button>
+                <button class="btn" onclick="resetMenu()" style="background:#444; color:white; width:100%;">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="walkie-container">
+        <div class="antenna"></div>
+        <div class="led" id="status-led"></div>
+        
+        <div class="screen">
+            <div class="noise-overlay"></div>
+            <div class="screen-text" id="screen-status">OFFLINE</div>
+            <div class="frequency" id="screen-freq">---.--- MHz</div>
+            <div class="viz" id="viz-bars">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </div>
+        </div>
+
+        <div class="speaker-grill"></div>
+
+        <button id="ptt-btn" class="ptt-btn" disabled>HOLD<br>TO TALK</button>
+
+        <div class="controls">
+            <button class="small-btn" onclick="location.href='technology.html'">PWR</button>
+            <button class="small-btn" onclick="toggleMute()">🔇</button>
+        </div>
+    </div>
+
+    <audio id="remote-audio" autoplay></audio>
+
+    <script>
+        // --- State ---
+        let peer = null;
+        let conn = null; // Data connection
+        let mediaCall = null; // Media connection
+        let localStream = null;
+        let isHost = false;
+        let isMuted = false;
+        
+        // --- UI ---
+        const modal = document.getElementById('connection-modal');
+        const screenStatus = document.getElementById('screen-status');
+        const screenFreq = document.getElementById('screen-freq');
+        const pttBtn = document.getElementById('ptt-btn');
+        const led = document.getElementById('status-led');
+        const vizBars = document.querySelectorAll('.bar');
+
+        // --- Audio Context for Visualizer ---
+        let audioCtx, analyser, dataArray;
+
+        // --- Setup ---
+        async function getLocalStream() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                localStream = stream;
+                // Initially mute the track (PTT logic)
+                localStream.getAudioTracks()[0].enabled = false;
+                return stream;
+            } catch (err) {
+                console.error("Mic access denied", err);
+                alert("Microphone access is required!");
+                return null;
+            }
+        }
+
+        function setupHost() {
+            getLocalStream().then(stream => {
+                if (!stream) return;
+                
+                const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+                peer = new Peer(id);
+                
+                peer.on('open', (id) => {
+                    document.getElementById('host-id').innerText = id;
+                    document.getElementById('menu-main').classList.add('hidden');
+                    document.getElementById('menu-host').classList.remove('hidden');
+                    isHost = true;
+                });
+
+                peer.on('connection', (c) => {
+                    conn = c;
+                    setupDataConnection();
+                });
+
+                peer.on('call', (call) => {
+                    mediaCall = call;
+                    call.answer(localStream);
+                    call.on('stream', (remoteStream) => {
+                        handleRemoteStream(remoteStream);
+                    });
+                });
+            });
+        }
+
+        function showJoin() {
+            document.getElementById('menu-main').classList.add('hidden');
+            document.getElementById('menu-join').classList.remove('hidden');
+        }
+
+        function joinGame() {
+            const id = document.getElementById('join-id-input').value.toUpperCase();
+            if (!id) return;
+            
+            getLocalStream().then(stream => {
+                if (!stream) return;
+
+                peer = new Peer();
+                peer.on('open', () => {
+                    conn = peer.connect(id);
+                    setupDataConnection();
+                    
+                    // Initiate call
+                    mediaCall = peer.call(id, localStream);
+                    mediaCall.on('stream', (remoteStream) => {
+                        handleRemoteStream(remoteStream);
+                    });
+                });
+            });
+        }
+
+        function setupDataConnection() {
+            conn.on('open', () => {
+                modal.classList.add('hidden');
+                screenStatus.innerText = "CONNECTED";
+                screenFreq.innerText = "CH " + (isHost ? peer.id : conn.peer);
+                pttBtn.disabled = false;
+                playStaticBurst();
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'talking_start') {
+                    screenStatus.innerText = "RECEIVING";
+                    led.className = "led rx";
+                } else if (data.type === 'talking_end') {
+                    screenStatus.innerText = "CONNECTED";
+                    led.className = "led";
+                    playStaticBurst();
+                }
+            });
+
+            conn.on('close', () => {
+                alert("Connection Lost");
+                location.reload();
+            });
+        }
+
+        function handleRemoteStream(stream) {
+            const audioEl = document.getElementById('remote-audio');
+            audioEl.srcObject = stream;
+            setupVisualizer(stream);
+        }
+
+        // --- PTT Logic ---
+        
+        // Mouse
+        pttBtn.addEventListener('mousedown', startTalking);
+        document.addEventListener('mouseup', stopTalking);
+        
+        // Touch
+        pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startTalking(); });
+        pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopTalking(); });
+
+        function startTalking() {
+            if (!localStream || pttBtn.disabled) return;
+            
+            localStream.getAudioTracks()[0].enabled = true;
+            pttBtn.classList.add('active');
+            screenStatus.innerText = "TRANSMITTING";
+            led.className = "led on";
+            
+            if (conn) conn.send({ type: 'talking_start' });
+        }
+
+        function stopTalking() {
+            if (!localStream || !pttBtn.classList.contains('active')) return;
+            
+            localStream.getAudioTracks()[0].enabled = false;
+            pttBtn.classList.remove('active');
+            screenStatus.innerText = "CONNECTED";
+            led.className = "led";
+            
+            if (conn) conn.send({ type: 'talking_end' });
+            playStaticBurst();
+        }
+
+        // --- Audio FX ---
+        function playStaticBurst() {
+            // Simple white noise burst to simulate radio squelch
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const bufferSize = ctx.sampleRate * 0.2; // 200ms
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const gain = ctx.createGain();
+            gain.gain.value = 0.1;
+            
+            noise.connect(gain);
+            gain.connect(ctx.destination);
+            noise.start();
+        }
+
+        function setupVisualizer(stream) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioCtx.createMediaStreamSource(stream);
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 32;
+            source.connect(analyser);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            drawViz();
+        }
+
+        function drawViz() {
+            requestAnimationFrame(drawViz);
+            if (!analyser) return;
+            
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Update bars
+            for(let i=0; i<8; i++) {
+                const val = dataArray[i];
+                const h = (val / 255) * 20;
+                if (vizBars[i]) {
+                    vizBars[i].style.height = Math.max(2, h) + 'px';
+                    vizBars[i].style.background = val > 100 ? '#333' : '#333';
+                }
+            }
+        }
+
+        function toggleMute() {
+            const audioEl = document.getElementById('remote-audio');
+            audioEl.muted = !audioEl.muted;
+            screenStatus.innerText = audioEl.muted ? "MUTED" : "CONNECTED";
+        }
+
+    </script>
+</body>
+</html>
