@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scopa P2P</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            position: relative;
+            background: radial-gradient(circle at center, #2a4a2a 0%, #1a2a1a 100%);
+        }
+
+        .opponent-area {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 100px;
+        }
+
+        .table-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .player-area {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 120px;
+        }
+
+        .card {
+            width: 70px;
+            height: 110px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: black;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+            user-select: none;
+        }
+
+        .card.opponent {
+            background: repeating-linear-gradient(
+                45deg,
+                #b71c1c,
+                #b71c1c 10px,
+                #d32f2f 10px,
+                #d32f2f 20px
+            );
+            cursor: default;
+        }
+
+        .card:hover:not(.opponent) {
+            transform: translateY(-10px);
+        }
+
+        .card.selected {
+            border: 3px solid #00d4ff;
+            transform: translateY(-15px);
+        }
+
+        .suit-icon {
+            font-size: 2rem;
+        }
+
+        .deck-info {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .deck {
+            width: 50px;
+            height: 80px;
+            background: repeating-linear-gradient(
+                45deg,
+                #b71c1c,
+                #b71c1c 10px,
+                #d32f2f 10px,
+                #d32f2f 20px
+            );
+            border-radius: 6px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: #222;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .hidden { display: none !important; }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #333;
+            color: white;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .log-area {
+            position: absolute;
+            bottom: 150px;
+            left: 20px;
+            width: 200px;
+            height: 100px;
+            overflow-y: auto;
+            font-size: 0.7rem;
+            color: #aaa;
+            pointer-events: none;
+            text-shadow: 1px 1px 1px black;
+        }
+
+        .score-board {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .scopa-anim {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            animation: popIn 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Connection Modal -->
+    <div id="connection-modal" class="modal">
+        <div class="modal-content">
+            <h2>Scopa P2P</h2>
+            <p>Connect with a friend to play Scopa.</p>
+            
+            <div id="menu-main">
+                <button class="btn" onclick="setupHost()" style="width:100%; margin-bottom:10px;">Host Game</button>
+                <button class="btn" onclick="showJoin()" style="width:100%; background:#444;">Join Game</button>
+            </div>
+
+            <div id="menu-host" class="hidden">
+                <p>Your Game ID:</p>
+                <h1 id="host-id" style="color:#00d4ff; letter-spacing: 2px;">...</h1>
+                <p style="font-size:0.8rem; color:#888;">Share this ID with your friend</p>
+                <div class="spinner" style="margin: 20px auto;">Waiting for player...</div>
+                <button class="btn" onclick="resetMenu()" style="background:#444;">Back</button>
+            </div>
+
+            <div id="menu-join" class="hidden">
+                <p>Enter Host ID:</p>
+                <input type="text" id="join-id-input" placeholder="e.g. A1B2" style="text-transform:uppercase;">
+                <button class="btn" onclick="joinGame()" style="width:100%; margin-bottom:10px;">Connect</button>
+                <button class="btn" onclick="resetMenu()" style="background:#444; width:100%;">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="header">
+        <div style="font-weight:bold;">Scopa</div>
+        <a href="index.html#projects" class="btn" style="font-size:0.8rem; padding:5px 10px;">Exit</a>
+    </div>
+
+    <div class="connection-status" id="status-display">Disconnected</div>
+
+    <div class="score-board">
+        <div>Me: <span id="score-me">0</span> (Scope: <span id="scope-me">0</span>)</div>
+        <div>Opp: <span id="score-opp">0</span> (Scope: <span id="scope-opp">0</span>)</div>
+    </div>
+
+    <div class="game-area">
+        <div class="opponent-area" id="opponent-hand">
+            <!-- Opponent cards (back) -->
+        </div>
+
+        <div class="table-area" id="table-area">
+            <!-- Table cards -->
+        </div>
+
+        <div class="deck-info">
+            <div class="deck"></div>
+            <div id="deck-count">40</div>
+        </div>
+
+        <div class="player-area" id="player-hand">
+            <!-- Player cards -->
+        </div>
+        
+        <div class="log-area" id="game-log"></div>
+    </div>
+
+    <script>
+        // --- Game Constants ---
+        const SUITS = ['🏆', '🟡', '⚔️', '🪵']; // Coppe, Denari, Spade, Bastoni
+        // Values: 1-10. 8=Fante, 9=Cavallo, 10=Re
+        const RANKS = [
+            { name: 'A', value: 1 },
+            { name: '2', value: 2 },
+            { name: '3', value: 3 },
+            { name: '4', value: 4 },
+            { name: '5', value: 5 },
+            { name: '6', value: 6 },
+            { name: '7', value: 7 },
+            { name: 'F', value: 8 },
+            { name: 'C', value: 9 },
+            { name: 'R', value: 10 }
+        ];
+
+        // --- State ---
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let myHand = [];
+        let oppHandCount = 0;
+        let tableCards = [];
+        let deck = [];
+        let turn = null; // 'me' or 'opponent'
+        let deckCount = 40;
+        
+        // Captured piles for scoring
+        let myPile = [];
+        let oppPile = [];
+        let myScope = 0;
+        let oppScope = 0;
+        
+        // Last player to capture (takes remaining cards at end)
+        let lastCapturer = null; 
+
+        // --- UI Elements ---
+        const modal = document.getElementById('connection-modal');
+        const statusDisplay = document.getElementById('status-display');
+        const playerHandEl = document.getElementById('player-hand');
+        const opponentHandEl = document.getElementById('opponent-hand');
+        const tableEl = document.getElementById('table-area');
+        const deckCountEl = document.getElementById('deck-count');
+        const logEl = document.getElementById('game-log');
+
+        // --- PeerJS Setup ---
+        function setupHost() {
+            const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+            peer = new Peer(id);
+            
+            peer.on('open', (id) => {
+                document.getElementById('host-id').innerText = id;
+                document.getElementById('menu-main').classList.add('hidden');
+                document.getElementById('menu-host').classList.remove('hidden');
+                isHost = true;
+            });
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
+            });
+        }
+
+        function showJoin() {
+            document.getElementById('menu-main').classList.add('hidden');
+            document.getElementById('menu-join').classList.remove('hidden');
+        }
+
+        function joinGame() {
+            const id = document.getElementById('join-id-input').value.toUpperCase();
+            if (!id) return;
+            
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(id);
+                setupConnection();
+            });
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                modal.classList.add('hidden');
+                statusDisplay.innerText = "Connected";
+                statusDisplay.style.background = "rgba(46, 213, 115, 0.5)";
+                
+                if (isHost) {
+                    initGame();
+                }
+            });
+
+            conn.on('data', (data) => {
+                handleData(data);
+            });
+
+            conn.on('close', () => {
+                alert("Opponent disconnected");
+                location.reload();
+            });
+        }
+
+        function resetMenu() {
+            if (peer) peer.destroy();
+            document.getElementById('menu-main').classList.remove('hidden');
+            document.getElementById('menu-host').classList.add('hidden');
+            document.getElementById('menu-join').classList.add('hidden');
+        }
+
+        // --- Game Logic ---
+
+        function createDeck() {
+            let d = [];
+            SUITS.forEach((suit, sIdx) => {
+                RANKS.forEach((rank, rIdx) => {
+                    d.push({ 
+                        suit: suit, 
+                        rank: rank.name, 
+                        value: rank.value,
+                        suitIdx: sIdx, // 0=Coppe, 1=Denari, 2=Spade, 3=Bastoni
+                        id: sIdx * 10 + rIdx
+                    });
+                });
+            });
+            return shuffle(d);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            deck = createDeck();
+            myPile = [];
+            oppPile = [];
+            myScope = 0;
+            oppScope = 0;
+            lastCapturer = null;
+            
+            // Initial Deal: 4 to table, 3 to each player
+            tableCards = deck.splice(0, 4);
+            const p1Hand = deck.splice(0, 3);
+            const p2Hand = deck.splice(0, 3);
+            
+            deckCount = deck.length;
+            
+            // Host is Player 1, starts first
+            turn = 'me';
+            myHand = p1Hand;
+            oppHandCount = 3;
+
+            updateUI();
+            
+            // Send initial state to opponent
+            conn.send({
+                type: 'init',
+                hand: p2Hand,
+                table: tableCards,
+                deckCount: deckCount
+            });
+        }
+
+        function handleData(data) {
+            if (data.type === 'init') {
+                myHand = data.hand;
+                tableCards = data.table;
+                deckCount = data.deckCount;
+                oppHandCount = 3;
+                turn = 'opponent'; // Host starts
+                updateUI();
+            } else if (data.type === 'move') {
+                processOpponentMove(data.card, data.capturedIds, data.isScopa);
+            } else if (data.type === 'deal') {
+                myHand = data.hand;
+                deckCount = data.deckCount;
+                oppHandCount = 3;
+                updateUI();
+                log("Dealt 3 new cards");
+            } else if (data.type === 'endRound') {
+                // Receive final scores or piles info if needed
+                // For simplicity, we track piles locally and mirror logic
+            }
+        }
+
+        function playCard(index) {
+            if (turn !== 'me') return;
+            
+            const card = myHand[index];
+            
+            // Check for captures
+            // Rule: Must take single card if matches value
+            let capturedIndices = [];
+            let singleMatchIndex = tableCards.findIndex(c => c.value === card.value);
+            
+            if (singleMatchIndex !== -1) {
+                capturedIndices.push(singleMatchIndex);
+            } else {
+                // Check for sum combinations
+                // Simple greedy approach: find first combination that sums to value
+                // A proper subset sum algorithm would be better but for N<=10 it's trivial
+                const combo = findSumCombination(tableCards, card.value);
+                if (combo) {
+                    // Map combo cards back to table indices
+                    combo.forEach(c => {
+                        const idx = tableCards.indexOf(c);
+                        if (idx !== -1) capturedIndices.push(idx);
+                    });
+                }
+            }
+
+            // Execute Move
+            myHand.splice(index, 1);
+            
+            let capturedCards = [];
+            if (capturedIndices.length > 0) {
+                // Sort indices descending to remove correctly
+                capturedIndices.sort((a, b) => b - a);
+                capturedIndices.forEach(idx => {
+                    capturedCards.push(tableCards[idx]);
+                    tableCards.splice(idx, 1);
+                });
+                
+                // Add played card + captured cards to pile
+                myPile.push(card, ...capturedCards);
+                lastCapturer = 'me';
+            } else {
+                // No capture, add to table
+                tableCards.push(card);
+            }
+
+            // Check Scopa
+            let isScopa = false;
+            if (tableCards.length === 0 && deckCount > 0 && capturedIndices.length > 0) {
+                isScopa = true;
+                myScope++;
+                showScopaAnim();
+            }
+
+            // Send move
+            conn.send({
+                type: 'move',
+                card: card,
+                capturedIds: capturedCards.map(c => c.id),
+                isScopa: isScopa
+            });
+
+            turn = 'opponent';
+            updateUI();
+            
+            checkEndOfHand();
+        }
+
+        function processOpponentMove(card, capturedIds, isScopa) {
+            oppHandCount--;
+            
+            if (capturedIds && capturedIds.length > 0) {
+                // Remove captured cards from table
+                // We need to find them by ID since order might vary slightly or just to be safe
+                let capturedCards = [];
+                capturedIds.forEach(id => {
+                    const idx = tableCards.findIndex(c => c.id === id);
+                    if (idx !== -1) {
+                        capturedCards.push(tableCards[idx]);
+                        tableCards.splice(idx, 1);
+                    }
+                });
+                
+                oppPile.push(card, ...capturedCards);
+                lastCapturer = 'opponent';
+                
+                if (isScopa) {
+                    oppScope++;
+                    showScopaAnim();
+                    log("Opponent scored SCOPA!");
+                }
+            } else {
+                tableCards.push(card);
+            }
+            
+            turn = 'me';
+            updateUI();
+            checkEndOfHand();
+        }
+
+        function checkEndOfHand() {
+            if (myHand.length === 0 && oppHandCount === 0) {
+                if (deckCount > 0) {
+                    if (isHost) {
+                        setTimeout(() => {
+                            const p1Hand = deck.splice(0, 3);
+                            const p2Hand = deck.splice(0, 3);
+                            deckCount = deck.length;
+                            
+                            myHand = p1Hand;
+                            oppHandCount = 3;
+                            
+                            conn.send({
+                                type: 'deal',
+                                hand: p2Hand,
+                                deckCount: deckCount
+                            });
+                            
+                            updateUI();
+                            log("Dealt 3 new cards");
+                        }, 1000);
+                    }
+                } else {
+                    endGame();
+                }
+            }
+        }
+
+        function endGame() {
+            // Last capturer takes remaining table cards
+            if (tableCards.length > 0) {
+                if (lastCapturer === 'me') {
+                    myPile.push(...tableCards);
+                } else {
+                    oppPile.push(...tableCards);
+                }
+                tableCards = [];
+            }
+            
+            calculateScores();
+            updateUI();
+            log("Game Over!");
+        }
+
+        function calculateScores() {
+            // 1. Scope (already counted)
+            
+            // 2. Carte (Most cards)
+            let p1Points = myScope;
+            let p2Points = oppScope;
+            
+            if (myPile.length > oppPile.length) p1Points++;
+            else if (oppPile.length > myPile.length) p2Points++;
+            
+            // 3. Denari (Most coins)
+            const myDenari = myPile.filter(c => c.suitIdx === 1).length;
+            const oppDenari = oppPile.filter(c => c.suitIdx === 1).length;
+            if (myDenari > oppDenari) p1Points++;
+            else if (oppDenari > myDenari) p2Points++;
+            
+            // 4. Settebello (7 of Coins)
+            const settebello = myPile.find(c => c.suitIdx === 1 && c.value === 7);
+            if (settebello) p1Points++;
+            else p2Points++;
+            
+            // 5. Primiera (Simplified: just count 7s, then 6s, etc. Proper rule is complex)
+            // Standard Primiera values: 7=21, 6=18, A=16, 5=15, 4=14, 3=13, 2=12, Face=10
+            const primieraValues = {7:21, 6:18, 1:16, 5:15, 4:14, 3:13, 2:12, 8:10, 9:10, 10:10};
+            
+            function calcPrimieraScore(pile) {
+                let score = 0;
+                let suits = [0,0,0,0]; // Max value per suit
+                pile.forEach(c => {
+                    const val = primieraValues[c.value] || 0;
+                    if (val > suits[c.suitIdx]) suits[c.suitIdx] = val;
+                });
+                return suits.reduce((a,b) => a+b, 0);
+            }
+            
+            const myPrimiera = calcPrimieraScore(myPile);
+            const oppPrimiera = calcPrimieraScore(oppPile);
+            
+            if (myPrimiera > oppPrimiera) p1Points++;
+            else if (oppPrimiera > myPrimiera) p2Points++;
+            
+            document.getElementById('score-me').innerText = p1Points;
+            document.getElementById('score-opp').innerText = p2Points;
+            
+            let msg = `Final Score: Me ${p1Points} - Opp ${p2Points}`;
+            if (p1Points > p2Points) msg += " You Win!";
+            else if (p2Points > p1Points) msg += " You Lose!";
+            else msg += " Draw!";
+            
+            alert(msg);
+        }
+
+        function findSumCombination(cards, target) {
+            // Recursive subset sum
+            function search(index, currentSum, currentCards) {
+                if (currentSum === target) return currentCards;
+                if (currentSum > target || index >= cards.length) return null;
+                
+                // Include current card
+                const res1 = search(index + 1, currentSum + cards[index].value, [...currentCards, cards[index]]);
+                if (res1) return res1;
+                
+                // Exclude current card
+                const res2 = search(index + 1, currentSum, currentCards);
+                if (res2) return res2;
+                
+                return null;
+            }
+            
+            return search(0, 0, []);
+        }
+
+        function updateUI() {
+            // Update Hand
+            playerHandEl.innerHTML = '';
+            myHand.forEach((card, index) => {
+                const el = createCardEl(card);
+                el.onclick = () => playCard(index);
+                playerHandEl.appendChild(el);
+            });
+
+            // Update Opponent Hand (backs)
+            opponentHandEl.innerHTML = '';
+            for(let i=0; i<oppHandCount; i++) {
+                const el = document.createElement('div');
+                el.className = 'card opponent';
+                opponentHandEl.appendChild(el);
+            }
+
+            // Update Table
+            tableEl.innerHTML = '';
+            tableCards.forEach(card => {
+                tableEl.appendChild(createCardEl(card));
+            });
+
+            // Update Deck Count
+            deckCountEl.innerText = deckCount;
+            
+            // Update Scores
+            document.getElementById('scope-me').innerText = myScope;
+            document.getElementById('scope-opp').innerText = oppScope;
+
+            // Status
+            if (turn === 'me') {
+                statusDisplay.innerText = "Your Turn";
+                statusDisplay.style.background = "rgba(0, 212, 255, 0.5)";
+            } else {
+                statusDisplay.innerText = "Opponent's Turn";
+                statusDisplay.style.background = "rgba(255, 100, 100, 0.5)";
+            }
+        }
+
+        function createCardEl(card) {
+            const el = document.createElement('div');
+            el.className = 'card';
+            el.innerHTML = `
+                <div style="font-size:0.8rem; position:absolute; top:5px; left:5px;">${card.rank}</div>
+                <div class="suit-icon">${card.suit}</div>
+                <div style="font-size:0.8rem; position:absolute; bottom:5px; right:5px;">${card.rank}</div>
+            `;
+            // Color suits
+            if (card.suit === '🏆' || card.suit === '🟡') {
+                el.style.color = '#d32f2f';
+            }
+            return el;
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.innerText = `> ${msg}`;
+            logEl.appendChild(div);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function showScopaAnim() {
+            const el = document.createElement('div');
+            el.className = 'scopa-anim';
+            el.innerText = 'SCOPA!';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+        }
+
+    </script>
+</body>
+</html>
