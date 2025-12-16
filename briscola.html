@@ -216,14 +216,23 @@
             <div id="menu-host" class="hidden">
                 <p>Your Game ID:</p>
                 <h1 id="host-id" style="color:#00d4ff; letter-spacing: 2px;">...</h1>
-                <p style="font-size:0.8rem; color:#888;">Share this ID with your friend</p>
-                <div class="spinner" style="margin: 20px auto;">Waiting for player...</div>
+                <p style="font-size:0.8rem; color:#888;">Share this ID with your friends</p>
+                
+                <div id="lobby-area" style="margin: 20px 0; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <div style="font-weight:bold; margin-bottom:5px;">Lobby (<span id="player-count">1</span>/3)</div>
+                    <ul id="player-list" style="list-style:none; padding:0; margin:0; text-align:left; font-size:0.9rem;">
+                        <li>👤 You (Host)</li>
+                    </ul>
+                </div>
+
+                <button id="start-btn" class="btn" onclick="hostStartGame()" disabled style="background:#555; width:100%; margin-bottom:10px;">Start Game</button>
                 <button class="btn" onclick="resetMenu()" style="background:#444;">Back</button>
             </div>
 
             <div id="menu-join" class="hidden">
                 <p>Enter Host ID:</p>
                 <input type="text" id="join-id-input" placeholder="e.g. A1B2" style="text-transform:uppercase;">
+                <div id="join-status" style="margin:10px 0; color:#aaa; font-size:0.9rem;"></div>
                 <button class="btn" onclick="joinGame()" style="width:100%; margin-bottom:10px;">Connect</button>
                 <button class="btn" onclick="resetMenu()" style="background:#444; width:100%;">Back</button>
             </div>
@@ -279,15 +288,19 @@
 
         // --- State ---
         let peer = null;
-        let conn = null;
+        let conn = null; // For Guest: connection to Host
+        let guests = []; // For Host: list of connections [guest1, guest2]
         let isHost = false;
+        let myPlayerIndex = 0; // 0=Host, 1=Guest1, 2=Guest2
+        let totalPlayers = 1;
+        
         let myHand = [];
         let deck = [];
         let briscola = null;
-        let tableCards = []; // { card, player }
-        let turn = null; // 'me' or 'opponent'
-        let myScore = 0;
-        let oppScore = 0;
+        let briscolaSuit = null; // Persists even after briscola card is drawn
+        let tableCards = []; // { card, playerIndex }
+        let turn = 0; // Player Index whose turn it is
+        let scores = [0, 0, 0]; // Scores for p0, p1, p2
         let deckCount = 40;
 
         // --- UI Elements ---
@@ -299,6 +312,10 @@
         const briscolaCardEl = document.getElementById('briscola-card');
         const deckCountEl = document.getElementById('deck-count');
         const gameLog = document.getElementById('game-log');
+        const playerListEl = document.getElementById('player-list');
+        const playerCountEl = document.getElementById('player-count');
+        const startBtn = document.getElementById('start-btn');
+        const joinStatusEl = document.getElementById('join-status');
 
         // --- Connection Logic ---
         function generateId() {
@@ -319,15 +336,66 @@
             const id = generateId();
             document.getElementById('host-id').textContent = id;
             isHost = true;
+            guests = [];
+            totalPlayers = 1;
+            updateLobbyUI();
 
             peer = new Peer(id);
             peer.on('open', (id) => {
                 log('Host ready. ID: ' + id);
             });
+            
             peer.on('connection', (c) => {
-                conn = c;
-                setupConnection();
+                if (guests.length >= 2) {
+                    // Room full
+                    c.on('open', () => {
+                        c.send({ type: 'ERROR', msg: 'Room full' });
+                        setTimeout(() => c.close(), 500);
+                    });
+                    return;
+                }
+
+                c.on('open', () => {
+                    guests.push(c);
+                    totalPlayers = guests.length + 1;
+                    updateLobbyUI();
+                    
+                    // Notify all guests about lobby update
+                    broadcast('LOBBY_UPDATE', { totalPlayers });
+                    
+                    // Send specific welcome to new guest
+                    c.send({ type: 'WELCOME', playerIndex: guests.length }); // 1 or 2
+                });
+
+                c.on('data', (data) => {
+                    handleData(data, c);
+                });
+
+                c.on('close', () => {
+                    guests = guests.filter(g => g !== c);
+                    totalPlayers = guests.length + 1;
+                    updateLobbyUI();
+                    broadcast('LOBBY_UPDATE', { totalPlayers });
+                });
             });
+        }
+
+        function updateLobbyUI() {
+            playerCountEl.textContent = totalPlayers;
+            playerListEl.innerHTML = '<li>👤 You (Host)</li>';
+            guests.forEach((g, i) => {
+                playerListEl.innerHTML += `<li>👤 Guest ${i+1}</li>`;
+            });
+            
+            if (totalPlayers >= 2) {
+                startBtn.disabled = false;
+                startBtn.style.background = '#00d4ff';
+                startBtn.style.color = 'black';
+            } else {
+                startBtn.disabled = true;
+                startBtn.style.background = '#555';
+                startBtn.style.color = 'white';
+            }
         }
 
         function showJoin() {
@@ -340,10 +408,16 @@
             if (!hostId) return;
             
             isHost = false;
+            joinStatusEl.textContent = "Connecting...";
+            
             peer = new Peer();
             peer.on('open', () => {
                 conn = peer.connect(hostId);
-                setupConnection();
+                setupGuestConnection();
+            });
+            
+            peer.on('error', (err) => {
+                joinStatusEl.textContent = "Error: " + err.type;
             });
         }
 
@@ -352,17 +426,13 @@
             document.getElementById('menu-host').classList.add('hidden');
             document.getElementById('menu-join').classList.add('hidden');
             if (peer) peer.destroy();
+            guests = [];
+            conn = null;
         }
 
-        function setupConnection() {
+        function setupGuestConnection() {
             conn.on('open', () => {
-                modal.style.display = 'none';
-                statusDisplay.textContent = 'Connected';
-                statusDisplay.style.color = '#00ff9d';
-                
-                if (isHost) {
-                    startGame();
-                }
+                joinStatusEl.textContent = "Connected! Waiting for host...";
             });
 
             conn.on('data', (data) => {
@@ -376,9 +446,21 @@
         }
 
         function send(type, payload) {
-            if (conn && conn.open) {
-                conn.send({ type, payload });
+            if (isHost) {
+                // Host logic usually broadcasts or handles internally, 
+                // but if we need to send to specific guest we use guests[i].send
+            } else {
+                if (conn && conn.open) {
+                    conn.send({ type, payload });
+                }
             }
+        }
+        
+        function broadcast(type, payload) {
+            if (!isHost) return;
+            guests.forEach(g => {
+                if (g.open) g.send({ type, payload });
+            });
         }
 
         // --- Game Logic ---
@@ -390,6 +472,12 @@
                     d.push({ suit, ...rank, id: suit + rank.name });
                 });
             });
+            
+            // If 3 players, remove 2 of Cups (Coppe) 🏆
+            if (totalPlayers === 3) {
+                d = d.filter(c => !(c.suit === '🏆' && c.name === '2'));
+            }
+            
             return d;
         }
 
@@ -401,64 +489,122 @@
             return array;
         }
 
-        function startGame() {
+        function hostStartGame() {
             deck = shuffle(createDeck());
             briscola = deck.pop(); // Last card is briscola
-            // Put briscola at the bottom of the deck effectively (visually it's under)
-            // In code, we keep it separate or push to bottom. 
-            // Let's keep it separate for display, but remember it's the last card drawn.
+            briscolaSuit = briscola.suit;
             
-            // Deal 3 cards
-            const hostHand = [deck.pop(), deck.pop(), deck.pop()];
-            const guestHand = [deck.pop(), deck.pop(), deck.pop()];
+            // Deal 3 cards to each player
+            let hands = [];
+            for(let i=0; i<totalPlayers; i++) {
+                hands.push([deck.pop(), deck.pop(), deck.pop()]);
+            }
             
-            myHand = hostHand;
-            turn = 'me'; // Host starts
+            myHand = hands[0];
+            myPlayerIndex = 0;
+            turn = 0; // Host starts
+            scores = [0, 0, 0];
+            deckCount = deck.length + 1; // +1 for briscola
 
-            // Send initial state to guest
-            send('INIT', {
-                hand: guestHand,
-                briscola: briscola,
-                turn: 'opponent' // Guest's opponent is Host (me)
+            // Send INIT to guests
+            guests.forEach((g, i) => {
+                g.send({
+                    type: 'INIT',
+                    payload: {
+                        hand: hands[i+1],
+                        briscola: briscola,
+                        turn: 0,
+                        myIndex: i+1,
+                        totalPlayers: totalPlayers,
+                        deckCount: deckCount
+                    }
+                });
             });
 
+            modal.style.display = 'none';
             updateUI();
         }
 
-        function handleData(data) {
-            switch(data.type) {
-                case 'INIT':
-                    myHand = data.payload.hand;
-                    briscola = data.payload.briscola;
-                    turn = data.payload.turn;
-                    deckCount = 34; // 40 - 6 dealt
-                    updateUI();
-                    break;
-                case 'PLAY_CARD':
-                    opponentPlay(data.payload.card);
-                    break;
-                case 'DRAW':
-                    // Opponent drew a card
-                    deckCount--;
-                    updateUI();
-                    break;
-                case 'TURN_UPDATE':
-                    turn = data.payload.turn;
-                    updateUI();
-                    break;
-                case 'ROUND_RESULT':
-                    // Host sends result of the round
-                    log(data.payload.winner + ' won the round');
-                    setTimeout(() => {
-                        tableCards = [];
+        function handleData(data, senderConn) {
+            // Guest handling
+            if (!isHost) {
+                switch(data.type) {
+                    case 'WELCOME':
+                        myPlayerIndex = data.playerIndex;
+                        joinStatusEl.textContent = `Connected as Player ${myPlayerIndex + 1}. Waiting for game...`;
+                        break;
+                    case 'LOBBY_UPDATE':
+                        joinStatusEl.textContent = `Lobby: ${data.payload.totalPlayers}/3 players. Waiting...`;
+                        break;
+                    case 'INIT':
+                        modal.style.display = 'none';
+                        myHand = data.payload.hand;
+                        briscola = data.payload.briscola;
+                        briscolaSuit = briscola.suit;
+                        turn = data.payload.turn;
+                        myPlayerIndex = data.payload.myIndex;
+                        totalPlayers = data.payload.totalPlayers;
+                        deckCount = data.payload.deckCount;
+                        scores = [0, 0, 0];
                         updateUI();
-                        // Draw cards if needed
-                        if (data.payload.drawCard) {
-                            myHand.push(data.payload.drawCard);
+                        break;
+                    case 'GAME_UPDATE':
+                        // Generic update for moves
+                        tableCards = data.payload.tableCards;
+                        turn = data.payload.turn;
+                        deckCount = data.payload.deckCount;
+                        updateUI();
+                        break;
+                    case 'ROUND_RESULT':
+                        log(`Player ${data.payload.winner + 1} won the round`);
+                        setTimeout(() => {
+                            tableCards = [];
+                            if (data.payload.drawCard) {
+                                myHand.push(data.payload.drawCard);
+                            }
+                            deckCount = data.payload.deckCount;
+                            turn = data.payload.turn;
                             updateUI();
-                        }
-                    }, 2000);
-                    break;
+                        }, 2000);
+                        break;
+                }
+                return;
+            }
+
+            // Host handling
+            if (isHost) {
+                switch(data.type) {
+                    case 'PLAY_CARD':
+                        // Find which player sent this
+                        let pIndex = guests.indexOf(senderConn) + 1;
+                        if (pIndex !== turn) return; // Not their turn
+                        
+                        processMove(pIndex, data.payload.card);
+                        break;
+                }
+            }
+        }
+
+        function processMove(pIndex, card) {
+            // Add to table
+            tableCards.push({ card, playerIndex: pIndex });
+            
+            // Broadcast update
+            broadcast('GAME_UPDATE', {
+                tableCards: tableCards,
+                turn: (turn + 1) % totalPlayers,
+                deckCount: deckCount
+            });
+            
+            // Update local state if I am not the one who moved (Host logic handles his own move directly)
+            if (pIndex !== 0) {
+                turn = (turn + 1) % totalPlayers;
+                updateUI();
+            }
+
+            // Check end of round
+            if (tableCards.length === totalPlayers) {
+                resolveRound();
             }
         }
 
@@ -471,13 +617,14 @@
                 playerHandEl.appendChild(el);
             });
 
-            // Render Opponent Hand (Backs)
+            // Render Opponent Hands (Backs)
+            // Just show a pile of backs for now to represent opponents
             opponentHandEl.innerHTML = '';
-            const oppHandSize = 3; // Simplified: assume always 3 until end
-            // Actually we should track opponent hand size. For now assume 3.
-            for(let i=0; i< (myHand.length || 3); i++) {
+            // Show 3 cards per opponent roughly
+            for(let i=0; i< (totalPlayers - 1) * 3; i++) {
                 const el = document.createElement('div');
                 el.className = 'card opponent';
+                el.style.transform = `scale(0.8)`;
                 opponentHandEl.appendChild(el);
             }
 
@@ -486,6 +633,15 @@
             tableCards.forEach(item => {
                 const el = createCardEl(item.card);
                 el.classList.add('played');
+                // Add label
+                const label = document.createElement('div');
+                label.style.position = 'absolute';
+                label.style.top = '-20px';
+                label.style.fontSize = '0.7rem';
+                label.style.color = '#aaa';
+                label.textContent = item.playerIndex === myPlayerIndex ? "You" : `P${item.playerIndex + 1}`;
+                el.appendChild(label);
+                
                 tableEl.appendChild(el);
             });
 
@@ -493,137 +649,158 @@
             if (briscola) {
                 briscolaCardEl.innerHTML = `<div class="suit-icon">${briscola.suit}</div><div>${briscola.name}</div>`;
                 briscolaCardEl.style.color = (briscola.suit === '🟡' || briscola.suit === '🏆') ? '#d32f2f' : 'black';
+                briscolaCardEl.style.display = 'flex';
+            } else {
+                briscolaCardEl.style.display = 'none';
             }
 
             // Deck Count
             deckCountEl.textContent = deckCount;
             if (deckCount <= 0) {
                 document.querySelector('.deck').style.display = 'none';
-                briscolaCardEl.style.display = 'none'; // Briscola taken
+            } else {
+                document.querySelector('.deck').style.display = 'block';
             }
 
-            statusDisplay.textContent = turn === 'me' ? "YOUR TURN" : "OPPONENT'S TURN";
-            statusDisplay.style.color = turn === 'me' ? "#00ff9d" : "#ff6464";
+            if (turn === myPlayerIndex) {
+                statusDisplay.textContent = "TUO TURNO";
+                statusDisplay.style.color = "#00ff9d";
+            } else {
+                statusDisplay.textContent = `TURNO GIOCATORE ${turn + 1}`;
+                statusDisplay.style.color = "#ff6464";
+            }
         }
 
         function createCardEl(card) {
             const el = document.createElement('div');
             el.className = 'card';
-            const isRed = card.suit === '🟡' || card.suit === '🏆'; // Denari/Coppe usually red-ish in some decks, let's stick to standard colors or just black
+            const isRed = card.suit === '🟡' || card.suit === '🏆'; 
             el.style.color = isRed ? '#d32f2f' : 'black';
             el.innerHTML = `<div class="suit-icon">${card.suit}</div><div>${card.name}</div>`;
             return el;
         }
 
         function playCard(card) {
-            if (turn !== 'me') {
-                log("Not your turn!");
+            if (turn !== myPlayerIndex) {
+                log("Non è il tuo turno!");
                 return;
             }
-            if (tableCards.length >= 2) return; // Round over
+            if (tableCards.length >= totalPlayers) return; 
 
             // Remove from hand
             myHand = myHand.filter(c => c.id !== card.id);
             
-            // Add to table
-            tableCards.push({ card, player: 'me' });
-            updateUI();
-
-            // Send move
-            send('PLAY_CARD', { card });
-
-            if (tableCards.length === 2) {
-                // End of round logic (Host handles it usually, or both calculate)
-                // To keep it simple, Host calculates winner
-                if (isHost) {
-                    resolveRound();
-                }
-            } else {
-                turn = 'opponent';
-                updateUI();
-            }
-        }
-
-        function opponentPlay(card) {
-            tableCards.push({ card, player: 'opponent' });
-            updateUI();
+            // Add to table locally
+            tableCards.push({ card, playerIndex: myPlayerIndex });
             
-            if (tableCards.length === 2) {
-                if (isHost) {
+            // If Host, process directly. If Guest, send to Host.
+            if (isHost) {
+                // Broadcast update
+                broadcast('GAME_UPDATE', {
+                    tableCards: tableCards,
+                    turn: (turn + 1) % totalPlayers,
+                    deckCount: deckCount
+                });
+                turn = (turn + 1) % totalPlayers;
+                
+                if (tableCards.length === totalPlayers) {
                     resolveRound();
                 }
             } else {
-                turn = 'me';
-                updateUI();
+                send('PLAY_CARD', { card });
             }
+            
+            updateUI();
         }
 
         function resolveRound() {
             setTimeout(() => {
                 // Determine winner
-                const c1 = tableCards[0];
-                const c2 = tableCards[1];
-                let winner = null;
-
-                // Logic: c1 is the first card played. c2 must follow suit or play briscola to win.
-                // If c2 suit != c1 suit and c2 != briscola, c1 wins.
+                // Logic: First card sets suit. Highest of that suit wins, unless Briscola played.
+                let winningItem = tableCards[0];
+                const leadSuit = winningItem.card.suit;
                 
-                const first = c1;
-                const second = c2;
-                
-                let winningCard = first;
-
-                if (second.card.suit === first.card.suit) {
-                    if (second.card.strength > first.card.strength) {
-                        winningCard = second;
+                for (let i = 1; i < tableCards.length; i++) {
+                    const current = tableCards[i];
+                    
+                    if (current.card.suit === leadSuit) {
+                        // Same suit, check strength
+                        if (current.card.strength > winningItem.card.strength) {
+                            winningItem = current;
+                        }
+                    } else if (current.card.suit === briscolaSuit) {
+                        // Briscola played
+                        if (winningItem.card.suit !== briscolaSuit) {
+                            // First briscola seen
+                            winningItem = current;
+                        } else {
+                            // Already had briscola, check strength
+                            if (current.card.strength > winningItem.card.strength) {
+                                winningItem = current;
+                            }
+                        }
                     }
-                } else if (second.card.suit === briscola.suit) {
-                    winningCard = second;
                 }
 
-                winner = winningCard.player;
+                const winnerIndex = winningItem.playerIndex;
                 
-                // Assign points (simplified)
-                const points = c1.card.value + c2.card.value;
-                if (winner === 'me') myScore += points;
-                else oppScore += points;
+                // Assign points
+                let points = 0;
+                tableCards.forEach(t => points += t.card.value);
+                scores[winnerIndex] += points;
 
-                log(`Winner: ${winner} (+${points} pts)`);
+                log(`Player ${winnerIndex + 1} wins (+${points} pts)`);
 
                 // Draw cards
-                let myNewCard = null;
-                let oppNewCard = null;
-
-                if (deck.length > 0) {
-                    myNewCard = deck.pop();
-                    oppNewCard = deck.pop();
-                    deckCount -= 2;
-                } else if (deckCount === 0 && briscola) {
-                    // Last cards (briscola is taken)
-                    // Simplified: assume deck array handles it
+                let draws = {}; // Map playerIndex -> card
+                
+                if (deckCount > 0) {
+                    // Winner draws first, then next, then next
+                    let drawOrder = [];
+                    for(let i=0; i<totalPlayers; i++) {
+                        drawOrder.push((winnerIndex + i) % totalPlayers);
+                    }
+                    
+                    drawOrder.forEach(pIdx => {
+                        let card = null;
+                        if (deck.length > 0) {
+                            card = deck.pop();
+                        } else if (briscola) {
+                            card = briscola;
+                            briscola = null;
+                        }
+                        
+                        if (card) {
+                            draws[pIdx] = card;
+                            deckCount--;
+                        }
+                    });
                 }
 
-                // Send results
-                // If I am host and I won, I draw first? Actually in Briscola winner draws first.
-                // Let's simplify: Host deals.
-                
-                if (myNewCard) myHand.push(myNewCard);
+                // Handle Host draw locally
+                if (draws[0]) myHand.push(draws[0]);
 
-                send('ROUND_RESULT', {
-                    winner: winner === 'me' ? 'opponent' : 'me', // From guest perspective
-                    drawCard: oppNewCard
+                // Send results to guests
+                guests.forEach((g, i) => {
+                    let guestIdx = i + 1;
+                    g.send({
+                        type: 'ROUND_RESULT',
+                        payload: {
+                            winner: winnerIndex,
+                            drawCard: draws[guestIdx],
+                            deckCount: deckCount,
+                            turn: winnerIndex
+                        }
+                    });
                 });
 
                 // Reset table
                 tableCards = [];
-                turn = winner; // Winner starts next
-                
-                // Sync turn
-                send('TURN_UPDATE', { turn: winner === 'me' ? 'opponent' : 'me' });
+                turn = winnerIndex;
                 
                 updateUI();
 
-            }, 1000);
+            }, 1500);
         }
 
     </script>

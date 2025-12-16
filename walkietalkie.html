@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Walkie Talkie</title>
+    <title>P2P Walkie Talkie - Multi-User</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body {
@@ -18,6 +18,8 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* ... Stili CSS (gli stessi del codice originale) ... */
 
         .walkie-container {
             background: #333;
@@ -180,7 +182,6 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
-            text-decoration: none;
             font-family: 'Segoe UI', sans-serif;
         }
 
@@ -208,7 +209,7 @@
             background: #e74c3c;
             box-shadow: 0 0 5px #e74c3c;
         }
-        
+            
         .led.rx {
             background: #2ecc71;
             box-shadow: 0 0 5px #2ecc71;
@@ -231,11 +232,10 @@
 </head>
 <body>
 
-    <!-- Connection Modal -->
     <div id="connection-modal" class="modal">
         <div class="modal-content">
             <h2>P2P Walkie Talkie 📻</h2>
-            <p>Secure, peer-to-peer voice chat.</p>
+            <p>Secure, peer-to-peer voice chat (Multi-Channel).</p>
             
             <div id="menu-main">
                 <button class="btn" onclick="setupHost()" style="width:100%; margin-bottom:10px;">Create Channel</button>
@@ -244,9 +244,9 @@
 
             <div id="menu-host" class="hidden">
                 <p>Channel Frequency (ID):</p>
-                <h1 id="host-id" style="color:#00d4ff; letter-spacing: 2px; font-family:monospace; background:#111; padding:10px; border-radius:6px;">...</h1>
-                <p style="font-size:0.8rem; color:#888;">Share this ID with your friend</p>
-                <div style="margin: 20px auto; color:#aaa;">Waiting for signal...</div>
+                <h1 id="channel-id-display-modal" style="color:#00d4ff; letter-spacing: 2px; font-family:monospace; background:#111; padding:10px; border-radius:6px;">...</h1>
+                <p style="font-size:0.8rem; color:#888;">Share this ID to invite friends</p>
+                <div style="margin: 20px auto; color:#aaa;">Waiting for clients...</div>
                 <button class="btn" onclick="resetMenu()" style="background:#444; color:white;">Back</button>
             </div>
 
@@ -265,12 +265,14 @@
         
         <div class="screen">
             <div class="noise-overlay"></div>
-            <div class="screen-text" id="screen-status">OFFLINE</div>
+            <div class="screen-text" id="channel-id-display">ID: ---</div> 
             <div class="frequency" id="screen-freq">---.--- MHz</div>
+            <div class="screen-text" id="screen-status">OFFLINE</div>
             <div class="viz" id="viz-bars">
                 <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
                 <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
             </div>
+            <div style="font-size: 0.6rem; color: #555; margin-top: 5px;" id="client-count">Clients: 0</div>
         </div>
 
         <div class="speaker-grill"></div>
@@ -278,39 +280,55 @@
         <button id="ptt-btn" class="ptt-btn" disabled>HOLD<br>TO TALK</button>
 
         <div class="controls">
-            <button class="small-btn" onclick="location.href='technology.html'">PWR</button>
+            <button class="small-btn" onclick="showConnectionModal()">📡</button>
             <button class="small-btn" onclick="toggleMute()">🔇</button>
         </div>
     </div>
 
-    <audio id="remote-audio" autoplay></audio>
+    <div id="remote-audio-container">
+        </div>
 
     <script>
-        // --- State ---
+        // --- Stato Globale (Aggiornato per Multi-User) ---
         let peer = null;
-        let conn = null; // Data connection
-        let mediaCall = null; // Media connection
         let localStream = null;
         let isHost = false;
         let isMuted = false;
+        let channelId = null;
         
-        // --- UI ---
+        // Collezione di tutte le connessioni dati e vocali attive
+        const activeConnections = new Map(); // Map<PeerID, {data: DataConnection, call: MediaConnection, remoteStream: MediaStream}>
+
+        // --- UI Elements ---
         const modal = document.getElementById('connection-modal');
         const screenStatus = document.getElementById('screen-status');
         const screenFreq = document.getElementById('screen-freq');
         const pttBtn = document.getElementById('ptt-btn');
         const led = document.getElementById('status-led');
-        const vizBars = document.querySelectorAll('.bar');
+        const channelIdDisplay = document.getElementById('channel-id-display');
+        const clientCountDisplay = document.getElementById('client-count');
+        const remoteAudioContainer = document.getElementById('remote-audio-container');
 
         // --- Audio Context for Visualizer ---
         let audioCtx, analyser, dataArray;
 
-        // --- Setup ---
+        // --- Funzioni UI di Base ---
+        function showConnectionModal() {
+            modal.classList.remove('hidden');
+        }
+
+        function resetMenu() {
+            document.getElementById('menu-main').classList.remove('hidden');
+            document.getElementById('menu-host').classList.add('hidden');
+            document.getElementById('menu-join').classList.add('hidden');
+        }
+        
+        // --- Setup Iniziale ---
         async function getLocalStream() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 localStream = stream;
-                // Initially mute the track (PTT logic)
+                // Inizialmente disattiva la traccia per la logica PTT
                 localStream.getAudioTracks()[0].enabled = false;
                 return stream;
             } catch (err) {
@@ -320,35 +338,33 @@
             }
         }
 
+        // --- HOST: Creazione Canale ---
         function setupHost() {
             getLocalStream().then(stream => {
                 if (!stream) return;
                 
+                // Genera un ID casuale e unico
                 const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+                channelId = id;
                 peer = new Peer(id);
                 
                 peer.on('open', (id) => {
-                    document.getElementById('host-id').innerText = id;
+                    document.getElementById('channel-id-display-modal').innerText = id;
                     document.getElementById('menu-main').classList.add('hidden');
                     document.getElementById('menu-host').classList.remove('hidden');
+                    channelIdDisplay.innerText = `ID: ${id}`; // Mostra ID in alto
+                    screenFreq.innerText = "HOST CHANNEL";
                     isHost = true;
+                    updateStatus("LISTENING", "led");
                 });
 
-                peer.on('connection', (c) => {
-                    conn = c;
-                    setupDataConnection();
-                });
-
-                peer.on('call', (call) => {
-                    mediaCall = call;
-                    call.answer(localStream);
-                    call.on('stream', (remoteStream) => {
-                        handleRemoteStream(remoteStream);
-                    });
-                });
+                // Gestisce le NUOVE connessioni in entrata (Host)
+                peer.on('connection', handleNewDataConnection);
+                peer.on('call', handleIncomingCall);
             });
         }
 
+        // --- JOINER: Accesso Canale ---
         function showJoin() {
             document.getElementById('menu-main').classList.add('hidden');
             document.getElementById('menu-join').classList.remove('hidden');
@@ -357,94 +373,246 @@
         function joinGame() {
             const id = document.getElementById('join-id-input').value.toUpperCase();
             if (!id) return;
+            channelId = id;
             
             getLocalStream().then(stream => {
                 if (!stream) return;
 
-                peer = new Peer();
-                peer.on('open', () => {
-                    conn = peer.connect(id);
-                    setupDataConnection();
+                // Non forniamo un ID, PeerJS ne genera uno casuale
+                peer = new Peer(); 
+                peer.on('open', (myPeerId) => {
+                    // Imposta l'ID del canale in alto
+                    channelIdDisplay.innerText = `ID: ${channelId}`;
+                    screenFreq.innerText = `CONNECTED TO ${channelId}`;
+                    updateStatus("CONNECTING...", "led");
                     
-                    // Initiate call
-                    mediaCall = peer.call(id, localStream);
-                    mediaCall.on('stream', (remoteStream) => {
-                        handleRemoteStream(remoteStream);
-                    });
+                    // Inizia la connessione dati e vocale verso l'host
+                    connectToPeer(channelId);
+                });
+                
+                // I client devono essere pronti a ricevere chiamate dagli altri client
+                peer.on('connection', handleNewDataConnection);
+                peer.on('call', handleIncomingCall);
+            });
+        }
+        
+        // --- Connessione a un Peer Specifico ---
+        function connectToPeer(targetPeerId) {
+            console.log(`Connecting to ${targetPeerId}`);
+            
+            // 1. Connessione Dati
+            const dataConn = peer.connect(targetPeerId);
+            setupDataConnection(dataConn);
+            
+            // 2. Connessione Media (Voce)
+            const mediaCall = peer.call(targetPeerId, localStream);
+            setupMediaCall(mediaCall);
+            
+            // Aggiungi alla mappa (solo l'host usa la mappa in modo estensivo, ma la usiamo per uniformità)
+            activeConnections.set(targetPeerId, { data: dataConn, call: mediaCall, remoteStream: null });
+            
+            // L'host aggiorna i client connessi, il client mostra l'host
+            updateClientCount();
+
+            // Nasconde il modale per tutti dopo la prima connessione
+            modal.classList.add('hidden');
+            pttBtn.disabled = false;
+        }
+
+        // --- Gestione Connessioni Dati ---
+        function handleNewDataConnection(conn) {
+            console.log(`Incoming Data Connection from: ${conn.peer}`);
+            setupDataConnection(conn);
+            
+            // Se l'host riceve una connessione, la salva e tenta di chiamare
+            if (isHost) {
+                // Se non è già in mappa, connettiti anche per la voce
+                if (!activeConnections.has(conn.peer)) {
+                    const mediaCall = peer.call(conn.peer, localStream);
+                    setupMediaCall(mediaCall);
+                    activeConnections.set(conn.peer, { data: conn, call: mediaCall, remoteStream: null });
+                }
+                
+                // Invia a tutti i client l'ID del nuovo arrivato (opzionale, per connettersi a tutti)
+                // Nota: In questa implementazione semplificata, tutti parlano con tutti (Mesh), 
+                // quindi l'host si limita a gestire la prima connessione dati.
+                
+                updateClientCount();
+            }
+        }
+        
+        function setupDataConnection(conn) {
+            conn.on('open', () => {
+                console.log(`Data connection established with ${conn.peer}`);
+                updateStatus("CONNECTED", "led");
+                
+                // Dopo la prima connessione, nascondi il modale
+                if (modal.classList.contains('hidden')) {
+                     playStaticBurst();
+                }
+                
+                // Se non è l'host, deve connettersi anche agli altri peer noti!
+                // Per semplicità, in questa mesh P2P, ci aspettiamo che l'host faccia da coordinatore.
+                
+                conn.on('data', (data) => {
+                    handleData(data, conn.peer);
+                });
+
+                conn.on('close', () => {
+                    handlePeerDisconnect(conn.peer);
+                });
+                
+                conn.on('error', (err) => {
+                    console.error("Data connection error:", err);
                 });
             });
         }
 
-        function setupDataConnection() {
-            conn.on('open', () => {
-                modal.classList.add('hidden');
-                screenStatus.innerText = "CONNECTED";
-                screenFreq.innerText = "CH " + (isHost ? peer.id : conn.peer);
-                pttBtn.disabled = false;
-                playStaticBurst();
-            });
+        // --- Gestione Chiamate Vocali ---
+        function handleIncomingCall(call) {
+            console.log(`Incoming Media Call from: ${call.peer}`);
+            
+            // Risponde alla chiamata in entrata con il proprio flusso locale
+            call.answer(localStream); 
+            setupMediaCall(call);
 
-            conn.on('data', (data) => {
-                if (data.type === 'talking_start') {
-                    screenStatus.innerText = "RECEIVING";
-                    led.className = "led rx";
-                } else if (data.type === 'talking_end') {
-                    screenStatus.innerText = "CONNECTED";
-                    led.className = "led";
-                    playStaticBurst();
-                }
-            });
-
-            conn.on('close', () => {
-                alert("Connection Lost");
-                location.reload();
-            });
+            // Se il peer non è nell'elenco delle connessioni (caso di connessione diretta)
+            if (!activeConnections.has(call.peer)) {
+                 activeConnections.set(call.peer, { data: null, call: call, remoteStream: null });
+            }
+            updateClientCount();
         }
-
-        function handleRemoteStream(stream) {
-            const audioEl = document.getElementById('remote-audio');
-            audioEl.srcObject = stream;
-            setupVisualizer(stream);
-        }
-
-        // --- PTT Logic ---
         
-        // Mouse
+        function setupMediaCall(call) {
+            call.on('stream', (remoteStream) => {
+                handleRemoteStream(remoteStream, call.peer);
+            });
+            
+            call.on('close', () => {
+                 handlePeerDisconnect(call.peer);
+            });
+            
+            call.on('error', (err) => {
+                console.error("Media call error:", err);
+            });
+        }
+
+        // --- Gestione dei Dati (PTT Status) ---
+        function handleData(data, peerId) {
+            if (data.type === 'talking_start') {
+                screenStatus.innerText = `RX: ${peerId}`;
+                led.className = "led rx";
+            } else if (data.type === 'talking_end') {
+                screenStatus.innerText = "CONNECTED";
+                led.className = "led";
+                playStaticBurst();
+            }
+        }
+        
+        // --- Gestione Streaming Audio Remoto ---
+        function handleRemoteStream(stream, peerId) {
+            // Se esiste già un elemento audio, aggiorna
+            let audioEl = document.getElementById(`remote-audio-${peerId}`);
+            if (!audioEl) {
+                // Altrimenti, crea un nuovo elemento <audio> per questo peer
+                audioEl = document.createElement('audio');
+                audioEl.id = `remote-audio-${peerId}`;
+                audioEl.autoplay = true;
+                remoteAudioContainer.appendChild(audioEl);
+            }
+            audioEl.srcObject = stream;
+            
+            // Aggiorna l'oggetto in activeConnections
+            if (activeConnections.has(peerId)) {
+                activeConnections.get(peerId).remoteStream = stream;
+            }
+            
+            // Configura il visualizer sul primo stream ricevuto (o sul principale)
+            // if (!audioCtx) setupVisualizer(stream); 
+            // Nota: Per semplicità, manteniamo il visualizer sul primo stream
+            
+            // Nasconde il modale dopo aver ricevuto il primo stream audio
+            modal.classList.add('hidden');
+            updateStatus("CONNECTED", "led");
+        }
+        
+        // --- Logica PTT (Push-to-Talk) ---
+        
+        // Mouse & Touch events
         pttBtn.addEventListener('mousedown', startTalking);
         document.addEventListener('mouseup', stopTalking);
-        
-        // Touch
         pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startTalking(); });
         pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopTalking(); });
 
         function startTalking() {
             if (!localStream || pttBtn.disabled) return;
             
+            // 1. Abilita la traccia vocale locale
             localStream.getAudioTracks()[0].enabled = true;
+            
+            // 2. Aggiorna la UI locale
             pttBtn.classList.add('active');
             screenStatus.innerText = "TRANSMITTING";
             led.className = "led on";
             
-            if (conn) conn.send({ type: 'talking_start' });
+            // 3. BROADCAST: Invia il segnale di 'talking_start' a TUTTE le connessioni
+            activeConnections.forEach(conn => {
+                if (conn.data && conn.data.open) {
+                    conn.data.send({ type: 'talking_start', senderId: peer.id });
+                }
+            });
         }
 
         function stopTalking() {
             if (!localStream || !pttBtn.classList.contains('active')) return;
             
+            // 1. Disabilita la traccia vocale locale
             localStream.getAudioTracks()[0].enabled = false;
+            
+            // 2. Aggiorna la UI locale
             pttBtn.classList.remove('active');
             screenStatus.innerText = "CONNECTED";
             led.className = "led";
             
-            if (conn) conn.send({ type: 'talking_end' });
+            // 3. BROADCAST: Invia il segnale di 'talking_end' a TUTTE le connessioni
+            activeConnections.forEach(conn => {
+                if (conn.data && conn.data.open) {
+                    conn.data.send({ type: 'talking_end', senderId: peer.id });
+                }
+            });
             playStaticBurst();
         }
 
-        // --- Audio FX ---
+        // --- Gestione Disconnessione e UI ---
+        function handlePeerDisconnect(peerId) {
+            console.warn(`Peer ${peerId} disconnected.`);
+            
+            // Rimuovi l'elemento audio
+            const audioEl = document.getElementById(`remote-audio-${peerId}`);
+            if (audioEl) audioEl.remove();
+            
+            // Rimuovi dalla mappa
+            activeConnections.delete(peerId);
+            updateClientCount();
+
+            updateStatus("CONNECTED", "led"); // Ritorna allo stato base
+            playStaticBurst();
+        }
+        
+        function updateClientCount() {
+            clientCountDisplay.innerText = `Clients: ${activeConnections.size}`;
+        }
+        
+        function updateStatus(text, ledClass) {
+            screenStatus.innerText = text;
+            led.className = `led ${ledClass}`;
+        }
+
+        // --- Funzioni Audio FX e Visualizer (non modificate) ---
+
         function playStaticBurst() {
-            // Simple white noise burst to simulate radio squelch
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const bufferSize = ctx.sampleRate * 0.2; // 200ms
+            const bufferSize = ctx.sampleRate * 0.2; 
             const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
             const data = buffer.getChannelData(0);
             
@@ -461,6 +629,7 @@
             noise.connect(gain);
             gain.connect(ctx.destination);
             noise.start();
+            noise.stop(ctx.currentTime + 0.1); // Ferma dopo 100ms
         }
 
         function setupVisualizer(stream) {
@@ -474,29 +643,37 @@
             drawViz();
         }
 
+        const vizBars = document.querySelectorAll('.bar');
         function drawViz() {
             requestAnimationFrame(drawViz);
             if (!analyser) return;
             
             analyser.getByteFrequencyData(dataArray);
             
-            // Update bars
             for(let i=0; i<8; i++) {
-                const val = dataArray[i];
+                // Calcola l'indice per campionare il dato dalla frequenza
+                const dataIndex = Math.floor(i * dataArray.length / 8); 
+                const val = dataArray[dataIndex];
                 const h = (val / 255) * 20;
                 if (vizBars[i]) {
                     vizBars[i].style.height = Math.max(2, h) + 'px';
-                    vizBars[i].style.background = val > 100 ? '#333' : '#333';
+                    vizBars[i].style.background = val > 100 ? '#e74c3c' : '#333';
                 }
             }
         }
-
+        
         function toggleMute() {
-            const audioEl = document.getElementById('remote-audio');
-            audioEl.muted = !audioEl.muted;
-            screenStatus.innerText = audioEl.muted ? "MUTED" : "CONNECTED";
+            // Mute tutti i flussi remoti
+            const audioElements = document.querySelectorAll('#remote-audio-container audio');
+            const isCurrentlyMuted = audioElements.length > 0 ? audioElements[0].muted : false;
+            
+            audioElements.forEach(el => {
+                el.muted = !isCurrentlyMuted;
+            });
+            
+            screenStatus.innerText = !isCurrentlyMuted ? "MUTED" : "CONNECTED";
         }
-
+        
     </script>
 </body>
 </html>

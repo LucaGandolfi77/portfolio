@@ -775,6 +775,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const val = quickSearch.value.trim().toLowerCase();
                 if (val === 'easter') {
                     window.location.href = 'easter_egg.html';
+                } else if (val === 'viper') {
+                    window.location.href = 'aviator_viper.html';
                 } else if (val === '8') {
                     window.location.href = '8.html';
                 } else if (val === 'spark') {
