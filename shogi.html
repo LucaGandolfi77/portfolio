@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogi (Japanese Chess) - Luca Gandolfi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-900: #0a1628;
+            --bg-800: #1a2940;
+            --accent: #00d4ff;
+            --board-bg: #e6cca0;
+            --line-color: #5d4037;
+            --piece-bg: #f5deb3;
+            --highlight: rgba(0, 212, 255, 0.5);
+            --selected: rgba(255, 215, 0, 0.6);
+            --last-move: rgba(0, 255, 0, 0.3);
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-900), var(--bg-800));
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 800px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        h1 { margin: 0 0 10px 0; color: var(--accent); }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #002;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:hover { opacity: 0.9; }
+
+        .status {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .hand {
+            display: flex;
+            gap: 5px;
+            min-height: 50px;
+            background: rgba(255,255,255,0.1);
+            padding: 5px;
+            border-radius: 4px;
+            width: 100%;
+            max-width: 450px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .shogi-board {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(9, 1fr);
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1;
+            background: var(--board-bg);
+            border: 4px solid var(--line-color);
+            position: relative;
+        }
+
+        .cell {
+            border: 1px solid var(--line-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cell.selected { background: var(--selected); }
+        .cell.last-move { background: var(--last-move); }
+        .cell.valid-move::after {
+            content: '';
+            width: 20%;
+            height: 20%;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+        }
+
+        .piece {
+            width: 85%;
+            height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--piece-bg);
+            color: #000;
+            clip-path: polygon(50% 0%, 100% 20%, 100% 100%, 0% 100%, 0% 20%);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: bold;
+            font-size: clamp(12px, 4vw, 20px);
+            user-select: none;
+            position: relative;
+            z-index: 2;
+            line-height: 1;
+        }
+
+        .piece.opponent {
+            transform: rotate(180deg);
+        }
+        
+        .piece.promoted {
+            color: #d00;
+        }
+
+        .hand .piece {
+            width: 35px;
+            height: 40px;
+            font-size: 14px;
+            position: relative;
+        }
+        
+        .hand .piece span.count {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #333;
+            color: #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: rotate(0deg); /* Reset rotation for count */
+        }
+        
+        /* Modal for Promotion */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: var(--bg-800);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--accent);
+        }
+        .modal-btn {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        /* Rules Modal */
+        .rules-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+        }
+        .rules-content {
+            background: var(--bg-800);
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--accent);
+            position: relative;
+            text-align: left;
+            line-height: 1.6;
+        }
+        .rules-content h2 { color: var(--accent); margin-top: 0; }
+        .rules-content h3 { color: #ffd700; margin-bottom: 5px; }
+        .rules-content ul { padding-left: 20px; }
+        .close-rules {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .info-btn {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html" class="back-btn">← Back to Portfolio</a>
+        <h1>Shogi (将棋)</h1>
+        <p>Japanese Chess</p>
+        <button class="btn info-btn" onclick="toggleRules()">ℹ️ Rules</button>
+    </div>
+
+    <div class="game-container">
+        <div class="controls">
+            <button class="btn" onclick="initGame('pvp')">PvP (Local)</button>
+            <button class="btn" onclick="initGame('ai')">Vs AI (Easy)</button>
+            <button class="btn" onclick="undoMove()">Undo</button>
+        </div>
+        
+        <div class="status" id="status">Select a mode to start</div>
+
+        <!-- Opponent Hand (Gote) -->
+        <div class="hand" id="hand-1"></div>
+
+        <div class="shogi-board" id="board"></div>
+
+        <!-- Player Hand (Sente) -->
+        <div class="hand" id="hand-0"></div>
+    </div>
+
+    <!-- Promotion Modal -->
+    <div id="promotionModal" class="modal">
+        <div class="modal-content">
+            <h2>Promote?</h2>
+            <button class="modal-btn" onclick="resolvePromotion(true)">Yes</button>
+            <button class="modal-btn" onclick="resolvePromotion(false)">No</button>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="rules-modal">
+        <div class="rules-content">
+            <button class="close-rules" onclick="toggleRules()">×</button>
+            <h2>Shogi Rules</h2>
+            
+            <h3>Objective</h3>
+            <p>Capture the opponent's King (王).</p>
+
+            <h3>The Pieces</h3>
+            <ul>
+                <li><strong>King (王/玉):</strong> Moves 1 step in any direction.</li>
+                <li><strong>Rook (飛):</strong> Moves any number of squares orthogonally. Promotes to <strong>Dragon (龍)</strong> (+1 step diagonally).</li>
+                <li><strong>Bishop (角):</strong> Moves any number of squares diagonally. Promotes to <strong>Horse (馬)</strong> (+1 step orthogonally).</li>
+                <li><strong>Gold General (金):</strong> Moves 1 step orthogonally or diagonally forward. Cannot promote.</li>
+                <li><strong>Silver General (銀):</strong> Moves 1 step diagonally or straight forward. Promotes to Gold.</li>
+                <li><strong>Knight (桂):</strong> Jumps in an "L" shape forward only. Promotes to Gold.</li>
+                <li><strong>Lance (香):</strong> Moves any number of squares forward only. Promotes to Gold.</li>
+                <li><strong>Pawn (歩):</strong> Moves 1 step forward. Captures forward. Promotes to Gold.</li>
+            </ul>
+
+            <h3>Drops (Paracadutaggio)</h3>
+            <p>Captured pieces become yours! You can drop them back onto the board on any empty square as your turn, with a few exceptions:</p>
+            <ul>
+                <li><strong>Nifu (Two Pawns):</strong> You cannot drop a Pawn on a file (column) that already contains one of your unpromoted Pawns.</li>
+                <li><strong>Drop Pawn Mate:</strong> You cannot checkmate the King with a Pawn drop.</li>
+                <li><strong>No Mobility:</strong> You cannot drop a piece where it would have no legal moves (e.g., Pawn/Lance on the last rank).</li>
+            </ul>
+
+            <h3>Promotion</h3>
+            <p>The promotion zone is the last 3 ranks (the opponent's camp). If a piece moves into, out of, or within this zone, it can promote (flip over) to gain new powers. Promotion is optional unless the piece would otherwise have no moves.</p>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants
+        const BOARD_SIZE = 9;
+        const PLAYERS = { SENTE: 0, GOTE: 1 }; // 0 = Bottom (You), 1 = Top (Opponent)
+        const PIECES = {
+            K: { label: '王', pLabel: '', move: 'K' },
+            R: { label: '飛', pLabel: '龍', move: 'R' },
+            B: { label: '角', pLabel: '馬', move: 'B' },
+            G: { label: '金', pLabel: '', move: 'G' },
+            S: { label: '銀', pLabel: '成銀', move: 'S' },
+            N: { label: '桂', pLabel: '成桂', move: 'N' },
+            L: { label: '香', pLabel: '成香', move: 'L' },
+            P: { label: '歩', pLabel: 'と', move: 'P' }
+        };
+
+        // Initial Board Setup (Sente view)
+        // 9x9 grid. 0,0 is Top-Left.
+        // Sente starts at bottom (rows 6,7,8). Gote at top (rows 0,1,2).
+        const INITIAL_BOARD = [
+            ['L','N','S','G','K','G','S','N','L'], // 0 (Gote)
+            [' ','R',' ',' ',' ',' ',' ','B',' '], // 1
+            ['P','P','P','P','P','P','P','P','P'], // 2
+            [' ',' ',' ',' ',' ',' ',' ',' ',' '], // 3
+            [' ',' ',' ',' ',' ',' ',' ',' ',' '], // 4
+            [' ',' ',' ',' ',' ',' ',' ',' ',' '], // 5
+            ['P','P','P','P','P','P','P','P','P'], // 6 (Sente)
+            [' ','B',' ',' ',' ',' ',' ','R',' '], // 7
+            ['L','N','S','G','K','G','S','N','L']  // 8
+        ];
+
+        let board = [];
+        let hands = [[], []]; // [SenteHand, GoteHand]
+        let turn = PLAYERS.SENTE;
+        let selectedCell = null; // {x, y} or {handIndex, pieceType}
+        let validMoves = [];
+        let gameMode = 'pvp'; // 'pvp' or 'ai'
+        let history = [];
+        let promotionPending = null; // {x, y, piece}
+        let gameOver = false;
+
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const handEls = [document.getElementById('hand-0'), document.getElementById('hand-1')];
+
+        function toggleRules() {
+            const modal = document.getElementById('rulesModal');
+            modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function initGame(mode) {
+            gameMode = mode;
+            turn = PLAYERS.SENTE;
+            hands = [[], []];
+            history = [];
+            gameOver = false;
+            selectedCell = null;
+            validMoves = [];
+            
+            // Deep copy initial board
+            board = Array(9).fill(null).map(() => Array(9).fill(null));
+            
+            for(let y=0; y<9; y++) {
+                for(let x=0; x<9; x++) {
+                    const char = INITIAL_BOARD[y][x];
+                    if(char !== ' ') {
+                        const owner = y < 3 ? PLAYERS.GOTE : PLAYERS.SENTE;
+                        board[y][x] = { type: char, owner: owner, promoted: false };
+                    }
+                }
+            }
+
+            render();
+            updateStatus();
+        }
+
+        function render() {
+            boardEl.innerHTML = '';
+            
+            // Render Board
+            for(let y=0; y<9; y++) {
+                for(let x=0; x<9; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    
+                    // Check if selected
+                    if (selectedCell && selectedCell.x === x && selectedCell.y === y) {
+                        cell.classList.add('selected');
+                    }
+                    
+                    // Check if valid move
+                    if (validMoves.some(m => m.x === x && m.y === y)) {
+                        cell.classList.add('valid-move');
+                        cell.onclick = () => handleMove(x, y);
+                    } else {
+                        cell.onclick = () => handleSelect(x, y);
+                    }
+
+                    // Last move highlight
+                    if (history.length > 0) {
+                        const last = history[history.length-1];
+                        if ((last.to.x === x && last.to.y === y) || (last.from.x === x && last.from.y === y)) {
+                            cell.classList.add('last-move');
+                        }
+                    }
+
+                    const piece = board[y][x];
+                    if (piece) {
+                        const pDiv = document.createElement('div');
+                        pDiv.className = `piece ${piece.owner === PLAYERS.GOTE ? 'opponent' : ''} ${piece.promoted ? 'promoted' : ''}`;
+                        pDiv.textContent = piece.promoted ? PIECES[piece.type].pLabel : PIECES[piece.type].label;
+                        cell.appendChild(pDiv);
+                    }
+                    
+                    boardEl.appendChild(cell);
+                }
+            }
+
+            // Render Hands
+            renderHand(0);
+            renderHand(1);
+        }
+
+        function renderHand(playerIdx) {
+            const container = handEls[playerIdx];
+            container.innerHTML = '';
+            const counts = {};
+            hands[playerIdx].forEach(p => {
+                counts[p] = (counts[p] || 0) + 1;
+            });
+
+            Object.keys(counts).forEach(type => {
+                const div = document.createElement('div');
+                div.className = `piece ${playerIdx === PLAYERS.GOTE ? 'opponent' : ''}`;
+                div.textContent = PIECES[type].label;
+                
+                if (counts[type] > 1) {
+                    const countSpan = document.createElement('span');
+                    countSpan.className = 'count';
+                    countSpan.textContent = counts[type];
+                    div.appendChild(countSpan);
+                }
+
+                if (turn === playerIdx && !gameOver) {
+                    if (selectedCell && selectedCell.handPiece === type) {
+                        div.style.border = '2px solid gold';
+                    }
+                    div.onclick = () => handleHandSelect(type);
+                    div.style.cursor = 'pointer';
+                }
+                
+                container.appendChild(div);
+            });
+        }
+
+        function updateStatus() {
+            if (gameOver) {
+                statusEl.textContent = `Game Over! ${turn === PLAYERS.SENTE ? 'Gote' : 'Sente'} Wins!`;
+                return;
+            }
+            const player = turn === PLAYERS.SENTE ? 'Sente (Bottom)' : 'Gote (Top)';
+            statusEl.textContent = `Turn: ${player}`;
+        }
+
+        function handleSelect(x, y) {
+            if (gameOver) return;
+            if (gameMode === 'ai' && turn === PLAYERS.GOTE) return; // AI turn
+
+            const piece = board[y][x];
+            
+            // If clicking own piece, select it
+            if (piece && piece.owner === turn) {
+                selectedCell = { x, y };
+                calculateValidMoves(x, y, piece);
+                render();
+            } else {
+                // Deselect if clicking empty or enemy without valid move
+                selectedCell = null;
+                validMoves = [];
+                render();
+            }
+        }
+
+        function handleHandSelect(type) {
+            if (gameOver) return;
+            if (gameMode === 'ai' && turn === PLAYERS.GOTE) return;
+
+            selectedCell = { handPiece: type };
+            calculateDropMoves(type);
+            render();
+        }
+
+        function calculateValidMoves(x, y, piece) {
+            validMoves = [];
+            const moves = getPieceMoves(piece.type, piece.promoted, piece.owner);
+            
+            moves.forEach(m => {
+                let tx = x + m.dx;
+                let ty = y + m.dy;
+                
+                // Sliding pieces (Rook, Bishop, Lance)
+                if (m.slide) {
+                    while (tx >= 0 && tx < 9 && ty >= 0 && ty < 9) {
+                        const target = board[ty][tx];
+                        if (!target) {
+                            validMoves.push({ x: tx, y: ty });
+                        } else {
+                            if (target.owner !== turn) {
+                                validMoves.push({ x: tx, y: ty });
+                            }
+                            break; // Blocked
+                        }
+                        tx += m.dx;
+                        ty += m.dy;
+                    }
+                } else {
+                    // Single step
+                    if (tx >= 0 && tx < 9 && ty >= 0 && ty < 9) {
+                        const target = board[ty][tx];
+                        if (!target || target.owner !== turn) {
+                            validMoves.push({ x: tx, y: ty });
+                        }
+                    }
+                }
+            });
+        }
+
+        function calculateDropMoves(type) {
+            validMoves = [];
+            for(let y=0; y<9; y++) {
+                for(let x=0; x<9; x++) {
+                    if (!board[y][x]) {
+                        // Rules for drops:
+                        // 1. Pawn: Cannot drop on file with own unpromoted pawn (Nifu)
+                        // 2. Pawn/Lance: Cannot drop where they can't move (last rank)
+                        // 3. Knight: Cannot drop on last 2 ranks
+                        
+                        if (type === 'P') {
+                            if (hasPawnOnFile(x, turn)) continue;
+                            if (turn === PLAYERS.SENTE && y === 0) continue;
+                            if (turn === PLAYERS.GOTE && y === 8) continue;
+                            // Checkmate with pawn drop (Uchifuzume) is complex, skipping for simplicity
+                        }
+                        if (type === 'L') {
+                            if (turn === PLAYERS.SENTE && y === 0) continue;
+                            if (turn === PLAYERS.GOTE && y === 8) continue;
+                        }
+                        if (type === 'N') {
+                            if (turn === PLAYERS.SENTE && y <= 1) continue;
+                            if (turn === PLAYERS.GOTE && y >= 7) continue;
+                        }
+
+                        validMoves.push({ x, y, isDrop: true });
+                    }
+                }
+            }
+        }
+
+        function hasPawnOnFile(x, owner) {
+            for(let y=0; y<9; y++) {
+                const p = board[y][x];
+                if (p && p.owner === owner && p.type === 'P' && !p.promoted) return true;
+            }
+            return false;
+        }
+
+        function handleMove(tx, ty) {
+            if (selectedCell.handPiece) {
+                // Drop
+                const type = selectedCell.handPiece;
+                // Remove from hand
+                const idx = hands[turn].indexOf(type);
+                if (idx > -1) hands[turn].splice(idx, 1);
+                
+                // Place on board
+                board[ty][tx] = { type: type, owner: turn, promoted: false };
+                
+                history.push({
+                    type: 'drop',
+                    piece: type,
+                    to: {x: tx, y: ty},
+                    turn: turn
+                });
+
+                endTurn();
+            } else {
+                // Move
+                const fx = selectedCell.x;
+                const fy = selectedCell.y;
+                const piece = board[fy][fx];
+                const target = board[ty][tx];
+                let captured = null;
+
+                // Capture
+                if (target) {
+                    captured = target.type;
+                    hands[turn].push(captured); // Add to hand (unpromoted)
+                }
+
+                // Move piece
+                board[ty][tx] = piece;
+                board[fy][fx] = null;
+
+                // Promotion Check
+                const isPromotionZone = (turn === PLAYERS.SENTE && ty <= 2) || (turn === PLAYERS.GOTE && ty >= 6) ||
+                                      (turn === PLAYERS.SENTE && fy <= 2) || (turn === PLAYERS.GOTE && fy >= 6);
+                
+                const canPromote = isPromotionZone && !piece.promoted && PIECES[piece.type].pLabel;
+                
+                // Forced promotion (Pawn/Lance at end, Knight at end 2)
+                let mustPromote = false;
+                if (piece.type === 'P' || piece.type === 'L') {
+                    if ((turn === PLAYERS.SENTE && ty === 0) || (turn === PLAYERS.GOTE && ty === 8)) mustPromote = true;
+                }
+                if (piece.type === 'N') {
+                    if ((turn === PLAYERS.SENTE && ty <= 1) || (turn === PLAYERS.GOTE && ty >= 7)) mustPromote = true;
+                }
+
+                if (mustPromote) {
+                    piece.promoted = true;
+                    completeMove(fx, fy, tx, ty, captured, true);
+                } else if (canPromote) {
+                    // Ask for promotion
+                    promotionPending = { piece, fx, fy, tx, ty, captured };
+                    document.getElementById('promotionModal').style.display = 'flex';
+                    return; // Wait for modal
+                } else {
+                    completeMove(fx, fy, tx, ty, captured, false);
+                }
+            }
+        }
+
+        function resolvePromotion(promote) {
+            if (promotionPending) {
+                if (promote) promotionPending.piece.promoted = true;
+                completeMove(promotionPending.fx, promotionPending.fy, promotionPending.tx, promotionPending.ty, promotionPending.captured, promote);
+                promotionPending = null;
+                document.getElementById('promotionModal').style.display = 'none';
+            }
+        }
+
+        function completeMove(fx, fy, tx, ty, captured, promoted) {
+            history.push({
+                type: 'move',
+                from: {x: fx, y: fy},
+                to: {x: tx, y: ty},
+                captured: captured,
+                promoted: promoted,
+                turn: turn
+            });
+            
+            // Check for King capture (Game Over)
+            if (captured === 'K') {
+                gameOver = true;
+                render();
+                updateStatus();
+                return;
+            }
+
+            endTurn();
+        }
+
+        function endTurn() {
+            selectedCell = null;
+            validMoves = [];
+            turn = turn === PLAYERS.SENTE ? PLAYERS.GOTE : PLAYERS.SENTE;
+            render();
+            updateStatus();
+
+            if (gameMode === 'ai' && turn === PLAYERS.GOTE && !gameOver) {
+                setTimeout(makeAIMove, 500);
+            }
+        }
+
+        function undoMove() {
+            if (history.length === 0 || gameOver) return;
+            
+            // If AI, undo 2 moves
+            let steps = (gameMode === 'ai' && turn === PLAYERS.SENTE) ? 2 : 1;
+            
+            while(steps > 0 && history.length > 0) {
+                const last = history.pop();
+                turn = last.turn; // Revert turn
+
+                if (last.type === 'drop') {
+                    board[last.to.y][last.to.x] = null;
+                    hands[turn].push(last.piece);
+                } else {
+                    const piece = board[last.to.y][last.to.x];
+                    if (last.promoted) piece.promoted = false;
+                    
+                    board[last.from.y][last.from.x] = piece;
+                    board[last.to.y][last.to.x] = null;
+
+                    if (last.captured) {
+                        // Restore captured piece to opponent
+                        const opp = turn === PLAYERS.SENTE ? PLAYERS.GOTE : PLAYERS.SENTE;
+                        board[last.to.y][last.to.x] = { type: last.captured, owner: opp, promoted: false }; // Was unpromoted when captured? Yes, captured pieces reset.
+                        // Remove from hand
+                        const idx = hands[turn].indexOf(last.captured);
+                        if (idx > -1) hands[turn].splice(idx, 1);
+                    }
+                }
+                steps--;
+            }
+            
+            gameOver = false;
+            render();
+            updateStatus();
+        }
+
+        // --- AI Logic (Random + Capture Preference) ---
+        function makeAIMove() {
+            // 1. Find all valid moves for Gote
+            const allMoves = [];
+            
+            // Board moves
+            for(let y=0; y<9; y++) {
+                for(let x=0; x<9; x++) {
+                    const p = board[y][x];
+                    if (p && p.owner === PLAYERS.GOTE) {
+                        calculateValidMoves(x, y, p);
+                        validMoves.forEach(vm => {
+                            allMoves.push({ type: 'move', from: {x, y}, to: vm, piece: p });
+                        });
+                    }
+                }
+            }
+
+            // Drop moves
+            const uniqueHand = [...new Set(hands[PLAYERS.GOTE])];
+            uniqueHand.forEach(type => {
+                calculateDropMoves(type);
+                validMoves.forEach(vm => {
+                    allMoves.push({ type: 'drop', pieceType: type, to: vm });
+                });
+            });
+
+            if (allMoves.length === 0) {
+                // Resign?
+                return;
+            }
+
+            // Simple Heuristic: Capture > Promote > Random
+            let bestMove = allMoves[0];
+            let bestScore = -1000;
+
+            allMoves.forEach(m => {
+                let score = Math.random() * 10;
+                if (m.type === 'move') {
+                    const target = board[m.to.y][m.to.x];
+                    if (target) score += 100; // Capture bonus
+                    
+                    // Promotion bonus
+                    const isPromZone = m.to.y >= 6 || m.from.y >= 6;
+                    if (isPromZone && !m.piece.promoted && PIECES[m.piece.type].pLabel) score += 50;
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                }
+            });
+
+            // Execute Move
+            if (bestMove.type === 'drop') {
+                selectedCell = { handPiece: bestMove.pieceType };
+                handleMove(bestMove.to.x, bestMove.to.y);
+            } else {
+                selectedCell = bestMove.from;
+                // AI Auto Promote
+                const piece = bestMove.piece;
+                const isPromZone = bestMove.to.y >= 6 || bestMove.from.y >= 6;
+                const canPromote = isPromZone && !piece.promoted && PIECES[piece.type].pLabel;
+                
+                // Hack: Set global selectedCell for handleMove to work
+                // But handleMove expects UI interaction for promotion.
+                // We need to bypass handleMove or mock it.
+                
+                // Let's just modify handleMove to accept an optional 'autoPromote' param or handle it manually here.
+                // Easier to manually execute for AI to avoid modal.
+                
+                const fx = bestMove.from.x;
+                const fy = bestMove.from.y;
+                const tx = bestMove.to.x;
+                const ty = bestMove.to.y;
+                const target = board[ty][tx];
+                let captured = null;
+
+                if (target) {
+                    captured = target.type;
+                    hands[turn].push(captured);
+                }
+
+                board[ty][tx] = piece;
+                board[fy][fx] = null;
+
+                let promoted = false;
+                // Always promote if possible for AI (simple)
+                if (canPromote) {
+                    piece.promoted = true;
+                    promoted = true;
+                }
+
+                completeMove(fx, fy, tx, ty, captured, promoted);
+            }
+        }
+
+        // --- Piece Movement Rules ---
+        function getPieceMoves(type, promoted, owner) {
+            const forward = owner === PLAYERS.SENTE ? -1 : 1;
+            const moves = [];
+
+            // Gold General Movement (used by many promoted pieces)
+            const goldMoves = [
+                {dx:0, dy:forward, slide:false}, {dx:1, dy:forward, slide:false}, {dx:-1, dy:forward, slide:false},
+                {dx:1, dy:0, slide:false}, {dx:-1, dy:0, slide:false},
+                {dx:0, dy:-forward, slide:false}
+            ];
+
+            if (promoted) {
+                if (['S','N','L','P'].includes(type)) return goldMoves;
+                if (type === 'R') { // Dragon (Rook + King)
+                    return [
+                        {dx:0, dy:1, slide:true}, {dx:0, dy:-1, slide:true}, {dx:1, dy:0, slide:true}, {dx:-1, dy:0, slide:true},
+                        {dx:1, dy:1, slide:false}, {dx:1, dy:-1, slide:false}, {dx:-1, dy:1, slide:false}, {dx:-1, dy:-1, slide:false}
+                    ];
+                }
+                if (type === 'B') { // Horse (Bishop + King)
+                    return [
+                        {dx:1, dy:1, slide:true}, {dx:1, dy:-1, slide:true}, {dx:-1, dy:1, slide:true}, {dx:-1, dy:-1, slide:true},
+                        {dx:0, dy:1, slide:false}, {dx:0, dy:-1, slide:false}, {dx:1, dy:0, slide:false}, {dx:-1, dy:0, slide:false}
+                    ];
+                }
+            }
+
+            switch(type) {
+                case 'K':
+                    return [
+                        {dx:0, dy:1}, {dx:0, dy:-1}, {dx:1, dy:0}, {dx:-1, dy:0},
+                        {dx:1, dy:1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:-1, dy:-1}
+                    ].map(m => ({...m, slide:false}));
+                case 'R':
+                    return [{dx:0, dy:1}, {dx:0, dy:-1}, {dx:1, dy:0}, {dx:-1, dy:0}].map(m => ({...m, slide:true}));
+                case 'B':
+                    return [{dx:1, dy:1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:-1, dy:-1}].map(m => ({...m, slide:true}));
+                case 'G':
+                    return goldMoves;
+                case 'S':
+                    return [
+                        {dx:0, dy:forward, slide:false}, {dx:1, dy:forward, slide:false}, {dx:-1, dy:forward, slide:false},
+                        {dx:1, dy:-forward, slide:false}, {dx:-1, dy:-forward, slide:false}
+                    ];
+                case 'N':
+                    return [{dx:1, dy:forward*2, slide:false}, {dx:-1, dy:forward*2, slide:false}];
+                case 'L':
+                    return [{dx:0, dy:forward, slide:true}];
+                case 'P':
+                    return [{dx:0, dy:forward, slide:false}];
+            }
+            return [];
+        }
+
+        // Start default
+        initGame('pvp');
+
+    </script>
+</body>
+</html>
