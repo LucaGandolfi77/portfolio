@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto collapse large sections after a short delay to allow rendering
     setTimeout(() => {
         if (typeof autoCollapse === 'function') {
-            autoCollapse('.projects-grid', 600);
+            // autoCollapse('.projects-grid', 600); // Removed to avoid duplicate button since it has a static one
             autoCollapse('.testimonials-container', 400);
         }
     }, 200);
