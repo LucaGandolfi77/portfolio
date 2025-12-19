@@ -335,7 +335,10 @@
         
         if (dist > zone.radius) {
             // Outside Zone - Take Damage
-            takeDamage(10 * dt); // Continuous damage
+            player.hp -= 10 * dt; // Direct HP damage (bypass shield)
+            updateHealthUI();
+            if (player.hp <= 0) gameOver();
+
             if (Math.random() < 0.2) createParticles(player.x, player.y, '#e74c3c');
         }
     }
@@ -887,7 +890,7 @@
                 // AI Logic
                 if (e.state === 'chase') {
                     if (dist < 40) { // Close enough to attack
-                        e.state = 'attack';
+                        e.state = 'windup';
                         e.attackTimer = 0.5; // Windup
                     } else {
                         let ex = (dx / dist) * e.speed * dt;
@@ -895,13 +898,23 @@
                         if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
                         if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
                     }
-                } else if (e.state === 'attack') {
+                } else if (e.state === 'windup') {
                     e.attackTimer -= dt;
                     if (e.attackTimer <= 0) {
-                        // Lunge!
-                        const lungeSpeed = 400;
-                        e.x += (dx / dist) * lungeSpeed * dt * 5; // Burst move
-                        e.y += (dy / dist) * lungeSpeed * dt * 5;
+                        e.state = 'lunge';
+                        e.attackTimer = 0.2; // Lunge duration
+                        e.lungeDx = dx / dist;
+                        e.lungeDy = dy / dist;
+                    }
+                } else if (e.state === 'lunge') {
+                    e.attackTimer -= dt;
+                    const lungeSpeed = 500;
+                    let ex = e.lungeDx * lungeSpeed * dt;
+                    let ey = e.lungeDy * lungeSpeed * dt;
+                    if (!checkCollision(e.x + ex, e.y, e.radius)) e.x += ex;
+                    if (!checkCollision(e.x, e.y + ey, e.radius)) e.y += ey;
+                    
+                    if (e.attackTimer <= 0) {
                         e.state = 'cooldown';
                         e.attackTimer = 1.0;
                     }
@@ -1139,27 +1152,26 @@
 
                 // Draw Wall
                 if (tile % 2 !== 0) {
-                    if (tile === TILES.WALL_GRASS) {
-                        ctx.fillStyle = '#145A32'; // Dark Green
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = '#27ae60'; // Lighter Top
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 15);
-                    } else if (tile === TILES.WALL_SAND) {
-                        ctx.fillStyle = '#A04000'; // Dark Orange
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = '#f1c40f'; // Lighter Top
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 15);
-                    } else if (tile === TILES.WALL_SNOW) {
-                        ctx.fillStyle = '#7F8C8D'; // Dark Grey
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = '#ecf0f1'; // Lighter Top
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 15);
-                    } else if (tile === TILES.WALL_DARK) {
-                        ctx.fillStyle = '#17202A'; // Very Dark
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = '#34495e'; // Lighter Top
-                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 15);
-                    }
+                    // Shadow/Side (Base)
+                    if (tile === TILES.WALL_GRASS) ctx.fillStyle = '#5d4037'; // Brown Shadow
+                    else if (tile === TILES.WALL_SAND) ctx.fillStyle = '#a04000'; // Dark Red Shadow
+                    else if (tile === TILES.WALL_SNOW) ctx.fillStyle = '#2874a6'; // Dark Blue Shadow
+                    else if (tile === TILES.WALL_DARK) ctx.fillStyle = '#4a235a'; // Dark Purple Shadow
+                    
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                    // Top Face (Distinct Color)
+                    if (tile === TILES.WALL_GRASS) ctx.fillStyle = '#8d6e63'; // Brown Box/Wood
+                    else if (tile === TILES.WALL_SAND) ctx.fillStyle = '#e67e22'; // Orange Rock
+                    else if (tile === TILES.WALL_SNOW) ctx.fillStyle = '#5dade2'; // Blue Ice
+                    else if (tile === TILES.WALL_DARK) ctx.fillStyle = '#9b59b6'; // Purple Block
+
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE - 15);
+                    
+                    // Outline for extra visibility
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE - 15);
                 }
             }
         }
