@@ -155,6 +155,23 @@
             font-size: 1.2rem;
         }
 
+        .progress-container {
+            width: 100%;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin: 15px 0;
+            height: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #00d4ff;
+            transition: width 0.3s ease;
+        }
+
         .back-link {
             margin-top: 30px;
             color: #a0c0e0;
@@ -188,6 +205,11 @@
         <div id="result-panel">
             <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #888;">Your Season Is</div>
             <div id="seasonResult" class="season-title">Analyzing...</div>
+            
+            <div id="progressContainer" class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            
             <p id="seasonDescription" style="margin-bottom: 20px;">...</p>
             
             <div class="analysis-details">
@@ -221,6 +243,8 @@
         const loading = document.getElementById('loading');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const resultPanel = document.getElementById('result-panel');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
         
         // Result elements
         const seasonResult = document.getElementById('seasonResult');
@@ -307,10 +331,24 @@
             performAnalysis();
         });
 
-        function performAnalysis() {
+        function updateProgress(percent) {
+            return new Promise(resolve => {
+                progressBar.style.width = percent + '%';
+                setTimeout(resolve, 200); // Simulate work / allow UI update
+            });
+        }
+
+        async function performAnalysis() {
             resultPanel.style.display = 'block';
-            seasonResult.innerText = "Calculating...";
+            progressContainer.style.display = 'block';
+            seasonResult.innerText = "Analyzing...";
+            seasonResult.className = "season-title";
+            seasonDescription.innerText = "Please wait while we analyze your features...";
+            paletteContainer.innerHTML = "";
+            analyzeBtn.disabled = true;
             
+            await updateProgress(10);
+
             // 1. Extract Colors
             // We need to sample pixels from the video feed based on landmarks
             // Since we can't easily read pixels from the video element directly if it's cross-origin (though local webcam usually fine),
@@ -319,11 +357,15 @@
             const width = outputCanvas.width;
             const height = outputCanvas.height;
             
+            // Get image data once to improve performance
+            const ctx = outputCanvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, width, height).data;
+            
+            await updateProgress(30);
+
             // Helper to get average color of a region
             function getAverageColor(landmarks, indices) {
                 let r = 0, g = 0, b = 0, count = 0;
-                const ctx = outputCanvas.getContext('2d');
-                const imageData = ctx.getImageData(0, 0, width, height).data;
                 
                 indices.forEach(idx => {
                     const pt = landmarks[idx];
@@ -357,7 +399,10 @@
             const hairIndices = [70, 63, 105, 336, 296, 334];
 
             const skinColor = getAverageColor(currentLandmarks, skinIndices);
+            await updateProgress(50);
+            
             const hairColor = getAverageColor(currentLandmarks, hairIndices);
+            await updateProgress(70);
 
             // 2. Analyze Properties
             
@@ -412,6 +457,8 @@
             const isHighContrast = contrast > 0.3; // Threshold
             const isDarkHair = hairBright < 0.4;
 
+            await updateProgress(90);
+
             // 3. Determine Season
             let season = "";
             
@@ -430,6 +477,14 @@
                     season = "spring"; // Light warm
                 }
             }
+
+            await updateProgress(100);
+            
+            // Hide progress after short delay
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }, 500);
 
             // Display Results
             const data = PALETTES[season];

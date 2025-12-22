@@ -118,6 +118,21 @@
             z-index: 10;
             border-radius: 8px;
         }
+        .progress-container {
+            width: 100%;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin: 10px 0;
+            height: 6px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #00d4ff;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -137,6 +152,9 @@
                     Upload Photo
                     <input type="file" id="uploadInput" accept="image/*">
                 </label>
+            </div>
+            <div id="refProgress" class="progress-container">
+                <div id="refProgressBar" class="progress-bar"></div>
             </div>
         </div>
 
@@ -172,12 +190,15 @@
         const compareBtn = document.getElementById('compareBtn');
         const resultDiv = document.getElementById('result');
         const cameraLoading = document.getElementById('cameraLoading');
+        const refProgress = document.getElementById('refProgress');
+        const refProgressBar = document.getElementById('refProgressBar');
 
         let faceMesh;
         let camera;
         let refLandmarks = null;
         let liveLandmarks = null;
         let isComparing = false;
+        let isProcessingReference = false;
 
         // Initialize FaceMesh
         async function setupFaceMesh() {
@@ -197,7 +218,7 @@
             // Start camera after model is ready
             camera = new Camera(videoElement, {
                 onFrame: async () => {
-                    if (!isComparing) {
+                    if (!isComparing && !isProcessingReference) {
                         await faceMesh.send({image: videoElement});
                     }
                 },
@@ -233,6 +254,34 @@
                 }
             }
             outputCtx.restore();
+        }
+
+        function onReferenceResults(results) {
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                refLandmarks = results.multiFaceLandmarks[0];
+                
+                // Draw mesh on ref canvas
+                refCtx.save();
+                refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
+                refCtx.drawImage(results.image, 0, 0);
+                drawConnectors(refCtx, refLandmarks, FACEMESH_TESSELATION, {color: '#00d4ff70', lineWidth: 1});
+                refCtx.restore();
+                
+                resultDiv.textContent = "Reference processed! Now capture your face.";
+                compareBtn.disabled = false;
+            } else {
+                resultDiv.textContent = "No face detected in reference image. Try another.";
+                refLandmarks = null;
+                compareBtn.disabled = true;
+            }
+            
+            // Restore original handler
+            faceMesh.onResults(onResults);
+            isProcessingReference = false;
+            refProgressBar.style.width = '100%';
+            setTimeout(() => {
+                refProgress.style.display = 'none';
+            }, 500);
         }
 
         function drawComparison(currentLandmarks) {
@@ -284,37 +333,16 @@
                     refCtx.drawImage(img, 0, 0);
                     
                     // Process reference image to get landmarks
-                    // We need a separate FaceMesh instance or reuse the existing one carefully
-                    // To avoid interrupting the camera stream, let's pause camera processing briefly
-                    
+                    isProcessingReference = true;
                     resultDiv.textContent = "Processing reference image...";
+                    refProgress.style.display = 'block';
+                    refProgressBar.style.width = '10%';
                     
-                    // Send image to FaceMesh
-                    // We need to temporarily hijack the onResults
-                    const originalOnResults = faceMesh.onResults;
+                    // Switch to reference handler
+                    faceMesh.onResults(onReferenceResults);
                     
-                    faceMesh.onResults = (results) => {
-                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                            refLandmarks = results.multiFaceLandmarks[0];
-                            
-                            // Draw mesh on ref canvas
-                            refCtx.save();
-                            refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
-                            refCtx.drawImage(results.image, 0, 0);
-                            drawConnectors(refCtx, refLandmarks, FACEMESH_TESSELATION, {color: '#00d4ff70', lineWidth: 1});
-                            refCtx.restore();
-                            
-                            resultDiv.textContent = "Reference processed! Now capture your face.";
-                            compareBtn.disabled = false;
-                        } else {
-                            resultDiv.textContent = "No face detected in reference image. Try another.";
-                            refLandmarks = null;
-                            compareBtn.disabled = true;
-                        }
-                        
-                        // Restore original handler
-                        faceMesh.onResults = onResults;
-                    };
+                    // Simulate progress
+                    setTimeout(() => refProgressBar.style.width = '50%', 200);
                     
                     await faceMesh.send({image: img});
                 };
