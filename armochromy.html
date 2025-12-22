@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armochromy Analysis AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a1628;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 { color: #00d4ff; margin-bottom: 10px; text-align: center; }
+        p.subtitle { color: #a0c0e0; margin-bottom: 30px; text-align: center; max-width: 600px; }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .view-area {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Mirror for selfie mode */
+        #inputVideo, #outputCanvas {
+            transform: scaleX(-1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #00d4ff;
+            color: #0a1628;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #result-panel {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .season-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .color-palette {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .color-swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .analysis-details {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #ccc;
+            text-align: left;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .detail-item span {
+            display: block;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        .color-preview {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 5px;
+            border: 1px solid #fff;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            color: #00d4ff;
+            font-size: 1.2rem;
+        }
+
+        .back-link {
+            margin-top: 30px;
+            color: #a0c0e0;
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        /* Season Styles */
+        .winter { color: #00d4ff; text-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+        .summer { color: #a0c0e0; text-shadow: 0 0 10px rgba(160, 192, 224, 0.5); }
+        .autumn { color: #d48806; text-shadow: 0 0 10px rgba(212, 136, 6, 0.5); }
+        .spring { color: #52c41a; text-shadow: 0 0 10px rgba(82, 196, 26, 0.5); }
+
+    </style>
+</head>
+<body>
+    <h1>Armochromy AI</h1>
+    <p class="subtitle">Discover your seasonal color palette based on your skin tone, hair, and features.</p>
+    
+    <div class="container">
+        <div class="view-area">
+            <video id="inputVideo" playsinline webkit-playsinline muted autoplay></video>
+            <canvas id="outputCanvas"></canvas>
+            <div id="loading" class="loading-overlay">Loading AI Model...</div>
+        </div>
+
+        <div class="controls">
+            <button id="analyzeBtn" disabled>Analyze My Season</button>
+        </div>
+
+        <div id="result-panel">
+            <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #888;">Your Season Is</div>
+            <div id="seasonResult" class="season-title">Analyzing...</div>
+            <p id="seasonDescription" style="margin-bottom: 20px;">...</p>
+            
+            <div class="analysis-details">
+                <div class="detail-item">
+                    <span>Skin Tone</span>
+                    <div id="skinToneVal">Detecting...</div>
+                </div>
+                <div class="detail-item">
+                    <span>Undertone</span>
+                    <div id="undertoneVal">Detecting...</div>
+                </div>
+                <div class="detail-item">
+                    <span>Contrast</span>
+                    <div id="contrastVal">Detecting...</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; font-weight: bold; color: #fff;">Your Best Colors</div>
+            <div id="paletteContainer" class="color-palette">
+                <!-- Swatches will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <a href="index.html#projects" class="back-link">← Back to Portfolio</a>
+
+    <script>
+        const videoElement = document.getElementById('inputVideo');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const outputCtx = outputCanvas.getContext('2d');
+        const loading = document.getElementById('loading');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultPanel = document.getElementById('result-panel');
+        
+        // Result elements
+        const seasonResult = document.getElementById('seasonResult');
+        const seasonDescription = document.getElementById('seasonDescription');
+        const skinToneVal = document.getElementById('skinToneVal');
+        const undertoneVal = document.getElementById('undertoneVal');
+        const contrastVal = document.getElementById('contrastVal');
+        const paletteContainer = document.getElementById('paletteContainer');
+
+        let faceMesh;
+        let camera;
+        let currentLandmarks = null;
+        let isAnalyzing = false;
+
+        // Palettes
+        const PALETTES = {
+            winter: {
+                name: "Winter",
+                colors: ["#000000", "#ffffff", "#00008b", "#800020", "#1c39bb", "#ffd700"],
+                desc: "You have cool undertones and high contrast. Bold, sharp, and icy colors suit you best."
+            },
+            summer: {
+                name: "Summer",
+                colors: ["#778899", "#b0c4de", "#e6e6fa", "#ffb6c1", "#add8e6", "#f08080"],
+                desc: "You have cool undertones with lower contrast. Soft, pastel, and muted colors look great on you."
+            },
+            autumn: {
+                name: "Autumn",
+                colors: ["#8b4513", "#d2691e", "#556b2f", "#daa520", "#800000", "#ff8c00"],
+                desc: "You have warm undertones and rich depth. Earthy, golden, and spicy colors are your best match."
+            },
+            spring: {
+                name: "Spring",
+                colors: ["#ff7f50", "#98fb98", "#ffd700", "#40e0d0", "#ff69b4", "#f0e68c"],
+                desc: "You have warm undertones and a bright, clear look. Fresh, vibrant, and warm colors make you shine."
+            }
+        };
+
+        async function setupFaceMesh() {
+            faceMesh = new FaceMesh({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }});
+            
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            faceMesh.onResults(onResults);
+            
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await faceMesh.send({image: videoElement});
+                },
+                width: 640,
+                height: 480
+            });
+            
+            await camera.start();
+            loading.style.display = 'none';
+            analyzeBtn.disabled = false;
+        }
+
+        function onResults(results) {
+            outputCanvas.width = videoElement.videoWidth;
+            outputCanvas.height = videoElement.videoHeight;
+
+            outputCtx.save();
+            outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            outputCtx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+            
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                currentLandmarks = results.multiFaceLandmarks[0];
+                // Draw minimal mesh to show tracking
+                drawConnectors(outputCtx, currentLandmarks, FACEMESH_TESSELATION, {color: '#C0C0C030', lineWidth: 0.5});
+            }
+            outputCtx.restore();
+        }
+
+        analyzeBtn.addEventListener('click', () => {
+            if (!currentLandmarks) return;
+            performAnalysis();
+        });
+
+        function performAnalysis() {
+            resultPanel.style.display = 'block';
+            seasonResult.innerText = "Calculating...";
+            
+            // 1. Extract Colors
+            // We need to sample pixels from the video feed based on landmarks
+            // Since we can't easily read pixels from the video element directly if it's cross-origin (though local webcam usually fine),
+            // we use the canvas we just drew to.
+            
+            const width = outputCanvas.width;
+            const height = outputCanvas.height;
+            
+            // Helper to get average color of a region
+            function getAverageColor(landmarks, indices) {
+                let r = 0, g = 0, b = 0, count = 0;
+                const ctx = outputCanvas.getContext('2d');
+                const imageData = ctx.getImageData(0, 0, width, height).data;
+                
+                indices.forEach(idx => {
+                    const pt = landmarks[idx];
+                    const x = Math.floor(pt.x * width);
+                    const y = Math.floor(pt.y * height);
+                    
+                    // Sample 3x3 area around point
+                    for(let dx=-1; dx<=1; dx++) {
+                        for(let dy=-1; dy<=1; dy++) {
+                            const px = (x + dx + (y + dy) * width) * 4;
+                            if (px >= 0 && px < imageData.length) {
+                                r += imageData[px];
+                                g += imageData[px+1];
+                                b += imageData[px+2];
+                                count++;
+                            }
+                        }
+                    }
+                });
+                
+                return { r: r/count, g: g/count, b: b/count };
+            }
+
+            // Landmarks indices (approximate)
+            // Cheeks for skin: 116, 117, 118 (left), 345, 346, 347 (right)
+            // Forehead for skin: 10, 338, 297, 109, 67
+            const skinIndices = [116, 117, 345, 346, 10, 109]; 
+            
+            // Eyebrows for hair approximation (often close to hair color): 70, 63, 105, 66, 107 (left), 336, 296, 334, 293, 300 (right)
+            // Note: Hair is hard with just facemesh as it's outside the mesh often. Eyebrows are a safe proxy for contrast.
+            const hairIndices = [70, 63, 105, 336, 296, 334];
+
+            const skinColor = getAverageColor(currentLandmarks, skinIndices);
+            const hairColor = getAverageColor(currentLandmarks, hairIndices);
+
+            // 2. Analyze Properties
+            
+            // Skin Undertone (Warm vs Cool)
+            // Simple heuristic: Compare Blue vs Yellow channel dominance in Lab or YCbCr, or just R vs B in RGB
+            // Cool skin often has more blue/pink. Warm has more yellow/gold.
+            // In RGB: Warm often has R > B significantly. Cool has R closer to B (pinkish).
+            // Better: Convert to HSV.
+            
+            function rgbToHsv(r, g, b) {
+                r /= 255, g /= 255, b /= 255;
+                var max = Math.max(r, g, b), min = Math.min(r, g, b);
+                var h, s, v = max;
+                var d = max - min;
+                s = max == 0 ? 0 : d / max;
+                if (max == min) { h = 0; } 
+                else {
+                    switch (max) {
+                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h /= 6;
+                }
+                return [h, s, v];
+            }
+
+            const skinHSV = rgbToHsv(skinColor.r, skinColor.g, skinColor.b);
+            const hairHSV = rgbToHsv(hairColor.r, hairColor.g, hairColor.b);
+            
+            // Determine Undertone
+            // Hue 0-360 (0-1 in our func). 
+            // Skin hues are usually orange/red (0 to 0.1 or 0.9 to 1).
+            // Lower hue (closer to 0 or > 0.95) is often cooler (pink/red).
+            // Higher hue (closer to 0.1-0.15) is often warmer (yellow/orange).
+            // This is very approximate.
+            
+            let isWarm = false;
+            // 0.08 is approx 28 degrees (orange-yellow). < 0.05 is red-orange (pinker).
+            if (skinHSV[0] > 0.06 && skinHSV[0] < 0.15) {
+                isWarm = true; // Yellow/Golden undertone
+            } else {
+                isWarm = false; // Pink/Blue undertone
+            }
+
+            // Determine Contrast (Hair vs Skin brightness)
+            // V in HSV is brightness.
+            const skinBright = skinHSV[2];
+            const hairBright = hairHSV[2];
+            const contrast = Math.abs(skinBright - hairBright);
+            
+            const isHighContrast = contrast > 0.3; // Threshold
+            const isDarkHair = hairBright < 0.4;
+
+            // 3. Determine Season
+            let season = "";
+            
+            if (!isWarm) {
+                // Cool Undertone
+                if (isHighContrast || isDarkHair) {
+                    season = "winter";
+                } else {
+                    season = "summer";
+                }
+            } else {
+                // Warm Undertone
+                if (isDarkHair || isHighContrast) { // Deep warm
+                    season = "autumn";
+                } else {
+                    season = "spring"; // Light warm
+                }
+            }
+
+            // Display Results
+            const data = PALETTES[season];
+            seasonResult.innerText = data.name;
+            seasonResult.className = "season-title " + season;
+            seasonDescription.innerText = data.desc;
+
+            // Update details
+            skinToneVal.innerHTML = `<span class="color-preview" style="background:rgb(${skinColor.r},${skinColor.g},${skinColor.b})"></span> ${isWarm ? "Warm (Golden)" : "Cool (Pink/Blue)"}`;
+            undertoneVal.innerText = isWarm ? "Warm" : "Cool";
+            contrastVal.innerText = isHighContrast ? "High" : "Low/Medium";
+
+            // Render Palette
+            paletteContainer.innerHTML = "";
+            data.colors.forEach(c => {
+                const div = document.createElement('div');
+                div.className = "color-swatch";
+                div.style.backgroundColor = c;
+                div.title = c;
+                paletteContainer.appendChild(div);
+            });
+        }
+
+        setupFaceMesh();
+    </script>
+</body>
+</html>
