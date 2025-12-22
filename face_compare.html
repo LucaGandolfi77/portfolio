@@ -257,6 +257,16 @@
         }
 
         function onReferenceResults(results) {
+            // Check if this result matches our reference image dimensions
+            // This prevents processing leftover video frames
+            const img = document.getElementById('refImage'); // We need to store the current img somewhere or use closure
+            // Actually, we can just check if the result image size matches the canvas size we just set
+            
+            if (results.image.width !== refCanvas.width || results.image.height !== refCanvas.height) {
+                console.log("Ignoring result with mismatching dimensions (likely video frame)");
+                return; // Ignore this result, wait for the next one (which should be our image)
+            }
+
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                 refLandmarks = results.multiFaceLandmarks[0];
                 
@@ -264,7 +274,8 @@
                 refCtx.save();
                 refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
                 refCtx.drawImage(results.image, 0, 0);
-                drawConnectors(refCtx, refLandmarks, FACEMESH_TESSELATION, {color: '#00d4ff70', lineWidth: 1});
+                // Draw with higher visibility (bright green, thicker lines)
+                drawConnectors(refCtx, refLandmarks, FACEMESH_TESSELATION, {color: '#30FF30', lineWidth: 2});
                 refCtx.restore();
                 
                 resultDiv.textContent = "Reference processed! Now capture your face.";
@@ -285,6 +296,9 @@
         }
 
         function drawComparison(currentLandmarks) {
+            // Draw reference mesh (ghost) on camera feed for visual alignment
+            drawConnectors(outputCtx, refLandmarks, FACEMESH_TESSELATION, {color: '#00d4ff30', lineWidth: 1});
+
             // Calculate difference and draw lines
             let totalDist = 0;
             
@@ -338,13 +352,19 @@
                     refProgress.style.display = 'block';
                     refProgressBar.style.width = '10%';
                     
-                    // Switch to reference handler
-                    faceMesh.onResults(onReferenceResults);
+                    // Reset FaceMesh to clear history and prevent temporal smoothing issues
+                    // and wait a bit for any pending video frames to clear
+                    faceMesh.reset();
                     
-                    // Simulate progress
-                    setTimeout(() => refProgressBar.style.width = '50%', 200);
-                    
-                    await faceMesh.send({image: img});
+                    setTimeout(async () => {
+                        // Switch to reference handler
+                        faceMesh.onResults(onReferenceResults);
+                        
+                        // Simulate progress
+                        refProgressBar.style.width = '50%';
+                        
+                        await faceMesh.send({image: img});
+                    }, 100);
                 };
                 img.src = event.target.result;
             };
