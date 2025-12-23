@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Card Collector</title>
     <style>
         * {
@@ -1670,7 +1670,7 @@
             } else {
                 btnMega.style.background = '#4a5568';
                 btnScopa.style.background = 'linear-gradient(45deg, #48bb78, #38a169)';
-                document.getElementById('deckTitle').textContent = "Scopa Deck (Select 40)";
+                document.getElementById('deckTitle').textContent = "Scopa Deck (Select 12)";
                 deckSlots.style.flexWrap = 'wrap';
             }
             
@@ -1682,7 +1682,7 @@
             const collectionGrid = document.getElementById('deckCollectionGrid');
             
             const currentDeck = currentDeckMode === 'mega' ? playerData.deck : playerData.scopaDeck;
-            const maxSlots = currentDeckMode === 'mega' ? 8 : 40;
+            const maxSlots = currentDeckMode === 'mega' ? 8 : 12;
 
             // Render Deck Slots
             deckSlots.innerHTML = '';
@@ -1730,7 +1730,7 @@
 
         function addToDeck(cardId) {
             const currentDeck = currentDeckMode === 'mega' ? playerData.deck : playerData.scopaDeck;
-            const maxSlots = currentDeckMode === 'mega' ? 8 : 40;
+            const maxSlots = currentDeckMode === 'mega' ? 8 : 12;
 
             if (currentDeck.length >= maxSlots) {
                 alert(`Deck is full! Remove a card first.`);
@@ -2360,7 +2360,8 @@
         }
 
         // Scopa Battle Logic
-        let scopaDeck = [];
+        let scopaPlayerDeck = [];
+        let scopaEnemyDeck = [];
         let scopaTable = [];
         let scopaPlayerHand = [];
         let scopaEnemyHand = [];
@@ -2371,52 +2372,59 @@
         let cachedStartScreen = null;
 
         function initScopaBattle() {
-            // 1. Create Deck
-            let deckCards = [];
-
+            // 1. Create Player Deck (12 cards)
+            let pDeck = [];
             if (playerData.scopaDeck && playerData.scopaDeck.length > 0) {
-                // Use Player's Scopa Deck
-                deckCards = playerData.scopaDeck.map(id => {
+                pDeck = playerData.scopaDeck.map(id => {
                     const baseCard = allCards.find(c => c.id == id);
                     const owned = playerData.collection[id];
                     return { ...baseCard, level: owned ? owned.level : 1 };
                 });
             } else {
-                // Fallback: Use all owned cards
-                deckCards = Object.keys(playerData.collection).map(id => {
+                // Fallback: Use owned cards
+                pDeck = Object.keys(playerData.collection).map(id => {
                     const baseCard = allCards.find(c => c.id == id);
                     const owned = playerData.collection[id];
                     return { ...baseCard, level: owned.level };
                 });
             }
             
-            // Fill to 10 if needed
-            while (deckCards.length < 10) {
+            // Fill/Trim to 12
+            while (pDeck.length < 12) {
                 const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
-                // For filler cards, assume level 1
-                deckCards.push({ ...randomCard, level: 1 });
+                pDeck.push({ ...randomCard, level: 1 });
             }
-            
-            // Trim to 10 if needed (prioritize higher rarity/level?)
-            if (deckCards.length > 10) {
-                deckCards = deckCards.slice(0, 10);
+            if (pDeck.length > 12) pDeck = pDeck.slice(0, 12);
+
+            // 2. Create Enemy Deck (12 random cards, level 1)
+            let eDeck = [];
+            for (let i = 0; i < 12; i++) {
+                const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
+                eDeck.push({ ...randomCard, level: 1 });
             }
 
-            // Assign Scopa Values (1-10) and Suits (Elements)
-            scopaDeck = deckCards.map((card, index) => {
-                return {
+            // Helper to process deck cards (add scopa values)
+            const processDeck = (deck) => {
+                return deck.map((card, index) => ({
                     ...card,
                     scopaValue: card.scopaValue || (index % 10) + 1,
                     scopaSuit: card.element || ['Fire', 'Water', 'Earth', 'Air'][Math.floor(Math.random() * 4)],
-                    uid: Math.random().toString(36).substr(2, 9) // Unique ID for this instance
-                };
-            });
+                    uid: Math.random().toString(36).substr(2, 9)
+                }));
+            };
 
-            // Shuffle
-            for (let i = scopaDeck.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [scopaDeck[i], scopaDeck[j]] = [scopaDeck[j], scopaDeck[i]];
-            }
+            scopaPlayerDeck = processDeck(pDeck);
+            scopaEnemyDeck = processDeck(eDeck);
+
+            // Shuffle both
+            const shuffle = (arr) => {
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+            };
+            shuffle(scopaPlayerDeck);
+            shuffle(scopaEnemyDeck);
 
             // Reset State
             scopaTable = [];
@@ -2427,12 +2435,13 @@
             scopaTurn = 'player';
             scopaLastCapturer = null;
 
-            // Deal Initial Cards
-            dealScopaCards(true); // Deal 3 to each
+            // Deal Initial Hands (3 each)
+            dealScopaCards(true); 
             
-            // Deal 4 to table
-            for (let i = 0; i < 4; i++) {
-                if (scopaDeck.length > 0) scopaTable.push(scopaDeck.pop());
+            // Deal 4 to table (2 from player deck, 2 from enemy deck)
+            for (let i = 0; i < 2; i++) {
+                if (scopaPlayerDeck.length > 0) scopaTable.push(scopaPlayerDeck.pop());
+                if (scopaEnemyDeck.length > 0) scopaTable.push(scopaEnemyDeck.pop());
             }
 
             updateScopaUI();
@@ -2441,12 +2450,17 @@
         }
 
         function dealScopaCards(initial = false) {
-            if (scopaDeck.length === 0) return;
-
+            // Deal up to 3 cards to each player from their respective decks
             const cardsToDeal = 3;
-            for (let i = 0; i < cardsToDeal; i++) {
-                if (scopaDeck.length > 0) scopaPlayerHand.push(scopaDeck.pop());
-                if (scopaDeck.length > 0) scopaEnemyHand.push(scopaDeck.pop());
+            
+            // Player
+            while (scopaPlayerHand.length < cardsToDeal && scopaPlayerDeck.length > 0) {
+                scopaPlayerHand.push(scopaPlayerDeck.pop());
+            }
+
+            // Enemy
+            while (scopaEnemyHand.length < cardsToDeal && scopaEnemyDeck.length > 0) {
+                scopaEnemyHand.push(scopaEnemyDeck.pop());
             }
         }
 
@@ -2586,7 +2600,7 @@
 
             // Check End of Round (Hands empty)
             if (scopaPlayerHand.length === 0 && scopaEnemyHand.length === 0) {
-                if (scopaDeck.length > 0) {
+                if (scopaPlayerDeck.length > 0 || scopaEnemyDeck.length > 0) {
                     dealScopaCards();
                     updateScopaUI();
                 } else {
@@ -2800,7 +2814,8 @@
             document.getElementById('boxesOpened').textContent = playerData.boxesOpened;
         }
 
-        // Swipe Navigation
+        // Swipe Navigation - DISABLED
+        /*
         let touchStartX = 0;
         let touchEndX = 0;
         const sections = ['collection', 'deck', 'shop', 'fortune', 'slot', 'battle', 'mega-battle', 'profile', 'stats'];
@@ -2837,6 +2852,7 @@
                 if (btn) btn.click();
             }
         }
+        */
 
         // Fortune Wheel
         const wheelCanvas = document.getElementById('wheelCanvas');
