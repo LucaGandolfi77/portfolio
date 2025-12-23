@@ -3,7 +3,37 @@ function drawGround(x, y, type) {
     const screenX = x * TILE_SIZE;
     const screenY = y * TILE_SIZE;
     
-    // Default Ground
+    let spriteKey = null;
+
+    // Determine sprite key based on type and biome
+    if (type === 4) spriteKey = 'water';
+    else if (type === 5) spriteKey = 'bridge';
+    else if (type === 9) spriteKey = 'floor';
+    else if (type === 10) spriteKey = 'mat';
+    else if (type === 13) spriteKey = 'tilled';
+    else if (type === 14) spriteKey = 'road';
+    else if (type === 19) spriteKey = 'bar_floor';
+    else if (type === 22) spriteKey = 'ice';
+    else if (type === 25) spriteKey = 'city_road';
+    else if (type === 26) spriteKey = 'city_sidewalk';
+    else if (type === 30) spriteKey = 'cave_entrance';
+    else if (type === 31) spriteKey = 'cave_floor';
+    else if (type === 32) spriteKey = 'cave_wall';
+    else if (type === 33) spriteKey = 'ladder';
+    else if (type === 34) spriteKey = 'tunnel';
+    else if (type === 0) {
+        if (currentData.biome === 'desert') spriteKey = 'sand';
+        else if (currentData.biome === 'ice') spriteKey = 'snow';
+        else if (currentData.biome === 'mountain') spriteKey = 'rock_ground';
+        else spriteKey = 'grass';
+    }
+
+    // Try to draw sprite
+    if (spriteKey && drawSprite(ctx, spriteKey, screenX, screenY)) {
+        return;
+    }
+
+    // Fallback: Default Ground
     if (currentData.biome === 'desert') ctx.fillStyle = colors.sand;
     else if (currentData.biome === 'ice') ctx.fillStyle = colors.snow;
     else if (currentData.biome === 'tropical') ctx.fillStyle = colors.jungleGrass;
@@ -181,6 +211,30 @@ function drawObject(x, y, type) {
         if (active) {
             shakeX = Math.sin(Date.now() / 50) * 2;
         }
+    }
+
+    let spriteKey = null;
+    if (type === 1) spriteKey = 'tall_grass';
+    else if (type === 2) spriteKey = 'tree';
+    else if (type === 20) spriteKey = 'cactus';
+    else if (type === 21) spriteKey = 'pine';
+    else if (type === 23) spriteKey = 'palm';
+    else if (type === 3) spriteKey = 'flower';
+    else if (type === 7) {
+        const isRoof = (y < currentMap.length-1 && (currentMap[y+1][x] === 7 || currentMap[y+1][x] === 8 || currentMap[y+1][x] === 18));
+        spriteKey = isRoof ? 'house_roof' : 'house_wall';
+    }
+    else if (type === 8 || type === 18) spriteKey = 'house_door';
+    else if (type === 11) spriteKey = 'rock';
+    else if (type === 12) spriteKey = 'stump';
+    else if (type === 15) spriteKey = 'bar_counter';
+    else if (type === 16) spriteKey = 'bar_table';
+    else if (type === 17) spriteKey = 'bar_chair';
+    else if (type === 24) spriteKey = 'puddle';
+
+    // Try to draw sprite
+    if (spriteKey && drawSprite(ctx, spriteKey, screenX + shakeX, screenY)) {
+        return;
     }
 
     // Helper per disegnare sprite cachati
@@ -445,6 +499,12 @@ function drawNPC(npc) {
     ctx.beginPath();
     ctx.ellipse(screenX + 16, screenY + 28, 8, 3, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Try to draw sprite
+    const action = npc.moving ? 'move' : 'idle'; // Or just use direction
+    if (drawSprite(ctx, npc.species, screenX, drawY, npc.direction)) {
+        return;
+    }
 
     if (npc.species === 'bulbasaur') {
         drawBulbasaur(screenX, drawY, npc.direction);
@@ -767,6 +827,11 @@ function drawWobbuffet(x, y, dir) {
 }
 
 function drawBoat(x, y, dir) {
+    // Try to draw sprite
+    if (drawSprite(ctx, 'boat', x, y, dir)) {
+        return;
+    }
+
     // Hull
     ctx.fillStyle = colors.boatBody;
     ctx.beginPath();
@@ -805,6 +870,11 @@ function drawPlayer() {
     // Animazione camminata
     const bounce = player.moving ? Math.abs(Math.sin(Date.now() / 100)) * 3 : 0;
     const drawY = screenY - bounce;
+
+    // Try to draw sprite
+    if (drawSprite(ctx, 'player', screenX, drawY, player.direction)) {
+        return;
+    }
 
     // Corpo
     ctx.fillStyle = colors.playerBody;
@@ -888,6 +958,8 @@ function updateCamera() {
 
 // Render Loop (Y-Sorted)
 function render() {
+    updateAnimation(); // Update sprite animations
+
     // Intro Zoom Logic
     if (zoomLevel < 1) {
         zoomLevel += 0.015;
