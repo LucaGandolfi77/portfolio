@@ -815,22 +815,24 @@
 
         /* Back Button */
         .back-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            background: rgba(0,0,0,0.5);
-            border: none;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
             border-radius: 10px;
             color: #fff;
             cursor: pointer;
-            font-size: 1rem;
-            z-index: 100;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.3s;
+            margin-right: 10px;
         }
 
         .back-btn:hover {
-            background: rgba(0,0,0,0.7);
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
         }
 
         /* Responsive */
@@ -1160,11 +1162,15 @@
     </style>
 </head>
 <body>
+    <div id="debugOverlay" style="position: fixed; top: 5px; right: 5px; z-index: 9999; font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.5); pointer-events: none; text-align: right; display: none;">
+        <div>Ver: f7d950a</div>
+        <div id="fpsCounter">FPS: --</div>
+    </div>
     <canvas id="fireworksCanvas"></canvas>
-    <a href="index.html" class="back-btn" style="top: 80px;">← Back</a>
 
     <div class="header">
         <div class="header-left">
+            <a href="index.html" class="back-btn">← Back</a>
             <h1>🎴 Card Collector</h1>
             <div class="player-level" id="headerLevel">Lv.1</div>
         </div>
@@ -1411,6 +1417,10 @@
                     <div class="stat-value" style="font-size: 1.5rem;">+5%</div>
                     <div class="stat-label">Luck</div>
                 </div>
+            </div>
+
+            <div style="margin-top: 30px; text-align: center;">
+                <button class="battle-btn" onclick="toggleDebug()" style="background: #4a5568; font-size: 0.9rem; padding: 10px 20px;">Toggle Debug Info</button>
             </div>
         </div>
     </div>
@@ -2206,15 +2216,20 @@
             showBoxOpening(cards);
 
             // Add cards to collection
+            console.log("Opening box, cards found:", cards.length);
             cards.forEach(card => {
+                console.log("Processing card:", card.name, "ID:", card.id);
                 if (!playerData.collection[card.id]) {
+                    console.log("New card found!");
                     playerData.collection[card.id] = { count: 0, level: 1 };
                 }
                 // Fix if corrupted
                 if (typeof playerData.collection[card.id] === 'number') {
+                    console.log("Fixing corrupted card data for ID:", card.id);
                     playerData.collection[card.id] = { count: playerData.collection[card.id], level: 1 };
                 }
                 playerData.collection[card.id].count++;
+                console.log("Card count updated to:", playerData.collection[card.id].count);
             });
 
             saveGame();
@@ -2620,15 +2635,19 @@
                     if (pool.length > 0) {
                         const card = pool[Math.floor(Math.random() * pool.length)];
                         results.cards.push(card);
+                        console.log("Fortune Wheel won card:", card.name, "ID:", card.id);
                         
                         if (!playerData.collection[card.id]) {
+                            console.log("New card from Wheel!");
                             playerData.collection[card.id] = { count: 1, level: 1 };
                         } else {
                             // Fix if corrupted
                             if (typeof playerData.collection[card.id] === 'number') {
+                                console.log("Fixing corrupted card from Wheel for ID:", card.id);
                                 playerData.collection[card.id] = { count: playerData.collection[card.id], level: 1 };
                             }
                             playerData.collection[card.id].count++;
+                            console.log("Wheel card count updated to:", playerData.collection[card.id].count);
                         }
                     }
                 }
@@ -2804,16 +2823,20 @@
                     // 10% chance for a card
                     if (Math.random() < 0.1) {
                         const card = allCards[Math.floor(Math.random() * allCards.length)];
+                        console.log("Slot Machine won card:", card.name, "ID:", card.id);
                         // Add to collection
                         if (!playerData.collection[card.id]) {
+                            console.log("New card from Slot!");
                             playerData.collection[card.id] = { count: 0, level: 1 };
                         }
                         // Fix if corrupted (is a number)
                         if (typeof playerData.collection[card.id] === 'number') {
+                             console.log("Fixing corrupted card from Slot for ID:", card.id);
                              playerData.collection[card.id] = { count: playerData.collection[card.id], level: 1 };
                         }
 
                         playerData.collection[card.id].count++;
+                        console.log("Slot card count updated to:", playerData.collection[card.id].count);
                         slotInfo.textContent += ` + CARD: ${card.name}!`;
                         updateCollection();
                     }
@@ -2848,6 +2871,35 @@
                 drawWheel();
             }
         }
+
+        // Debug & FPS
+        let debugVisible = false;
+        let lastLoop = new Date();
+        let fps = 0;
+
+        function toggleDebug() {
+            debugVisible = !debugVisible;
+            document.getElementById('debugOverlay').style.display = debugVisible ? 'block' : 'none';
+            localStorage.setItem('debugVisible', debugVisible);
+        }
+
+        function updateFPS() {
+            const thisLoop = new Date();
+            fps = 1000 / (thisLoop - lastLoop);
+            lastLoop = thisLoop;
+            
+            if (debugVisible) {
+                document.getElementById('fpsCounter').textContent = "FPS: " + Math.round(fps);
+            }
+            
+            requestAnimationFrame(updateFPS);
+        }
+
+        // Init Debug state
+        if (localStorage.getItem('debugVisible') === 'true') {
+            toggleDebug();
+        }
+        updateFPS();
 
         // Initialize
         loadGame();
