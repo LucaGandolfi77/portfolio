@@ -397,12 +397,13 @@ function generateInterior(type) {
     newMap[size-1][Math.floor(size/2)] = 10; // Mat (Exit)
     
     if (type === 'bar') {
-        // Counter
-        for(let x=2; x<8; x++) {
+        // Counter in fondo (Back of the room)
+        for(let x=1; x<9; x++) {
             newMap[2][x] = 15; // Counter
         }
-        newMap[2][2] = 15; // L-shape
-        newMap[3][2] = 15;
+        // Side parts of counter
+        newMap[3][1] = 15;
+        newMap[3][8] = 15;
 
         // Barman
         newNPCs.push({
@@ -419,20 +420,22 @@ function generateInterior(type) {
         });
 
         // Tables & Chairs
-        const tables = [{x: 4, y: 5}, {x: 7, y: 5}, {x: 4, y: 8}, {x: 7, y: 8}];
+        const tables = [{x: 3, y: 6}, {x: 6, y: 6}];
         tables.forEach(t => {
             newMap[t.y][t.x] = 16; // Table
             // Chairs around
             if (newMap[t.y][t.x-1] !== 7) newMap[t.y][t.x-1] = 17;
             if (newMap[t.y][t.x+1] !== 7) newMap[t.y][t.x+1] = 17;
+            if (newMap[t.y-1][t.x] !== 15) newMap[t.y-1][t.x] = 17; // Chair above
+            if (newMap[t.y+1][t.x] !== 10) newMap[t.y+1][t.x] = 17; // Chair below
         });
 
         // Patrons
         newNPCs.push({
-            x: 3,
-            y: 5,
-            pixelX: 3 * TILE_SIZE,
-            pixelY: 5 * TILE_SIZE,
+            x: 4,
+            y: 6,
+            pixelX: 4 * TILE_SIZE,
+            pixelY: 6 * TILE_SIZE,
             direction: 'right',
             moving: false,
             moveTimer: 0,
@@ -441,33 +444,41 @@ function generateInterior(type) {
         });
 
     } else {
+        // House Layout
+        // Table
+        newMap[5][5] = 16;
+        newMap[5][4] = 17; // Chair
+        newMap[5][6] = 17; // Chair
+
+        // Plants
+        newMap[1][1] = 3;
+        newMap[1][8] = 3;
+
         // NPC Quiz 1
         newNPCs.push({
-            x: 3,
+            x: 2,
             y: 4,
-            pixelX: 3 * TILE_SIZE,
+            pixelX: 2 * TILE_SIZE,
             pixelY: 4 * TILE_SIZE,
-            direction: 'down',
+            direction: 'right',
             moving: false,
             moveTimer: 0,
             quiz: houseQuizzes[0],
             color: '#ff9ff3'
         });
-        newMap[4][3] = 6;
 
         // NPC Quiz 2
         newNPCs.push({
-            x: 6,
+            x: 7,
             y: 4,
-            pixelX: 6 * TILE_SIZE,
+            pixelX: 7 * TILE_SIZE,
             pixelY: 4 * TILE_SIZE,
-            direction: 'down',
+            direction: 'left',
             moving: false,
             moveTimer: 0,
             quiz: houseQuizzes[1],
             color: '#54a0ff'
         });
-        newMap[4][6] = 6;
     }
 
     return { tiles: newMap, npcs: newNPCs, activeTiles: [], footprints: [], fireflies: [], type: 'indoor', width: size, height: size };
