@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nail Art Simulator & AR Try-On</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #e91e63;
+            --border-color: #333;
+        }
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            padding: 16px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+        }
+        header a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 20px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .panel {
+            background: var(--panel-bg);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 350px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .preview-container {
+            flex: 1;
+            min-width: 300px;
+            max-width: 800px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 4/3;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+        h2 { margin-top: 0; color: var(--accent-color); }
+        
+        .controls { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 0.9rem; color: #aaa; }
+        
+        input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+        input[type="range"] { width: 100%; accent-color: var(--accent-color); }
+        select {
+            padding: 10px;
+            border-radius: 6px;
+            background: #2d2d2d;
+            color: white;
+            border: 1px solid #444;
+            font-size: 1rem;
+        }
+        
+        button {
+            padding: 12px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+        /* Nail Preview Styling */
+        .nail-preview-box {
+            width: 100%;
+            height: 120px;
+            background: #2d2d2d;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .nail-sample {
+            width: 40px;
+            height: 60px;
+            background: #ccc;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .placeholder-msg {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="index.html#projects">← Back to Portfolio</a>
+        <h1>💅 Nail Art Simulator & AR</h1>
+    </header>
+
+    <main>
+        <div class="panel">
+            <h2>Design Studio</h2>
+            <div class="nail-preview-box">
+                <div id="nailSample" class="nail-sample"></div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>Base Color</label>
+                    <input type="color" id="color1" value="#ff0055">
+                </div>
+                <div class="control-group">
+                    <label>Mix Color (Gradient)</label>
+                    <input type="color" id="color2" value="#ffcc00">
+                </div>
+                <div class="control-group">
+                    <label>Shape</label>
+                    <select id="shape">
+                        <option value="round">Round</option>
+                        <option value="square">Square</option>
+                        <option value="stiletto">Stiletto</option>
+                        <option value="almond">Almond</option>
+                        <option value="coffin">Coffin</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Length</label>
+                    <input type="range" id="length" min="1" max="2.5" step="0.1" value="1.2">
+                </div>
+                <div class="control-group">
+                    <label>Glossiness</label>
+                    <input type="range" id="gloss" min="0" max="1" step="0.1" value="0.5">
+                </div>
+                
+                <button id="startBtn">Start AR Camera</button>
+            </div>
+        </div>
+
+        <div class="preview-container">
+            <div id="placeholder" class="placeholder-msg">
+                <h3>Ready to try on?</h3>
+                <p>Design your nails on the left, then click "Start AR Camera" to see them on your hands!</p>
+                <p><small>Powered by MediaPipe Hands</small></p>
+            </div>
+            <div id="loading-overlay">
+                <div class="spinner"></div>
+                <div id="loading-text">Loading AI Model...</div>
+            </div>
+            <video id="input_video" style="display:none"></video>
+            <canvas id="output_canvas"></canvas>
+        </div>
+    </main>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const placeholder = document.getElementById('placeholder');
+        const nailSample = document.getElementById('nailSample');
+
+        // Controls
+        const color1Input = document.getElementById('color1');
+        const color2Input = document.getElementById('color2');
+        const shapeInput = document.getElementById('shape');
+        const lengthInput = document.getElementById('length');
+        const glossInput = document.getElementById('gloss');
+
+        let hands;
+        let camera;
+        let isCameraRunning = false;
+
+        // Update Nail Preview
+        function updateNailDesign() {
+            const c1 = color1Input.value;
+            const c2 = color2Input.value;
+            const shape = shapeInput.value;
+            const len = lengthInput.value;
+            const gloss = glossInput.value;
+
+            // Base styles
+            nailSample.style.background = `linear-gradient(to bottom, ${c1}, ${c2})`;
+            nailSample.style.height = `${40 * len}px`;
+            
+            // Shape logic
+            let borderRadius = '0';
+            if (shape === 'round') borderRadius = '50% 50% 0 0';
+            else if (shape === 'square') borderRadius = '4px 4px 0 0';
+            else if (shape === 'stiletto') borderRadius = '0'; 
+            else if (shape === 'almond') borderRadius = '50% / 90% 90% 0 0';
+            else if (shape === 'coffin') borderRadius = '0';
+
+            nailSample.style.borderRadius = borderRadius;
+
+            // Advanced shapes using clip-path
+            if (shape === 'stiletto') {
+                nailSample.style.clipPath = 'polygon(50% 0%, 100% 100%, 0% 100%)'; 
+            } else if (shape === 'coffin') {
+                nailSample.style.clipPath = 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)';
+            } else {
+                nailSample.style.clipPath = 'none';
+            }
+
+            // Gloss effect
+            nailSample.style.boxShadow = `inset 0 0 10px rgba(255,255,255,${gloss})`;
+        }
+
+        // Listeners
+        [color1Input, color2Input, shapeInput, lengthInput, glossInput].forEach(el => {
+            el.addEventListener('input', updateNailDesign);
+        });
+        updateNailDesign(); // Init
+
+        // MediaPipe Setup
+        function onResults(results) {
+            loadingOverlay.style.display = 'none';
+            
+            // Draw video frame
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawNails(landmarks);
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        function drawNails(landmarks) {
+            // Fingertip indices: Thumb(4), Index(8), Middle(12), Ring(16), Pinky(20)
+            // DIP indices (joint below tip): 3, 7, 11, 15, 19
+            const tips = [4, 8, 12, 16, 20];
+            const dips = [3, 7, 11, 15, 19]; // Distal Interphalangeal Joints
+
+            const c1 = color1Input.value;
+            const c2 = color2Input.value;
+            const shape = shapeInput.value;
+            const lenMult = parseFloat(lengthInput.value);
+
+            tips.forEach((tipIdx, i) => {
+                const tip = landmarks[tipIdx];
+                const dip = landmarks[dips[i]]; // Joint below tip to determine direction and width
+
+                // Convert normalized coordinates to pixel coordinates
+                const tipX = tip.x * canvasElement.width;
+                const tipY = tip.y * canvasElement.height;
+                const dipX = dip.x * canvasElement.width;
+                const dipY = dip.y * canvasElement.height;
+
+                // Calculate finger width (approximate based on distance to joint)
+                // This is a rough approximation
+                const dist = Math.sqrt(Math.pow(tipX - dipX, 2) + Math.pow(tipY - dipY, 2));
+                const width = dist * 0.8; // Width relative to segment length
+                const height = dist * lenMult;
+
+                // Calculate angle
+                const angle = Math.atan2(tipY - dipY, tipX - dipX);
+
+                // Draw Nail
+                canvasCtx.save();
+                canvasCtx.translate(tipX, tipY);
+                canvasCtx.rotate(angle + Math.PI / 2); // Rotate to align with finger (pointing up)
+                
+                // Create gradient
+                const grd = canvasCtx.createLinearGradient(0, 0, 0, -height);
+                grd.addColorStop(0, c1);
+                grd.addColorStop(1, c2);
+                canvasCtx.fillStyle = grd;
+
+                // Draw shape
+                canvasCtx.beginPath();
+                
+                // Offset to start drawing from the nail bed (backwards from tip)
+                // dist is the length of the last finger segment. Nail bed is approx 40% of that.
+                const nailBed = dist * 0.4; 
+                
+                if (shape === 'round') {
+                    // Straight sides with rounded top
+                    canvasCtx.moveTo(-width/2, nailBed);
+                    canvasCtx.lineTo(-width/2, -height + width/2);
+                    canvasCtx.quadraticCurveTo(-width/2, -height, 0, -height);
+                    canvasCtx.quadraticCurveTo(width/2, -height, width/2, -height + width/2);
+                    canvasCtx.lineTo(width/2, nailBed);
+                    canvasCtx.fill();
+                } else if (shape === 'square') {
+                    // Rectangle with slight rounded corners
+                    const r = width * 0.1;
+                    canvasCtx.moveTo(-width/2, nailBed);
+                    canvasCtx.lineTo(-width/2, -height + r);
+                    canvasCtx.quadraticCurveTo(-width/2, -height, -width/2 + r, -height);
+                    canvasCtx.lineTo(width/2 - r, -height);
+                    canvasCtx.quadraticCurveTo(width/2, -height, width/2, -height + r);
+                    canvasCtx.lineTo(width/2, nailBed);
+                    canvasCtx.fill();
+                } else if (shape === 'stiletto') {
+                    // Sharp triangle
+                    canvasCtx.moveTo(-width/2, nailBed);
+                    canvasCtx.lineTo(0, -height);
+                    canvasCtx.lineTo(width/2, nailBed);
+                    canvasCtx.fill();
+                } else if (shape === 'almond') {
+                    // Tapered oval
+                    canvasCtx.moveTo(-width/2, nailBed);
+                    canvasCtx.quadraticCurveTo(-width/2, -height/2, 0, -height);
+                    canvasCtx.quadraticCurveTo(width/2, -height/2, width/2, nailBed);
+                    canvasCtx.fill();
+                } else if (shape === 'coffin') {
+                    // Tapered with flat top
+                    canvasCtx.moveTo(-width/2, nailBed);
+                    canvasCtx.lineTo(-width/3, -height);
+                    canvasCtx.lineTo(width/3, -height);
+                    canvasCtx.lineTo(width/2, nailBed);
+                    canvasCtx.fill();
+                }
+
+                // Gloss shine
+                canvasCtx.fillStyle = `rgba(255,255,255,${glossInput.value * 0.4})`;
+                canvasCtx.beginPath();
+                // Adjust gloss position to be on the nail body
+                canvasCtx.ellipse(-width/5, -height/2, width/8, height/4, 0, 0, Math.PI*2);
+                canvasCtx.fill();
+
+                canvasCtx.restore();
+            });
+        }
+
+        startBtn.addEventListener('click', async () => {
+            if (isCameraRunning) return;
+            
+            startBtn.disabled = true;
+            placeholder.style.display = 'none';
+            loadingOverlay.style.display = 'flex';
+
+            hands = new Hands({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }});
+
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onResults);
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({image: videoElement});
+                },
+                width: 1280,
+                height: 720
+            });
+
+            try {
+                await camera.start();
+                isCameraRunning = true;
+                
+                // Resize canvas to match video
+                videoElement.addEventListener('loadeddata', () => {
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                });
+
+            } catch (e) {
+                console.error(e);
+                alert('Error starting camera: ' + e.message);
+                loadingOverlay.style.display = 'none';
+                startBtn.disabled = false;
+            }
+        });
+
+    </script>
+</body>
+</html>
