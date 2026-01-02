@@ -210,6 +210,12 @@
                     <label>Glossiness</label>
                     <input type="range" id="gloss" min="0" max="1" step="0.1" value="0.5">
                 </div>
+                <div class="control-group">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="lighting" checked> 
+                        <span>Realistic Lighting & Shadows</span>
+                    </label>
+                </div>
                 
                 <button id="startBtn">Start AR Camera</button>
             </div>
@@ -245,6 +251,7 @@
         const shapeInput = document.getElementById('shape');
         const lengthInput = document.getElementById('length');
         const glossInput = document.getElementById('gloss');
+        const lightingInput = document.getElementById('lighting');
 
         let hands;
         let camera;
@@ -311,38 +318,73 @@
         function drawNails(landmarks) {
             // Fingertip indices: Thumb(4), Index(8), Middle(12), Ring(16), Pinky(20)
             // DIP indices (joint below tip): 3, 7, 11, 15, 19
+            // PIP indices (joint below DIP): 2, 6, 10, 14, 18
             const tips = [4, 8, 12, 16, 20];
-            const dips = [3, 7, 11, 15, 19]; // Distal Interphalangeal Joints
+            const dips = [3, 7, 11, 15, 19]; 
+            const pips = [2, 6, 10, 14, 18];
 
             const c1 = color1Input.value;
             const c2 = color2Input.value;
             const shape = shapeInput.value;
             const lenMult = parseFloat(lengthInput.value);
+            const useLighting = lightingInput.checked;
 
             tips.forEach((tipIdx, i) => {
                 const tip = landmarks[tipIdx];
-                const dip = landmarks[dips[i]]; // Joint below tip to determine direction and width
+                const dip = landmarks[dips[i]]; 
+                const pip = landmarks[pips[i]];
 
                 // Convert normalized coordinates to pixel coordinates
                 const tipX = tip.x * canvasElement.width;
                 const tipY = tip.y * canvasElement.height;
                 const dipX = dip.x * canvasElement.width;
                 const dipY = dip.y * canvasElement.height;
+                
+                // Use Z-depth for more accurate width calculation (prevent shrinking when pointing at camera)
+                // Z is normalized roughly to X scale.
+                const tipZ = tip.z * canvasElement.width;
+                const dipZ = dip.z * canvasElement.width;
 
-                // Calculate finger width (approximate based on distance to joint)
-                // This is a rough approximation
-                const dist = Math.sqrt(Math.pow(tipX - dipX, 2) + Math.pow(tipY - dipY, 2));
-                const width = dist * 0.8; // Width relative to segment length
-                const height = dist * lenMult;
+                // 2D Distance (Projected length on screen)
+                const dist2D = Math.sqrt(Math.pow(tipX - dipX, 2) + Math.pow(tipY - dipY, 2));
+                
+                // 3D Distance (Actual bone length approximation)
+                const dist3D = Math.sqrt(Math.pow(tipX - dipX, 2) + Math.pow(tipY - dipY, 2) + Math.pow(tipZ - dipZ, 2));
+
+                // Width is based on 3D bone length (constant), not projected length
+                // Factor 0.6 is tuned to match average finger width relative to distal phalanx
+                const width = dist3D * 0.65; 
+                
+                // Height (Nail Length) follows projection, but we ensure it doesn't disappear completely
+                // If dist2D is very small (steep angle), we keep a minimum length to show the "tip"
+                const height = Math.max(dist2D, width * 0.3) * lenMult;
 
                 // Calculate angle
-                const angle = Math.atan2(tipY - dipY, tipX - dipX);
+                // If projection is too short, use PIP->Tip vector for more stable rotation
+                let angle;
+                if (dist2D < 10) {
+                    const pipX = pip.x * canvasElement.width;
+                    const pipY = pip.y * canvasElement.height;
+                    angle = Math.atan2(tipY - pipY, tipX - pipX);
+                } else {
+                    angle = Math.atan2(tipY - dipY, tipX - dipX);
+                }
 
                 // Draw Nail
                 canvasCtx.save();
                 canvasCtx.translate(tipX, tipY);
-                canvasCtx.rotate(angle + Math.PI / 2); // Rotate to align with finger (pointing up)
+                canvasCtx.rotate(angle + Math.PI / 2); 
                 
+                // Shadow / Lighting
+                if (useLighting) {
+                    canvasCtx.shadowColor = 'rgba(0,0,0,0.6)';
+                    canvasCtx.shadowBlur = 10;
+                    canvasCtx.shadowOffsetX = 0;
+                    canvasCtx.shadowOffsetY = 4;
+                } else {
+                    canvasCtx.shadowColor = 'transparent';
+                }
+
                 // Create gradient
                 const grd = canvasCtx.createLinearGradient(0, 0, 0, -height);
                 grd.addColorStop(0, c1);
@@ -352,12 +394,11 @@
                 // Draw shape
                 canvasCtx.beginPath();
                 
-                // Offset to start drawing from the nail bed (backwards from tip)
-                // dist is the length of the last finger segment. Nail bed is approx 40% of that.
-                const nailBed = dist * 0.4; 
+                // Offset to start drawing from the nail bed
+                // We use dist3D for the nail bed offset to keep it stable during rotation
+                const nailBed = dist3D * 0.4; 
                 
                 if (shape === 'round') {
-                    // Straight sides with rounded top
                     canvasCtx.moveTo(-width/2, nailBed);
                     canvasCtx.lineTo(-width/2, -height + width/2);
                     canvasCtx.quadraticCurveTo(-width/2, -height, 0, -height);
@@ -365,7 +406,6 @@
                     canvasCtx.lineTo(width/2, nailBed);
                     canvasCtx.fill();
                 } else if (shape === 'square') {
-                    // Rectangle with slight rounded corners
                     const r = width * 0.1;
                     canvasCtx.moveTo(-width/2, nailBed);
                     canvasCtx.lineTo(-width/2, -height + r);
@@ -375,19 +415,16 @@
                     canvasCtx.lineTo(width/2, nailBed);
                     canvasCtx.fill();
                 } else if (shape === 'stiletto') {
-                    // Sharp triangle
                     canvasCtx.moveTo(-width/2, nailBed);
                     canvasCtx.lineTo(0, -height);
                     canvasCtx.lineTo(width/2, nailBed);
                     canvasCtx.fill();
                 } else if (shape === 'almond') {
-                    // Tapered oval
                     canvasCtx.moveTo(-width/2, nailBed);
                     canvasCtx.quadraticCurveTo(-width/2, -height/2, 0, -height);
                     canvasCtx.quadraticCurveTo(width/2, -height/2, width/2, nailBed);
                     canvasCtx.fill();
                 } else if (shape === 'coffin') {
-                    // Tapered with flat top
                     canvasCtx.moveTo(-width/2, nailBed);
                     canvasCtx.lineTo(-width/3, -height);
                     canvasCtx.lineTo(width/3, -height);
@@ -396,11 +433,22 @@
                 }
 
                 // Gloss shine
-                canvasCtx.fillStyle = `rgba(255,255,255,${glossInput.value * 0.4})`;
+                // If lighting is enabled, we can make the gloss more subtle or positioned
+                const glossOpacity = useLighting ? glossInput.value * 0.6 : glossInput.value * 0.4;
+                canvasCtx.fillStyle = `rgba(255,255,255,${glossOpacity})`;
+                canvasCtx.shadowBlur = 0; // No shadow for gloss
+                
                 canvasCtx.beginPath();
-                // Adjust gloss position to be on the nail body
                 canvasCtx.ellipse(-width/5, -height/2, width/8, height/4, 0, 0, Math.PI*2);
                 canvasCtx.fill();
+
+                // Extra highlight for realism
+                if (useLighting) {
+                    canvasCtx.fillStyle = `rgba(255,255,255,${glossOpacity * 0.5})`;
+                    canvasCtx.beginPath();
+                    canvasCtx.ellipse(width/5, -height/3, width/12, height/6, 0, 0, Math.PI*2);
+                    canvasCtx.fill();
+                }
 
                 canvasCtx.restore();
             });
