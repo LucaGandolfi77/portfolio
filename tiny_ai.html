@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tiny Local AI Demo</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;flex-direction:column;min-height:100vh;margin:0}
+    header{padding:16px;background:#0d6efd;color:#fff}
+    main{flex:1;padding:20px;display:flex;gap:20px;align-items:flex-start}
+    .panel{flex:1;max-width:800px}
+    textarea{width:100%;height:160px;padding:10px;font-size:1rem}
+    button{padding:10px 14px;font-size:1rem;border-radius:6px;background:#0d6efd;color:#fff;border:none;cursor:pointer}
+    #output{white-space:pre-wrap;background:#f7f7f8;padding:14px;border-radius:6px;border:1px solid #eee;min-height:120px}
+    .hint{color:#666;font-size:0.9rem;margin-top:8px}
+    nav a{color:#fff;text-decoration:none;margin-right:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="index.html#projects">← Back</a>
+      <span style="font-weight:700">Tiny Local AI Demo</span>
+    </nav>
+  </header>
+  <main>
+    <div class="panel">
+      <h2>Prompt</h2>
+      <textarea id="prompt" placeholder="Write a short prompt (e.g. 'Write a friendly 2-line haiku about coffee')."></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+        <label for="backend">Backend</label>
+        <select id="backend" style="padding:6px;border-radius:6px">
+          <option value="server">Flask Server (/generate)</option>
+          <option value="webllm">WebLLM (WebSocket ws://127.0.0.1:11434)</option>
+          <option value="webgpu">In-Browser WebLLM (WebGPU)</option>
+        </select>
+        <select id="model" style="padding:6px;border-radius:6px;display:none;max-width:200px">
+          <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (Default)</option>
+          <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 2.5 0.5B (Tiny)</option>
+          <option value="TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC">TinyLlama 1.1B</option>
+          <option value="SmolLM2-135M-Instruct-q4f16_1-MLC">SmolLM2 135M (Smallest - 135M)</option>
+          <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (Very Tiny)</option>        </select>
+        <label for="maxlen">Max tokens</label>
+        <input id="maxlen" type="number" value="128" style="width:80px;padding:6px;border:1px solid #ccc;border-radius:6px">
+        <button id="gen">Generate</button>
+        <button id="clearCache" style="background:#dc3545;margin-left:10px" title="Free up space if you get QuotaExceededError">Clear Cache</button>
+      </div>
+      <div class="hint">This page expects a local server to run a small model. See the included <code>server.py</code> and <code>README.md</code> for setup instructions.</div>
+    </div>
+    <div class="panel">
+      <h2>Output</h2>
+      <div id="output">Results will appear here.</div>
+    </div>
+  </main>
+
+  <script>
+    async function generate(){
+      const prompt = document.getElementById('prompt').value.trim();
+      const maxlen = parseInt(document.getElementById('maxlen').value) || 128;
+      const out = document.getElementById('output');
+      if(!prompt){ out.textContent = 'Please enter a prompt.'; return; }
+
+      const backend = document.getElementById('backend').value;
+      const modelId = document.getElementById('model').value;
+      
+      if (backend === 'webgpu') {
+        out.textContent = 'Initializing WebLLM (WebGPU)...';
+      } else {
+        out.textContent = backend === 'webllm' ? 'Connecting to WebLLM (ws://127.0.0.1:11434)...' : 'Contacting local model server...';
+      }
+
+      try{
+        if(backend === 'webgpu'){
+          const text = await runWebGPU(prompt, maxlen, (msg) => out.textContent = msg, modelId);
+          out.textContent = text || 'No output';
+        } else if(backend === 'webllm'){
+          const text = await webllmGenerate(prompt, maxlen);
+          out.textContent = text || 'No output';
+        } else {
+          const res = await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({prompt,max_length: maxlen})});
+          if(!res.ok){ const text = await res.text(); out.textContent = 'Server error: '+text; return; }
+          const data = await res.json();
+          out.textContent = data.generated || data.error || 'No output';
+        }
+      }catch(e){ 
+        console.error(e);
+        if (e.name === 'QuotaExceededError' || e.message.includes('QuotaExceededError')) {
+            out.textContent = 'Error: Browser storage quota exceeded. Please click "Clear Cache" to free up space, then try again.\n\n' + e.message;
+        } else {
+            out.textContent = 'Error: ' + e.message + '\n\nCheck console for details.'; 
+        }
+      }
+    }
+    document.getElementById('gen').addEventListener('click', generate);
+    
+    document.getElementById('clearCache').addEventListener('click', async () => {
+      if(!confirm('This will delete all downloaded models from your browser cache to free up space. Are you sure?')) return;
+      const out = document.getElementById('output');
+      out.textContent = 'Clearing cache...';
+      try {
+        // Clear Cache API
+        const keys = await caches.keys();
+        let count = 0;
+        for(const key of keys) {
+           // WebLLM uses specific cache names, but we can be safe and clear ones that look like model caches
+           if(key.startsWith('webllm/') || key.includes('mlc')) {
+             await caches.delete(key);
+             count++;
+           }
+        }
+        
+        // Also try to clear IndexedDB if used by WebLLM
+        try {
+            const dbs = await window.indexedDB.databases();
+            for (const db of dbs) {
+                if (db.name && (db.name.includes('webllm') || db.name.includes('mlc'))) {
+                    window.indexedDB.deleteDatabase(db.name);
+                    count++;
+                }
+            }
+        } catch(e) { console.warn("Could not list/delete IndexedDB:", e); }
+
+        out.textContent = `Cache cleared (${count} items removed). You can now reload the page and try downloading a model again.`;
+        webllmEngine = null; 
+        currentModelId = null;
+      } catch(e) {
+        out.textContent = 'Error clearing cache: ' + e;
+      }
+    });
+
+    // Allow Ctrl+Enter to generate
+    document.getElementById('prompt').addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.key === 'Enter') generate(); });
+
+    // Toggle model selector visibility
+    const backendSelect = document.getElementById('backend');
+    const modelSelect = document.getElementById('model');
+    function updateModelVisibility() {
+        modelSelect.style.display = backendSelect.value === 'webgpu' ? 'block' : 'none';
+    }
+    backendSelect.addEventListener('change', updateModelVisibility);
+    updateModelVisibility();
+
+    let webllmEngine = null;
+    let currentModelId = null;
+
+    async function runWebGPU(prompt, maxTokens, onProgress, modelId) {
+        // Dynamic import from CDN
+        const { CreateMLCEngine, prebuiltAppConfig } = await import('https://esm.run/@mlc-ai/web-llm');
+        
+        const selectedModel = modelId || "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
+        
+        // Custom config for models not in prebuilt list
+        const appConfig = {
+            model_list: [
+                ...prebuiltAppConfig.model_list,
+                {
+                    "model": "https://huggingface.co/mlc-ai/SmolLM2-135M-Instruct-q4f16_1-MLC",
+                    "model_id": "SmolLM2-135M-Instruct-q4f16_1-MLC",
+                    "model_lib": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-135M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+                    "vram_required_MB": 128,
+                    "low_resource_required": true,
+                    "overrides": { "context_window_size": 4096 }
+                },
+                {
+                    "model": "https://huggingface.co/mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC",
+                    "model_id": "SmolLM2-360M-Instruct-q4f16_1-MLC",
+                    "model_lib": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-360M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+                    "vram_required_MB": 256,
+                    "low_resource_required": true,
+                    "overrides": { "context_window_size": 4096 }
+                }
+            ]
+        };
+
+        if (!webllmEngine) {
+            onProgress("Loading WebLLM engine and model " + selectedModel + " (this may take a while)...");
+            webllmEngine = await CreateMLCEngine(
+                selectedModel,
+                { 
+                    appConfig: appConfig,
+                    initProgressCallback: (report) => onProgress(report.text) 
+                }
+            );
+            currentModelId = selectedModel;
+        } else if (currentModelId !== selectedModel) {
+            onProgress("Switching to model " + selectedModel + "...");
+            await webllmEngine.reload(selectedModel, { 
+                appConfig: appConfig,
+                initProgressCallback: (report) => onProgress(report.text) 
+            });
+            currentModelId = selectedModel;
+        }
+
+        onProgress("Generating...");
+        const messages = [
+            { role: "user", content: prompt }
+        ];
+
+        const reply = await webllmEngine.chat.completions.create({
+            messages,
+            max_tokens: maxTokens,
+        });
+        
+        return reply.choices[0].message.content;
+    }
+
+    // WebLLM WebSocket client (best-effort). Many WebLLM setups expose a WebSocket at ws://127.0.0.1:11434
+    function webllmGenerate(prompt, maxTokens){
+      return new Promise((resolve, reject) => {
+        try{
+          const url = 'ws://127.0.0.1:11434/';
+          const ws = new WebSocket(url);
+          const timeout = setTimeout(()=>{ try{ ws.close(); }catch{}; reject('WebLLM connection timeout'); }, 20000);
+
+          ws.onopen = () => {
+            // Generic request format. Different WebLLM versions may expect different JSON; adjust if needed.
+            const msg = {
+              type: 'generate',
+              input: prompt,
+              parameters: { max_new_tokens: maxTokens }
+            };
+            ws.send(JSON.stringify(msg));
+          };
+
+          ws.onmessage = (evt) => {
+            try{
+              const data = JSON.parse(evt.data);
+              // Try common response fields
+              if(data.result || data.text || data.output){
+                clearTimeout(timeout);
+                try{ ws.close(); }catch{};
+                resolve(data.result || data.text || data.output);
+              } else if(data.type === 'generation_chunk' && data.text){
+                // chunked streaming -- resolve final on 'finished' flag
+                if(data.finished){ clearTimeout(timeout); try{ ws.close(); }catch{}; resolve(data.text); }
+              } else {
+                // fallback: return the raw message
+                clearTimeout(timeout);
+                try{ ws.close(); }catch{};
+                resolve(JSON.stringify(data));
+              }
+            }catch(err){ clearTimeout(timeout); try{ ws.close(); }catch{}; resolve(evt.data); }
+          };
+
+          ws.onerror = (err) => { clearTimeout(timeout); try{ ws.close(); }catch{}; reject('WebSocket error'); };
+          ws.onclose = ()=>{};
+        }catch(e){ reject(e); }
+      });
+    }
+  </script>
+</body>
+</html>
