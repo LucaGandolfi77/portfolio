@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pixel Draw — Luca Gandolfi</title>
+  <style>
+    :root{--bg:#0b1116;--panel:#071017;--muted:#9fbfe8}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg);color:#eaf6ff}
+    .wrap{max-width:1100px;margin:20px auto;padding:18px;}
+    .topbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    label{font-size:0.9rem;color:var(--muted);margin-right:8px}
+    select,input[type=number]{padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{background:#00b7ff;border:none;color:#001218;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .controls{display:flex;gap:12px;align-items:center}
+    .palette{display:flex;gap:8px;align-items:center}
+    .color-swatch{width:28px;height:28px;border-radius:6px;border:2px solid rgba(255,255,255,0.06);cursor:pointer}
+    .canvas-area{margin-top:18px;display:flex;gap:18px;align-items:flex-start}
+    .viewer{background:var(--panel);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
+    #canvasWrap{width:640px;height:640px;display:flex;align-items:center;justify-content:center;}
+    canvas{background:#071017;display:block;}
+    .info{flex:1;min-width:220px}
+    .small{font-size:0.85rem;color:var(--muted)}
+    @media (max-width:900px){#canvasWrap{width:90vw;height:90vw}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="margin:0 0 10px">Pixel Draw</h1>
+    <div class="topbar panel">
+      <div class="controls">
+        <label for="gridSize">Grid</label>
+        <select id="gridSize"><option>16</option><option selected>32</option><option>64</option></select>
+        <label for="customSize" class="small">Custom</label>
+        <input id="customSize" type="number" min="4" max="256" style="width:80px" placeholder="es: 24">
+        <button id="applySize">Applica</button>
+      </div>
+      <div style="flex:1"></div>
+      <div class="palette">
+        <div id="colors"></div>
+        <input id="colorPicker" type="color" value="#00b7ff" style="width:44px;height:34px;border-radius:6px;border:0;padding:0">
+        <button id="clearBtn">Clear</button>
+        <button id="exportBtn">Esporta PNG</button>
+      </div>
+    </div>
+
+    <div class="canvas-area">
+      <div class="viewer panel" style="flex:0 0 auto">
+        <div id="canvasWrap">
+          <canvas id="drawCanvas" width="512" height="512"></canvas>
+        </div>
+      </div>
+      <div class="info">
+        <div class="panel small" style="padding:12px">
+          <div><strong>Instructions</strong></div>
+          <ul style="margin:8px 0 0 16px">
+            <li>To draw: touch or hold mouse and move over the canvas.</li>
+            <li>Pinch to zoom and use two fingers to pan on touch devices.</li>
+            <li>Change grid size and press "Applica" to resize the pixel grid.</li>
+          </ul>
+        </div>
+        <div style="height:12px"></div>
+        <div class="panel small" style="padding:12px">Grid size: <span id="currentGrid">32</span> × <span id="currentGrid2">32</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Basic state
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+    const baseSize = 512; // logical canvas pixels
+    const canvasWrap = document.getElementById('canvasWrap');
+    let grid = 32;
+    let pixels = createPixels(grid);
+    const colors = ['#000000','#ffffff','#ff3b30','#ff9500','#ffd60a','#32d74b','#0a84ff','#5856d6','#ff2d55'];
+    const colorPicker = document.getElementById('colorPicker');
+    let currentColor = colorPicker.value || '#00b7ff';
+    document.getElementById('currentGrid').textContent = grid;
+    document.getElementById('currentGrid2').textContent = grid;
+
+    // transform state
+    let scale = 1, tx = 0, ty = 0;
+
+    // render palette
+    const colorsDiv = document.getElementById('colors');
+    colors.forEach(c=>{
+      const d = document.createElement('div'); d.className='color-swatch'; d.style.background=c; d.addEventListener('click',()=>{currentColor=c;colorPicker.value=rgbToHex(c)}); colorsDiv.appendChild(d);
+    });
+
+    function createPixels(n){
+      const a = new Array(n*n).fill('#071017');
+      return {w:n,h:n,data:a};
+    }
+
+    function drawAll(){
+      ctx.clearRect(0,0,baseSize,baseSize);
+      const px = baseSize / pixels.w;
+      for(let y=0;y<pixels.h;y++){
+        for(let x=0;x<pixels.w;x++){
+          const col = pixels.data[y*pixels.w+x];
+          ctx.fillStyle = col || '#071017';
+          ctx.fillRect(Math.floor(x*px),Math.floor(y*px),Math.ceil(px),Math.ceil(px));
+        }
+      }
+      // grid lines
+      ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+      for(let i=1;i<pixels.w;i++){ const gx = Math.round(i*px)+0.5; ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,baseSize); ctx.stroke(); }
+      for(let i=1;i<pixels.h;i++){ const gy = Math.round(i*px)+0.5; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(baseSize,gy); ctx.stroke(); }
+    }
+
+    function setPixelAtCanvasCoord(cx,cy,color){
+      // canvas logical coords (0..baseSize)
+      const px = baseSize / pixels.w;
+      const x = Math.floor(cx/px);
+      const y = Math.floor(cy/px);
+      if(x<0||y<0||x>=pixels.w||y>=pixels.h) return;
+      pixels.data[y*pixels.w+x]=color;
+      // draw single
+      ctx.fillStyle = color; ctx.fillRect(Math.floor(x*px),Math.floor(y*px),Math.ceil(px),Math.ceil(px));
+    }
+
+    // map client coords to canvas logical coords accounting for translate and scale
+    function clientToCanvas(clientX,clientY){
+      const rect = canvasWrap.getBoundingClientRect();
+      // position relative to wrapper
+      const rx = clientX - rect.left;
+      const ry = clientY - rect.top;
+      // apply inverse transform
+      const localX = (rx - tx) / scale;
+      const localY = (ry - ty) / scale;
+      // canvas is centered inside wrapper; compute offset to canvas element
+      const cRect = canvas.getBoundingClientRect();
+      const offX = (cRect.left - rect.left) + (localX - (cRect.width/2));
+      // Instead of complex offsets, we assume canvas fills wrapper center; easier: compute canvas element logical coords
+      const canvasRect = canvas.getBoundingClientRect();
+      const cx = (clientX - canvasRect.left - tx) / scale;
+      const cy = (clientY - canvasRect.top - ty) / scale;
+      // But canvas internal logical size is baseSize; map pixel coordinates proportionally
+      const relX = (clientX - canvasRect.left);
+      const relY = (clientY - canvasRect.top);
+      const canvasLocalX = relX / canvasRect.width * baseSize;
+      const canvasLocalY = relY / canvasRect.height * baseSize;
+      // Adjust for transforms
+      const adjX = (canvasLocalX - tx) / scale;
+      const adjY = (canvasLocalY - ty) / scale;
+      // The transform is applied to the wrapper, so simpler approach: compute wrapper-based mapping
+      const wrapperX = (clientX - canvasRect.left - tx) / scale;
+      const wrapperY = (clientY - canvasRect.top - ty) / scale;
+      // convert to baseSize coordinate
+      const pxRatioX = baseSize / canvasRect.width;
+      const pxRatioY = baseSize / canvasRect.height;
+      return {x: wrapperX * pxRatioX, y: wrapperY * pxRatioY};
+    }
+
+    // Simpler event handling: we compute coordinate by using bounding rect and reversing transforms
+    function getCanvasCoordsFromClient(clientX,clientY){
+      const wrapRect = canvasWrap.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      // point relative to canvas center in screen space
+      const relToCanvasLeft = clientX - canvasRect.left;
+      const relToCanvasTop = clientY - canvasRect.top;
+      // account for scale
+      const scaleX = canvas.width / canvasRect.width;
+      const cx = (relToCanvasLeft) * scaleX;
+      const cy = (relToCanvasTop) * (canvas.height / canvasRect.height);
+      return {x:cx,y:cy};
+    }
+
+    // Event handling: drawing with mouse
+    let drawing=false;
+    canvas.addEventListener('pointerdown', (e)=>{ if(e.button===0){drawing=true; canvas.setPointerCapture(e.pointerId); const p=getCanvasCoordsFromClient(e.clientX,e.clientY); setPixelAtCanvasCoord(p.x,p.y,currentColor);} });
+    canvas.addEventListener('pointermove',(e)=>{ if(drawing){ const p=getCanvasCoordsFromClient(e.clientX,e.clientY); setPixelAtCanvasCoord(p.x,p.y,currentColor);} });
+    window.addEventListener('pointerup',(e)=>{ drawing=false; try{canvas.releasePointerCapture(e.pointerId)}catch(e){} });
+
+    // Touch: support single touch to draw, two-finger pinch/drag to zoom/pan
+    let ongoingTouches = {};
+    let pinch = null;
+    canvasWrap.addEventListener('touchstart', function(e){ e.preventDefault(); if(e.touches.length===1){ const t=e.touches[0]; const p=getCanvasCoordsFromClient(t.clientX,t.clientY); setPixelAtCanvasCoord(p.x,p.y,currentColor); ongoingTouches[t.identifier]=t; } else if(e.touches.length===2){ // start pinch
+      const [a,b]=[e.touches[0],e.touches[1]]; const dist = Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); const mid = {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; pinch = {startDist:dist,startScale:scale,startTx:tx,startTy:ty,mid}; }
+    }, {passive:false});
+
+    canvasWrap.addEventListener('touchmove', function(e){ e.preventDefault(); if(e.touches.length===1 && !pinch){ const t=e.touches[0]; const p=getCanvasCoordsFromClient(t.clientX,t.clientY); setPixelAtCanvasCoord(p.x,p.y,currentColor); ongoingTouches[t.identifier]=t; } else if(e.touches.length===2 && pinch){ const [a,b]=[e.touches[0],e.touches[1]]; const dist = Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); const mid = {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; const s1 = pinch.startScale * (dist / pinch.startDist);
+      // compute new tx,ty so midpoint stays stable
+      const s0 = pinch.startScale; const sRatio = s1 / s0;
+      const mx = mid.x - canvasWrap.getBoundingClientRect().left;
+      const my = mid.y - canvasWrap.getBoundingClientRect().top;
+      tx = (sRatio)*pinch.startTx + mx*(1 - sRatio);
+      ty = (sRatio)*pinch.startTy + my*(1 - sRatio);
+      scale = Math.max(0.5, Math.min(6, s1)); applyTransform(); }
+    }, {passive:false});
+
+    canvasWrap.addEventListener('touchend', function(e){ e.preventDefault(); if(e.touches.length<2) pinch=null; for(const t of e.changedTouches){ delete ongoingTouches[t.identifier]; } }, {passive:false});
+
+    function applyTransform(){ canvasWrap.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; }
+    applyTransform();
+
+    // mouse wheel zoom
+    canvasWrap.addEventListener('wheel', (e)=>{ e.preventDefault(); const delta = -e.deltaY; const factor = delta>0?1.08:0.92; const rect = canvasWrap.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const newScale = Math.max(0.5, Math.min(6, scale * factor)); const sRatio = newScale/scale; tx = sRatio*tx + mx*(1 - sRatio); ty = sRatio*ty + my*(1 - sRatio); scale = newScale; applyTransform(); }, {passive:false});
+
+    // color picker
+    colorPicker.addEventListener('change', ()=>{ currentColor = colorPicker.value; });
+
+    // clear
+    document.getElementById('clearBtn').addEventListener('click',()=>{ pixels = createPixels(grid); drawAll(); });
+
+    // export
+    document.getElementById('exportBtn').addEventListener('click', ()=>{ // render pixel art to temporary canvas at nearest neighbor scaling
+      const out = document.createElement('canvas'); out.width = pixels.w; out.height = pixels.h; const octx = out.getContext('2d'); for(let y=0;y<pixels.h;y++){ for(let x=0;x<pixels.w;x++){ octx.fillStyle = pixels.data[y*pixels.w+x]||'#071017'; octx.fillRect(x,y,1,1); }} const link=document.createElement('a'); link.href = out.toDataURL('image/png'); link.download='pixel-art.png'; link.click(); });
+
+    // grid size apply
+    document.getElementById('applySize').addEventListener('click', ()=>{
+      const sel = document.getElementById('gridSize').value; const custom = document.getElementById('customSize').value; const newSize = custom?Math.max(4,Math.min(256,parseInt(custom)||32)):parseInt(sel)||32; grid=newSize; pixels = createPixels(grid); document.getElementById('currentGrid').textContent = grid; document.getElementById('currentGrid2').textContent = grid; drawAll();
+    });
+
+    // init
+    drawAll();
+
+    // util
+    function rgbToHex(rgb){ return rgb; }
+  </script>
+</body>
+</html>
