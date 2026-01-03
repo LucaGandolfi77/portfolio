@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fashion Detector — Hugging Face prototype</title>
+  <style>
+    body{font-family:Inter,system-ui,Arial; background:#071017;color:#eaf6ff;margin:0;padding:20px}
+    .wrap{max-width:900px;margin:0 auto}
+    .panel{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    input,select,button,textarea{font-size:1rem}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .preview{max-width:360px;max-height:360px;border-radius:8px;overflow:hidden;background:#0b1116;border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center}
+    .muted{color:#9fbfe8}
+    .results{margin-top:12px}
+    .label{display:flex;justify-content:space-between;padding:6px;border-bottom:1px dashed rgba(255,255,255,0.03)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Fashion Detector — prototipo Hugging Face</h1>
+    <div class="panel">
+      <div class="row">
+        <label class="muted">Hugging Face API Token</label>
+        <input id="hfToken" type="password" placeholder="Inserisci il tuo token (hf_...)" style="min-width:320px">
+        <button id="saveToken">Salva</button>
+      </div>
+      <p class="muted" style="margin-top:8px">Il token sarà usato per chiamare l'Inference API. Puoi crearne uno su https://huggingface.co/settings/tokens</p>
+    </div>
+
+    <div style="height:12px"></div>
+
+    <div class="panel">
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:280px">
+          <label class="muted">Carica foto o usa la camera</label>
+          <input id="fileInput" type="file" accept="image/*" capture="environment">
+          <div style="height:8px"></div>
+          <label class="muted">Candidate labels (comma separated)</label>
+          <input id="labels" type="text" value="dress,shirt,jacket,pants,jeans,sneakers,boots,heels,sandal" style="width:100%">
+          <div style="height:8px"></div>
+          <button id="analyzeBtn">Analizza con Hugging Face (zero-shot CLIP)</button>
+          <div style="height:8px"></div>
+          <button id="captionBtn">Ottieni caption (fallback BLIP)</button>
+          <div style="height:8px"></div>
+          <button id="searchProductsBtn">Cerca prodotto (demo)</button>
+        </div>
+        <div style="width:360px">
+          <div class="preview" id="preview">Nessuna immagine</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="output" class="panel results" style="margin-top:12px">
+      <div class="muted">Risultati</div>
+      <div id="resultsList"></div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const hfModelZeroShot = 'joeddav/clip-vit-base-patch32'; // zero-shot CLIP
+    const hfModelCaption = 'Salesforce/blip-image-captioning-base';
+
+    // Example product catalog (small demo). Replace with your own catalog/images.
+    const productCatalog = [
+      { id: 'p1', name: 'White Sneakers', desc: 'white casual sneakers', img: 'https://images.unsplash.com/photo-1528701800484-1c4f9d8c9b8a?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=1' },
+      { id: 'p2', name: 'Black Leather Boots', desc: 'black ankle boots', img: 'https://images.unsplash.com/photo-1585386959984-a4155220b2d6?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=2' },
+      { id: 'p3', name: 'Red Dress', desc: 'red evening dress', img: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=3' },
+      { id: 'p4', name: 'Blue Jeans', desc: 'denim jeans', img: 'https://images.unsplash.com/photo-1530845640176-38d6b7f3ca1b?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=4' },
+      { id: 'p5', name: 'Brown Leather Jacket', desc: 'brown leather jacket', img: 'https://images.unsplash.com/photo-1520975910845-6f0d7d2b2fb3?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=5' },
+      { id: 'p6', name: 'Black Heels', desc: 'black high heels', img: 'https://images.unsplash.com/photo-1503342452485-86f7f4f1281b?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=6' }
+    ];
+
+    // render product previews
+    const productsContainer = document.createElement('div'); productsContainer.style.marginTop='10px';
+    productsContainer.innerHTML = '<div class="muted">Catalogo demo</div>';
+    const prodGrid = document.createElement('div'); prodGrid.style.display='flex'; prodGrid.style.gap='8px'; prodGrid.style.flexWrap='wrap'; prodGrid.style.marginTop='8px';
+    productCatalog.forEach(p=>{ const el = document.createElement('div'); el.style.width='120px'; el.style.fontSize='0.85rem'; el.style.color='#dfefff'; el.innerHTML = `<div style="height:80px;overflow:hidden;border-radius:6px;border:1px solid rgba(255,255,255,0.03)"><img src="${p.img}" style="width:100%;height:100%;object-fit:cover"></div><div style="margin-top:6px">${p.name}</div>`; prodGrid.appendChild(el); });
+    productsContainer.appendChild(prodGrid);
+    document.getElementById('output').appendChild(productsContainer);
+
+    // Elements
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const captionBtn = document.getElementById('captionBtn');
+    const resultsList = document.getElementById('resultsList');
+    const hfTokenInput = document.getElementById('hfToken');
+    const saveTokenBtn = document.getElementById('saveToken');
+
+    // load saved token
+    const saved = localStorage.getItem('hf_token');
+    if(saved) hfTokenInput.value = saved;
+
+    saveTokenBtn.addEventListener('click', ()=>{ localStorage.setItem('hf_token', hfTokenInput.value); alert('Token salvato in localStorage (sessione browser).'); });
+
+    let lastDataUrl = null;
+    fileInput.addEventListener('change', async (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f) return; const reader=new FileReader(); reader.onload = ()=>{ lastDataUrl = reader.result; showPreview(lastDataUrl); }; reader.readAsDataURL(f);
+    });
+
+    function showPreview(dataUrl){ preview.innerHTML=''; const img = document.createElement('img'); img.src=dataUrl; img.style.maxWidth='100%'; img.style.maxHeight='100%'; preview.appendChild(img); }
+
+    function getToken(){ const t = hfTokenInput.value || localStorage.getItem('hf_token'); if(!t) { alert('Inserisci il token Hugging Face'); throw new Error('no token'); } return t; }
+
+    async function callHfModel(model, body){ const token = getToken(); const res = await fetch('https://api-inference.huggingface.co/models/' + model, { method:'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if(!res.ok){ const txt = await res.text(); throw new Error('HF error: '+res.status+' '+txt); } return res.json(); }
+
+    analyzeBtn.addEventListener('click', async ()=>{
+      try{
+        if(!lastDataUrl) return alert('Carica una immagine prima');
+        resultsList.innerHTML = '<div class="muted">Chiamando modello CLIP per zero-shot classification…</div>';
+        const candidateLabels = document.getElementById('labels').value.split(',').map(s=>s.trim()).filter(Boolean);
+        const body = { inputs: lastDataUrl, parameters: { candidate_labels: candidateLabels, hypothesis_template: 'This is a photo of a {}.' } };
+        const json = await callHfModel(hfModelZeroShot, body);
+        renderResults(json);
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+err.message+'</div>'; }
+    });
+
+    // Product search: use zero-shot CLIP over product labels (name + desc) to rank catalog
+    const searchProductsBtn = document.getElementById('searchProductsBtn');
+    searchProductsBtn.addEventListener('click', async ()=>{
+      try{
+        if(!lastDataUrl) return alert('Carica una immagine prima');
+        resultsList.innerHTML = '<div class="muted">Ricerca prodotti: chiamando CLIP zero-shot…</div>';
+        // build candidate labels from catalog
+        const candidateLabels = productCatalog.map(p=>`${p.name} ${p.desc}`);
+        const body = { inputs: lastDataUrl, parameters: { candidate_labels: candidateLabels, hypothesis_template: 'This is a photo of {}.' } };
+        const json = await callHfModel(hfModelZeroShot, body);
+        // json.labels contains labels (strings) matching candidateLabels; json.scores aligns
+        resultsList.innerHTML = '';
+        if(json.labels && Array.isArray(json.labels)){
+          const scores = json.scores || [];
+          // create mapping label->score
+          const map = new Map();
+          json.labels.forEach((lab,i)=> map.set(lab, scores[i]||0));
+          // map back to products
+          const ranked = productCatalog.map(p=>({product:p, score: map.get(`${p.name} ${p.desc}`) || 0})).sort((a,b)=>b.score-a.score);
+          // show top 4
+          const out = document.createElement('div'); out.style.display='flex'; out.style.gap='12px'; out.style.flexWrap='wrap';
+          ranked.slice(0,4).forEach(r=>{
+            const d = document.createElement('div'); d.style.width='160px'; d.className='panel'; d.style.padding='8px'; d.innerHTML = `<div style="height:100px;overflow:hidden;border-radius:6px"><img src="${r.product.img}" style="width:100%;height:100%;object-fit:cover"></div><div style="margin-top:6px"><strong>${r.product.name}</strong><div class="muted" style="font-size:0.9rem">${Math.round(r.score*100)}%</div></div>`;
+            out.appendChild(d);
+          });
+          resultsList.appendChild(out);
+        } else {
+          resultsList.innerHTML = 'No results: ' + JSON.stringify(json);
+        }
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+err.message+'</div>'; }
+    });
+
+    captionBtn.addEventListener('click', async ()=>{
+      try{
+        if(!lastDataUrl) return alert('Carica una immagine prima');
+        resultsList.innerHTML = '<div class="muted">Chiamando modello di captioning (BLIP)…</div>';
+        const body = { inputs: lastDataUrl };
+        const json = await callHfModel(hfModelCaption, body);
+        // typically returns [{generated_text: '...'}] or {generated_text:'...'}
+        let caption = '';
+        if(Array.isArray(json) && json[0] && json[0].generated_text) caption = json[0].generated_text;
+        else if(json.generated_text) caption = json.generated_text;
+        else caption = JSON.stringify(json);
+        resultsList.innerHTML = '<div><strong>Caption:</strong> ' + escapeHtml(caption) + '</div>';
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+err.message+'</div>'; }
+    });
+
+    function renderResults(json){
+      // CLIP zero-shot usually returns {labels: [...], scores:[...]} or {labels:[{label,score}]}
+      resultsList.innerHTML = '';
+      if(json.error){ resultsList.innerHTML = '<div style="color:salmon">Model error: '+escapeHtml(json.error)+'</div>'; return; }
+      if(json.labels && Array.isArray(json.labels)){
+        if(typeof json.labels[0] === 'string'){
+          // labels + scores array
+          const scores = json.scores || [];
+          json.labels.forEach((lab,i)=>{ const s = scores[i]||0; appendLabel(lab,s); });
+        } else {
+          // array of {label,score}
+          json.labels.forEach(item=>{ appendLabel(item.label,item.score); });
+        }
+      } else if(Array.isArray(json)){
+        // some models return [{label,score},...]
+        json.forEach(item=>{ if(item.label) appendLabel(item.label,item.score||0); });
+      } else {
+        resultsList.textContent = JSON.stringify(json,null,2);
+      }
+    }
+
+    function appendLabel(label,score){ const d = document.createElement('div'); d.className='label'; d.innerHTML = '<div>'+escapeHtml(label)+'</div><div style="opacity:0.9">'+(Math.round(score*100)+'%')+'</div>'; resultsList.appendChild(d); }
+
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  </script>
+</body>
+</html>
