@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>RSA Key Generator — Luca Gandolfi</title>
   <link href="./assets/css/main.css" rel="stylesheet">
-  <style>
+    <style>
     body{font-family:Inter,system-ui,Segoe UI,Arial;background:#071023;color:#e6f7ff;padding:24px}
     .wrap{max-width:980px;margin:0 auto}
     h1{margin:0 0 12px}
@@ -13,7 +13,16 @@
     select,input,button,textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
     button{background:#00d4ff;color:#002;border:none}
     pre{background:rgba(255,255,255,0.03);padding:12px;border-radius:8px;overflow:auto}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    /* Allow long BigInt values to wrap and use a smaller monospace font */
+    .keys pre{
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
+      line-height: 1.3;
+    }
+    .keys{display:block;gap:8px}
+    .keys h3{margin:12px 0 6px}
     .small{font-size:0.9rem;color:#9fcfff}
   </style>
 </head>
@@ -31,17 +40,15 @@
       </select>
       <button id="gen">Generate Keypair</button>
       <button id="copy">Copy Private Key</button>
+      <button id="infoBtn">Info</button>
     </div>
 
-    <div class="grid">
-      <div>
-        <h3>Public key</h3>
-        <pre id="pub">—</pre>
-      </div>
-      <div>
-        <h3>Private key</h3>
-        <pre id="priv">—</pre>
-      </div>
+    <div class="keys">
+      <h3>Public key</h3>
+      <pre id="pub">—</pre>
+
+      <h3>Private key</h3>
+      <pre id="priv">—</pre>
     </div>
 
     <h3 style="margin-top:12px">Encrypt / Decrypt</h3>
@@ -52,6 +59,36 @@
       <input id="cipher" type="text" placeholder="Cipher (hex)" style="flex:1" />
     </div>
     <div id="log" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Info Modal -->
+  <div id="rsaInfoModal" class="modal" role="dialog" aria-hidden="true" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;z-index:2000;">
+    <div style="background:rgba(10,22,40,0.95);backdrop-filter:blur(6px);padding:20px;border-radius:10px;max-width:720px;width:92%;color:#e6f7ff">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">RSA — Spiegazione</h3>
+        <button id="rsaInfoClose" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div style="max-height:60vh;overflow:auto">
+        <p>Questa pagina genera una coppia di chiavi RSA (pubblica/privata) usando BigInt. Di seguito gli elementi mostrati e il loro ruolo:</p>
+        <ul>
+          <li><strong>p, q</strong>: due numeri primi scelti casualmente. La sicurezza RSA dipende dalla difficoltà di fattorizzare il loro prodotto.</li>
+          <li><strong>n = p · q</strong>: il modulo pubblico. Viene usato sia nella cifratura che nella decifratura.</li>
+          <li><strong>φ(n)</strong> (phi): (p−1)(q−1), utile per calcolare l'esponente privato.</li>
+          <li><strong>e</strong>: esponente pubblico (tipicamente 65537). Deve essere coprimo con φ(n); viene usato per cifrare.</li>
+          <li><strong>d</strong>: esponente privato, l'inverso modulo di e rispetto a φ(n). Viene usato per decifrare e deve rimanere segreto.</li>
+          <li><strong>Public key</strong>: contiene `n` ed `e`. Può essere condivisa pubblicamente per cifrare messaggi destinati al proprietario della chiave privata.</li>
+          <li><strong>Private key</strong>: contiene `d` (e spesso p e q). Serve per decifrare e per firmare; NON condividerla.</li>
+        </ul>
+        <p>Algoritmo sintetico:</p>
+        <ol>
+          <li>Genera primi p e q.</li>
+          <li>Calcola n = p·q e φ(n) = (p−1)(q−1).</li>
+          <li>Scegli e coprimo con φ(n) (es. 65537) e calcola d = e^{-1} mod φ(n).</li>
+          <li>Public key = (n, e); Private key = (d) (o d, p, q per efficienza).</li>
+        </ol>
+        <p>Avvertenze: questa implementazione è didattica. Non usare queste chiavi per produzione; generatori di primi e gestione sicura delle chiavi richiedono controlli e protezioni crittografiche aggiuntive.</p>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -198,6 +235,21 @@
       if(!current) return alert('Genera prima');
       navigator.clipboard.writeText(`n:${current.n}\ne:${current.e}\nd:${current.d}`).then(()=>alert('Private key copied to clipboard'));
     });
+    // Info modal handlers
+    const rsaInfoBtn = document.getElementById('infoBtn');
+    const rsaInfoModal = document.getElementById('rsaInfoModal');
+    const rsaInfoClose = document.getElementById('rsaInfoClose');
+    if (rsaInfoBtn && rsaInfoModal) {
+      rsaInfoBtn.addEventListener('click', () => {
+        rsaInfoModal.style.display = 'flex';
+        rsaInfoModal.setAttribute('aria-hidden', 'false');
+      });
+      rsaInfoClose.addEventListener('click', () => {
+        rsaInfoModal.style.display = 'none';
+        rsaInfoModal.setAttribute('aria-hidden', 'true');
+      });
+      rsaInfoModal.addEventListener('click', (e) => { if (e.target === rsaInfoModal) { rsaInfoClose.click(); } });
+    }
   </script>
 </body>
 <script src="top_buttons.js"></script>

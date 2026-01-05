@@ -41,8 +41,73 @@
 			for(let i=obstacles.length-1;i>=0;i--){ const obs=obstacles[i]; const relZ=obs.z-distance; if(relZ<-5){ obstacles.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.5){ if(Math.abs(player.x-(obs.lane*LANE_WIDTH))<0.6){ if(obs.type==='low'){ if(player.jumpY<1.0){ gameOver(); } } else { gameOver(); } } } }
 			for(let i=coins.length-1;i>=0;i--){ const coin=coins[i]; const relZ=coin.z-distance; if(relZ<-5){ coins.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.8 && Math.abs(player.x-(coin.lane*LANE_WIDTH))<0.6){ if(player.jumpY<1.5){ score+=50; coins.splice(i,1); } } }
 		}
-		function draw(){ ctx.fillStyle='#87CEEB'; ctx.fillRect(0,0,canvas.width,canvas.height); }
-		function gameLoop(t){ const dt=(t-lastTime)/1000; lastTime=t; if(gameRunning){ update(dt); draw(); requestAnimationFrame(gameLoop);} }
+		function draw(){
+			// Sky
+			ctx.fillStyle = '#87CEEB';
+			ctx.fillRect(0,0,canvas.width,canvas.height);
+
+			// Ground / road area
+			const groundY = canvas.height * 0.65;
+			ctx.fillStyle = '#2ecc71';
+			ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+			// Draw simple perspective lanes
+			for(let i=0;i<LANES;i++){
+				const laneX = canvas.width/2 + (i-1) * 80;
+				ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(laneX, groundY);
+				ctx.lineTo(laneX, canvas.height);
+				ctx.stroke();
+			}
+
+			// Draw obstacles and coins using projection
+			for(let i=0;i<obstacles.length;i++){
+				const obs = obstacles[i];
+				const p = project(obs.lane*LANE_WIDTH, 0, obs.z);
+				if(!p.visible) continue;
+				const size = 40 * p.scale;
+				ctx.fillStyle = obs.type==='low' ? '#8B4513' : '#555';
+				ctx.fillRect(p.x - size/2, p.y - size, size, size);
+			}
+
+			for(let i=0;i<coins.length;i++){
+				const c = coins[i];
+				const p = project(c.lane*LANE_WIDTH, 0.5, c.z);
+				if(!p.visible) continue;
+				const r = 10 * p.scale;
+				ctx.fillStyle = '#ffd700';
+				ctx.beginPath(); ctx.arc(p.x, p.y - r, r, 0, Math.PI*2); ctx.fill();
+			}
+
+			// Draw player at fixed screen position (near bottom)
+			const playerScreen = { x: canvas.width/2, y: groundY - 40 - player.jumpY*40 };
+			ctx.save();
+			ctx.translate(playerScreen.x, playerScreen.y);
+			ctx.fillStyle = player.color;
+			ctx.fillRect(-30, -40, 60, 40);
+			ctx.fillStyle = '#fff'; ctx.fillRect(-10, -30, 20, 20);
+			ctx.restore();
+
+			// HUD handled by separate layer, but draw some particles
+			for(let i=0;i<particles.length;i++){
+				const p = particles[i];
+				ctx.globalAlpha = Math.max(0, p.life/20);
+				ctx.fillStyle = p.color;
+				ctx.fillRect(p.x, p.y, 2, 2);
+				ctx.globalAlpha = 1;
+			}
+		}
+
+		function gameLoop(t){
+			const dt=(t-lastTime)/1000;
+			lastTime=t;
+			if(gameRunning) update(dt);
+			// always draw to avoid blank screen even when paused/not started
+			draw();
+			requestAnimationFrame(gameLoop);
+		}
 	</script>
 </body>
 </html>

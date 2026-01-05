@@ -126,6 +126,12 @@
         const projectiles = [];
         const particles = [];
 
+        // Minimap configuration
+        const MINIMAP_WIDTH = 180;
+        const MINIMAP_HEIGHT = 180;
+        const MINIMAP_PADDING = 16;
+        const MINIMAP_VIEW_RADIUS = 900; // world units shown from player center
+
         // Input
         const keys = {
             w: false, a: false, s: false, d: false,
@@ -552,6 +558,70 @@
 
             // Draw Player
             if(!gameOver) drawShip(player, '#fff');
+
+            ctx.restore();
+
+            // Draw minimap overlay (not world-transformed)
+            drawMinimap();
+        }
+
+        // Draw a small circular minimap showing nearby enemies and islands
+        function drawMinimap() {
+            const x = canvas.width - MINIMAP_PADDING - MINIMAP_WIDTH;
+            const y = MINIMAP_PADDING;
+            const w = MINIMAP_WIDTH;
+            const h = MINIMAP_HEIGHT;
+            const cx = x + w/2;
+            const cy = y + h/2;
+
+            ctx.save();
+            // background
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = 'rgba(8,12,18,0.75)';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+
+            // draw islands as green small dots (relative to player)
+            islands.forEach(is => {
+                const dx = is.x - player.x;
+                const dy = is.y - player.y;
+                const nx = (dx / MINIMAP_VIEW_RADIUS) * (w/2);
+                const ny = (dy / MINIMAP_VIEW_RADIUS) * (h/2);
+                const px = cx + nx;
+                const py = cy + ny;
+                // only draw if inside minimap box (clamp)
+                if (Math.abs(nx) <= w/2 && Math.abs(ny) <= h/2) {
+                    ctx.fillStyle = '#3fbf6f';
+                    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+                }
+            });
+
+            // draw enemies as red dots
+            enemies.forEach(e => {
+                const dx = e.x - player.x;
+                const dy = e.y - player.y;
+                const nx = (dx / MINIMAP_VIEW_RADIUS) * (w/2);
+                const ny = (dy / MINIMAP_VIEW_RADIUS) * (h/2);
+                const px = cx + nx;
+                const py = cy + ny;
+                // clamp to border for offscreen indicators
+                const clampedX = Math.max(x + 4, Math.min(x + w - 4, px));
+                const clampedY = Math.max(y + 4, Math.min(y + h - 4, py));
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath(); ctx.arc(clampedX, clampedY, 3, 0, Math.PI*2); ctx.fill();
+            });
+
+            // player in center (triangle pointing up)
+            ctx.translate(cx, cy);
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.lineTo(5, 6);
+            ctx.lineTo(-5, 6);
+            ctx.closePath();
+            ctx.fill();
 
             ctx.restore();
         }

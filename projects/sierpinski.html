@@ -208,6 +208,14 @@
         let mode = 'recursive';
         let depth = 5;
         let color = '#00d4ff';
+        // Zoom / Pan state
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // Touch gesture state
+        let lastTouchDist = null;
+        let lastTouchCenter = null;
         
         // Chaos Game State
         let chaosRunning = false;
@@ -256,7 +264,12 @@
         }
 
         function drawRecursive() {
+            // clear with identity transform
+            ctx.setTransform(1,0,0,1,0,0);
             ctx.clearRect(0, 0, width, height);
+
+            // apply zoom/pan transform
+            ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
             ctx.fillStyle = color;
             
             const pad = 20;
@@ -296,7 +309,10 @@
 
         function resetChaos() {
             stopChaos();
+            // clear with identity transform then reapply
+            ctx.setTransform(1,0,0,1,0,0);
             ctx.clearRect(0, 0, width, height);
+            ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
             chaosPointsCount = 0;
             document.getElementById('statsDisplay').textContent = `Points: 0`;
             
@@ -348,6 +364,8 @@
             const speed = parseInt(document.getElementById('speedSlider').value);
             const pointsPerFrame = Math.floor(Math.pow(speed, 1.5)); // Non-linear speed
 
+            // ensure transform is applied
+            ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
             ctx.fillStyle = color;
             
             for (let i = 0; i < pointsPerFrame; i++) {
@@ -365,6 +383,63 @@
             document.getElementById('statsDisplay').textContent = `Points: ${chaosPointsCount}`;
             animationId = requestAnimationFrame(loopChaos);
         }
+
+        // --- Pinch to zoom handlers ---
+        function getTouchDist(t1, t2) {
+            const dx = t2.clientX - t1.clientX;
+            const dy = t2.clientY - t1.clientY;
+            return Math.hypot(dx, dy);
+        }
+
+        function getTouchCenter(t1, t2) {
+            return {
+                x: (t1.clientX + t2.clientX) / 2 - container.getBoundingClientRect().left,
+                y: (t1.clientY + t2.clientY) / 2 - container.getBoundingClientRect().top
+            };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                lastTouchDist = getTouchDist(e.touches[0], e.touches[1]);
+                lastTouchCenter = getTouchCenter(e.touches[0], e.touches[1]);
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dist = getTouchDist(e.touches[0], e.touches[1]);
+                const center = getTouchCenter(e.touches[0], e.touches[1]);
+                if (lastTouchDist != null) {
+                    const scaleFactor = dist / lastTouchDist;
+
+                    // Convert center to canvas space before scaling
+                    const cx = (center.x - offsetX) / scale;
+                    const cy = (center.y - offsetY) / scale;
+
+                    // Update scale
+                    scale *= scaleFactor;
+                    // Clamp scale
+                    scale = Math.max(0.2, Math.min(10, scale));
+
+                    // After scaling, adjust offset so the touch center remains fixed
+                    offsetX = center.x - cx * scale;
+                    offsetY = center.y - cy * scale;
+
+                    if (mode === 'recursive') drawRecursive();
+                    else resetChaos();
+                }
+                lastTouchDist = dist;
+                lastTouchCenter = center;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                lastTouchDist = null;
+                lastTouchCenter = null;
+            }
+        });
 
         // Init
         resize();

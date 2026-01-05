@@ -290,7 +290,14 @@
         </div>
 
         <div class="card scheduled-times">
-            <h3>Orari programmati (8:00 - 24:00)</h3>
+            <h3 id="scheduledTitle">Orari programmati (8:00 - 24:00)</h3>
+            <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+                <label style="color:var(--text-muted);font-size:0.9rem">Start</label>
+                <input type="time" id="startTime" value="08:00" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit">
+                <label style="color:var(--text-muted);font-size:0.9rem">End</label>
+                <input type="time" id="endTime" value="00:00" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit">
+                <button class="btn" id="applyTimes" style="padding:6px 10px;font-size:0.9rem">Applica</button>
+            </div>
             <div class="times-grid" id="timesGrid"></div>
         </div>
 
@@ -318,14 +325,31 @@
 
         // Genera gli orari programmati per la giornata
         function generateScheduledTimes() {
-            scheduledTimes = [];
-            let currentTime = new Date();
-            currentTime.setHours(START_HOUR, 0, 0, 0);
+            // Read start/end from inputs (type=time). If end <= start, treat end as next day.
+            const startVal = document.getElementById('startTime').value || '08:00';
+            const endVal = document.getElementById('endTime').value || '00:00';
+            const [sh, sm] = startVal.split(':').map(n => parseInt(n,10));
+            const [eh, em] = endVal.split(':').map(n => parseInt(n,10));
 
-            for (let i = 0; i < DAILY_TOTAL; i++) {
-                scheduledTimes.push(new Date(currentTime));
-                currentTime.setMinutes(currentTime.getMinutes() + INTERVAL_MINUTES);
+            const now = new Date();
+            let startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0, 0);
+            let endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0, 0);
+            if (endDate <= startDate) {
+                // if end is same or before start, advance end to next day
+                endDate.setDate(endDate.getDate() + 1);
             }
+
+            scheduledTimes = [];
+            const totalMs = endDate.getTime() - startDate.getTime();
+            const intervalMs = totalMs / DAILY_TOTAL;
+            for (let i = 0; i < DAILY_TOTAL; i++) {
+                scheduledTimes.push(new Date(startDate.getTime() + Math.round(i * intervalMs)));
+            }
+
+            // Update title to reflect chosen range
+            const displayStart = formatTime(startDate);
+            const displayEnd = formatTime(endDate);
+            document.getElementById('scheduledTitle').textContent = `Orari programmati (${displayStart} - ${displayEnd})`;
         }
 
         // Formatta il tempo in HH:MM
@@ -519,9 +543,42 @@
             }
         }
 
+        // Save/load start/end time settings
+        function saveTimeSettings() {
+            const s = document.getElementById('startTime')?.value || '';
+            const e = document.getElementById('endTime')?.value || '';
+            localStorage.setItem('iqosStartTime', s);
+            localStorage.setItem('iqosEndTime', e);
+        }
+
+        function loadTimeSettings() {
+            const s = localStorage.getItem('iqosStartTime');
+            const e = localStorage.getItem('iqosEndTime');
+            if (s) document.getElementById('startTime').value = s;
+            if (e) document.getElementById('endTime').value = e;
+        }
+
         // Inizializzazione
         function init() {
             loadFromStorage();
+            // ensure inputs exist before generating
+            const startInput = document.getElementById('startTime');
+            const endInput = document.getElementById('endTime');
+            if (startInput && endInput) {
+                // load saved settings and regenerate when user changes values
+                loadTimeSettings();
+                document.getElementById('applyTimes').addEventListener('click', () => {
+                    generateScheduledTimes();
+                    updateTimer();
+                    updateTimesGrid();
+                    updateHistory();
+                    saveToStorage();
+                    saveTimeSettings();
+                });
+                // Auto-save when inputs change and refresh UI
+                startInput.addEventListener('change', () => { saveTimeSettings(); generateScheduledTimes(); updateTimer(); updateTimesGrid(); });
+                endInput.addEventListener('change', () => { saveTimeSettings(); generateScheduledTimes(); updateTimer(); updateTimesGrid(); });
+            }
             generateScheduledTimes();
             updateTimer();
             updateHistory();

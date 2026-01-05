@@ -1,7 +1,7 @@
 // Create a fixed top bar with Home and Language buttons, and push page content down
 if (!document.getElementById('site-top-bar')) {
   (function(){
-    const BAR_HEIGHT = 56; // px
+    const BAR_HEIGHT = 36; // px
 
     // Remove any legacy top-left/top-right overlays if present
     ['top-left','top-right'].forEach(c => {
@@ -24,33 +24,33 @@ if (!document.getElementById('site-top-bar')) {
       body { --site-top-bar-height: ${BAR_HEIGHT}px; }
     `;
 
-    // Create or reuse the exit button
-    let exitBtn = document.getElementById('siteExitBtn') || document.getElementById('exitTop');
-    if (exitBtn) {
-      // detach from previous parent
-      if (exitBtn.parentNode) exitBtn.parentNode.removeChild(exitBtn);
-      exitBtn.id = 'siteExitBtn';
-    } else {
-      exitBtn = document.createElement('button');
-      exitBtn.id = 'siteExitBtn';
-      exitBtn.className = 'tb';
-      exitBtn.textContent = '← Home';
+    // Create a fresh exit button (don't reuse existing DOM nodes to avoid leftover event listeners)
+    if (document.getElementById('siteExitBtn')) {
+      const old = document.getElementById('siteExitBtn'); if (old.parentNode) old.parentNode.removeChild(old);
     }
+    if (document.getElementById('exitTop')) {
+      const old2 = document.getElementById('exitTop'); if (old2.parentNode) old2.parentNode.removeChild(old2);
+    }
+    const exitBtn = document.createElement('button');
+    exitBtn.id = 'siteExitBtn';
+    exitBtn.className = 'tb';
+    exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      window.location.href = '../index.html';
+      try { window.location.href = '/'; } catch(e) { window.location.href = '../index.html'; }
     });
 
     // Create or reuse language button
-    let langBtn = document.getElementById('siteLangBtn') || document.getElementById('langBtn');
-    if (langBtn) {
-      if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn);
-      langBtn.id = 'siteLangBtn';
-    } else {
-      langBtn = document.createElement('button');
-      langBtn.id = 'siteLangBtn';
-      langBtn.className = 'tb';
+    // Create a fresh language button as well to avoid duplicated listeners
+    if (document.getElementById('siteLangBtn')) {
+      const oldL = document.getElementById('siteLangBtn'); if (oldL.parentNode) oldL.parentNode.removeChild(oldL);
     }
+    if (document.getElementById('langBtn')) {
+      const oldL2 = document.getElementById('langBtn'); if (oldL2.parentNode) oldL2.parentNode.removeChild(oldL2);
+    }
+    const langBtn = document.createElement('button');
+    langBtn.id = 'siteLangBtn';
+    langBtn.className = 'tb';
     function getLang() { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'it'); }
     function setLang(v){ localStorage.setItem('site_lang', v); localStorage.setItem('lang', v); updateLangUI(); }
     function updateLangUI(){ langBtn.textContent = (getLang() || 'it').toUpperCase(); }

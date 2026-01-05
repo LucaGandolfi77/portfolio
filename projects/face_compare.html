@@ -16,12 +16,18 @@
 		<h1>Face Compare</h1>
 		<div class="row">
 			<div>
-				<input id="a" type="file" accept="image/*"><br>
-				<img id="ia">
+				<div style="margin-bottom:8px">
+					<button id="startCam">Start Webcam</button>
+					<button id="stopCam" style="display:none">Stop Webcam</button>
+					<button id="capture" style="display:none">Capture Frame</button>
+				</div>
+				<video id="video" autoplay playsinline muted style="display:block;max-width:45%;border-radius:8px;background:#000"></video>
+				<div style="margin-top:8px">or upload image:<br><input id="a" type="file" accept="image/*"></div>
+				<img id="ia" style="display:block;margin-top:8px;max-width:100%">
 			</div>
 			<div>
 				<input id="b" type="file" accept="image/*"><br>
-				<img id="ib">
+				<img id="ib" style="max-width:45%;display:block;margin-top:8px">
 			</div>
 		</div>
 		<div style="margin-top:12px"><button id="compare">Compare</button> <span id="res"></span></div>
@@ -30,11 +36,86 @@
 		function load(file, img){ if(!file) return; img.src = URL.createObjectURL(file); }
 		document.getElementById('a').addEventListener('change', e=> load(e.target.files[0], document.getElementById('ia')));
 		document.getElementById('b').addEventListener('change', e=> load(e.target.files[0], document.getElementById('ib')));
-		document.getElementById('compare').addEventListener('click', async ()=>{
-			const ia = document.getElementById('ia'); const ib = document.getElementById('ib'); if(!ia.src||!ib.src) return alert('Select both images');
-			document.getElementById('res').textContent = 'Comparing...';
-			await new Promise(r=>setTimeout(r,900));
-			const fake = Math.random()*0.6 + 0.2; document.getElementById('res').textContent = `Similarity: ${ (fake*100).toFixed(1) }%`;
+
+		// Webcam handling
+		let stream = null;
+		const video = document.getElementById('video');
+		const startBtn = document.getElementById('startCam');
+		const stopBtn = document.getElementById('stopCam');
+		const captureBtn = document.getElementById('capture');
+
+		startBtn.addEventListener('click', async ()=>{
+			try{
+				stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+				video.srcObject = stream;
+				startBtn.style.display = 'none'; stopBtn.style.display='inline-block'; captureBtn.style.display='inline-block';
+				startCompareLoop();
+			}catch(e){ alert('Cannot access webcam: '+e.message); }
+		});
+
+		stopBtn.addEventListener('click', ()=>{
+			if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+			video.srcObject = null; startBtn.style.display='inline-block'; stopBtn.style.display='none'; captureBtn.style.display='none';
+		});
+
+		captureBtn.addEventListener('click', ()=>{
+			// capture current video frame into image B
+			const ib = document.getElementById('ib');
+			const w = 640, h = 480;
+			const c = document.createElement('canvas'); c.width = w; c.height = h;
+			const cx = c.getContext('2d'); cx.drawImage(video, 0, 0, w, h);
+			ib.src = c.toDataURL('image/png');
+		});
+
+		// Comparison logic (real-time)
+		const resEl = document.getElementById('res');
+		const compareBtn = document.getElementById('compare');
+		let running = false;
+
+		function getImageDataFromEl(el, w, h){
+			const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d');
+			if(el.tagName === 'VIDEO') cx.drawImage(el, 0, 0, w, h);
+			else cx.drawImage(el, 0, 0, w, h);
+			return cx.getImageData(0,0,w,h).data;
+		}
+
+		function computeSimilarity(dataA, dataB){
+			let total = 0;
+			const len = Math.min(dataA.length, dataB.length);
+			for(let i=0;i<len;i+=4){
+				const dr = Math.abs(dataA[i] - dataB[i]);
+				const dg = Math.abs(dataA[i+1] - dataB[i+1]);
+				const db = Math.abs(dataA[i+2] - dataB[i+2]);
+				total += (dr+dg+db)/3;
+			}
+			const avg = total / (len/4);
+			const sim = 1 - (avg / 255);
+			return Math.max(0, Math.min(1, sim));
+		}
+
+		function startCompareLoop(){ if(running) return; running = true; const SIZE = 128; (function loop(){
+			if(!running) return;
+			let srcA = null, srcB = null;
+			// prefer video as A if available
+			if(stream && video.readyState >= 2) srcA = video;
+			else if(document.getElementById('ia').src) srcA = document.getElementById('ia');
+			if(document.getElementById('ib').src) srcB = document.getElementById('ib');
+			if(srcA && srcB){
+				try{
+					const dA = getImageDataFromEl(srcA, SIZE, SIZE);
+					const dB = getImageDataFromEl(srcB, SIZE, SIZE);
+					const sim = computeSimilarity(dA,dB);
+					resEl.textContent = `Similarity: ${(sim*100).toFixed(1)}%`;
+				}catch(e){ /* ignore */ }
+			}
+			requestAnimationFrame(loop);
+		})(); }
+
+		compareBtn.addEventListener('click', ()=>{
+			// one-shot compare (if not using webcam loop)
+			const ia = document.getElementById('ia'); const ib = document.getElementById('ib');
+			if(!ia.src||!ib.src) return alert('Select both images or start webcam and upload/capture a frame');
+			startCompareLoop();
 		});
 	</script>
 </body>

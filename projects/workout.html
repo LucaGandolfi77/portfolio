@@ -163,29 +163,35 @@
             text-align: center;
         }
 
-        /* Progress Ring */
+        /* Progress Bar (linear) */
         .progress-ring {
             position: relative;
-            width: 200px;
-            height: 200px;
+            width: 320px;
+            height: 24px;
             margin: 0 auto;
         }
-        .progress-ring circle {
-            fill: transparent;
-            stroke-width: 8;
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-            transition: stroke-dashoffset 0.1s linear;
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 12px;
         }
-        .ring-bg { stroke: rgba(255,255,255,0.1); }
-        .ring-progress { stroke: var(--accent); stroke-dasharray: 565; stroke-dashoffset: 0; }
-        
+        .progress-fill {
+            height: 100%;
+            width: 100%;
+            background: var(--accent);
+            transform-origin: left center;
+            transition: width 0.2s linear;
+        }
         .timer-overlay {
             position: absolute;
-            top: 50%;
+            top: -86px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             text-align: center;
+            width: 100%;
         }
     </style>
 </head>
@@ -225,13 +231,12 @@
             </div>
 
             <div class="progress-ring">
-                <svg width="200" height="200">
-                    <circle class="ring-bg" r="90" cx="100" cy="100"></circle>
-                    <circle class="ring-progress" id="ringProgress" r="90" cx="100" cy="100"></circle>
-                </svg>
                 <div class="timer-overlay">
                     <div class="timer-state" id="timerState">READY</div>
                     <div class="timer-display" id="timerDisplay">00:00</div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
 
@@ -268,7 +273,7 @@
         const currentExerciseName = document.getElementById('currentExerciseName');
         const timerDisplay = document.getElementById('timerDisplay');
         const timerState = document.getElementById('timerState');
-        const ringProgress = document.getElementById('ringProgress');
+        const progressFill = document.getElementById('progressFill');
         const btnStart = document.getElementById('btnStart');
         const btnSkip = document.getElementById('btnSkip');
         
@@ -277,9 +282,10 @@
         let totalTime;
         let isRunning = false;
         let isResting = false;
-        
-        // Circle circumference = 2 * PI * r (r=90) => ~565
-        const CIRCUMFERENCE = 565;
+
+        // visible exercises (current filtered list) and index
+        let visibleExercises = [];
+        let currentIndex = null;
 
         function filterExercises(category) {
             // Update buttons
@@ -292,6 +298,7 @@
 
             exerciseList.innerHTML = '';
             const filtered = category === 'all' ? exercises : exercises.filter(e => e.category === category);
+            visibleExercises = filtered;
             
             filtered.forEach(ex => {
                 const card = document.createElement('div');
@@ -309,12 +316,15 @@
             currentExerciseName.textContent = name;
             timerSection.classList.add('active');
             timerSection.scrollIntoView({ behavior: 'smooth' });
+            // set currentIndex based on visibleExercises
+            const idx = visibleExercises.findIndex(e => e.name === name);
+            currentIndex = idx >= 0 ? idx : null;
             resetTimer();
         }
 
         function setProgress(percent) {
-            const offset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
-            ringProgress.style.strokeDashoffset = offset;
+            percent = Math.max(0, Math.min(100, percent));
+            progressFill.style.width = percent + '%';
         }
 
         function formatTime(seconds) {
@@ -343,10 +353,11 @@
             timerInterval = setInterval(() => {
                 timeLeft--;
                 updateDisplay();
-                
+
                 if (timeLeft <= 0) {
                     if (isResting) {
-                        startWorkPhase();
+                        // after rest, move to next exercise
+                        advanceToNextExercise();
                     } else {
                         startRestPhase();
                     }
@@ -370,7 +381,7 @@
             btnStart.textContent = "START";
             btnSkip.style.display = "none";
             setProgress(100);
-            ringProgress.style.stroke = "var(--accent)";
+            progressFill.style.background = "var(--accent)";
         }
 
         function startWorkPhase() {
@@ -380,7 +391,7 @@
             
             timerState.textContent = "WORK";
             timerState.className = "timer-state state-work";
-            ringProgress.style.stroke = "var(--success)";
+            progressFill.style.background = "var(--success)";
             btnSkip.style.display = "none";
             
             // Play sound?
@@ -394,7 +405,7 @@
             
             timerState.textContent = "REST";
             timerState.className = "timer-state state-rest";
-            ringProgress.style.stroke = "var(--warning)";
+            progressFill.style.background = "var(--warning)";
             btnSkip.style.display = "inline-block";
             
             updateDisplay();
@@ -403,6 +414,27 @@
         function skipRest() {
             if (isResting) {
                 startWorkPhase();
+            }
+        }
+
+        function advanceToNextExercise() {
+            if (!visibleExercises || visibleExercises.length === 0) return;
+            const nextIndex = (currentIndex === null) ? 0 : (currentIndex + 1);
+            // If we've reached the end, stop instead of wrapping
+            if (nextIndex >= visibleExercises.length) {
+                pauseTimer();
+                timerState.textContent = "COMPLETE";
+                timerState.className = "timer-state";
+                setProgress(0);
+                return;
+            }
+            const nextName = visibleExercises[nextIndex].name;
+            const wasRunning = isRunning;
+            // selectExercise resets timer and sets currentIndex
+            selectExercise(nextName);
+            // if timer was running, restart it for next exercise
+            if (wasRunning) {
+                startTimer();
             }
         }
 

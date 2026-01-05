@@ -63,8 +63,15 @@
         
         /* Actions on right */
         #btn-fire { right: 30px; bottom: 40px; background: rgba(255,50,50,0.3); border-color: rgba(255,100,100,0.5); width: 80px; height: 80px; font-size: 1rem; }
+        /* Bomb button shown to the left of FIRE on touch devices */
+        #btn-bomb { right: 120px; bottom: 40px; background: rgba(255,200,50,0.25); border-color: rgba(255,200,50,0.5); width: 80px; height: 80px; font-size: 1rem; }
 
         @media (max-width: 768px) {
+            .mobile-controls { display: block; }
+            #controls-hint { display: none; }
+        }
+        /* Also show mobile controls on touch-capable devices (iPhone, Android) */
+        @media (pointer: coarse) {
             .mobile-controls { display: block; }
             #controls-hint { display: none; }
         }
@@ -106,6 +113,7 @@
         <div id="btn-left" class="btn-area">LEFT</div>
         <div id="btn-right" class="btn-area">RIGHT</div>
         <div id="btn-fire" class="btn-area">FIRE</div>
+        <div id="btn-bomb" class="btn-area">BOMB</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -127,16 +135,18 @@
             y: 200,
             width: 50,
             height: 20,
-            vx: 0,
+            vx: 6,
             vy: 0,
             speed: 6,
-            angle: 0,
+            angle: 0, // radians: 0 = right
+            targetAngle: 0,
             health: 100,
             reload: 0
         };
 
         let enemies = [];
         let projectiles = [];
+        let bombs = [];
         let particles = [];
         let clouds = [];
 
@@ -155,7 +165,11 @@
         resize();
 
         // Input Listeners
-        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keydown', e => {
+            // single-key actions
+            if (e.key === 'b' || e.key === 'B') { dropBomb(); }
+            else keys[e.key] = true;
+        });
         window.addEventListener('keyup', e => keys[e.key] = false);
 
         // Mobile Input
@@ -171,6 +185,78 @@
         bindTouch('btn-left', 'ArrowLeft');
         bindTouch('btn-right', 'ArrowRight');
         bindTouch('btn-fire', ' ');
+        // Add mouse/touch handlers for FIRE and BOMB UI buttons
+        const fireEl = document.getElementById('btn-fire');
+        if (fireEl) {
+            // touch handlers already bound via bindTouch, add mouse support
+            fireEl.addEventListener('mousedown', e => { e.preventDefault(); keys[' '] = true; });
+            fireEl.addEventListener('mouseup', e => { e.preventDefault(); keys[' '] = false; });
+            fireEl.addEventListener('mouseleave', e => { keys[' '] = false; });
+        }
+
+        const bombEl = document.getElementById('btn-bomb');
+        if (bombEl) {
+            bombEl.addEventListener('touchstart', e => { e.preventDefault(); dropBomb(); }, { passive: false });
+            bombEl.addEventListener('mousedown', e => { e.preventDefault(); dropBomb(); });
+            bombEl.addEventListener('click', e => { e.preventDefault(); dropBomb(); });
+        }
+
+        // iPhone / touch controls: joystick on left half, fire on right half, long-press or two-finger for bomb
+        (function setupTouchControls(){
+            let longPressTimer = null;
+            const LONGPRESS_MS = 600;
+            const MAX_PITCH = 0.9; // radians max pitch for touch
+
+            function handleTouchStart(e){
+                // prevent default scrolling/zooming
+                e.preventDefault();
+                const touches = e.touches;
+                // two-finger tap/drop bomb immediately
+                if (touches.length >= 2) {
+                    dropBomb();
+                    return;
+                }
+                const t = touches[0];
+                const x = t.clientX;
+                const y = t.clientY;
+
+                if (x < window.innerWidth / 2) {
+                    // left half: set target angle based on vertical touch position
+                    const norm = 1 - (y / canvas.height); // 0..1 top..bottom
+                    player.targetAngle = (norm - 0.5) * 2 * MAX_PITCH;
+                } else {
+                    // right half: start firing and set up long-press to drop bomb
+                    keys[' '] = true;
+                    longPressTimer = setTimeout(() => { dropBomb(); longPressTimer = null; }, LONGPRESS_MS);
+                }
+            }
+
+            function handleTouchMove(e){
+                e.preventDefault();
+                const touches = e.touches;
+                if (touches.length === 0) return;
+                const t = touches[0];
+                const x = t.clientX;
+                const y = t.clientY;
+                if (x < window.innerWidth / 2) {
+                    const norm = 1 - (y / canvas.height);
+                    player.targetAngle = (norm - 0.5) * 2 * MAX_PITCH;
+                }
+            }
+
+            function handleTouchEnd(e){
+                e.preventDefault();
+                // stop firing and cancel longpress
+                keys[' '] = false;
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            }
+
+            // Use non-passive listeners so we can preventDefault on iPhone
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+        })();
 
         function initLevel(lvl) {
             level = lvl;
@@ -188,6 +274,7 @@
             player.vy = 0;
             player.health = 100;
             player.angle = 0;
+            player.targetAngle = 0;
             
             // Reset Entities
             enemies = [];
@@ -264,27 +351,22 @@
 
         function update() {
             if (gameOver || gamePaused) return;
+            // --- Player Movement (forward flight with pitch control) ---
+            // Controls: up/down change pitch (targetAngle). Plane always moves forward along its angle.
+            const pitchSpeed = 0.035; // radians per frame when holding up/down
+            if (keys.ArrowUp || keys.w) player.targetAngle -= pitchSpeed;
+            if (keys.ArrowDown || keys.s) player.targetAngle += pitchSpeed;
 
-            // --- Player Movement ---
-            let targetVx = 0;
-            let targetVy = 0;
-            let targetAngle = 0;
+            // Smooth angle change
+            player.angle += (player.targetAngle - player.angle) * 0.08;
 
-            if (keys.ArrowUp || keys.w) targetVy = -player.speed;
-            if (keys.ArrowDown || keys.s) targetVy = player.speed;
-            if (keys.ArrowLeft || keys.a) targetVx = -player.speed;
-            if (keys.ArrowRight || keys.d) targetVx = player.speed;
+            // Compute forward velocity from angle
+            player.vx = Math.cos(player.angle) * player.speed;
+            player.vy = Math.sin(player.angle) * player.speed;
 
-            // Physics
-            player.vx += (targetVx - player.vx) * 0.1;
-            player.vy += (targetVy - player.vy) * 0.1;
-            
+            // Move
             player.x += player.vx;
             player.y += player.vy;
-
-            // Angle based on velocity
-            targetAngle = player.vy * 0.05;
-            player.angle += (targetAngle - player.angle) * 0.1;
 
             // Bounds
             if (player.y < 20) player.y = 20; // Ceiling
@@ -304,19 +386,44 @@
             // Smooth camera
             cameraX += (targetCamX - cameraX) * 0.1;
 
-            // Shooting
+            // Shooting (fires from plane's nose along angle)
             if (player.reload > 0) player.reload--;
             if (keys[" "] && player.reload <= 0) {
+                const muzzleSpeed = 15;
+                const noseX = player.x + Math.cos(player.angle) * 30;
+                const noseY = player.y + Math.sin(player.angle) * 30;
                 projectiles.push({
-                    x: player.x + 20,
-                    y: player.y + 5,
-                    vx: Math.cos(player.angle) * 15 + player.vx,
-                    vy: Math.sin(player.angle) * 15 + player.vy,
+                    x: noseX,
+                    y: noseY,
+                    vx: Math.cos(player.angle) * muzzleSpeed + player.vx,
+                    vy: Math.sin(player.angle) * muzzleSpeed + player.vy,
                     owner: 'player',
                     life: 100,
                     color: '#fff'
                 });
                 player.reload = 10;
+            }
+
+            // Bombs update
+            for (let bi = bombs.length - 1; bi >= 0; bi--) {
+                const b = bombs[bi];
+                // gravity
+                b.vy += b.g;
+                    b.x += b.vx;
+                    b.y += b.vy;
+
+                    // trail particles (smoke + ember)
+                    // small semi-transparent smoke
+                    particles.push({ x: b.x, y: b.y, vx: -b.vx*0.15 + (Math.random()-0.5), vy: -0.5 + (Math.random()-0.5)*0.5, life: 18 + Math.random()*12, color: 'rgba(120,120,120,0.5)', size: 3 + Math.random()*3 });
+                    // occasional ember
+                    if (Math.random() < 0.3) particles.push({ x: b.x, y: b.y, vx: -b.vx*0.2 + (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 8+Math.random()*8, color: 'rgba(255,150,60,0.9)', size: 2 });
+
+                // simple ground collision
+                    if (b.y > canvas.height - 40) {
+                            // explosion that also damages enemies within radius (colorful)
+                            createExplosion(b.x, canvas.height - 60, '#ff6600', 60, { radius: 140, damage: 120, colorful: true });
+                        bombs.splice(bi, 1);
+                    }
             }
 
             // --- Enemies ---
@@ -401,6 +508,7 @@
                 }
             }
 
+
             // Particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
@@ -409,6 +517,8 @@
                 p.life--;
                 if (p.life <= 0) particles.splice(i, 1);
             }
+
+                // Bombs drawing handled in draw()
         }
 
         function checkWin() {
@@ -435,17 +545,76 @@
             return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
         }
 
-        function createExplosion(x, y, color, count=10) {
+        function createExplosion(x, y, color, count=10, options = {}) {
+            // spawn visual particles
+            // flash + colorful burst for bomb explosions when requested
+            const colorful = options.colorful || false;
             for(let i=0; i<count; i++) {
-                particles.push({
-                    x: x, y: y,
-                    vx: (Math.random() - 0.5) * 5,
-                    vy: (Math.random() - 0.5) * 5,
-                    life: 20 + Math.random() * 10,
-                    color: color,
-                    size: 2 + Math.random() * 3
-                });
+                if (colorful) {
+                    // generate hues around orange/red
+                    const t = Math.random();
+                    const r = 200 + Math.floor(Math.random()*55);
+                    const g = 80 + Math.floor(Math.random()*120);
+                    const b = Math.floor(Math.random()*40);
+                    const col = `rgba(${r},${g},${b},${0.9 - Math.random()*0.5})`;
+                    particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 20 + Math.random() * 30, color: col, size: 3 + Math.random() * 6 });
+                } else {
+                    particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, life: 20 + Math.random() * 10, color: color, size: 2 + Math.random() * 3 });
+                }
             }
+
+            // add a bright flash particle (short-lived, large)
+            particles.push({ x: x, y: y, vx: 0, vy: 0, life: 8, color: 'rgba(255,240,200,0.95)', size: 18 });
+
+            // optional damage to enemies within radius
+            const radius = options.radius || 0;
+            const damage = options.damage || 0;
+            if (radius > 0 && damage > 0) {
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const e = enemies[i];
+                    // approximate enemy center
+                    const ex = e.x + (e.w || 0) / 2;
+                    const ey = e.y + (e.h || 0) / 2;
+                    const dx = ex - x;
+                    const dy = ey - y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist <= radius) {
+                        // scale damage by proximity (closer -> more damage)
+                        const frac = 1 - (dist / radius);
+                        const dealt = Math.max(1, Math.round(damage * frac));
+                        e.hp -= dealt;
+                        // small hit particle burst on enemy
+                        for (let p = 0; p < 6; p++) {
+                            particles.push({ x: ex, y: ey, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 10+Math.random()*10, color: '#ffcc66', size: 2 });
+                        }
+                        if (e.hp <= 0) {
+                            // remove enemy and create bigger explosion
+                            createExplosion(ex, ey, '#ff4400', 12);
+                            enemies.splice(i, 1);
+                            updateUI();
+                            checkWin();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Drop a bomb from the plane
+        function dropBomb() {
+            // spawn bomb at plane nose, initial horizontal speed similar to plane
+            const noseX = player.x + Math.cos(player.angle) * 30;
+            const noseY = player.y + Math.sin(player.angle) * 30;
+            bombs.push({
+                x: noseX,
+                y: noseY + 10,
+                vx: player.vx * 0.9 + Math.cos(player.angle) * 1.5,
+                vy: player.vy + 2,
+                g: 0.35
+            });
+
+            // initial launch flare + a few ember particles
+            createExplosion(noseX, noseY, '#ffcc33', 8, { colorful: false });
+            for (let i=0;i<6;i++) particles.push({ x: noseX, y: noseY, vx: -player.vx*0.2 + (Math.random()-0.5)*3, vy: (Math.random()-0.5)*2, life: 10+Math.random()*10, color: 'rgba(255,180,60,0.95)', size: 2+Math.random()*3 });
         }
 
         function draw() {
@@ -545,6 +714,17 @@
                 ctx.fillStyle = p.color || '#fff';
                 ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
             });
+
+                // Bombs
+                bombs.forEach(b => {
+                    ctx.save();
+                    ctx.fillStyle = '#aa3300';
+                    ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI*2); ctx.fill();
+                    // trail
+                    ctx.fillStyle = 'rgba(255,160,60,0.6)';
+                    ctx.beginPath(); ctx.ellipse(b.x - b.vx*2, b.y - b.vy*2, 6, 3, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                });
 
             // Particles
             particles.forEach(p => {
