@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>Briscola Bluetooth</title>
+	<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+	<style>
+		body {
+			margin: 0;
+			background: #1a1a1a;
+			color: white;
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			display: flex;
+			flex-direction: column;
+			height: 100vh;
+			overflow: hidden;
+		}
+
+		.header {
+			padding: 15px;
+			background: rgba(0,0,0,0.3);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.btn {
+			background: #00d4ff;
+			color: #000;
+			border: none;
+			padding: 8px 16px;
+			border-radius: 6px;
+			cursor: pointer;
+			font-weight: bold;
+			text-decoration: none;
+		}
+
+		.game-area {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+			padding: 20px;
+			position: relative;
+			background: radial-gradient(circle at center, #2a4a2a 0%, #1a2a1a 100%);
+		}
+
+		.opponent-area {
+			display: flex;
+			justify-content: center;
+			gap: 10px;
+			min-height: 100px;
+		}
+
+		.table-area {
+			flex: 1;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			gap: 20px;
+			position: relative;
+		}
+
+		.player-area {
+			display: flex;
+			justify-content: center;
+			gap: 10px;
+			min-height: 120px;
+		}
+
+		.card {
+			width: 70px;
+			height: 110px;
+			background: white;
+			border-radius: 8px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			color: black;
+			font-weight: bold;
+			font-size: 1.2rem;
+			box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+			cursor: pointer;
+			transition: transform 0.2s;
+			position: relative;
+			user-select: none;
+		}
+
+		.card.opponent {
+			background: repeating-linear-gradient(
+				45deg,
+				#b71c1c,
+				#b71c1c 10px,
+				#d32f2f 10px,
+				#d32f2f 20px
+			);
+			cursor: default;
+		}
+
+		.card:hover:not(.opponent) {
+			transform: translateY(-10px);
+		}
+
+		.card.played {
+			transform: none;
+			cursor: default;
+		}
+
+		.suit-icon {
+			font-size: 2rem;
+		}
+
+		.briscola-indicator {
+			position: absolute;
+			right: 20px;
+			top: 50%;
+			transform: translateY(-50%);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.deck {
+			width: 70px;
+			height: 110px;
+			background: repeating-linear-gradient(
+				45deg,
+				#b71c1c,
+				#b71c1c 10px,
+				#d32f2f 10px,
+				#d32f2f 20px
+			);
+			border-radius: 8px;
+			box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+			margin-bottom: -40px;
+			z-index: 2;
+		}
+
+		.briscola-card {
+			transform: rotate(90deg) translateX(-20px);
+			z-index: 1;
+		}
+
+		.modal {
+			position: fixed;
+			top: 0; left: 0; right: 0; bottom: 0;
+			background: rgba(0,0,0,0.9);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 100;
+		}
+
+		.modal-content {
+			background: #222;
+			padding: 30px;
+			border-radius: 12px;
+			text-align: center;
+			max-width: 400px;
+			width: 90%;
+		}
+
+		.connection-status {
+			position: absolute;
+			top: 10px;
+			left: 50%;
+			transform: translateX(-50%);
+			background: rgba(0,0,0,0.5);
+			padding: 5px 10px;
+			border-radius: 20px;
+			font-size: 0.8rem;
+		}
+
+		.hidden { display: none !important; }
+
+		input {
+			padding: 10px;
+			border-radius: 5px;
+			border: 1px solid #444;
+			background: #333;
+			color: white;
+			margin: 10px 0;
+			width: 100%;
+			box-sizing: border-box;
+		}
+
+		.log-area {
+			position: absolute;
+			bottom: 150px;
+			left: 20px;
+			width: 200px;
+			height: 100px;
+			overflow-y: auto;
+			font-size: 0.7rem;
+			color: #aaa;
+			pointer-events: none;
+			text-shadow: 1px 1px 1px black;
+		}
+	</style>
+</head>
+<body>
+
+	<!-- Connection Modal -->
+	<div id="connection-modal" class="modal">
+		<div class="modal-content">
+			<h2>Briscola Bluetooth</h2>
+			<p>Connect with a friend to play.</p>
+            
+			<div id="menu-main">
+				<button class="btn" onclick="setupHost()" style="width:100%; margin-bottom:10px;">Host Game</button>
+				<button class="btn" onclick="showJoin()" style="width:100%; background:#444;">Join Game</button>
+			</div>
+
+			<div id="menu-host" class="hidden">
+				<p>Your Game ID:</p>
+				<h1 id="host-id" style="color:#00d4ff; letter-spacing: 2px;">...</h1>
+				<p style="font-size:0.8rem; color:#888;">Share this ID with your friends</p>
+                
+				<div id="lobby-area" style="margin: 20px 0; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+					<div style="font-weight:bold; margin-bottom:5px;">Lobby (<span id="player-count">1</span>/3)</div>
+					<ul id="player-list" style="list-style:none; padding:0; margin:0; text-align:left; font-size:0.9rem;">
+						<li>👤 You (Host)</li>
+					</ul>
+				</div>
+
+				<button id="start-btn" class="btn" onclick="hostStartGame()" disabled style="background:#555; width:100%; margin-bottom:10px;">Start Game</button>
+				<button class="btn" onclick="resetMenu()" style="background:#444;">Back</button>
+			</div>
+
+			<div id="menu-join" class="hidden">
+				<p>Enter Host ID:</p>
+				<input type="text" id="join-id-input" placeholder="e.g. A1B2" style="text-transform:uppercase;">
+				<div id="join-status" style="margin:10px 0; color:#aaa; font-size:0.9rem;"></div>
+				<button class="btn" onclick="joinGame()" style="width:100%; margin-bottom:10px;">Connect</button>
+				<button class="btn" onclick="resetMenu()" style="background:#444; width:100%;">Back</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="header">
+		<div style="font-weight:bold;">Briscola</div>
+		<a href="../index.html#projects" class="btn" style="font-size:0.8rem; padding:5px 10px;">Exit</a>
+	</div>
+
+	<div class="connection-status" id="status-display">Disconnected</div>
+
+	<div class="game-area">
+		<div class="opponent-area" id="opponent-hand">
+			<!-- Opponent cards (back) -->
+		</div>
+
+		<div class="table-area" id="table-area">
+			<!-- Played cards -->
+		</div>
+
+		<div class="briscola-indicator" id="deck-area">
+			<div class="deck"></div>
+			<div class="card briscola-card" id="briscola-card">
+				<!-- Briscola -->
+			</div>
+			<div style="margin-top: 10px; font-weight:bold;" id="deck-count">40</div>
+		</div>
+
+		<div class="player-area" id="player-hand">
+			<!-- Player cards -->
+		</div>
+        
+		<div class="log-area" id="game-log"></div>
+	</div>
+
+	<script>
+		// --- Game Constants ---
+		const SUITS = ['🏆', '🟡', '⚔️', '🪵']; // Coppe, Denari, Spade, Bastoni
+		const RANKS = [
+			{ name: 'A', value: 11, strength: 9 },
+			{ name: '3', value: 10, strength: 8 },
+			{ name: 'R', value: 4, strength: 7 },
+			{ name: 'C', value: 3, strength: 6 },
+			{ name: 'F', value: 2, strength: 5 },
+			{ name: '7', value: 0, strength: 4 },
+			{ name: '6', value: 0, strength: 3 },
+			{ name: '5', value: 0, strength: 2 },
+			{ name: '4', value: 0, strength: 1 },
+			{ name: '2', value: 0, strength: 0 }
+		];
+
+		// --- State ---
+		let peer = null;
+		let conn = null; // For Guest: connection to Host
+		let guests = []; // For Host: list of connections [guest1, guest2]
+		let isHost = false;
+		let myPlayerIndex = 0; // 0=Host, 1=Guest1, 2=Guest2
+		let totalPlayers = 1;
+        
+		let myHand = [];
+		let deck = [];
+		let briscola = null;
+		let briscolaSuit = null; // Persists even after briscola card is drawn
+		let tableCards = []; // { card, playerIndex }
+		let turn = 0; // Player Index whose turn it is
+		let scores = [0, 0, 0]; // Scores for p0, p1, p2
+		let deckCount = 40;
+
+		// --- UI Elements ---
+		const modal = document.getElementById('connection-modal');
+		const statusDisplay = document.getElementById('status-display');
+		const playerHandEl = document.getElementById('player-hand');
+		const opponentHandEl = document.getElementById('opponent-hand');
+		const tableEl = document.getElementById('table-area');
+		const briscolaCardEl = document.getElementById('briscola-card');
+		const deckCountEl = document.getElementById('deck-count');
+		const gameLog = document.getElementById('game-log');
+		const playerListEl = document.getElementById('player-list');
+		const playerCountEl = document.getElementById('player-count');
+		const startBtn = document.getElementById('start-btn');
+		const joinStatusEl = document.getElementById('join-status');
+
+		// --- Connection Logic ---
+		function generateId() {
+			return Math.random().toString(36).substr(2, 4).toUpperCase();
+		}
+
+		function log(msg) {
+			const div = document.createElement('div');
+			div.textContent = msg;
+			gameLog.appendChild(div);
+			gameLog.scrollTop = gameLog.scrollHeight;
+		}
+
+		function setupHost() {
+			document.getElementById('menu-main').classList.add('hidden');
+			document.getElementById('menu-host').classList.remove('hidden');
+            
+			const id = generateId();
+			document.getElementById('host-id').textContent = id;
+			isHost = true;
+			guests = [];
+			totalPlayers = 1;
+			updateLobbyUI();
+
+			peer = new Peer(id);
+			peer.on('open', (id) => {
+				log('Host ready. ID: ' + id);
+			});
+            
+			peer.on('connection', (c) => {
+				if (guests.length >= 2) {
+					// Room full
+					c.on('open', () => {
+						c.send({ type: 'ERROR', msg: 'Room full' });
+						setTimeout(() => c.close(), 500);
+					});
+					return;
+				}
+
+				c.on('open', () => {
+					guests.push(c);
+					totalPlayers = guests.length + 1;
+					updateLobbyUI();
+                    
+					// Notify all guests about lobby update
+					broadcast('LOBBY_UPDATE', { totalPlayers });
+                    
+					// Send specific welcome to new guest
+					c.send({ type: 'WELCOME', playerIndex: guests.length }); // 1 or 2
+				});
+
+				c.on('data', (data) => {
+					handleData(data, c);
+				});
+
+				c.on('close', () => {
+					guests = guests.filter(g => g !== c);
+					totalPlayers = guests.length + 1;
+					updateLobbyUI();
+					broadcast('LOBBY_UPDATE', { totalPlayers });
+				});
+			});
+		}
+
+		function updateLobbyUI() {
+			playerCountEl.textContent = totalPlayers;
+			playerListEl.innerHTML = '<li>👤 You (Host)</li>';
+			guests.forEach((g, i) => {
+				playerListEl.innerHTML += `<li>👤 Guest ${i+1}</li>`;
+			});
+            
+			if (totalPlayers >= 2) {
+				startBtn.disabled = false;
+				startBtn.style.background = '#00d4ff';
+				startBtn.style.color = 'black';
+			} else {
+				startBtn.disabled = true;
+				startBtn.style.background = '#555';
+				startBtn.style.color = 'white';
+			}
+		}
+
+		function showJoin() {
+			document.getElementById('menu-main').classList.add('hidden');
+			document.getElementById('menu-join').classList.remove('hidden');
+		}
+
+		function joinGame() {
+			const hostId = document.getElementById('join-id-input').value.trim().toUpperCase();
+			if (!hostId) return;
+            
+			isHost = false;
+			joinStatusEl.textContent = "Connecting...";
+            
+			peer = new Peer();
+			peer.on('open', () => {
+				conn = peer.connect(hostId);
+				setupGuestConnection();
+			});
+            
+			peer.on('error', (err) => {
+				joinStatusEl.textContent = "Error: " + err.type;
+			});
+		}
+
+		function resetMenu() {
+			document.getElementById('menu-main').classList.remove('hidden');
+			document.getElementById('menu-host').classList.add('hidden');
+			document.getElementById('menu-join').classList.add('hidden');
+			if (peer) peer.destroy();
+			guests = [];
+			conn = null;
+		}
+
+		function setupGuestConnection() {
+			conn.on('open', () => {
+				joinStatusEl.textContent = "Connected! Waiting for host...";
+			});
+
+			conn.on('data', (data) => {
+				handleData(data);
+			});
+
+			conn.on('close', () => {
+				alert('Connection lost');
+				location.reload();
+			});
+		}
+
+		function send(type, payload) {
+			if (isHost) {
+				// Host logic usually broadcasts or handles internally, 
+				// but if we need to send to specific guest we use guests[i].send
+			} else {
+				if (conn && conn.open) {
+					conn.send({ type, payload });
+				}
+			}
+		}
+        
+		function broadcast(type, payload) {
+			if (!isHost) return;
+			guests.forEach(g => {
+				if (g.open) g.send({ type, payload });
+			});
+		}
+
+		// --- Game Logic ---
+
+		function createDeck() {
+			let d = [];
+			SUITS.forEach(suit => {
+				RANKS.forEach(rank => {
+					d.push({ suit, ...rank, id: suit + rank.name });
+				});
+			});
+            
+			// If 3 players, remove 2 of Cups (Coppe) 🏆
+			if (totalPlayers === 3) {
+				d = d.filter(c => !(c.suit === '🏆' && c.name === '2'));
+			}
+            
+			return d;
+		}
+
+		function shuffle(array) {
+			for (let i = array.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[array[i], array[j]] = [array[j], array[i]];
+			}
+			return array;
+		}
+
+		function hostStartGame() {
+			deck = shuffle(createDeck());
+			briscola = deck.pop(); // Last card is briscola
+			briscolaSuit = briscola.suit;
+            
+			// Deal 3 cards to each player
+			let hands = [];
+			for(let i = 0; i<totalPlayers; i++) {
+				hands.push([deck.pop(), deck.pop(), deck.pop()]);
+			}
+            
+			myHand = hands[0];
+			myPlayerIndex = 0;
+			turn = 0; // Host starts
+			scores = [0, 0, 0];
+			deckCount = deck.length + 1; // +1 for briscola
+
+			// Send INIT to guests
+			guests.forEach((g, i) => {
+				g.send({
+					type: 'INIT',
+					payload: {
+						hand: hands[i+1],
+						briscola: briscola,
+						turn: 0,
+						myIndex: i+1,
+						totalPlayers: totalPlayers,
+						deckCount: deckCount
+					}
+				});
+			});
+
+			modal.style.display = 'none';
+			updateUI();
+		}
+
+		function handleData(data, senderConn) {
+			// Guest handling
+			if (!isHost) {
+				switch(data.type) {
+					case 'WELCOME':
+						myPlayerIndex = data.playerIndex;
+						joinStatusEl.textContent = `Connected as Player ${myPlayerIndex + 1}. Waiting for game...`;
+						break;
+					case 'LOBBY_UPDATE':
+						joinStatusEl.textContent = `Lobby: ${data.payload.totalPlayers}/3 players. Waiting...`;
+						break;
+					case 'INIT':
+						modal.style.display = 'none';
+						myHand = data.payload.hand;
+						briscola = data.payload.briscola;
+						briscolaSuit = briscola.suit;
+						turn = data.payload.turn;
+						myPlayerIndex = data.payload.myIndex;
+						totalPlayers = data.payload.totalPlayers;
+						deckCount = data.payload.deckCount;
+						scores = [0, 0, 0];
+						updateUI();
+						break;
+					case 'GAME_UPDATE':
+						// Generic update for moves
+						tableCards = data.payload.tableCards;
+						turn = data.payload.turn;
+						deckCount = data.payload.deckCount;
+						updateUI();
+						break;
+					case 'ROUND_RESULT':
+						log(`Player ${data.payload.winner + 1} won the round`);
+						setTimeout(() => {
+							tableCards = [];
+							if (data.payload.drawCard) {
+								myHand.push(data.payload.drawCard);
+							}
+							deckCount = data.payload.deckCount;
+							turn = data.payload.turn;
+							updateUI();
+						}, 2000);
+						break;
+				}
+				return;
+			}
+
+			// Host handling
+			if (isHost) {
+				switch(data.type) {
+					case 'PLAY_CARD':
+						// Find which player sent this
+						let pIndex = guests.indexOf(senderConn) + 1;
+						if (pIndex !== turn) return; // Not their turn
+                        
+						processMove(pIndex, data.payload.card);
+						break;
+				}
+			}
+		}
+
+		function processMove(pIndex, card) {
+			// Add to table
+			tableCards.push({ card, playerIndex: pIndex });
+            
+			// Broadcast update
+			broadcast('GAME_UPDATE', {
+				tableCards: tableCards,
+				turn: (turn + 1) % totalPlayers,
+				deckCount: deckCount
+			});
+            
+			// Update local state if I am not the one who moved (Host logic handles his own move directly)
+			if (pIndex !== 0) {
+				turn = (turn + 1) % totalPlayers;
+				updateUI();
+			}
+
+			// Check end of round
+			if (tableCards.length === totalPlayers) {
+				resolveRound();
+			}
+		}
+
+		function updateUI() {
+			// Render My Hand
+			playerHandEl.innerHTML = '';
+			myHand.forEach(card => {
+				const el = createCardEl(card);
+				el.onclick = () => playCard(card);
+				playerHandEl.appendChild(el);
+			});
+
+			// Render Opponent Hands (Backs)
+			// Just show a pile of backs for now to represent opponents
+			opponentHandEl.innerHTML = '';
+			// Show 3 cards per opponent roughly
+			for(let i=0; i< (totalPlayers - 1) * 3; i++) {
+				const el = document.createElement('div');
+				el.className = 'card opponent';
+				el.style.transform = `scale(0.8)`;
+				opponentHandEl.appendChild(el);
+			}
+
+			// Render Table
+			tableEl.innerHTML = '';
+			tableCards.forEach(item => {
+				const el = createCardEl(item.card);
+				el.classList.add('played');
+				// Add label
+				const label = document.createElement('div');
+				label.style.position = 'absolute';
+				label.style.top = '-20px';
+				label.style.fontSize = '0.7rem';
+				label.style.color = '#aaa';
+				label.textContent = item.playerIndex === myPlayerIndex ? "You" : `P${item.playerIndex + 1}`;
+				el.appendChild(label);
+                
+				tableEl.appendChild(el);
+			});
+
+			// Render Briscola
+			if (briscola) {
+				briscolaCardEl.innerHTML = `<div class="suit-icon">${briscola.suit}</div><div>${briscola.name}</div>`;
+				briscolaCardEl.style.color = (briscola.suit === '🟡' || briscola.suit === '🏆') ? '#d32f2f' : 'black';
+				briscolaCardEl.style.display = 'flex';
+			} else {
+				briscolaCardEl.style.display = 'none';
+			}
+
+			// Deck Count
+			deckCountEl.textContent = deckCount;
+			if (deckCount <= 0) {
+				document.querySelector('.deck').style.display = 'none';
+			} else {
+				document.querySelector('.deck').style.display = 'block';
+			}
+
+			if (turn === myPlayerIndex) {
+				statusDisplay.textContent = "TUO TURNO";
+				statusDisplay.style.color = "#00ff9d";
+			} else {
+				statusDisplay.textContent = `TURNO GIOCATORE ${turn + 1}`;
+				statusDisplay.style.color = "#ff6464";
+			}
+		}
+
+		function createCardEl(card) {
+			const el = document.createElement('div');
+			el.className = 'card';
+			const isRed = card.suit === '🟡' || card.suit === '🏆'; 
+			el.style.color = isRed ? '#d32f2f' : 'black';
+			el.innerHTML = `<div class="suit-icon">${card.suit}</div><div>${card.name}</div>`;
+			return el;
+		}
+
+		function playCard(card) {
+			if (turn !== myPlayerIndex) {
+				log("Non è il tuo turno!");
+				return;
+			}
+			if (tableCards.length >= totalPlayers) return; 
+
+			// Remove from hand
+			myHand = myHand.filter(c => c.id !== card.id);
+            
+			// Add to table locally
+			tableCards.push({ card, playerIndex: myPlayerIndex });
+            
+			// If Host, process directly. If Guest, send to Host.
+			if (isHost) {
+				// Broadcast update
+				broadcast('GAME_UPDATE', {
+					tableCards: tableCards,
+					turn: (turn + 1) % totalPlayers,
+					deckCount: deckCount
+				});
+				turn = (turn + 1) % totalPlayers;
+                
+				if (tableCards.length === totalPlayers) {
+					resolveRound();
+				}
+			} else {
+				send('PLAY_CARD', { card });
+			}
+            
+			updateUI();
+		}
+
+		function resolveRound() {
+			setTimeout(() => {
+				// Determine winner
+				// Logic: First card sets suit. Highest of that suit wins, unless Briscola played.
+				let winningItem = tableCards[0];
+				const leadSuit = winningItem.card.suit;
+                
+				for (let i = 1; i < tableCards.length; i++) {
+					const current = tableCards[i];
+                    
+					if (current.card.suit === leadSuit) {
+						// Same suit, check strength
+						if (current.card.strength > winningItem.card.strength) {
+							winningItem = current;
+						}
+					} else if (current.card.suit === briscolaSuit) {
+						// Briscola played
+						if (winningItem.card.suit !== briscolaSuit) {
+							// First briscola seen
+							winningItem = current;
+						} else {
+							// Already had briscola, check strength
+							if (current.card.strength > winningItem.card.strength) {
+								winningItem = current;
+							}
+						}
+					}
+				}
+
+				const winnerIndex = winningItem.playerIndex;
+                
+				// Assign points
+				let points = 0;
+				tableCards.forEach(t => points += t.card.value);
+				scores[winnerIndex] += points;
+
+				log(`Player ${winnerIndex + 1} wins (+${points} pts)`);
+
+				// Draw cards
+				let draws = {}; // Map playerIndex -> card
+                
+				if (deckCount > 0) {
+					// Winner draws first, then next, then next
+					let drawOrder = [];
+					for(let i=0; i<totalPlayers; i++) {
+						drawOrder.push((winnerIndex + i) % totalPlayers);
+					}
+                    
+					drawOrder.forEach(pIdx => {
+						let card = null;
+						if (deck.length > 0) {
+							card = deck.pop();
+						} else if (briscola) {
+							card = briscola;
+							briscola = null;
+						}
+                        
+						if (card) {
+							draws[pIdx] = card;
+							deckCount--;
+						}
+					});
+				}
+
+				// Handle Host draw locally
+				if (draws[0]) myHand.push(draws[0]);
+
+				// Send results to guests
+				guests.forEach((g, i) => {
+					let guestIdx = i + 1;
+					g.send({
+						type: 'ROUND_RESULT',
+						payload: {
+							winner: winnerIndex,
+							drawCard: draws[guestIdx],
+							deckCount: deckCount,
+							turn: winnerIndex
+						}
+					});
+				});
+
+				// Reset table
+				tableCards = [];
+				turn = winnerIndex;
+                
+				updateUI();
+
+			}, 1500);
+		}
+
+	</script>
+</body>
+</html>

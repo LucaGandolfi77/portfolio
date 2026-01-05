@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Birds — generative flock</title>
+	<style>
+		body { margin:0; background:#0b1220; color:#eaf6ff; font-family: Inter, system-ui, -apple-system, Roboto, Arial; }
+		canvas { display:block; width:100vw; height:100vh; }
+		.overlay { position:absolute; left:12px; top:12px; background:rgba(0,0,0,0.35); padding:8px 10px; border-radius:8px; }
+		.overlay input { width:80px }
+	</style>
+</head>
+<body>
+	<canvas id="c"></canvas>
+	<div class="overlay">
+		<label>Boids: <input id="count" type="range" min="10" max="800" value="200"></label>
+		<button id="reset">Reset</button>
+	</div>
+	<script>
+		const canvas = document.getElementById('c');
+		const ctx = canvas.getContext('2d');
+		function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+		addEventListener('resize', resize); resize();
+
+		class Boid { constructor(){ this.x = Math.random()*canvas.width; this.y = Math.random()*canvas.height; this.vx = (Math.random()-0.5)*2; this.vy = (Math.random()-0.5)*2; } update(boids){
+				let ax=0, ay=0; let neigh=0; for(const b of boids){ const dx=b.x-this.x; const dy=b.y-this.y; const d=Math.hypot(dx,dy); if(d>0 && d<60){ ax += dx/d; ay += dy/d; neigh++; } }
+				if(neigh){ ax/=neigh; ay/=neigh; this.vx += ax*0.05; this.vy += ay*0.05; }
+				// limit
+				const speed = Math.hypot(this.vx,this.vy); if(speed>3){ this.vx = (this.vx/speed)*3; this.vy = (this.vy/speed)*3; }
+				this.x+=this.vx; this.y+=this.vy;
+				if(this.x<0) this.x+=canvas.width; if(this.x>canvas.width) this.x-=canvas.width;
+				if(this.y<0) this.y+=canvas.height; if(this.y>canvas.height) this.y-=canvas.height;
+		} draw(){ ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(Math.atan2(this.vy,this.vx)); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(-6,4); ctx.lineTo(-6,-4); ctx.closePath(); ctx.fill(); ctx.restore(); } }
+
+		let boids = [];
+		function make(n){ boids = []; for(let i=0;i<n;i++) boids.push(new Boid()); }
+		make(200);
+		function frame(){ ctx.fillStyle='rgba(10,16,32,0.18)'; ctx.fillRect(0,0,canvas.width,canvas.height); for(const b of boids){ b.update(boids); b.draw(); } requestAnimationFrame(frame); }
+		frame();
+		document.getElementById('count').addEventListener('input', (e)=> make(+e.target.value));
+		document.getElementById('reset').addEventListener('click', ()=> make(+document.getElementById('count').value));
+	</script>
+</body>
+</html>
+

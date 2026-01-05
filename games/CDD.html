@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>CDD Run - Endless Runner</title>
+	<style>
+		body { margin:0; overflow:hidden; background:#87CEEB; font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif; touch-action:none }
+		canvas{ display:block }
+		#ui-layer{ position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between }
+		#score-board{ padding:20px; font-size:24px; color:white; text-shadow:2px 2px 0 #000; font-weight:bold }
+		#game-over{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; background:rgba(0,0,0,0.8); padding:40px; border-radius:20px; color:white; display:none; pointer-events:auto }
+		h1{ margin-top:0; color:#ff4757; font-size:48px } p{ font-size:24px; margin-bottom:30px }
+		button{ background:#2ed573; color:white; border:none; padding:15px 40px; font-size:24px; border-radius:50px; cursor:pointer; box-shadow:0 5px 0 #26af61 }
+		button:active{ transform:translateY(5px); box-shadow:none }
+		#start-screen{ position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; pointer-events:auto; z-index:10 }
+		.controls-hint{ margin-top:20px; font-size:18px; color:#ccc }
+		#mobile-controls{ position:absolute; bottom:20px; width:100%; height:100px; display:flex; justify-content:space-between; padding:0 20px; box-sizing:border-box; pointer-events:auto }
+		.control-btn{ width:80px; height:80px; background:rgba(255,255,255,0.2); border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:30px; color:white; user-select:none; border:2px solid rgba(255,255,255,0.5) }
+		.control-btn:active{ background:rgba(255,255,255,0.4) }
+		@media(min-width:768px){ #mobile-controls{ display:none } }
+	</style>
+</head>
+<body>
+	<canvas id="gameCanvas"></canvas>
+	<div id="ui-layer"><div id="score-board">Score: <span id="score">0</span></div></div>
+	<div id="start-screen"><h1 style="color:#2ed573">CDD RUN</h1><p>Dodge the barriers! Collect coins!</p><button id="start-btn">PLAY</button><div class="controls-hint">Use Arrow Keys or Swipe to Move</div></div>
+	<div id="game-over"><h1>GAME OVER</h1><p>Score: <span id="final-score">0</span></p><button id="restart-btn">TRY AGAIN</button><br><button id="exit-btn" style="background:#ff4757; margin-top:10px;">EXIT</button></div>
+	<div id="mobile-controls"><div class="control-btn" id="btn-left">←</div><div class="control-btn" id="btn-right">→</div></div>
+	<script>
+		const canvas=document.getElementById('gameCanvas'); const ctx=canvas.getContext('2d'); let gameRunning=false, score=0, speed=0, distance=0, lastTime=0; const LANES=3, LANE_WIDTH=2, SEGMENT_LENGTH=5, DRAW_DISTANCE=100, BASE_SPEED=20, MAX_SPEED=60; const player={ lane:0, x:0, y:0, z:10, width:0.8, height:1.5, color:'#ff4757', targetLane:0, jumpY:0, isJumping:false, jumpVel:0 }; let obstacles=[], coins=[], particles=[]; function resize(){ canvas.width=innerWidth; canvas.height=innerHeight } addEventListener('resize',resize); resize(); function moveLeft(){ if(player.targetLane>-1) player.targetLane--; } function moveRight(){ if(player.targetLane<1) player.targetLane++; } function jump(){ if(!player.isJumping){ player.isJumping=true; player.jumpVel=15 } }
+		document.addEventListener('keydown', e=>{ if(!gameRunning) return; if(e.key==='ArrowLeft'||e.key==='a') moveLeft(); if(e.key==='ArrowRight'||e.key==='d') moveRight(); if(e.key==='ArrowUp'||e.key==='w'||e.key===' ') jump(); });
+		let touchStartX=0,touchStartY=0; document.addEventListener('touchstart', e=>{ touchStartX=e.changedTouches[0].screenX; touchStartY=e.changedTouches[0].screenY }); document.addEventListener('touchend', e=>{ if(!gameRunning) return; const touchEndX=e.changedTouches[0].screenX, touchEndY=e.changedTouches[0].screenY, dx=touchEndX-touchStartX, dy=touchEndY-touchStartY; if(Math.abs(dx)>Math.abs(dy)){ if(Math.abs(dx)>30){ if(dx>0) moveRight(); else moveLeft(); } } else { if(dy< -30) jump(); } });
+		document.getElementById('btn-left').addEventListener('touchstart', e=>{ e.preventDefault(); moveLeft()}); document.getElementById('btn-right').addEventListener('touchstart', e=>{ e.preventDefault(); moveRight()}); document.getElementById('btn-left').addEventListener('click', ()=>moveLeft()); document.getElementById('btn-right').addEventListener('click', ()=>moveRight()); document.getElementById('start-btn').addEventListener('click', startGame); document.getElementById('restart-btn').addEventListener('click', startGame); document.getElementById('exit-btn').addEventListener('click', ()=>{ location.href='index.html' });
+		function startGame(){ gameRunning=true; score=0; speed=BASE_SPEED; distance=0; obstacles=[]; coins=[]; particles=[]; player.lane=0; player.targetLane=0; player.x=0; player.jumpY=0; player.isJumping=false; document.getElementById('start-screen').style.display='none'; document.getElementById('game-over').style.display='none'; document.getElementById('score').innerText='0'; lastTime=performance.now(); requestAnimationFrame(gameLoop); }
+		function gameOver(){ gameRunning=false; document.getElementById('game-over').style.display='block'; document.getElementById('final-score').innerText=Math.floor(score); }
+		function project(x,y,z){ const cameraHeight=2.5; const cameraDepth=distance; const fov=600; const relZ=z-cameraDepth; if(relZ<=0) return {x:0,y:0,scale:0,visible:false}; const scale=fov/relZ; const screenX=canvas.width/2 + (x*scale); const screenY=canvas.height/2 - ((y-cameraHeight)*scale); return {x:screenX,y:screenY,scale:scale,visible:true} }
+		function spawnObstacle(z){ const lane=Math.floor(Math.random()*3)-1; const type=Math.random()>0.5?'tall':'low'; obstacles.push({lane:lane,z:z,type:type,passed:false}); for(let l=-1;l<=1;l++){ if(l!==lane && Math.random()>0.6) coins.push({lane:l,z:z}); } }
+		function update(dt){ speed=Math.min(MAX_SPEED,speed+dt*0.5); distance+=speed*dt; score+=speed*dt*0.1; document.getElementById('score').innerText=Math.floor(score); const targetX=player.targetLane*LANE_WIDTH; player.x+=(targetX-player.x)*10*dt; if(player.isJumping){ player.jumpY+=player.jumpVel*dt*60; player.jumpVel-=50*dt; if(player.jumpY<=0){ player.jumpY=0; player.isJumping=false } }
+			const spawnZ=Math.floor(distance/20)*20+100; if(obstacles.length===0||obstacles[obstacles.length-1].z<spawnZ-15) spawnObstacle(spawnZ);
+			for(let i=obstacles.length-1;i>=0;i--){ const obs=obstacles[i]; const relZ=obs.z-distance; if(relZ<-5){ obstacles.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.5){ if(Math.abs(player.x-(obs.lane*LANE_WIDTH))<0.6){ if(obs.type==='low'){ if(player.jumpY<1.0){ gameOver(); } } else { gameOver(); } } } }
+			for(let i=coins.length-1;i>=0;i--){ const coin=coins[i]; const relZ=coin.z-distance; if(relZ<-5){ coins.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.8 && Math.abs(player.x-(coin.lane*LANE_WIDTH))<0.6){ if(player.jumpY<1.5){ score+=50; coins.splice(i,1); } } }
+		}
+		function draw(){ ctx.fillStyle='#87CEEB'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+		function gameLoop(t){ const dt=(t-lastTime)/1000; lastTime=t; if(gameRunning){ update(dt); draw(); requestAnimationFrame(gameLoop);} }
+	</script>
+</body>
+</html>
