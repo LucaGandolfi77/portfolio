@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RSA Key Generator — Luca Gandolfi</title>
+  <link href="./assets/css/main.css" rel="stylesheet">
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Arial;background:#071023;color:#e6f7ff;padding:24px}
+    .wrap{max-width:980px;margin:0 auto}
+    h1{margin:0 0 12px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    select,input,button,textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+    button{background:#00d4ff;color:#002;border:none}
+    pre{background:rgba(255,255,255,0.03);padding:12px;border-radius:8px;overflow:auto}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .small{font-size:0.9rem;color:#9fcfff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>RSA Key Generator (in-browser)</h1>
+    <p class="small">Genera coppie di chiavi RSA usando BigInt. Usa test di primalità Miller–Rabin, ricerca di coprimi e inverso modolare. Non usare per produzione critica: è una demo educativa.</p>
+
+    <div class="controls">
+      <label for="bits">Bit length</label>
+      <select id="bits">
+        <option value="512">512 (fast)</option>
+        <option value="1024" selected>1024</option>
+        <option value="2048">2048 (slow)</option>
+      </select>
+      <button id="gen">Generate Keypair</button>
+      <button id="copy">Copy Private Key</button>
+    </div>
+
+    <div class="grid">
+      <div>
+        <h3>Public key</h3>
+        <pre id="pub">—</pre>
+      </div>
+      <div>
+        <h3>Private key</h3>
+        <pre id="priv">—</pre>
+      </div>
+    </div>
+
+    <h3 style="margin-top:12px">Encrypt / Decrypt</h3>
+    <textarea id="plain" rows="3" style="width:100%" placeholder="Test message"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="enc">Encrypt</button>
+      <button id="dec">Decrypt</button>
+      <input id="cipher" type="text" placeholder="Cipher (hex)" style="flex:1" />
+    </div>
+    <div id="log" style="margin-top:12px"></div>
+  </div>
+
+  <script>
+    // Utilities using BigInt
+    const rng = (bytes)=>{
+      const arr = new Uint8Array(bytes);
+      crypto.getRandomValues(arr);
+      let v=0n;
+      for(const b of arr){ v=(v<<8n)+BigInt(b); }
+      return v;
+    }
+
+    function bitMask(bits){ return (1n<<BigInt(bits))-1n; }
+
+    function fromBytes(bytes){ let v=0n; for(const b of bytes) v=(v<<8n)+BigInt(b); return v; }
+
+    function toHex(bn){ return bn.toString(16); }
+
+    function modPow(base,exp,mod){
+      base = base % mod;
+      let result = 1n;
+      while(exp>0){ if(exp & 1n) result = (result * base) % mod; exp >>= 1n; base = (base*base) % mod; }
+      return result;
+    }
+
+    function egcd(a,b){
+      if(b===0n) return {g:a,x:1n,y:0n};
+      let {g:x1,x:y1,y:z1} = egcd(b, a % b);
+      // above line intentionally recursive but we need correct unpacking; implement iterative below instead
+    }
+
+    function egcdIter(a,b){
+      let x0=1n,y0=0n,x1=0n,y1=1n;
+      while(b!=0n){ const q = a / b; const r = a - q*b; a=b; b=r; const x2 = x0 - q*x1; x0=x1; x1=x2; const y2 = y0 - q*y1; y0=y1; y1=y2; }
+      return {g:a,x:x0,y:y0};
+    }
+
+    function modInv(a,m){ const r = egcdIter(a,m); if(r.g !== 1n) return null; let inv = r.x % m; if(inv<0) inv += m; return inv; }
+
+    function gcd(a,b){ while(b){ const t = a % b; a=b; b=t;} return a; }
+
+    // Miller-Rabin primality (probabilistic)
+    function isProbablyPrime(n, k=12){
+      if(n<2n) return false;
+      const smallPrimes = [2n,3n,5n,7n,11n,13n,17n,19n,23n,29n,31n,37n];
+      for(const p of smallPrimes){ if(n===p) return true; if(n%p===0n) return false; }
+      let d = n-1n; let s = 0n;
+      while((d & 1n)===0n){ d >>= 1n; s++; }
+      witnessLoop: for(let i=0;i<k;i++){
+        const a = 2n + (rng(8) % (n-4n));
+        let x = modPow(a,d,n);
+        if(x===1n || x===n-1n) continue;
+        for(let r=1n;r<s;r++){
+          x = (x*x) % n;
+          if(x===n-1n) continue witnessLoop;
+        }
+        return false;
+      }
+      return true;
+    }
+
+    async function generatePrime(bits){
+      while(true){
+        // generate random of desired bits with high bit set
+        const bytes = Math.ceil(bits/8);
+        let p = rng(bytes) & bitMask(bits);
+        p |= (1n << (BigInt(bits)-1n)); // ensure top bit
+        p |= 1n; // odd
+        if(isProbablyPrime(p, 20)) return p;
+        // loop until prime
+        await new Promise(r=>setTimeout(r,0));
+      }
+    }
+
+    async function generateKeypair(bits){
+      const half = Math.floor(bits/2);
+      const p = await generatePrime(half);
+      const q = await generatePrime(bits-half);
+      const n = p*q;
+      const phi = (p-1n)*(q-1n);
+      let e = 65537n;
+      if(gcd(e,phi) !== 1n){
+        // find small odd e coprime to phi
+        e = 3n;
+        while(gcd(e,phi) !== 1n) e += 2n;
+      }
+      const d = modInv(e, phi);
+      return {p,q,n,e,d,phi};
+    }
+
+    function textToBigInt(str){ const enc = new TextEncoder().encode(str); return fromBytes(enc); }
+    function bigIntToText(bn){
+      const hex = bn.toString(16); const padded = hex.length%2? '0'+hex: hex; const bytes = new Uint8Array(padded.length/2);
+      for(let i=0;i<bytes.length;i++) bytes[i]=parseInt(padded.substr(i*2,2),16);
+      return new TextDecoder().decode(bytes);
+    }
+
+    // UI wiring
+    const bitsEl = document.getElementById('bits');
+    const genBtn = document.getElementById('gen');
+    const pubEl = document.getElementById('pub');
+    const privEl = document.getElementById('priv');
+    const plainEl = document.getElementById('plain');
+    const encBtn = document.getElementById('enc');
+    const decBtn = document.getElementById('dec');
+    const cipherEl = document.getElementById('cipher');
+    const copyBtn = document.getElementById('copy');
+    const log = document.getElementById('log');
+
+    let current = null;
+
+    genBtn.addEventListener('click', async ()=>{
+      genBtn.disabled = true; genBtn.textContent='Generating…';
+      const b = parseInt(bitsEl.value,10);
+      try{
+        const k = await generateKeypair(b);
+        current = k;
+        pubEl.textContent = `n: ${k.n}\ne: ${k.e}`;
+        privEl.textContent = `d: ${k.d}\np: ${k.p}\nq: ${k.q}`;
+        log.innerHTML = `<div class="small">Generated ${b}-bit keypair. n bitlen: ${k.n.toString(2).length}</div>`;
+        // store minimal PEM-like (not real PEM)
+      }catch(e){ console.error(e); log.textContent = 'Error generating keys'; }
+      genBtn.disabled = false; genBtn.textContent='Generate Keypair';
+    });
+
+    encBtn.addEventListener('click', ()=>{
+      if(!current) return alert('Genera una coppia di chiavi prima');
+      const m = textToBigInt(plainEl.value||'');
+      if(m >= current.n) return alert('Messaggio troppo lungo per il modulo n; usa testo più corto.');
+      const c = modPow(m, current.e, current.n);
+      cipherEl.value = c.toString(16);
+      log.innerHTML = '<div class="small">Encrypted (hex)</div>';
+    });
+
+    decBtn.addEventListener('click', ()=>{
+      if(!current) return alert('Genera una coppia di chiavi prima');
+      const cHex = cipherEl.value.trim(); if(!cHex) return alert('Inserisci cipher hex');
+      const c = BigInt('0x'+cHex);
+      const m = modPow(c, current.d, current.n);
+      try{ const txt = bigIntToText(m); log.innerHTML = `<div class="small">Decrypted text:</div><pre>${txt}</pre>`; }catch(e){ log.textContent='Decrypted (non-text)'; }
+    });
+
+    copyBtn.addEventListener('click', ()=>{
+      if(!current) return alert('Genera prima');
+      navigator.clipboard.writeText(`n:${current.n}\ne:${current.e}\nd:${current.d}`).then(()=>alert('Private key copied to clipboard'));
+    });
+  </script>
+</body>
+</html>
