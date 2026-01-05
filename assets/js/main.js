@@ -270,6 +270,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('lang', v);
         });
     }
+    
+    // Save scroll position when navigating to a project so we can restore it on return
+    try {
+        document.querySelectorAll('a[href^="projects/"], a[href*="/projects/"], a[href*="#projects"]').forEach(a => {
+            a.addEventListener('click', () => {
+                try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (e) { /* ignore */ }
+            });
+        });
+    } catch (e) { /* ignore if DOM structure differs */ }
+    
+    // Also save on beforeunload (fallback)
+    window.addEventListener('beforeunload', () => {
+        try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (e) { }
+    });
+    
+    // If we are on the index page, restore saved scroll after full load
+    const isIndexPage = (location.pathname.endsWith('index.html') || location.pathname === '/' || location.pathname === '');
+    if (isIndexPage) {
+        const saved = sessionStorage.getItem('index_scroll');
+        if (saved) {
+            window.addEventListener('load', () => {
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    try {
+                        window.scrollTo(0, parseInt(saved, 10) || 0);
+                        sessionStorage.removeItem('index_scroll');
+                    } catch (e) {}
+                }));
+            });
+        }
+    }
 });
 
 // Handle language change for cases where langSelect is already in DOM before DOMContentLoaded
