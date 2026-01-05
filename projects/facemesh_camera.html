@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -111,6 +112,7 @@
         
         <div class="controls">
             <button class="btn" onclick="window.location.href='index.html#projects'">Exit</button>
+            <button class="btn" id="captureBtn">Scatta & Scarica</button>
         </div>
     </div>
 
@@ -225,6 +227,54 @@
             canvasElement.width = window.innerWidth;
             canvasElement.height = window.innerHeight;
         });
+
+        // Capture and download as compressed ZIP
+        async function canvasToBlob(canvas, type = 'image/png', quality = 0.92) {
+            return new Promise((resolve) => {
+                canvas.toBlob((b) => resolve(b), type, quality);
+            });
+        }
+
+        async function captureAndDownload() {
+            const btn = document.getElementById('captureBtn');
+            if (!canvasElement || canvasElement.width === 0 || canvasElement.height === 0) {
+                alert('Canvas non pronto per lo scatto. Riprova tra un attimo.');
+                return;
+            }
+            btn.disabled = true;
+            const oldText = btn.textContent;
+            btn.textContent = 'Elaborazione...';
+            try {
+                // get current canvas image as jpeg to reduce size
+                const imgBlob = await canvasToBlob(canvasElement, 'image/jpeg', 0.85);
+                if (!imgBlob) throw new Error('Impossibile ottenere l\'immagine dal canvas');
+
+                const zip = new JSZip();
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const imgName = `facemesh_${timestamp}.jpg`;
+                zip.file(imgName, imgBlob);
+
+                const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+                const a = document.createElement('a');
+                const zipName = `facemesh_snapshot_${timestamp}.zip`;
+                a.href = URL.createObjectURL(zipBlob);
+                a.download = zipName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(a.href);
+            } catch (err) {
+                console.error(err);
+                alert('Errore durante la creazione dello snapshot: ' + (err.message || err));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = oldText;
+            }
+        }
+
+        document.getElementById('captureBtn').addEventListener('click', captureAndDownload);
     </script>
-</body>
-</html>
+    <script src="top_buttons.js"></script>
+    </body>
+    </html>

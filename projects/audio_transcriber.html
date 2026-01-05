@@ -6,6 +6,11 @@
 		<title>Audio Transcriber — Local Whisper</title>
 		<style>
 			body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:#0b1020; color:#e6eef9; margin:0; padding:20px; }
+			/* Top buttons */
+			.top-left, .top-right { position:fixed; top:12px; z-index:1200; }
+			.top-left { left:12px; }
+			.top-right { right:12px; }
+			.top-left .btn, .top-right .btn { padding:8px 12px; border-radius:8px; font-weight:700; }
 			.card { background: rgba(255,255,255,0.03); border-radius:12px; padding:20px; max-width:900px; margin:20px auto; }
 			h1 { margin:0 0 10px 0; color:#7de0ff }
 			.controls { display:flex; gap:12px; align-items:center; margin:10px 0 20px 0; }
@@ -17,6 +22,9 @@
 		</style>
 	</head>
 	<body>
+		<!-- Top-left: Exit to index | Top-right: Language selector -->
+		<div class="top-left"><button class="btn" id="exitTop">← Home</button></div>
+		<div class="top-right"><button class="btn" id="langBtn" title="Cambia lingua">IT</button></div>
 		<div class="card">
 			<h1>Audio Transcriber</h1>
 			<div class="small">Use a local or browser-based transcription model (Whisper style) to transcribe audio files. This UI lets you pick a file or record live.</div>
@@ -24,7 +32,9 @@
 			<div class="controls">
 				<input id="file" type="file" accept="audio/*" />
 				<button id="recordBtn">Record</button>
+				<button id="transcribingIndicator" style="display:none; background:#a00;">● REC</button>
 				<button id="transcribeBtn" disabled>Transcribe</button>
+				<button id="infoBtn" title="How to use">Info</button>
 			</div>
 
 			<audio id="player" controls></audio>
@@ -34,15 +44,34 @@
 			</div>
 		</div>
 
+		<!-- Info Modal -->
+		<div id="infoModal" class="modal hidden" role="dialog" aria-hidden="true">
+			<div class="modal-content">
+				<h2>Come funziona</h2>
+				<ul>
+					<li>Puoi caricare un file audio usando il pulsante file.</li>
+					<li>Premi <strong>Record</strong> per iniziare la registrazione. Premi di nuovo per fermare.</li>
+					<li>Quando la registrazione è disponibile, premi <strong>Transcribe</strong> per ottenere il testo.</li>
+					<li>Questa demo usa una trascrizione simulata — sostituisci la chiamata API con il tuo backend Whisper.</li>
+				</ul>
+				<button class="btn" id="closeInfo">Chiudi</button>
+			</div>
+		</div>
+
 		<script>
 			const fileInput = document.getElementById('file');
 			const recordBtn = document.getElementById('recordBtn');
 			const transcribeBtn = document.getElementById('transcribeBtn');
 			const player = document.getElementById('player');
 			const output = document.getElementById('output');
+			const recIndicator = document.getElementById('transcribingIndicator');
+			const infoBtn = document.getElementById('infoBtn');
+			const infoModal = document.getElementById('infoModal');
+			const closeInfo = document.getElementById('closeInfo');
 
 			let currentBlob = null;
 			let recorder = null;
+			let chunks = [];
 
 			fileInput.addEventListener('change', e => {
 				const f = e.target.files[0];
@@ -54,20 +83,36 @@
 
 			recordBtn.addEventListener('click', async () => {
 				if (!recorder) {
-					const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-					recorder = new MediaRecorder(stream);
-					const chunks = [];
-					recorder.ondataavailable = e => chunks.push(e.data);
-					recorder.onstop = () => {
-						const blob = new Blob(chunks, { type: 'audio/webm' });
-						currentBlob = blob;
-						player.src = URL.createObjectURL(blob);
-						transcribeBtn.disabled = false;
-						recorder = null;
-						recordBtn.textContent = 'Record';
-					};
-					recorder.start();
-					recordBtn.textContent = 'Stop';
+					try {
+						const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+						recorder = new MediaRecorder(stream);
+						chunks = [];
+						recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+						recorder.onstart = () => {
+							recordBtn.textContent = 'Stop';
+							recIndicator.style.display = 'inline-block';
+							recIndicator.disabled = false;
+						};
+						recorder.onstop = () => {
+							const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+							currentBlob = blob;
+							player.src = URL.createObjectURL(blob);
+							transcribeBtn.disabled = false;
+							recorder = null;
+							recordBtn.textContent = 'Record';
+							recIndicator.style.display = 'none';
+						};
+						recorder.onerror = (ev) => {
+							console.error('Recorder error', ev);
+							alert('Recording error: ' + ev.message || ev);
+							recorder = null;
+							recIndicator.style.display = 'none';
+							recordBtn.textContent = 'Record';
+						};
+						recorder.start();
+					} catch (err) {
+						alert('Cannot access microphone: ' + err.message);
+					}
 				} else {
 					recorder.stop();
 				}
@@ -79,7 +124,7 @@
 				transcribeBtn.disabled = true;
 				try {
 					// Placeholder: in a real deployment, send to a local model/whisper backend
-					// For demo, we simulate an async transcription
+					// Example: fetch('/transcribe', { method: 'POST', body: currentBlob })
 					await new Promise(r => setTimeout(r, 1200));
 					const fake = 'This is a simulated transcription of the provided audio.';
 					output.textContent = fake;
@@ -87,6 +132,37 @@
 					transcribeBtn.disabled = false;
 				}
 			});
+
+			// Info modal handlers
+			infoBtn.addEventListener('click', () => {
+				infoModal.classList.remove('hidden');
+				infoModal.setAttribute('aria-hidden', 'false');
+			});
+			closeInfo.addEventListener('click', () => {
+				infoModal.classList.add('hidden');
+				infoModal.setAttribute('aria-hidden', 'true');
+			});
+			infoModal.addEventListener('click', (e) => {
+				if (e.target === infoModal) { closeInfo.click(); }
+			});
+
+			// Top buttons: exit and language
+			const exitTop = document.getElementById('exitTop');
+			const langBtn = document.getElementById('langBtn');
+			let lang = localStorage.getItem('site_lang') || 'it';
+			function updateLangUI() {
+				langBtn.textContent = lang.toUpperCase();
+			}
+			if (exitTop) exitTop.addEventListener('click', () => { window.location.href = '../index.html'; });
+			if (langBtn) {
+				updateLangUI();
+				langBtn.addEventListener('click', () => {
+					lang = lang === 'it' ? 'en' : 'it';
+					localStorage.setItem('site_lang', lang);
+					updateLangUI();
+					// Optional: you could update visible texts here based on lang
+				});
+			}
 		</script>
 	</body>
 </html>
