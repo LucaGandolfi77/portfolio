@@ -90,14 +90,33 @@
     <div id="loader-overlay">
         <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
         <div class="progress-container"><div id="progress-bar"></div></div>
+        <pre id="loader-log" style="max-width:80%;max-height:200px;overflow:auto;margin-top:12px;color:#fff;font-size:12px"></pre>
     </div>
 
-    <a href="technology.html" class="back-btn">← Back</a>
     <div id="score-container">Score: <span id="score">0</span></div>
     <video id="video" playsinline style="display:none" autoplay muted></video>
     <canvas id="canvas"></canvas>
 
     <script>
+        // Capture console messages into loader log for easier debugging
+        (function(){
+            const logEl = document.getElementById('loader-log');
+            if (!logEl) return;
+            const origLog = console.log.bind(console);
+            const origErr = console.error.bind(console);
+            const origWarn = console.warn.bind(console);
+            function append(msg){
+                const line = document.createElement('div');
+                line.textContent = (new Date()).toISOString() + ' ' + msg;
+                logEl.appendChild(line);
+                // keep at most 200 lines
+                while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+            console.log = function(...args){ origLog(...args); try{ append(args.join(' ')); }catch(e){} };
+            console.error = function(...args){ origErr(...args); try{ append('ERROR: '+args.join(' ')); }catch(e){} };
+            console.warn = function(...args){ origWarn(...args); try{ append('WARN: '+args.join(' ')); }catch(e){} };
+        })();
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -200,41 +219,74 @@
             const scripts = [
                 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
                 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                'assets/js/hand_tracker.js'
+                '/assets/js/hand_tracker.js'
             ];
-            
+
             const progressBar = document.getElementById('progress-bar');
             const timeLeft = document.getElementById('time-left');
             let loaded = 0;
-            
-            for (let i = 0; i < scripts.length; i++) {
-                await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('GET', scripts[i]);
-                    xhr.onprogress = (e) => {
-                        if (e.lengthComputable) {
-                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
-                            progressBar.style.width = percent + '%';
-                            timeLeft.textContent = Math.round(100 - percent) + '% left';
-                        }
-                    };
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            const script = document.createElement('script');
-                            script.text = xhr.responseText;
-                            document.body.appendChild(script);
-                            loaded++;
-                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
-                            resolve();
-                        } else {
-                            reject();
-                        }
-                    };
-                    xhr.onerror = reject;
-                    xhr.send();
+
+            function setProgress() {
+                const percent = (loaded / scripts.length) * 100;
+                progressBar.style.width = percent + '%';
+                timeLeft.textContent = Math.round(100 - percent) + '% left';
+            }
+
+            async function insertScriptTag(url) {
+                return new Promise((resolve, reject) => {
+                    console.log('[loader] injecting script tag:', url);
+                    const script = document.createElement('script');
+                    script.src = url;
+                    // add crossorigin for CDNs that require it
+                    if (url.includes('cdn.jsdelivr.net') || url.includes('unpkg.com')) script.crossOrigin = 'anonymous';
+                    script.onload = () => { console.log('[loader] loaded:', url); resolve(); };
+                    script.onerror = (e) => { console.error('[loader] failed to load:', url, e); reject(new Error('Failed to load ' + url)); };
+                    document.body.appendChild(script);
                 });
             }
-            
+
+            for (let i = 0; i < scripts.length; i++) {
+                const url = scripts[i];
+                try {
+                    console.log('[loader] fetching', url);
+                    // Prefer direct injection via script.src to avoid XHR issues with package root URLs
+                    // but provide a small mapping for common package roots to explicit JS builds
+                    let tryUrls = [url];
+                    if (url.includes('@tensorflow/tfjs')) {
+                        // explicit dist path is required for tfjs
+                        tryUrls = [
+                            'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js',
+                            'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
+                            url
+                        ];
+                    }
+
+                    let success = false;
+                    let lastErr = null;
+                    for (const u of tryUrls) {
+                        try {
+                            await insertScriptTag(u);
+                            success = true;
+                            break;
+                        } catch (err) {
+                            lastErr = err;
+                            console.warn('[loader] fallback failed for', u, err);
+                        }
+                    }
+
+                    if (!success) throw lastErr || new Error('Unknown error loading ' + url);
+
+                    loaded++;
+                    setProgress();
+                } catch (err) {
+                    console.error('[loader] error loading script', url, err);
+                    // Show user-friendly message in loader overlay
+                    document.getElementById('loader-overlay').style.opacity = 1;
+                    document.getElementById('loader-overlay').textContent = 'Errore caricamento librerie: ' + url + '\n' + (err.message || err);
+                    break;
+                }
+            }
+
             // Wait a bit for evaluation
             setTimeout(() => {
                 document.getElementById('loader-overlay').style.opacity = 0;

@@ -83,6 +83,7 @@
     <div id="loader-overlay">
         <div class="loader-text">Setting up Drum Kit... <span id="time-left"></span></div>
         <div class="progress-container"><div id="progress-bar"></div></div>
+        <pre id="loader-log" style="max-width:80%;max-height:200px;overflow:auto;margin-top:12px;color:#fff;font-size:12px"></pre>
     </div>
 
     <div id="start-overlay">
@@ -314,58 +315,100 @@
             initCamera();
         }
 
+        // Capture console messages into loader log for easier debugging
+        (function(){
+            const logEl = document.getElementById('loader-log');
+            if (!logEl) return;
+            const origLog = console.log.bind(console);
+            const origErr = console.error.bind(console);
+            const origWarn = console.warn.bind(console);
+            function append(msg){
+                const line = document.createElement('div');
+                line.textContent = (new Date()).toISOString() + ' ' + msg;
+                logEl.appendChild(line);
+                while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+            console.log = function(...args){ origLog(...args); try{ append(args.join(' ')); }catch(e){} };
+            console.error = function(...args){ origErr(...args); try{ append('ERROR: '+args.join(' ')); }catch(e){} };
+            console.warn = function(...args){ origWarn(...args); try{ append('WARN: '+args.join(' ')); }catch(e){} };
+        })();
+
         // Start loading immediately
         window.addEventListener('load', loadScripts);
 
-        // Load Scripts
+        // Load Scripts — robust injection with fallback URLs
         async function loadScripts() {
             const scripts = [
                 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                'assets/js/hand_tracker.js'
+                '/assets/js/hand_tracker.js'
             ];
-            
+
             const progressBar = document.getElementById('progress-bar');
             const timeLeft = document.getElementById('time-left');
             let loaded = 0;
-            
+
+            function setProgress(stage){
+                // stage: 0..1 overall progress
+                progressBar.style.width = Math.round(stage*100) + '%';
+            }
+
+            function insertScript(url){
+                return new Promise((resolve,reject)=>{
+                    console.log('[loader] inserting', url);
+                    const s = document.createElement('script');
+                    s.src = url;
+                    if (url.includes('cdn.jsdelivr.net')||url.includes('unpkg.com')) s.crossOrigin='anonymous';
+                    s.onload = ()=>{ console.log('[loader] loaded', url); resolve(); };
+                    s.onerror = (e)=>{ console.error('[loader] failed', url, e); reject(e); };
+                    document.body.appendChild(s);
+                });
+            }
+
             try {
-                for (let i = 0; i < scripts.length; i++) {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = scripts[i];
-                        script.crossOrigin = "anonymous";
-                        script.onload = () => {
-                            loaded++;
-                            const percent = (loaded / scripts.length) * 50; // First 50% is script loading
-                            progressBar.style.width = percent + '%';
-                            resolve();
-                        };
-                        script.onerror = (e) => {
-                            console.error('Failed to load script: ' + scripts[i], e);
-                            timeLeft.textContent = "Error loading resources!";
-                            timeLeft.style.color = "red";
-                            reject(new Error(`Failed to load ${scripts[i]}`));
-                        };
-                        document.body.appendChild(script);
-                    });
+                for (let i=0;i<scripts.length;i++){
+                    const url = scripts[i];
+                    console.log('[loader] try load', url);
+                    let tried = false;
+                    let lastErr = null;
+                    const candidates = url.includes('mediapipe') ? [
+                        'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                        'https://unpkg.com/@mediapipe/hands/hands.js',
+                        url
+                    ] : [url];
+                    for (const u of candidates) {
+                        try {
+                            await insertScript(u);
+                            tried = true; break;
+                        } catch (e) { lastErr = e; console.warn('[loader] fallback failed', u, e); }
+                    }
+                    if (!tried) throw lastErr || new Error('Failed loading '+url);
+                    loaded++;
+                    setProgress(0.5 * (loaded / scripts.length)); // first half reserved for script loading
                 }
 
-                // Initialize Model
-                timeLeft.textContent = "Initializing AI Model...";
+                timeLeft.textContent = 'Initializing AI Model...';
+                // Initialize model if present
                 if (window.HandTracker) {
-                    await window.HandTracker.load();
-                    progressBar.style.width = '100%';
+                    try {
+                        await window.HandTracker.load();
+                        setProgress(1);
+                    } catch(e) {
+                        console.error('HandTracker.load() failed', e);
+                        timeLeft.textContent = 'Error initializing model';
+                        timeLeft.style.color = 'red';
+                        return;
+                    }
                 }
-                
-                setTimeout(() => {
+
+                setTimeout(()=>{
                     document.getElementById('loader-overlay').style.opacity = 0;
-                    setTimeout(() => {
-                        document.getElementById('loader-overlay').style.display = 'none';
-                    }, 500);
-                }, 500);
-            } catch (error) {
-                console.error("Script loading failed:", error);
-                alert("Failed to load necessary libraries. Please check your internet connection and reload.");
+                    setTimeout(()=>{ document.getElementById('loader-overlay').style.display='none'; },500);
+                },500);
+            } catch (err) {
+                console.error('Script loading failed', err);
+                timeLeft.textContent = 'Error loading resources!';
+                timeLeft.style.color = 'red';
             }
         }
 

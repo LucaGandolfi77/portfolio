@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Longest MIDI — analizza durata e note</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
+    textarea{width:100%;height:260px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <h1>Longest MIDI — durata e log delle note</h1>
+  <div class="controls">
+    <input id="file" type="file" accept=".mid,.midi" />
+    <button id="loadExample">Carica esempio</button>
+    <button id="parseBtn">Analizza</button>
+    <a id="downloadExample" href="#">Scarica esempio .mid</a>
+  </div>
+  <div>
+    <strong>Risultato:</strong> <span id="duration">—</span> secondi
+  </div>
+  <h3>Log eventi</h3>
+  <textarea id="log" readonly></textarea>
+
+  <script>
+  function hexToUint8Array(hex) {
+    hex = hex.replace(/[^0-9A-Fa-f]/g,'');
+    const out = new Uint8Array(hex.length/2);
+    for (let i=0;i<out.length;i++) out[i]=parseInt(hex.substr(i*2,2),16);
+    return out;
+  }
+
+  function readVarLen(bytes, pos) {
+    let value = 0, i = 0, b;
+    do {
+      b = bytes[pos + i];
+      value = (value << 7) | (b & 0x7F);
+      i++;
+    } while (b & 0x80);
+    return { value, length: i };
+  }
+
+  function parseMIDI(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    let p = 0;
+    function readStr(len){
+      const s = String.fromCharCode.apply(null, bytes.slice(p,p+len)); p+=len; return s;
+    }
+    function readUint32(){ const v = (bytes[p]<<24)|(bytes[p+1]<<16)|(bytes[p+2]<<8)|bytes[p+3]; p+=4; return v; }
+    function readUint16(){ const v = (bytes[p]<<8)|bytes[p+1]; p+=2; return v; }
+
+    const headerId = readStr(4);
+    if (headerId !== 'MThd') throw new Error('Not a MIDI file (no MThd)');
+    const headerLen = readUint32();
+    const format = readUint16();
+    const ntrks = readUint16();
+    const division = readUint16();
+    p = p + (headerLen - 6);
+
+    const tracks = [];
+    for (let t=0;t<ntrks;t++){
+      const id = readStr(4);
+      if (id!=='MTrk') throw new Error('Expected MTrk');
+      const len = readUint32();
+      const trackStart = p;
+      const trackEnd = p + len;
+      let absTick = 0;
+      let lastStatus = null;
+      const events = [];
+      while (p < trackEnd) {
+        const vl = readVarLen(bytes, p);
+        absTick += vl.value;
+        p += vl.length;
+        let status = bytes[p];
+        if (status < 0x80) {
+          // running status
+          if (lastStatus === null) throw new Error('Running status without previous status');
+          status = lastStatus;
+        } else {
+          p++;
+          lastStatus = status;
+        }
+        if (status === 0xFF) {
+          const metaType = bytes[p++];
+          const linfo = readVarLen(bytes, p); p += linfo.length;
+          const mlen = linfo.value;
+          if (metaType === 0x2F) { // End of track
+            p += mlen;
+            events.push({type:'endOfTrack', tick:absTick});
+            break;
+          } else if (metaType === 0x51 && mlen===3) {
+            const b0=bytes[p], b1=bytes[p+1], b2=bytes[p+2];
+            const tempo = (b0<<16)|(b1<<8)|b2; // microseconds per quarter note
+            events.push({type:'tempo', tick:absTick, tempo});
+            p += mlen;
+          } else {
+            p += mlen; // skip other meta
+          }
+        } else if (status >= 0x80 && status <= 0xEF) {
+          const ev = (status & 0xF0) >> 4;
+          const channel = status & 0x0F;
+          let param1 = bytes[p++];
+          let param2 = null;
+          // program change and channel aftertouch use 1 param
+          if (ev !== 0xC && ev !== 0xD) {
+            param2 = bytes[p++];
+          }
+          if (ev === 0x9) {
+            const velocity = param2!==null?param2:0;
+            if (velocity>0) events.push({type:'noteOn', tick:absTick, channel, note:param1, velocity});
+            else events.push({type:'noteOff', tick:absTick, channel, note:param1, velocity:0});
+          } else if (ev === 0x8) {
+            events.push({type:'noteOff', tick:absTick, channel, note:param1, velocity:param2||0});
+          } else {
+            // ignore other channel messages
+          }
+        } else {
+          // system common / realtime or unknown: skip
+        }
+      }
+      p = trackEnd;
+      tracks.push(events);
+    }
+
+    // Merge all events by tick
+    const all = [].concat(...tracks).sort((a,b)=>a.tick - b.tick);
+    return {events: all, division};
+  }
+
+  function analyze(eventsObj) {
+    const events = eventsObj.events;
+    const division = eventsObj.division;
+    let currentTempo = 500000; // default µs per quarter
+    let lastTick = 0;
+    let seconds = 0;
+    const logLines = [];
+    for (const ev of events) {
+      const delta = ev.tick - lastTick;
+      seconds += (delta * currentTempo) / 1_000_000 / division;
+      lastTick = ev.tick;
+      if (ev.type === 'tempo') {
+        logLines.push(`[${seconds.toFixed(3)}s] Tempo change: ${ev.tempo} µs/qn`);
+        currentTempo = ev.tempo;
+      } else if (ev.type === 'noteOn') {
+        logLines.push(`[${seconds.toFixed(3)}s] Note ON  ch${ev.channel+1} note ${ev.note} vel ${ev.velocity}`);
+      } else if (ev.type === 'noteOff') {
+        logLines.push(`[${seconds.toFixed(3)}s] Note OFF ch${ev.channel+1} note ${ev.note}`);
+      } else if (ev.type==='endOfTrack') {
+        // ignore
+      }
+    }
+    // final length is seconds (time of last event). If no events, 0.
+    return {seconds, log: logLines.join('\n')};
+  }
+
+  const fileInput = document.getElementById('file');
+  const loadExample = document.getElementById('loadExample');
+  const parseBtn = document.getElementById('parseBtn');
+  const logEl = document.getElementById('log');
+  const durationEl = document.getElementById('duration');
+  const downloadExample = document.getElementById('downloadExample');
+
+  let currentArrayBuffer = null;
+
+  fileInput.addEventListener('change', (e)=>{
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{ currentArrayBuffer = reader.result; logEl.value = 'File caricato: ' + f.name; durationEl.textContent='—'; };
+    reader.readAsArrayBuffer(f);
+  });
+
+  loadExample.addEventListener('click', async ()=>{
+    try {
+      const res = await fetch('longest_midi.hex');
+      if (!res.ok) throw new Error('Impossibile caricare esempio');
+      const hex = await res.text();
+      const bytes = hexToUint8Array(hex);
+      currentArrayBuffer = bytes.buffer;
+      // prepare download link
+      const blob = new Blob([bytes], {type:'audio/midi'});
+      downloadExample.href = URL.createObjectURL(blob);
+      downloadExample.download = 'longest_midi_example.mid';
+      logEl.value = 'Esempio caricato in memoria.';
+      durationEl.textContent='—';
+    } catch (err) { logEl.value = 'Errore: '+err.message; }
+  });
+
+  parseBtn.addEventListener('click', ()=>{
+    if (!currentArrayBuffer) { logEl.value='Nessun file caricato.'; return; }
+    try {
+      const parsed = parseMIDI(currentArrayBuffer);
+      const res = analyze(parsed);
+      durationEl.textContent = res.seconds.toFixed(3);
+      logEl.value = res.log;
+    } catch (err) { logEl.value = 'Parsing error: '+err.message; }
+  });
+  </script>
+</body>
+</html>
