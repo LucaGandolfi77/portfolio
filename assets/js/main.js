@@ -114,7 +114,7 @@ const translations = {
         dailyQuote: { viewAll: 'View all quotes' },
         page: { back: 'Back to portfolio' },
         quotes: { page: { title: 'Daily Motivation Quotes — Luca Gandolfi', heading: 'Daily Motivation', lead: 'A collection of 366 quotes to inspire you every day of the year.' } },
-        footer: { text: '© 2025 Luca Gandolfi. Built with passion and technology.' }
+        footer: { text: '© 2026 Luca Gandolfi. Built with passion and technology.' }
     },
     es: {
         common: { showMore: 'Ver más', showLess: 'Ver menos' },
@@ -127,7 +127,7 @@ const translations = {
         dailyQuote: { viewAll: 'Ver todas las frases' },
         page: { back: 'Volver al portafolio' },
         quotes: { page: { title: 'Frases de Motivación Diaria — Luca Gandolfi', heading: 'Motivación Diaria', lead: 'Una colección de 366 frases para inspirarte cada día del año.' } },
-        footer: { text: '© 2025 Luca Gandolfi. Construido con pasión y tecnología.' }
+        footer: { text: '© 2026 Luca Gandolfi. Construido con pasión y tecnología.' }
     },
     zh: {
         common: { showMore: '显示更多', showLess: '收起' },
@@ -166,7 +166,7 @@ const translations = {
         dailyQuote: { viewAll: 'Alle Zitate anzeigen' },
         page: { back: 'Zurück zum Portfolio' },
         quotes: { page: { title: 'Tägliche Motivationszitate — Luca Gandolfi', heading: 'Tägliche Motivation', lead: 'Eine Sammlung von 366 Zitaten, die Sie jeden Tag des Jahres inspirieren.' } },
-        footer: { text: '© 2025 Luca Gandolfi. Mit Leidenschaft und Technologie erstellt.' }
+        footer: { text: '© 2026 Luca Gandolfi. Mit Leidenschaft und Technologie erstellt.' }
     },
     it: {
         common: { showMore: 'Mostra altro', showLess: 'Mostra meno' },
@@ -184,7 +184,7 @@ const translations = {
         dailyQuote: { viewAll: 'Vedi tutte le frasi' },
         page: { back: 'Torna al portfolio' },
         quotes: { page: { title: 'Frasi Motivazionali Giornaliere — Luca Gandolfi', heading: 'Motivazione Quotidiana', lead: 'Una raccolta di 366 frasi per ispirarti ogni giorno dell\'anno.' } },
-        footer: { text: '© 2025 Luca Gandolfi. Costruito con passione e tecnologia.' }
+        footer: { text: '© 2026 Luca Gandolfi. Costruito con passione e tecnologia.' }
     },
     fr: {
         common: { showMore: 'Voir plus', showLess: 'Voir moins' },
@@ -197,7 +197,7 @@ const translations = {
         dailyQuote: { viewAll: 'Voir toutes les citations' },
         page: { back: 'Retour au portfolio' },
         quotes: { page: { title: 'Citations de Motivation Quotidienne — Luca Gandolfi', heading: 'Motivation Quotidienne', lead: 'Une collection de 366 citations pour vous inspirer chaque jour de l\'année.' } },
-        footer: { text: '© 2025 Luca Gandolfi. Construit avec passion et technologie.' }
+        footer: { text: '© 2026 Luca Gandolfi. Construit avec passion et technologie.' }
     },
     ja: {
         common: { showMore: 'もっと見る', showLess: '表示を減らす' },

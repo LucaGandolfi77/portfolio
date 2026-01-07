@@ -71,6 +71,14 @@
     const urlInput = document.getElementById('urlInput');
     const playUrlBtn = document.getElementById('playUrlBtn');
 
+    // Some helpful default stations shown before any search
+    const defaultStations = [
+      { name: 'SomaFM — Groove Salad', url_resolved: 'https://ice1.somafm.com/groovesalad-128-mp3', favicon: '' , country: 'US', language: 'en', tags: 'ambient,electronic' },
+      { name: 'SomaFM — Drone Zone', url_resolved: 'https://ice1.somafm.com/dronezone-128-mp3', favicon: '' , country: 'US', language: 'en', tags: 'drone,ambient' },
+      { name: 'SomaFM — Lush', url_resolved: 'https://ice1.somafm.com/lush-128-mp3', favicon: '' , country: 'US', language: 'en', tags: 'chill,ambient' },
+      { name: 'SomaFM — Secret Agent', url_resolved: 'https://ice1.somafm.com/secretagent-128-mp3', favicon: '' , country: 'US', language: 'en', tags: 'lounge,spy' }
+    ];
+
     // Web Audio visualizer
     let audioCtx, sourceNode, analyser, dataArray;
     const canvas = document.getElementById('vis');
@@ -128,18 +136,46 @@
       stationsEl.innerHTML = '<div class="small">Loading…</div>';
       try{
         const resp = await fetch(`${apiBase}/stations/search?name=${encodeURIComponent(q)}&limit=30`);
-        const data = await resp.json();
+        if (!resp.ok) {
+          stationsEl.innerHTML = `<div class="small">Error searching: ${resp.status} ${resp.statusText}</div>`;
+          console.error('Search fetch failed', resp.status, resp.statusText);
+          return;
+        }
+        let data;
+        try { data = await resp.json(); } catch(parseErr){
+          stationsEl.innerHTML = `<div class="small">Error parsing response: ${parseErr.message || parseErr}</div>`;
+          console.error('JSON parse error', parseErr);
+          return;
+        }
+        if (!data || !data.length) {
+          stationsEl.innerHTML = `<div class="small">No stations found for "${escapeHtml(q)}". Try a broader query or different keywords.</div>`;
+          return;
+        }
         renderStations(data);
-      }catch(e){ stationsEl.innerHTML = '<div class="small">Error searching.</div>'; console.error(e); }
+      }catch(e){ stationsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`; console.error(e); }
     }
 
     async function top(){
       stationsEl.innerHTML = '<div class="small">Loading Top 20…</div>';
       try{
         const resp = await fetch(`${apiBase}/stations/topvote/20`);
-        const data = await resp.json();
+        if (!resp.ok) {
+          stationsEl.innerHTML = `<div class="small">Error loading Top: ${resp.status} ${resp.statusText}</div>`;
+          console.error('Top fetch failed', resp.status, resp.statusText);
+          return;
+        }
+        let data;
+        try { data = await resp.json(); } catch(parseErr){
+          stationsEl.innerHTML = `<div class="small">Error parsing top response: ${parseErr.message || parseErr}</div>`;
+          console.error('JSON parse error', parseErr);
+          return;
+        }
+        if (!data || !data.length) {
+          stationsEl.innerHTML = '<div class="small">No top stations found.</div>';
+          return;
+        }
         renderStations(data);
-      }catch(e){ stationsEl.innerHTML = '<div class="small">Error loading Top.</div>'; console.error(e); }
+      }catch(e){ stationsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`; console.error(e); }
     }
 
     function playStation(url, name, favicon){
@@ -174,8 +210,8 @@
       navigator.mediaSession.setActionHandler('pause', ()=> player.pause());
     }
 
-    // Auto-load top list on open
-    top();
+    // Show a few default stations before the user searches
+    renderStations(defaultStations);
 
     // Resume AudioContext on first user gesture to avoid autoplay restrictions
     document.addEventListener('click', ()=>{

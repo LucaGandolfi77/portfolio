@@ -29,14 +29,14 @@
     <div class="controls">
       <input id="q" type="search" placeholder="Search (e.g. news, documentary, bbc, italy)" />
       <button id="searchBtn">Search</button>
-      <button id="topBtn">Popolari</button>
+      <button id="topBtn">Popular</button>
       <input id="urlInput" type="text" placeholder="Incolla video URL diretto (mp4) o YouTube embed URL" style="max-width:520px" />
       <button id="playUrlBtn">Play URL</button>
     </div>
 
     <div id="playerArea"></div>
 
-    <h3 style="margin-top:18px">Risultati</h3>
+    <h3 style="margin-top:18px">Results</h3>
     <div id="results" class="results" aria-live="polite"></div>
   </div>
 
@@ -58,9 +58,29 @@
       const url = `${api}?q=${encodeURIComponent(query)}&fl[]=identifier,created,title,description,scanner,mediatype&rows=24&page=1&output=json`;
       try{
         const r = await fetch(url);
-        const j = await r.json();
-        renderResults(j.response.docs || []);
-      }catch(e){ resultsEl.innerHTML = '<div class="small">Error searching.</div>'; console.error(e); }
+        if (!r.ok) {
+          resultsEl.innerHTML = `<div class="small">Error searching: ${r.status} ${r.statusText}</div>`;
+          console.error('Search fetch failed', r.status, r.statusText);
+          return;
+        }
+        let j;
+        try {
+          j = await r.json();
+        } catch (parseErr) {
+          resultsEl.innerHTML = `<div class="small">Error parsing search response: ${escapeHtml(parseErr.message||String(parseErr))}</div>`;
+          console.error('JSON parse error', parseErr);
+          return;
+        }
+        const docs = (j && j.response && j.response.docs) ? j.response.docs : [];
+        if (!docs.length) {
+          resultsEl.innerHTML = `<div class="small">No results for "${escapeHtml(q)}". Try a broader query or check spelling.</div>`;
+          return;
+        }
+        renderResults(docs);
+      }catch(e){
+        resultsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`;
+        console.error(e);
+      }
     }
 
     async function top(){
@@ -68,14 +88,32 @@
       const url = `${api}?q=mediatype:(movies)&sort[]=downloads+desc&fl[]=identifier,created,title,description,mediatype&rows=24&page=1&output=json`;
       try{
         const r = await fetch(url);
-        const j = await r.json();
-        renderResults(j.response.docs || []);
-      }catch(e){ resultsEl.innerHTML = '<div class="small">Error loading.</div>'; console.error(e); }
+        if (!r.ok) {
+          resultsEl.innerHTML = `<div class="small">Error loading popular: ${r.status} ${r.statusText}</div>`;
+          console.error('Top fetch failed', r.status, r.statusText);
+          return;
+        }
+        let j;
+        try { j = await r.json(); } catch (parseErr) {
+          resultsEl.innerHTML = `<div class="small">Error parsing popular response: ${escapeHtml(parseErr.message||String(parseErr))}</div>`;
+          console.error('JSON parse error', parseErr);
+          return;
+        }
+        const docs = (j && j.response && j.response.docs) ? j.response.docs : [];
+        if (!docs.length) {
+          resultsEl.innerHTML = '<div class="small">No popular items found.</div>';
+          return;
+        }
+        renderResults(docs);
+      }catch(e){
+        resultsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`;
+        console.error(e);
+      }
     }
 
     function renderResults(items){
       resultsEl.innerHTML = '';
-      if(!items.length){ resultsEl.innerHTML = '<div class="small">Nessun risultato.</div>'; return; }
+      if(!items.length){ resultsEl.innerHTML = '<div class="small">No results found.</div>'; return; }
       items.forEach(it=>{
         const div = document.createElement('div'); div.className='item';
         const thumb = document.createElement('img'); thumb.className='thumb'; thumb.alt='thumb';

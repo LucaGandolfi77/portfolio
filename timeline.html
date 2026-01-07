@@ -386,7 +386,7 @@
         <!-- Statistics -->
         <div class="timeline-stats">
             <div class="stat-card">
-                <div class="stat-number">22</div>
+                <div class="stat-number">31</div>
                 <div class="stat-label">Years Old</div>
             </div>
             <div class="stat-card">
@@ -398,7 +398,7 @@
                 <div class="stat-label">Born Year</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">2025</div>
+                <div class="stat-number">2026</div>
                 <div class="stat-label">Current Year</div>
             </div>
         </div>
@@ -413,7 +413,7 @@
 
         <!-- Footer -->
         <div class="footer">
-            <p data-i18n="footer.text">© 2025 Luca Gandolfi. Built with passion and technology.</p>
+            <p data-i18n="footer.text">© 2026 Luca Gandolfi. Built with passion and technology.</p>
         </div>
     </div>
 
@@ -615,11 +615,33 @@
         async function loadTranslations(lang) {
             try {
                 const response = await fetch(`./i18n/${lang}.json`);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
                 const translations = await response.json();
                 window.translations = translations;
+
+                // set document language and direction (support RTL langs)
+                document.documentElement.lang = lang;
+                const rtlLangs = ['ar', 'he', 'fa', 'ur'];
+                document.documentElement.dir = rtlLangs.includes(lang) ? 'rtl' : 'ltr';
+
                 applyTranslations();
             } catch (err) {
-                console.warn(`Failed to load ${lang}.json`);
+                console.warn(`Failed to load ${lang}.json, falling back to en.json`, err);
+                // fallback to English if available
+                if (lang !== 'en') {
+                    try {
+                        const fb = await fetch(`./i18n/en.json`);
+                        if (fb.ok) {
+                            window.translations = await fb.json();
+                            document.documentElement.lang = 'en';
+                            document.documentElement.dir = 'ltr';
+                            applyTranslations();
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load fallback en.json', e);
+                    }
+                }
             }
         }
 
@@ -639,7 +661,14 @@
                 }
                 
                 if (value) {
-                    el.textContent = value;
+                    const tag = el.tagName && el.tagName.toUpperCase();
+                    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                        el.placeholder = value;
+                    } else if (tag === 'OPTION') {
+                        el.textContent = value;
+                    } else {
+                        el.textContent = value;
+                    }
                 }
             });
 
