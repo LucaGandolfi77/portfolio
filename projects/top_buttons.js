@@ -3,6 +3,8 @@ if (!document.getElementById('site-top-bar')) {
   (function(){
     const BAR_HEIGHT = 36; // px
 
+    // no inline CSS fallback here; pages may choose to declare `--site-top-bar-height` if needed
+
     // Remove any legacy top-left/top-right overlays if present
     ['top-left','top-right'].forEach(c => {
       document.querySelectorAll('.' + c).forEach(el => el.remove());
@@ -37,7 +39,7 @@ if (!document.getElementById('site-top-bar')) {
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      try { window.location.href = 'index.html'; } catch(e) { window.location.href = './index.html'; }
+      try { window.location.href = 'index.html'; } catch(e) { window.location.href = '../index.html'; }
     });
 
     // Create or reuse language button
