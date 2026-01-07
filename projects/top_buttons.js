@@ -42,24 +42,93 @@ if (!document.getElementById('site-top-bar')) {
       try { window.location.href = '../index.html'; } catch(e) { window.location.href = '../index.html'; }
     });
 
-    // Create or reuse language button
-    // Create a fresh language button as well to avoid duplicated listeners
-    if (document.getElementById('siteLangBtn')) {
-      const oldL = document.getElementById('siteLangBtn'); if (oldL.parentNode) oldL.parentNode.removeChild(oldL);
+    // Create or reuse language selector (select with options like index.html)
+    // Remove older language controls if present
+    ['siteLangBtn','langBtn','siteLangSelect'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
+
+    function getLang() { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'en'); }
+    function setLang(v){ try { localStorage.setItem('site_lang', v); localStorage.setItem('lang', v); } catch(e){} updateLangUI(); }
+
+    // Build select element with language list (same options as index.html)
+    const langSelect = document.createElement('select');
+    langSelect.id = 'siteLangSelect';
+    langSelect.className = 'tb';
+    langSelect.setAttribute('aria-label', 'Select language');
+    langSelect.title = 'Change language';
+    const languages = [
+      ['en','🇬🇧 EN'],['it','🇮🇹 IT'],['fr','🇫🇷 FR'],['es','🇪🇸 ES'],['zh','🇨🇳 中'],['ru','🇷🇺 RU'],['de','🇩🇪 DE'],['ja','🇯🇵 日本'],['sv','🇸🇪 SV'],['ar','🇸🇦 AR'],['he','🇮🇱 HE']
+    ];
+    languages.forEach(([code,label]) => {
+      const o = document.createElement('option'); o.value = code; o.textContent = label; langSelect.appendChild(o);
+    });
+    langSelect.addEventListener('change', () => setLang(langSelect.value));
+    async function loadTranslations(lang) {
+      // Try site root first, then parent folder. Return true on success.
+      try {
+        const res = await fetch(`/i18n/${lang}.json`);
+        if (!res.ok) throw new Error('no translations');
+        const translations = await res.json();
+        window.translations = translations;
+        applyTranslations();
+        if (langSelect) langSelect.disabled = false;
+        return true;
+      } catch (e) {
+        try {
+          const res2 = await fetch(`../i18n/${lang}.json`);
+          if (!res2.ok) throw new Error('no translations');
+          const translations = await res2.json();
+          window.translations = translations;
+          applyTranslations();
+          if (langSelect) langSelect.disabled = false;
+          return true;
+        } catch (err) {
+          console.warn('Translations not found for', lang);
+          // Fallback to English and disable selector so user cannot pick unavailable languages
+          if (lang !== 'en') {
+            try { if (langSelect) langSelect.value = 'en'; } catch(e){}
+            try { await loadTranslations('en'); } catch(e){}
+          }
+          if (langSelect) langSelect.disabled = true;
+          return false;
+        }
+      }
     }
-    if (document.getElementById('langBtn')) {
-      const oldL2 = document.getElementById('langBtn'); if (oldL2.parentNode) oldL2.parentNode.removeChild(oldL2);
+
+    function applyTranslations() {
+      if (!window.translations) return;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const parts = key.split('.');
+        let value = window.translations;
+        for (const p of parts) { if (value && typeof value === 'object') value = value[p]; else { value = null; break; } }
+        if (value === null || value === undefined) return;
+
+        // Special handling for common attributes
+        const lower = key.toLowerCase();
+        if (el.tagName === 'TITLE' || lower.endsWith('page.title')) {
+          try { document.title = value; } catch (e) {}
+          return;
+        }
+
+        if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && lower.endsWith('.placeholder')) {
+          try { el.placeholder = value; } catch (e) { el.setAttribute('placeholder', value); }
+          return;
+        }
+
+        if (el.tagName === 'OPTION') {
+          el.textContent = value;
+          return;
+        }
+
+        // fallback: set textContent
+        el.textContent = value;
+      });
     }
-    const langBtn = document.createElement('button');
-    langBtn.id = 'siteLangBtn';
-    langBtn.className = 'tb';
-    function getLang() { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'it'); }
-    function setLang(v){ localStorage.setItem('site_lang', v); localStorage.setItem('lang', v); updateLangUI(); }
-    function updateLangUI(){ langBtn.textContent = (getLang() || 'it').toUpperCase(); }
-    langBtn.addEventListener('click', () => { setLang(getLang() === 'it' ? 'en' : 'it'); });
+
+    function updateLangUI(){ const v = getLang() || 'it'; try { langSelect.value = v; } catch(e){} loadTranslations(v); }
 
     left.appendChild(exitBtn);
-    right.appendChild(langBtn);
+    right.appendChild(langSelect);
     bar.appendChild(style);
     bar.appendChild(left);
     bar.appendChild(right);
@@ -72,7 +141,7 @@ if (!document.getElementById('site-top-bar')) {
 
     // Accessibility: allow focus to first element
     exitBtn.setAttribute('aria-label', 'Return to home');
-    langBtn.setAttribute('aria-label', 'Toggle language');
+    if (langSelect) langSelect.setAttribute('aria-label', 'Toggle language');
 
     updateLangUI();
   })();
