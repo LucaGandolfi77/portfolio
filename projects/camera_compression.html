@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Camera – JPEG Compression Preview</title>
+<style>
+  :root { --bar-offset: 36px; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#06121a; color:#e6eef9; -webkit-font-smoothing:antialiased; }
+  .wrap { padding-top: var(--bar-offset); display:flex; min-height:100vh; align-items:center; justify-content:center; box-sizing:border-box; }
+  .stage { width:100%; max-width:940px; margin:20px; background:#071920; border-radius:12px; box-shadow:0 6px 30px rgba(0,0,0,0.6); overflow:hidden; }
+  .preview, .results { padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .video-wrap { position:relative; width:100%; aspect-ratio:16/9; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); } /* mirrored for user camera */
+  canvas { display:none; }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; }
+  .btn { background:#0b66d7; color:#fff; border:0; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+  .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); }
+  .results-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .card { background:#081b23; padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:8px; align-items:center; }
+  .thumb { width:100%; height:160px; object-fit:cover; border-radius:6px; background:#000; }
+  .meta { font-size:0.85rem; color:#cfefff; }
+  .small { font-size:0.8rem; color:#9fbecf; }
+  .top-actions { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .note { font-size:0.85rem; color:#9fbecf; text-align:center; }
+  @media (max-width:600px){ .thumb{height:120px} .controls{flex-wrap:wrap} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage" id="stage">
+      <div class="preview" id="captureStage">
+        <div class="top-actions">
+          <div class="note">Point your camera and tap Capture</div>
+          <div>
+            <button class="btn ghost" id="flipBtn">Flip</button>
+            <button class="btn" id="exitBtn">Exit</button>
+          </div>
+        </div>
+
+        <div class="video-wrap" id="videoWrap">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="hiddenCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+          <button class="btn" id="captureBtn">Capture</button>
+          <button class="btn ghost" id="pauseBtn">Pause</button>
+        </div>
+      </div>
+
+      <div class="results" id="resultsStage" style="display:none;">
+        <div class="top-actions">
+          <div class="note">Captured image — compare JPEG sizes and download the preferred one</div>
+          <div>
+            <button class="btn ghost" id="retakeBtn">Retake</button>
+            <button class="btn" id="doneExitBtn">Done</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <img id="capturedPreview" style="width:260px;border-radius:8px;background:#000" alt="Captured preview"/>
+          <div style="flex:1">
+            <div class="small">Original dimensions: <span id="origDim">—</span></div>
+            <div class="small">Original format: JPEG</div>
+          </div>
+        </div>
+
+        <h3 style="margin:6px 0;color:#cfefff">Compression variants</h3>
+        <div class="results-grid" id="variantsGrid"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(async ()=> {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('hiddenCanvas');
+  const captureBtn = document.getElementById('captureBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const flipBtn = document.getElementById('flipBtn');
+  const exitBtn = document.getElementById('exitBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const doneExitBtn = document.getElementById('doneExitBtn');
+  const captureStage = document.getElementById('captureStage');
+  const resultsStage = document.getElementById('resultsStage');
+  const variantsGrid = document.getElementById('variantsGrid');
+  const capturedPreview = document.getElementById('capturedPreview');
+  const origDim = document.getElementById('origDim');
+
+  let stream = null;
+  let usingFront = false; // default environment
+  let trackSettings = null;
+
+  const qualities = [0.92,0.85,0.75,0.6,0.45,0.3,0.15,0.05];
+
+  async function startCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t=>t.stop());
+      stream = null;
+    }
+    const constraints = {
+      video: { facingMode: usingFront ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await video.play();
+    const [t] = stream.getVideoTracks();
+    trackSettings = t.getSettings ? t.getSettings() : {};
+    video.style.transform = usingFront ? 'scaleX(-1)' : 'scaleX(1)';
+  }
+
+  function stopCamera(){
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+  }
+
+  flipBtn.addEventListener('click', async ()=> {
+    usingFront = !usingFront;
+    await startCamera();
+  });
+
+  exitBtn.addEventListener('click', ()=> { stopCamera(); window.location.href='index.html#projects'; });
+
+  pauseBtn.addEventListener('click', ()=> {
+    if (!stream) return;
+    const [t] = stream.getVideoTracks();
+    if (t.enabled) { t.enabled = false; pauseBtn.textContent = 'Resume'; }
+    else { t.enabled = true; pauseBtn.textContent = 'Pause'; }
+  });
+
+  captureBtn.addEventListener('click', async ()=> {
+    if(!video.videoWidth || !video.videoHeight) return alert('Camera not ready');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    // mirror for user-facing camera so preview matches user expectation
+    if (usingFront) {
+      ctx.save();
+      ctx.scale(-1,1);
+      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.restore();
+    } else {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    }
+
+    // show preview
+    capturedPreview.src = canvas.toDataURL('image/jpeg', 0.92);
+    origDim.textContent = `${canvas.width}×${canvas.height}`;
+
+    // generate compressed variants
+    variantsGrid.innerHTML = '';
+    const timestamp = new Date().toISOString().replace(/[:.]/g,'-');
+    for (const q of qualities) {
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', q));
+      const url = URL.createObjectURL(blob);
+      const sizeKB = (blob.size/1024).toFixed(1);
+      const card = document.createElement('div');
+      card.className = 'card';
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = url;
+      img.alt = `q=${q}`;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `quality ${q} · ${sizeKB} KB`;
+      const dl = document.createElement('a');
+      dl.className = 'btn';
+      dl.href = url;
+      dl.download = `capture_${timestamp}_q${String(q).replace('.','-')}.jpeg`;
+      dl.textContent = 'Download';
+      dl.addEventListener('click', ()=> {
+        // revoke after a short timeout to allow download to start
+        setTimeout(()=>{ URL.revokeObjectURL(url); }, 2000);
+      });
+      card.appendChild(img);
+      card.appendChild(meta);
+      card.appendChild(dl);
+      variantsGrid.appendChild(card);
+    }
+
+    // switch UI
+    captureStage.style.display = 'none';
+    resultsStage.style.display = 'block';
+    stopCamera(); // free camera while inspecting
+  });
+
+  retakeBtn.addEventListener('click', async ()=> {
+    resultsStage.style.display = 'none';
+    captureStage.style.display = 'block';
+    await startCamera();
+  });
+
+  doneExitBtn.addEventListener('click', ()=> { stopCamera(); window.location.href='index.html#projects'; });
+
+  // init
+  try { await startCamera(); } catch(e) { console.error(e); alert('Could not start camera: '+(e.message||e)); }
+
+  // cleanup on unload
+  window.addEventListener('beforeunload', ()=> stopCamera());
+})();
+</script>
+
+<script src="top_buttons.js"></script>
+</body>
+</html>
