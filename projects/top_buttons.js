@@ -39,7 +39,7 @@ if (!document.getElementById('site-top-bar')) {
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      try { window.location.href = 'index.html'; } catch(e) { window.location.href = '../index.html'; }
+      try { window.location.href = '../index.html'; } catch(e) { window.location.href = '../index.html'; }
     });
 
     // Create or reuse language button
