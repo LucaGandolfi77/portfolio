@@ -115,34 +115,42 @@
 
         .card-hand {
             display: flex;
+            gap: 12px;
             justify-content: center;
-            gap: 8px;
-            padding: 10px;
-            background: transparent;
+            align-items: flex-end;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 18px;
             pointer-events: auto;
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
+            z-index: 40;
+            padding: 8px;
+            background: rgba(0,0,0,0.12);
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
             box-sizing: border-box;
+            max-width: 92%;
         }
 
         .card {
-            width: 75px;
-            height: 100px;
-            background: linear-gradient(135deg, #fff, #e0e0e0);
+            width: 88px;
+            min-width: 88px;
+            max-width: 100px;
+            height: 110px;
+            background: linear-gradient(135deg, #fff, #e9e9e9);
             border-radius: 8px;
             border: 3px solid #555;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 4px;
+            padding: 6px;
             cursor: pointer;
             position: relative;
-            transition: transform 0.1s, filter 0.2s;
+            transition: transform 0.12s, filter 0.18s;
             user-select: none;
             color: #000;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.45);
         }
 
         .card.selected {
@@ -261,7 +269,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <a href="index.html" class="nav-brand">
+        <a href="index.html" class="nav-brand" id="backBtn">
             <i class="fas fa-arrow-left"></i> <span data-i18n="backToHome">Back</span>
         </a>
         <div style="font-weight: bold; color: #f1c40f;">CLASH ROYALE CLONE</div>
@@ -426,17 +434,23 @@
         }
 
         function createTower(x, y, team, type) {
+            const isKing = type === 'KING';
+            const isPrincess = type === 'PRINCESS';
             return {
                 x: x, y: y, team: team, type: type,
-                hp: type === 'KING' ? 2400 : 1400,
-                maxHp: type === 'KING' ? 2400 : 1400,
-                range: 180,
+                hp: isKing ? 2400 : 1400,
+                maxHp: isKing ? 2400 : 1400,
+                // Adjusted ranges: princess towers have longer reach
+                range: isPrincess ? 260 : (isKing ? 200 : 180),
                 dmg: 50,
                 attackSpeed: 45, // frames
                 cooldown: 0,
                 radius: 25,
                 isBuilding: true,
-                targetsAir: true // Towers hit air
+                targetsAir: true, // Towers hit air
+                // King tower passive until attacked
+                passiveUntilAttacked: isKing,
+                hasBeenAttacked: false
             };
         }
 
@@ -489,21 +503,25 @@
             towers.forEach(t => {
                 if (t.hp <= 0) return;
                 if (t.cooldown > 0) t.cooldown--;
-                
-                // Find target
-                let target = findTarget(t, entities.filter(e => e.team !== t.team));
-                if (target && t.cooldown <= 0) {
-                    // Shoot
-                    projectiles.push({
-                        x: t.x, y: t.y,
-                        target: target,
-                        speed: 5,
-                        dmg: t.dmg,
-                        team: t.team,
-                        type: 'arrow'
-                    });
-                    t.cooldown = t.attackSpeed;
-                }
+                    // Find targets (units + enemy towers)
+                    let potentialTargets = [...entities.filter(e => e.team !== t.team), ...towers.filter(tt => tt.team !== t.team && tt.hp > 0)];
+                    let target = findTarget(t, potentialTargets);
+
+                    // If KING tower is passive until attacked, skip attacking until it has been hit
+                    if (t.type === 'KING' && t.passiveUntilAttacked && !t.hasBeenAttacked) {
+                        // do not auto-attack
+                    } else if (target && t.cooldown <= 0) {
+                        // Shoot
+                        projectiles.push({
+                            x: t.x, y: t.y,
+                            target: target,
+                            speed: 5,
+                            dmg: t.dmg,
+                            team: t.team,
+                            type: 'arrow'
+                        });
+                        t.cooldown = t.attackSpeed;
+                    }
             });
 
             // Update Units
@@ -541,24 +559,26 @@
                     let dist = Math.hypot(target.x - u.x, target.y - u.y);
                     if (dist <= u.range + target.radius) {
                         // Attack
-                        if (u.cooldown <= 0) {
-                            if (u.range > 40) {
-                                // Ranged projectile
-                                projectiles.push({
-                                    x: u.x, y: u.y,
-                                    target: target,
-                                    speed: 5,
-                                    dmg: u.dmg,
-                                    team: u.team,
-                                    type: 'arrow'
-                                });
-                            } else {
-                                // Melee hit
-                                target.hp -= u.dmg;
-                                createHitEffect(target.x, target.y);
+                            if (u.cooldown <= 0) {
+                                if (u.range > 40) {
+                                    // Ranged projectile
+                                    projectiles.push({
+                                        x: u.x, y: u.y,
+                                        target: target,
+                                        speed: 5,
+                                        dmg: u.dmg,
+                                        team: u.team,
+                                        type: 'arrow'
+                                    });
+                                } else {
+                                    // Melee hit
+                                    target.hp -= u.dmg;
+                                    // If target is a KING tower, mark it as attacked
+                                    if (target.isBuilding && target.type === 'KING') target.hasBeenAttacked = true;
+                                    createHitEffect(target.x, target.y);
+                                }
+                                u.cooldown = u.attackSpeed;
                             }
-                            u.cooldown = u.attackSpeed;
-                        }
                     } else {
                         // Move towards target
                         let angle = Math.atan2(target.y - u.y, target.x - u.x);
@@ -613,12 +633,16 @@
                                 let d = Math.hypot(e.x - p.target.x, e.y - p.target.y);
                                 if (d < p.splash) {
                                     e.hp -= p.dmg;
+                                    // If a KING building takes damage, mark it as attacked
+                                    if (e.isBuilding && e.type === 'KING') e.hasBeenAttacked = true;
                                 }
                             }
                         });
                     } else {
                         // Single Target
                         p.target.hp -= p.dmg;
+                        // If target is a KING tower, mark as attacked so it can retaliate
+                        if (p.target.isBuilding && p.target.type === 'KING') p.target.hasBeenAttacked = true;
                         createHitEffect(p.target.x, p.target.y);
                     }
                     p.active = false;
@@ -693,6 +717,7 @@
                         let d = Math.hypot(e.x - x, e.y - y);
                         if (d < type.radius) {
                             e.hp -= type.dmg;
+                            if (e.isBuilding && e.type === 'KING') e.hasBeenAttacked = true;
                         }
                     }
                 });
@@ -961,6 +986,24 @@
             el.style.opacity = 1;
             setTimeout(() => el.style.opacity = 0, 1000);
         }
+
+        // Back button: try history.back() first, fallback to index.html
+        (function(){
+            const back = document.getElementById('backBtn');
+            if (!back) return;
+            back.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                try {
+                    if (document.referrer && document.referrer.indexOf(location.origin) === 0) {
+                        history.back();
+                    } else {
+                        location.href = 'index.html';
+                    }
+                } catch (e) {
+                    location.href = 'index.html';
+                }
+            });
+        })();
     </script>
 </body>
 </html>

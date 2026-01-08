@@ -169,7 +169,7 @@
 </head>
 <body>
 
-    <a href="index.html" id="back-btn">← Back to Portfolio</a>
+    <a href="index.html" id="back-btn">← Torna al Portfolio</a>
 
     <canvas id="gameCanvas"></canvas>
 
@@ -237,6 +237,8 @@
         trackCanvas.width = TRACK_WIDTH;
         trackCanvas.height = TRACK_HEIGHT;
 
+        const ROAD_COLOR = '#999';
+
         const maps = [
             {
                 name: "Circuit Alpha",
@@ -248,7 +250,7 @@
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.lineWidth = 200;
-                    ctx.strokeStyle = '#333'; // Road
+                    ctx.strokeStyle = ROAD_COLOR; // Road
                     
                     ctx.beginPath();
                     ctx.moveTo(200, 200);
@@ -281,7 +283,7 @@
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.lineWidth = 180;
-                    ctx.strokeStyle = '#222';
+                    ctx.strokeStyle = ROAD_COLOR;
                     
                     ctx.beginPath();
                     ctx.moveTo(300, 300);
@@ -302,7 +304,7 @@
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.lineWidth = 220;
-                    ctx.strokeStyle = '#555';
+                    ctx.strokeStyle = ROAD_COLOR;
                     
                     ctx.beginPath();
                     ctx.arc(1000, 1000, 800, 0, Math.PI*2);
@@ -412,6 +414,19 @@
             if (e.key === ' ' || e.key === 'Shift') toggleNitro(false);
         });
 
+        // Back button behavior: history.back() fallback to index.html
+        (function(){
+            const back = document.getElementById('back-btn');
+            if (!back) return;
+            back.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                try {
+                    if (document.referrer && document.referrer.indexOf(location.origin) === 0) history.back();
+                    else location.href = 'index.html';
+                } catch (e) { location.href = 'index.html'; }
+            });
+        })();
+
         function toggleNitro(state) {
             if (state !== undefined) {
                 input.nitro = state;
@@ -515,8 +530,22 @@
             } catch(e) {}
 
             // Move Car
-            car.x += Math.cos(car.angle) * car.speed;
-            car.y += Math.sin(car.angle) * car.speed;
+            // Proposed next position
+            const nextX = car.x + Math.cos(car.angle) * car.speed;
+            const nextY = car.y + Math.sin(car.angle) * car.speed;
+
+            // Bounce if leaving track canvas bounds (black border area)
+            if (nextX < 0 || nextX > TRACK_WIDTH || nextY < 0 || nextY > TRACK_HEIGHT) {
+                // Reflect angle (simple bounce) and reduce speed
+                car.angle += Math.PI;
+                car.speed *= 0.5;
+                // Keep inside bounds
+                car.x = Math.max(10, Math.min(TRACK_WIDTH - 10, nextX));
+                car.y = Math.max(10, Math.min(TRACK_HEIGHT - 10, nextY));
+            } else {
+                car.x = nextX;
+                car.y = nextY;
+            }
 
             // Update Camera
             // Smooth follow

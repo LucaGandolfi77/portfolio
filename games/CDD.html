@@ -28,15 +28,36 @@
 	<div id="game-over"><h1>GAME OVER</h1><p>Score: <span id="final-score">0</span></p><button id="restart-btn">TRY AGAIN</button><br><button id="exit-btn" style="background:#ff4757; margin-top:10px;">EXIT</button></div>
 	<div id="mobile-controls"><div class="control-btn" id="btn-left">←</div><div class="control-btn" id="btn-right">→</div></div>
 	<script>
-		const canvas=document.getElementById('gameCanvas'); const ctx=canvas.getContext('2d'); let gameRunning=false, score=0, speed=0, distance=0, lastTime=0; const LANES=3, LANE_WIDTH=2, SEGMENT_LENGTH=5, DRAW_DISTANCE=100, BASE_SPEED=20, MAX_SPEED=60; const player={ lane:0, x:0, y:0, z:10, width:0.8, height:1.5, color:'#ff4757', targetLane:0, jumpY:0, isJumping:false, jumpVel:0 }; let obstacles=[], coins=[], particles=[]; function resize(){ canvas.width=innerWidth; canvas.height=innerHeight } addEventListener('resize',resize); resize(); function moveLeft(){ if(player.targetLane>-1) player.targetLane--; } function moveRight(){ if(player.targetLane<1) player.targetLane++; } function jump(){ if(!player.isJumping){ player.isJumping=true; player.jumpVel=15 } }
+		const canvas=document.getElementById('gameCanvas'); const ctx=canvas.getContext('2d'); let gameRunning=false, score=0, speed=0, distance=0, lastTime=0; const LANES=3, LANE_WIDTH=2, SEGMENT_LENGTH=5, DRAW_DISTANCE=100, BASE_SPEED=20, MAX_SPEED=60; const player={ lane:0, x:0, y:0, z:10, width:0.8, height:1.5, color:'#ff4757', targetLane:0, jumpY:0, isJumping:false, jumpVel:0 }; let obstacles=[], coins=[], particles=[];
+
+		// Camera: base height and dynamic height (follows player jump)
+		let cameraHeightBase = 3.5;
+		let cameraHeight = cameraHeightBase;
+
+		function resize(){ canvas.width=innerWidth; canvas.height=innerHeight } addEventListener('resize',resize); resize(); function moveLeft(){ if(player.targetLane>-1) player.targetLane--; } function moveRight(){ if(player.targetLane<1) player.targetLane++; } function jump(){ if(!player.isJumping){ player.isJumping=true; player.jumpVel=15 } }
 		document.addEventListener('keydown', e=>{ if(!gameRunning) return; if(e.key==='ArrowLeft'||e.key==='a') moveLeft(); if(e.key==='ArrowRight'||e.key==='d') moveRight(); if(e.key==='ArrowUp'||e.key==='w'||e.key===' ') jump(); });
 		let touchStartX=0,touchStartY=0; document.addEventListener('touchstart', e=>{ touchStartX=e.changedTouches[0].screenX; touchStartY=e.changedTouches[0].screenY }); document.addEventListener('touchend', e=>{ if(!gameRunning) return; const touchEndX=e.changedTouches[0].screenX, touchEndY=e.changedTouches[0].screenY, dx=touchEndX-touchStartX, dy=touchEndY-touchStartY; if(Math.abs(dx)>Math.abs(dy)){ if(Math.abs(dx)>30){ if(dx>0) moveRight(); else moveLeft(); } } else { if(dy< -30) jump(); } });
 		document.getElementById('btn-left').addEventListener('touchstart', e=>{ e.preventDefault(); moveLeft()}); document.getElementById('btn-right').addEventListener('touchstart', e=>{ e.preventDefault(); moveRight()}); document.getElementById('btn-left').addEventListener('click', ()=>moveLeft()); document.getElementById('btn-right').addEventListener('click', ()=>moveRight()); document.getElementById('start-btn').addEventListener('click', startGame); document.getElementById('restart-btn').addEventListener('click', startGame); document.getElementById('exit-btn').addEventListener('click', ()=>{ location.href='index.html' });
 		function startGame(){ gameRunning=true; score=0; speed=BASE_SPEED; distance=0; obstacles=[]; coins=[]; particles=[]; player.lane=0; player.targetLane=0; player.x=0; player.jumpY=0; player.isJumping=false; document.getElementById('start-screen').style.display='none'; document.getElementById('game-over').style.display='none'; document.getElementById('score').innerText='0'; lastTime=performance.now(); requestAnimationFrame(gameLoop); }
 		function gameOver(){ gameRunning=false; document.getElementById('game-over').style.display='block'; document.getElementById('final-score').innerText=Math.floor(score); }
-		function project(x,y,z){ const cameraHeight=2.5; const cameraDepth=distance; const fov=600; const relZ=z-cameraDepth; if(relZ<=0) return {x:0,y:0,scale:0,visible:false}; const scale=fov/relZ; const screenX=canvas.width/2 + (x*scale); const screenY=canvas.height/2 - ((y-cameraHeight)*scale); return {x:screenX,y:screenY,scale:scale,visible:true} }
+		function project(x,y,z){
+			// Camera configuration: use dynamic cameraHeight (follows player) and offset depth
+			const CAMERA_OFFSET = 140; // increased to push camera farther away for better perspective
+			const cameraDepth = Math.max(0, distance - CAMERA_OFFSET);
+			const fov = 600;
+			const relZ = z - cameraDepth;
+			if (relZ <= 0) return { x: 0, y: 0, scale: 0, visible: false };
+			const scale = fov / relZ;
+			const screenX = canvas.width / 2 + (x * scale);
+			// use dynamic cameraHeight variable here (smoothed in update())
+			const screenY = canvas.height / 2 - ((y - cameraHeight) * scale);
+			return { x: screenX, y: screenY, scale: scale, visible: true };
+		}
+
 		function spawnObstacle(z){ const lane=Math.floor(Math.random()*3)-1; const type=Math.random()>0.5?'tall':'low'; obstacles.push({lane:lane,z:z,type:type,passed:false}); for(let l=-1;l<=1;l++){ if(l!==lane && Math.random()>0.6) coins.push({lane:l,z:z}); } }
 		function update(dt){ speed=Math.min(MAX_SPEED,speed+dt*0.5); distance+=speed*dt; score+=speed*dt*0.1; document.getElementById('score').innerText=Math.floor(score); const targetX=player.targetLane*LANE_WIDTH; player.x+=(targetX-player.x)*10*dt; if(player.isJumping){ player.jumpY+=player.jumpVel*dt*60; player.jumpVel-=50*dt; if(player.jumpY<=0){ player.jumpY=0; player.isJumping=false } }
+			// Smoothly adjust camera height to follow player's jump (adds vertical follow feel)
+			cameraHeight += (cameraHeightBase + player.jumpY * 0.9 - cameraHeight) * 0.12;
 			const spawnZ=Math.floor(distance/20)*20+100; if(obstacles.length===0||obstacles[obstacles.length-1].z<spawnZ-15) spawnObstacle(spawnZ);
 			for(let i=obstacles.length-1;i>=0;i--){ const obs=obstacles[i]; const relZ=obs.z-distance; if(relZ<-5){ obstacles.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.5){ if(Math.abs(player.x-(obs.lane*LANE_WIDTH))<0.6){ if(obs.type==='low'){ if(player.jumpY<1.0){ gameOver(); } } else { gameOver(); } } } }
 			for(let i=coins.length-1;i>=0;i--){ const coin=coins[i]; const relZ=coin.z-distance; if(relZ<-5){ coins.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.8 && Math.abs(player.x-(coin.lane*LANE_WIDTH))<0.6){ if(player.jumpY<1.5){ score+=50; coins.splice(i,1); } } }
@@ -81,8 +102,15 @@
 				ctx.beginPath(); ctx.arc(p.x, p.y - r, r, 0, Math.PI*2); ctx.fill();
 			}
 
-			// Draw player at fixed screen position (near bottom)
-			const playerScreen = { x: canvas.width/2, y: groundY - 40 - player.jumpY*40 };
+			// Draw player using projection so camera height follows player
+			const p = project(player.x * LANE_WIDTH, player.jumpY, player.z);
+			let playerScreen;
+			if (p.visible) {
+				playerScreen = { x: p.x, y: p.y };
+			} else {
+				// fallback to fixed bottom position if projection not visible
+				playerScreen = { x: canvas.width/2, y: groundY - 40 - player.jumpY*40 };
+			}
 			ctx.save();
 			ctx.translate(playerScreen.x, playerScreen.y);
 			ctx.fillStyle = player.color;

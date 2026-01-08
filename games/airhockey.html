@@ -165,6 +165,16 @@
 			border-color: rgba(255, 107, 157, 0.5);
 		}
 
+		/* Dark mode override */
+		body.dark-mode {
+			background: #071016;
+			color: #e6eef8;
+		}
+
+		body.dark-mode .airhockey-container {
+			background: transparent;
+		}
+
 		.game-controls {
 			display: flex;
 			gap: 10px;
@@ -329,6 +339,13 @@
 		const canvas = document.getElementById('gameCanvas');
 		const ctx = canvas.getContext('2d');
 
+		// Force dark theme on load
+		document.body.classList.add('dark-mode');
+
+		// Game timing / speed control
+		let gameStartTime = Date.now();
+		let speedBoostApplied = false;
+
 		// Set canvas size
 		function resizeCanvas() {
 			canvas.width = canvas.offsetWidth;
@@ -406,8 +423,15 @@
 		function resetPuck() {
 			puck.x = TABLE_WIDTH / 2;
 			puck.y = TABLE_HEIGHT / 2;
-			puck.vx = (Math.random() - 0.5) * 8;
-			puck.vy = (Math.random() - 0.5) * 8;
+			// Initial speed depends on difficulty
+			const speedByDifficulty = { easy: 3, medium: 5, hard: 7 };
+			const speed = speedByDifficulty[difficulty] || 5;
+			const angle = (Math.random() - 0.5) * Math.PI * 2;
+			puck.vx = Math.cos(angle) * speed;
+			puck.vy = Math.sin(angle) * speed;
+			// reset timer for boost
+			gameStartTime = Date.now();
+			speedBoostApplied = false;
 		}
 
 		function resetGame() {
@@ -435,8 +459,14 @@
 			// Update puck physics
 			puck.x += puck.vx;
 			puck.y += puck.vy;
-			puck.vx *= 1.0005; // Accelerate slightly
-			puck.vy *= 1.0005;
+
+			// After 10 seconds of play, apply a one-time speed boost
+			if (!speedBoostApplied && (Date.now() - gameStartTime) > 10000) {
+				const boostFactor = 1.2;
+				puck.vx *= boostFactor;
+				puck.vy *= boostFactor;
+				speedBoostApplied = true;
+			}
 
 			// Wall collisions (left/right)
 			if (puck.x - puck.radius < 0 || puck.x + puck.radius > TABLE_WIDTH) {
@@ -473,13 +503,15 @@
 				puck.y < playerPaddle.y + playerPaddle.height &&
 				puck.x > playerPaddle.x &&
 				puck.x < playerPaddle.x + playerPaddle.width) {
-                
-				puck.vy *= -1.05;
+				// preserve speed magnitude, change direction based on hit position
+				const prevSpeed = Math.hypot(puck.vx, puck.vy);
+				let newVx = puck.vx + ((puck.x - playerPaddle.x) / playerPaddle.width - 0.5) * 8;
+				let newVy = -puck.vy;
+				const newMag = Math.hypot(newVx, newVy) || 1;
+				const scale = prevSpeed / newMag;
+				puck.vx = newVx * scale;
+				puck.vy = newVy * scale;
 				puck.y = playerPaddle.y - puck.radius;
-                
-				// Add horizontal momentum from paddle
-				const hitPos = (puck.x - playerPaddle.x) / playerPaddle.width;
-				puck.vx += (hitPos - 0.5) * 8;
 			}
 
 			// AI paddle collision
@@ -488,13 +520,15 @@
 				puck.y > aiPaddle.y &&
 				puck.x > aiPaddle.x &&
 				puck.x < aiPaddle.x + aiPaddle.width) {
-                
-				puck.vy *= -1.05;
+				// preserve speed magnitude on AI paddle collision as well
+				const prevSpeed = Math.hypot(puck.vx, puck.vy);
+				let newVx = puck.vx + ((puck.x - aiPaddle.x) / aiPaddle.width - 0.5) * 8;
+				let newVy = -puck.vy;
+				const newMag = Math.hypot(newVx, newVy) || 1;
+				const scale = prevSpeed / newMag;
+				puck.vx = newVx * scale;
+				puck.vy = newVy * scale;
 				puck.y = aiPaddle.y + aiPaddle.height + puck.radius;
-                
-				// Add horizontal momentum from paddle
-				const hitPos = (puck.x - aiPaddle.x) / aiPaddle.width;
-				puck.vx += (hitPos - 0.5) * 8;
 			}
 
 			// AI paddle movement
