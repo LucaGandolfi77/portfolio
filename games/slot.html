@@ -14,6 +14,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        /* Default dark theme */
+        body { background: #0b1220; color: #e6eef8; }
+
         .slot-container {
             max-width: 600px;
             margin: 0 auto;
@@ -91,21 +94,23 @@
             flex: 1;
         }
 
+        /* Smaller reel cells for a tighter grid */
         .reel {
             width: 100%;
+            max-width: 96px;
             aspect-ratio: 1;
             height: auto;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(0, 0, 0, 0.3));
-            border: 2px solid rgba(255, 215, 0, 0.4);
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.06), rgba(0, 0, 0, 0.32));
+            border: 2px solid rgba(255, 215, 0, 0.28);
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-size: clamp(1.2rem, 3vw, 2rem);
             font-weight: 700;
             position: relative;
             overflow: hidden;
-            box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.1);
+            box-shadow: inset 0 0 8px rgba(255, 215, 0, 0.08);
         }
 
         .reel.spinning {
@@ -125,6 +130,29 @@
         @keyframes winGlow {
             0%, 100% { box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.1), 0 0 0px rgba(0, 255, 136, 0); }
             50% { box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.3), 0 0 20px rgba(0, 255, 136, 0.5); }
+        }
+
+        /* Victory animation for message area */
+        @keyframes winPulse {
+            0% { transform: scale(1); box-shadow: 0 0 8px rgba(0,255,136,0.08); }
+            50% { transform: scale(1.04); box-shadow: 0 0 28px rgba(0,255,136,0.25); }
+            100% { transform: scale(1); box-shadow: 0 0 8px rgba(0,255,136,0.08); }
+        }
+
+        /* Confetti pieces */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 14px;
+            pointer-events: none;
+            opacity: 0.95;
+            z-index: 2000;
+            transform-origin: center;
+            will-change: transform, opacity;
+        }
+
+        @keyframes confettiFall {
+            to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
         }
 
         .message-area {
@@ -568,10 +596,40 @@
                 wins++;
                 updateMessage('games.slot.win', 'win');
                 document.getElementById('gameMessage').textContent = `WIN: $${Math.floor(totalWin)}!`;
+                    // Trigger small victory visual effect (confetti)
+                    spawnWinEffect(Math.min(40, 10 + Math.floor(totalWin / 10)));
             } else {
                 updateMessage('games.slot.lose', 'lose');
             }
         }
+
+            function spawnWinEffect(count) {
+                const colors = ['#ffd700','#ff6b6b','#00ff88','#00d4ff','#ff8a00'];
+                for (let i = 0; i < count; i++) {
+                    const el = document.createElement('div');
+                    el.className = 'confetti';
+                    el.style.left = (20 + Math.random() * 60) + '%';
+                    el.style.top = (10 + Math.random() * 10) + '%';
+                    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    el.style.transform = `rotate(${Math.random()*360}deg)`;
+                    document.body.appendChild(el);
+                    // animate
+                    const duration = 1200 + Math.random() * 800;
+                    el.style.transition = `transform ${duration}ms cubic-bezier(.2,.8,.2,1), opacity ${duration}ms linear`;
+                    requestAnimationFrame(() => {
+                        el.style.transform = `translateY(${80 + Math.random()*40}vh) rotate(${720 + Math.random()*360}deg)`;
+                        el.style.opacity = '0';
+                    });
+                    setTimeout(() => { try { el.remove(); } catch(e){} }, duration + 200);
+                }
+                // pulse the message area briefly
+                const msg = document.getElementById('gameMessage');
+                if (msg) {
+                    msg.style.animation = 'none';
+                    msg.offsetHeight;
+                    msg.style.animation = 'winPulse 900ms ease-in-out 1';
+                }
+            }
 
         function triggerBonus() {
             const modal = document.getElementById('bonusModal');

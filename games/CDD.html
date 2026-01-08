@@ -1,141 +1,185 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-	<title>CDD Run - Endless Runner</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+	<title>CDD RUN — Endless Runner</title>
 	<style>
-		body { margin:0; overflow:hidden; background:#87CEEB; font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif; touch-action:none }
-		canvas{ display:block }
-		#ui-layer{ position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between }
-		#score-board{ padding:20px; font-size:24px; color:white; text-shadow:2px 2px 0 #000; font-weight:bold }
-		#game-over{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; background:rgba(0,0,0,0.8); padding:40px; border-radius:20px; color:white; display:none; pointer-events:auto }
-		h1{ margin-top:0; color:#ff4757; font-size:48px } p{ font-size:24px; margin-bottom:30px }
-		button{ background:#2ed573; color:white; border:none; padding:15px 40px; font-size:24px; border-radius:50px; cursor:pointer; box-shadow:0 5px 0 #26af61 }
-		button:active{ transform:translateY(5px); box-shadow:none }
-		#start-screen{ position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; pointer-events:auto; z-index:10 }
-		.controls-hint{ margin-top:20px; font-size:18px; color:#ccc }
-		#mobile-controls{ position:absolute; bottom:20px; width:100%; height:100px; display:flex; justify-content:space-between; padding:0 20px; box-sizing:border-box; pointer-events:auto }
-		.control-btn{ width:80px; height:80px; background:rgba(255,255,255,0.2); border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:30px; color:white; user-select:none; border:2px solid rgba(255,255,255,0.5) }
-		.control-btn:active{ background:rgba(255,255,255,0.4) }
-		@media(min-width:768px){ #mobile-controls{ display:none } }
+		:root{--top-bar:0px}
+		html,body{height:100%;margin:0}
+		body{font-family:Segoe UI,system-ui,Helvetica,Arial;background:#87CEEB;overflow:hidden;touch-action:none}
+		canvas{display:block}
+		/* UI */
+		#top-ui{position:absolute;top:calc(var(--top-bar) + 12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+		#score{pointer-events:auto;background:rgba(0,0,0,0.35);color:#fff;padding:8px 12px;border-radius:8px;font-weight:700}
+		#back-btn{pointer-events:auto;background:rgba(0,0,0,0.35);color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none;border:1px solid rgba(255,255,255,0.12)}
+		#start-screen,#game-over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);color:#fff;pointer-events:auto}
+		.panel{background:rgba(0,0,0,0.75);padding:28px;border-radius:14px;text-align:center}
+		button{appearance:none;border:0;background:#2ed573;color:#fff;padding:12px 22px;border-radius:999px;font-size:16px;cursor:pointer}
+		button.alt{background:#ff4757}
+		/* Mobile controls */
+		#mobile-controls{position:fixed;bottom:18px;left:18px;right:18px;display:flex;justify-content:flex-end;gap:14px;pointer-events:none}
+		.ctrl{width:68px;height:68px;border-radius:999px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;pointer-events:auto;border:2px solid rgba(255,255,255,0.12)}
+		/* hide mobile controls on desktop */
+		@media(min-width:720px){#mobile-controls{display:none}}
 	</style>
 </head>
 <body>
-	<canvas id="gameCanvas"></canvas>
-	<div id="ui-layer"><div id="score-board">Score: <span id="score">0</span></div></div>
-	<div id="start-screen"><h1 style="color:#2ed573">CDD RUN</h1><p>Dodge the barriers! Collect coins!</p><button id="start-btn">PLAY</button><div class="controls-hint">Use Arrow Keys or Swipe to Move</div></div>
-	<div id="game-over"><h1>GAME OVER</h1><p>Score: <span id="final-score">0</span></p><button id="restart-btn">TRY AGAIN</button><br><button id="exit-btn" style="background:#ff4757; margin-top:10px;">EXIT</button></div>
-	<div id="mobile-controls"><div class="control-btn" id="btn-left">←</div><div class="control-btn" id="btn-right">→</div></div>
+	<a id="back-btn" href="#">Exit</a>
+	<div id="top-ui"><div id="score">Score: <span id="score-val">0</span></div><div></div></div>
+
+	<canvas id="c"></canvas>
+
+	<div id="start-screen"><div class="panel"><h1 style="margin:0 0 8px 0;color:#2ed573">CDD RUN</h1><p style="margin:0 0 18px 0">Sposta il corridore a sinistra/destra per evitare ostacoli e raccogliere monete.</p><div style="display:flex;gap:10px;justify-content:center"><button id="start">PLAY</button><button id="demo" style="background:#ffd700;color:#000">TUTORIAL</button></div><p style="margin-top:12px;color:#ccc;font-size:13px">Tastiere: ← → • Mobile: swipe o bottoni</p></div></div>
+
+	<div id="game-over" style="display:none"><div class="panel"><h2 style="margin:0 0 8px 0;color:#ff4757">GAME OVER</h2><p style="margin:0 0 12px 0">Score: <strong id="final-score">0</strong></p><div style="display:flex;gap:8px;justify-content:center"><button id="restart">RESTART</button><button id="exit" class="alt">EXIT</button></div></div></div>
+
+	<div id="mobile-controls"><div id="btn-left" class="ctrl">◀</div><div id="btn-right" class="ctrl">▶</div></div>
+
 	<script>
-		const canvas=document.getElementById('gameCanvas'); const ctx=canvas.getContext('2d'); let gameRunning=false, score=0, speed=0, distance=0, lastTime=0; const LANES=3, LANE_WIDTH=2, SEGMENT_LENGTH=5, DRAW_DISTANCE=100, BASE_SPEED=20, MAX_SPEED=60; const player={ lane:0, x:0, y:0, z:10, width:0.8, height:1.5, color:'#ff4757', targetLane:0, jumpY:0, isJumping:false, jumpVel:0 }; let obstacles=[], coins=[], particles=[];
+	// Simple 3-lane endless runner
+	const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d');
+	const scoreEl = document.getElementById('score-val'); const startScreen = document.getElementById('start-screen');
+	const gameOverPanel = document.getElementById('game-over'); const finalScoreEl = document.getElementById('final-score');
+	const startBtn = document.getElementById('start'); const restartBtn = document.getElementById('restart');
+	const backBtn = document.getElementById('back-btn');
 
-		// Camera: base height and dynamic height (follows player jump)
-		let cameraHeightBase = 3.5;
-		let cameraHeight = cameraHeightBase;
+	let W=0,H=0; function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; document.documentElement.style.setProperty('--top-bar', getComputedStyle(document.body).getPropertyValue('--site-top-bar-height') || '0px'); }
+	addEventListener('resize', resize); resize();
 
-		function resize(){ canvas.width=innerWidth; canvas.height=innerHeight } addEventListener('resize',resize); resize(); function moveLeft(){ if(player.targetLane>-1) player.targetLane--; } function moveRight(){ if(player.targetLane<1) player.targetLane++; } function jump(){ if(!player.isJumping){ player.isJumping=true; player.jumpVel=15 } }
-		document.addEventListener('keydown', e=>{ if(!gameRunning) return; if(e.key==='ArrowLeft'||e.key==='a') moveLeft(); if(e.key==='ArrowRight'||e.key==='d') moveRight(); if(e.key==='ArrowUp'||e.key==='w'||e.key===' ') jump(); });
-		let touchStartX=0,touchStartY=0; document.addEventListener('touchstart', e=>{ touchStartX=e.changedTouches[0].screenX; touchStartY=e.changedTouches[0].screenY }); document.addEventListener('touchend', e=>{ if(!gameRunning) return; const touchEndX=e.changedTouches[0].screenX, touchEndY=e.changedTouches[0].screenY, dx=touchEndX-touchStartX, dy=touchEndY-touchStartY; if(Math.abs(dx)>Math.abs(dy)){ if(Math.abs(dx)>30){ if(dx>0) moveRight(); else moveLeft(); } } else { if(dy< -30) jump(); } });
-		document.getElementById('btn-left').addEventListener('touchstart', e=>{ e.preventDefault(); moveLeft()}); document.getElementById('btn-right').addEventListener('touchstart', e=>{ e.preventDefault(); moveRight()}); document.getElementById('btn-left').addEventListener('click', ()=>moveLeft()); document.getElementById('btn-right').addEventListener('click', ()=>moveRight()); document.getElementById('start-btn').addEventListener('click', startGame); document.getElementById('restart-btn').addEventListener('click', startGame); document.getElementById('exit-btn').addEventListener('click', ()=>{ location.href='index.html' });
-		function startGame(){ gameRunning=true; score=0; speed=BASE_SPEED; distance=0; obstacles=[]; coins=[]; particles=[]; player.lane=0; player.targetLane=0; player.x=0; player.jumpY=0; player.isJumping=false; document.getElementById('start-screen').style.display='none'; document.getElementById('game-over').style.display='none'; document.getElementById('score').innerText='0'; lastTime=performance.now(); requestAnimationFrame(gameLoop); }
-		function gameOver(){ gameRunning=false; document.getElementById('game-over').style.display='block'; document.getElementById('final-score').innerText=Math.floor(score); }
-		function project(x,y,z){
-			// Camera configuration: use dynamic cameraHeight (follows player) and offset depth
-			const CAMERA_OFFSET = 140; // increased to push camera farther away for better perspective
-			const cameraDepth = Math.max(0, distance - CAMERA_OFFSET);
-			const fov = 600;
-			const relZ = z - cameraDepth;
-			if (relZ <= 0) return { x: 0, y: 0, scale: 0, visible: false };
-			const scale = fov / relZ;
-			const screenX = canvas.width / 2 + (x * scale);
-			// use dynamic cameraHeight variable here (smoothed in update())
-			const screenY = canvas.height / 2 - ((y - cameraHeight) * scale);
-			return { x: screenX, y: screenY, scale: scale, visible: true };
+	// World
+	const LANES = 3; const LANE_W = 120; const LANE_GAP = 1; // visual spacing
+	const player = { lane:1, target:1, x:0, y:0, width:40, height:60, color:'#ff4757' };
+	let obstacles = [], coins = [], particles = [];
+	let time = 0;
+	let running = false, last=0, speed=400, distance=0, score=0, spawnTimer=0;
+
+	function reset(){ obstacles = []; coins = []; running = false; last = 0; speed = 400; distance = 0; score = 0; spawnTimer = 0; player.lane = 1; player.target = 1; updateScore(); }
+
+	function updateScore(){ scoreEl.textContent = Math.floor(score); }
+
+	function worldToScreen(lane, depth){ // depth > 0 => farther
+		const centerX = W/2 + (lane - 1) * LANE_W;
+		const perspective = 1 / (1 + depth * 0.0035); // simple perspective
+		const x = centerX;
+		const y = H * (0.5 + 0.45 * (1 - perspective));
+		const scale = perspective * 1.2;
+		return { x, y, scale };
+	}
+
+	function spawn(){
+		// spawn obstacles and coins ahead with random lanes
+		const z = distance + 900 + Math.random()*400;
+		const lane = Math.floor(Math.random()*LANES);
+		const type = Math.random() < 0.7 ? 'box' : 'tall';
+		obstacles.push({ lane, z, type });
+		// sometimes place coins in other lanes
+		for(let i=0;i<LANES;i++) if(i!==lane && Math.random()<0.4) coins.push({ lane:i, z:z - 80 + Math.random()*160 });
+	}
+
+	function update(dt){
+		if(!running) return;
+		time += dt;
+		distance += speed * dt;
+		score += dt * 10 + (distance/1000) * dt * 2;
+		updateScore();
+
+		// smooth lane interpolation using lerp for animation
+		const laneDiff = player.target - player.lane;
+		player.lane += laneDiff * Math.min(1, 8 * dt);
+
+		// subtle bobbing effect driven by time/distance (for visual polish)
+		player.bob = Math.sin(distance * 0.01 + time * 6) * 6;
+
+		// spawn logic
+		spawnTimer -= dt*1000;
+		if(spawnTimer <= 0){ spawn(); spawnTimer = 500 + Math.random()*600; }
+
+		// move obstacles/coins closer to player
+		for(let i=obstacles.length-1;i>=0;i--){ obstacles[i].z -= speed*dt; if(obstacles[i].z < distance - 200) obstacles.splice(i,1); }
+		for(let i=coins.length-1;i>=0;i--){ coins[i].z -= speed*dt; if(coins[i].z < distance - 200) coins.splice(i,1); }
+
+		// update particles
+		for(let i=particles.length-1;i>=0;i--){ const p = particles[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.vy += 300 * dt; if(p.life <= 0) particles.splice(i,1); }
+
+		// collisions: when z approximates distance
+		for(let i=obstacles.length-1;i>=0;i--){ const ob = obstacles[i]; if(Math.abs(ob.z - distance) < 120){ if(Math.abs(ob.lane - Math.round(player.lane)) < 0.5){ // collision
+					running = false; gameOver(); return;
+				}
+			}
 		}
-
-		function spawnObstacle(z){ const lane=Math.floor(Math.random()*3)-1; const type=Math.random()>0.5?'tall':'low'; obstacles.push({lane:lane,z:z,type:type,passed:false}); for(let l=-1;l<=1;l++){ if(l!==lane && Math.random()>0.6) coins.push({lane:l,z:z}); } }
-		function update(dt){ speed=Math.min(MAX_SPEED,speed+dt*0.5); distance+=speed*dt; score+=speed*dt*0.1; document.getElementById('score').innerText=Math.floor(score); const targetX=player.targetLane*LANE_WIDTH; player.x+=(targetX-player.x)*10*dt; if(player.isJumping){ player.jumpY+=player.jumpVel*dt*60; player.jumpVel-=50*dt; if(player.jumpY<=0){ player.jumpY=0; player.isJumping=false } }
-			// Smoothly adjust camera height to follow player's jump (adds vertical follow feel)
-			cameraHeight += (cameraHeightBase + player.jumpY * 0.9 - cameraHeight) * 0.12;
-			const spawnZ=Math.floor(distance/20)*20+100; if(obstacles.length===0||obstacles[obstacles.length-1].z<spawnZ-15) spawnObstacle(spawnZ);
-			for(let i=obstacles.length-1;i>=0;i--){ const obs=obstacles[i]; const relZ=obs.z-distance; if(relZ<-5){ obstacles.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.5){ if(Math.abs(player.x-(obs.lane*LANE_WIDTH))<0.6){ if(obs.type==='low'){ if(player.jumpY<1.0){ gameOver(); } } else { gameOver(); } } } }
-			for(let i=coins.length-1;i>=0;i--){ const coin=coins[i]; const relZ=coin.z-distance; if(relZ<-5){ coins.splice(i,1); continue } if(Math.abs(relZ-player.z)<0.8 && Math.abs(player.x-(coin.lane*LANE_WIDTH))<0.6){ if(player.jumpY<1.5){ score+=50; coins.splice(i,1); } } }
-		}
-		function draw(){
-			// Sky
-			ctx.fillStyle = '#87CEEB';
-			ctx.fillRect(0,0,canvas.width,canvas.height);
-
-			// Ground / road area
-			const groundY = canvas.height * 0.65;
-			ctx.fillStyle = '#2ecc71';
-			ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
-
-			// Draw simple perspective lanes
-			for(let i=0;i<LANES;i++){
-				const laneX = canvas.width/2 + (i-1) * 80;
-				ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-				ctx.lineWidth = 2;
-				ctx.beginPath();
-				ctx.moveTo(laneX, groundY);
-				ctx.lineTo(laneX, canvas.height);
-				ctx.stroke();
-			}
-
-			// Draw obstacles and coins using projection
-			for(let i=0;i<obstacles.length;i++){
-				const obs = obstacles[i];
-				const p = project(obs.lane*LANE_WIDTH, 0, obs.z);
-				if(!p.visible) continue;
-				const size = 40 * p.scale;
-				ctx.fillStyle = obs.type==='low' ? '#8B4513' : '#555';
-				ctx.fillRect(p.x - size/2, p.y - size, size, size);
-			}
-
-			for(let i=0;i<coins.length;i++){
-				const c = coins[i];
-				const p = project(c.lane*LANE_WIDTH, 0.5, c.z);
-				if(!p.visible) continue;
-				const r = 10 * p.scale;
-				ctx.fillStyle = '#ffd700';
-				ctx.beginPath(); ctx.arc(p.x, p.y - r, r, 0, Math.PI*2); ctx.fill();
-			}
-
-			// Draw player using projection so camera height follows player
-			const p = project(player.x * LANE_WIDTH, player.jumpY, player.z);
-			let playerScreen;
-			if (p.visible) {
-				playerScreen = { x: p.x, y: p.y };
-			} else {
-				// fallback to fixed bottom position if projection not visible
-				playerScreen = { x: canvas.width/2, y: groundY - 40 - player.jumpY*40 };
-			}
-			ctx.save();
-			ctx.translate(playerScreen.x, playerScreen.y);
-			ctx.fillStyle = player.color;
-			ctx.fillRect(-30, -40, 60, 40);
-			ctx.fillStyle = '#fff'; ctx.fillRect(-10, -30, 20, 20);
-			ctx.restore();
-
-			// HUD handled by separate layer, but draw some particles
-			for(let i=0;i<particles.length;i++){
-				const p = particles[i];
-				ctx.globalAlpha = Math.max(0, p.life/20);
-				ctx.fillStyle = p.color;
-				ctx.fillRect(p.x, p.y, 2, 2);
-				ctx.globalAlpha = 1;
+		for(let i=coins.length-1;i>=0;i--){ const c = coins[i]; if(Math.abs(c.z - distance) < 120){ if(Math.abs(c.lane - Math.round(player.lane)) < 0.5){ score += 100; // spawn collect particles
+					const s = worldToScreen(c.lane, (c.z - distance));
+					for(let k=0;k<10;k++) particles.push({ x: s.x + (Math.random()-0.5)*20, y: s.y - 10 + (Math.random()-0.5)*20, vx: (Math.random()-0.5)*200, vy: -200 + Math.random()*-40, life: 0.6 + Math.random()*0.6, color: '#ffd700' });
+					coins.splice(i,1); updateScore(); }
 			}
 		}
 
-		function gameLoop(t){
-			const dt=(t-lastTime)/1000;
-			lastTime=t;
-			if(gameRunning) update(dt);
-			// always draw to avoid blank screen even when paused/not started
-			draw();
-			requestAnimationFrame(gameLoop);
+		// gradually increase difficulty
+		speed += dt * 6;
+	}
+
+	function draw(){
+		// sky
+		ctx.fillStyle = '#87CEEB'; ctx.fillRect(0,0,W,H);
+
+		// ground
+		ctx.fillStyle = '#2ecc71'; ctx.fillRect(0,H*0.62,W,H*0.38);
+
+		// lane lines and perspective
+		for(let l=0;l<LANES;l++){
+			const laneCenter = W/2 + (l - 1) * LANE_W;
+			ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 2;
+			ctx.beginPath(); ctx.moveTo(laneCenter, H*0.62); ctx.lineTo(laneCenter, H); ctx.stroke();
 		}
+
+		// draw obstacles (from far to near) with subtle pulsing
+		const sortObs = obstacles.slice().sort((a,b)=> (b.z - distance) - (a.z - distance));
+		for(const ob of sortObs){ const rel = (ob.z - distance); if(rel < -200) continue; const s = worldToScreen(ob.lane, rel); const pulse = 1 + 0.06 * Math.sin((ob.z - distance) * 0.02 + time * 6); const size = 70 * s.scale * pulse; ctx.fillStyle = ob.type==='box' ? '#8B4513' : '#333'; ctx.fillRect(s.x - size/2, s.y - size, size, size); }
+
+		// draw coins with rotation/float
+		for(const c of coins){ const rel = (c.z - distance); if(rel < -200) continue; const s = worldToScreen(c.lane, rel); const r = 12 * s.scale; const float = Math.sin((c.z - distance) * 0.02 + time * 8) * 6 * s.scale; ctx.save(); ctx.translate(s.x, s.y - r + float); ctx.rotate(time * 6 + (c.z - distance) * 0.002); ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+
+		// draw player near bottom center with bob animation
+		const playerScreen = { x: W/2 + (player.lane - 1) * LANE_W, y: H*0.78 + (player.bob || 0) };
+		ctx.save(); ctx.translate(playerScreen.x, playerScreen.y);
+		ctx.fillStyle = player.color; ctx.fillRect(-player.width/2, -player.height, player.width, player.height);
+		ctx.fillStyle = '#fff'; ctx.fillRect(-10, -player.height+10, 20, 20);
+		ctx.restore();
+
+		// draw particles
+		for(const p of particles){ ctx.globalAlpha = Math.max(0, Math.min(1, p.life)); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); ctx.globalAlpha = 1; }
+	}
+
+	function loop(t){ const dt = last ? Math.min((t-last)/1000, 0.05) : 0; last = t; update(dt); draw(); requestAnimationFrame(loop); }
+
+	function start(){ reset(); running = true; last = 0; startScreen.style.display = 'none'; gameOverPanel.style.display = 'none'; requestAnimationFrame(loop); }
+	function gameOver(){ gameOverPanel.style.display = 'flex'; finalScoreEl.textContent = Math.floor(score); }
+
+	// Input
+	addEventListener('keydown', e=>{ if(e.key==='ArrowLeft' || e.key==='a'){ player.target = Math.max(0, player.target-1); } if(e.key==='ArrowRight' || e.key==='d'){ player.target = Math.min(LANES-1, player.target+1); } });
+	// Mobile buttons
+	document.getElementById('btn-left').addEventListener('touchstart', e=>{ e.preventDefault(); player.target = Math.max(0, player.target-1); });
+	document.getElementById('btn-right').addEventListener('touchstart', e=>{ e.preventDefault(); player.target = Math.min(LANES-1, player.target+1); });
+	document.getElementById('btn-left').addEventListener('click', ()=> player.target = Math.max(0, player.target-1));
+	document.getElementById('btn-right').addEventListener('click', ()=> player.target = Math.min(LANES-1, player.target+1));
+
+	// swipe
+	let sx=0, sy=0; addEventListener('touchstart', e=>{ sx = e.touches[0].clientX; sy = e.touches[0].clientY; });
+	addEventListener('touchend', e=>{ const dx = e.changedTouches[0].clientX - sx; const dy = e.changedTouches[0].clientY - sy; if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40){ if(dx > 0) player.target = Math.min(LANES-1, player.target+1); else player.target = Math.max(0, player.target-1); } });
+
+	// Start / restart / exit handlers
+	startBtn.addEventListener('click', start); restartBtn.addEventListener('click', ()=>{ start(); }); document.getElementById('exit').addEventListener('click', ()=>{ back(); });
+
+	// Back button behavior (history.back with fallbacks)
+	function back(){ try{ sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); }catch(e){}
+		try{ if(window.history && window.history.length > 1) window.history.back(); else if(document.referrer) window.location.href = document.referrer; else window.location.href = '../index.html'; } catch(e){ window.location.href = '../index.html'; } }
+	backBtn.addEventListener('click', e=>{ e.preventDefault(); back(); });
+
+	// Initialize
+	resize(); reset();
+	// start loop only after player presses PLAY
+
 	</script>
 </body>
 </html>

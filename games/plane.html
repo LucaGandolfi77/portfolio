@@ -27,19 +27,21 @@
             background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px;
         }
         #back-btn {
-            position: absolute; top: 20px; right: 20px;
+            position: absolute; top: 20px; left: 20px;
             background: rgba(0,0,0,0.3); padding: 10px 20px;
             border-radius: 8px; color: white; text-decoration: none;
             font-size: 0.9rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
+            z-index: 10001;
         }
         #back-btn:hover { background: rgba(0,0,0,0.5); }
 
+        /* Place Flip near FIRE/BOMB controls (bottom-right) */
         #flip-btn {
-            position: absolute; top: 20px; right: 120px;
-            background: rgba(0,0,0,0.3); padding: 8px 14px;
+            position: absolute; right: 30px; bottom: 140px;
+            background: rgba(0,0,0,0.3); padding: 10px 14px;
             border-radius: 8px; color: white; text-decoration: none;
-            font-size: 0.9rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
-            cursor: pointer;
+            font-size: 0.95rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer; z-index: 10001;
         }
         #flip-btn:hover { background: rgba(0,0,0,0.5); }
 
@@ -210,9 +212,48 @@
             bombEl.addEventListener('click', e => { e.preventDefault(); dropBomb(); });
         }
 
-        // Flip button: mirror the plane sprite
+        // Flip button: rotate the plane 180° (change flight direction)
         const flipBtn = document.getElementById('flip-btn');
-        if (flipBtn) flipBtn.addEventListener('click', () => { player.flipped = !player.flipped; });
+        if (flipBtn) flipBtn.addEventListener('click', () => {
+            // Keep motion consistent: add PI to angle and targetAngle so the plane faces opposite direction
+            player.angle += Math.PI;
+            player.targetAngle += Math.PI;
+            // Normalize angles to avoid unbounded growth
+            function normalize(a){
+                while(a > Math.PI) a -= Math.PI*2;
+                while(a <= -Math.PI) a += Math.PI*2;
+                return a;
+            }
+            player.angle = normalize(player.angle);
+            player.targetAngle = normalize(player.targetAngle);
+        });
+
+        // Back button: behave like browser back with sensible fallbacks
+        const backBtn = document.getElementById('back-btn');
+        if (backBtn) backBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
+            try {
+                if (window.history && window.history.length > 1) {
+                    window.history.back();
+                } else if (document.referrer && document.referrer !== '') {
+                    try {
+                        const ref = new URL(document.referrer, location.href);
+                        if (ref.origin === location.origin) {
+                            window.location.href = document.referrer;
+                        } else {
+                            window.location.href = '../index.html';
+                        }
+                    } catch (e) {
+                        window.location.href = '../index.html';
+                    }
+                } else {
+                    window.location.href = '../index.html';
+                }
+            } catch(e) {
+                try { window.location.href = '../index.html'; } catch(e) { window.location.href = '/index.html'; }
+            }
+        });
 
         // iPhone / touch controls: joystick on left half, fire on right half, long-press or two-finger for bomb
         (function setupTouchControls(){
@@ -860,7 +901,10 @@
                 const mapH = 90;
                 const margin = 12;
                 const x0 = canvas.width - mapW - margin;
-                const y0 = margin;
+                // Respect the site top bar if present (CSS var --site-top-bar-height)
+                const topBarHeightVal = getComputedStyle(document.body).getPropertyValue('--site-top-bar-height') || '';
+                const topBarHeight = parseInt(topBarHeightVal, 10) || 0;
+                const y0 = margin + topBarHeight;
                 // background
                 ctx.save();
                 ctx.globalAlpha = 0.9;

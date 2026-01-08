@@ -114,6 +114,12 @@
             min-height: 30px;
             font-size: 1.5rem;
         }
+        /* Modal for game end */
+        .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); z-index: 999; }
+        .modal.hidden { display: none; }
+        .modal-content { background: white; color: black; padding: 20px; border-radius: 10px; max-width: 90%; width: 360px; text-align: center; }
+        .modal-content h2 { margin: 0 0 8px 0; }
+        .modal-content button { margin-top: 12px; padding: 8px 14px; border-radius: 6px; border: none; background: var(--accent); color: var(--bg-900); cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -137,10 +143,20 @@
                 </select>
             </div>
             <button class="btn" onclick="resetGame()" data-i18n="games.chess.reset">Reset Game</button>
+            <button class="btn" id="undo-btn" onclick="undoMove()" disabled>Undo</button>
         </div>
+        <div id="move-log" style="width:90%; max-width:95vmin; max-height:220px; overflow:auto; background: rgba(255,255,255,0.04); padding:8px; border-radius:6px; margin-top:10px; font-size:14px; color: #fff;"></div>
     </div>
 
     <script>
+    <script>
+        // ensure modal exists if script loaded after DOMContent
+        if (!document.getElementById('modal')) {
+            const modal = document.createElement('div');
+            modal.id = 'modal'; modal.className = 'modal hidden';
+            modal.innerHTML = `<div class="modal-content"><h2 id="modal-title">Game Over</h2><p id="modal-body">Someone won</p><button id="modal-ok" onclick="closeModalAndReset()">Play again</button></div>`;
+            document.body.appendChild(modal);
+        }
         const boardEl = document.getElementById('board');
         const statusEl = document.getElementById('status');
         const capturedWhiteEl = document.getElementById('captured-white');
@@ -152,6 +168,10 @@
             b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
         };
 
+        // History and move log
+        let moveHistory = []; // stack of previous game states
+        let movesLog = [];    // textual move list
+
         let board = [];
         let turn = 'w'; // 'w' or 'b'
         let selectedSquare = null;
@@ -159,6 +179,27 @@
         let capturedPieces = { w: [], b: [] };
         let gameMode = 'pvp';
         let isComputerThinking = false;
+
+        function squareName(pos) {
+            const files = 'abcdefgh';
+            return files[pos.col] + (8 - pos.row);
+        }
+
+        function pushHistory(note) {
+            moveHistory.push({ board: JSON.parse(JSON.stringify(board)), turn, capturedPieces: JSON.parse(JSON.stringify(capturedPieces)), isGameOver });
+            document.getElementById('undo-btn').disabled = false;
+        }
+
+        function renderMoveLog() {
+            const el = document.getElementById('move-log');
+            el.innerHTML = '';
+            movesLog.forEach((m,i) => {
+                const d = document.createElement('div');
+                d.textContent = `${i+1}. ${m}`;
+                el.appendChild(d);
+            });
+            el.scrollTop = el.scrollHeight;
+        }
 
         function initBoard() {
             gameMode = modeSelect.value;
@@ -256,8 +297,16 @@
         }
 
         function executeMove(move) {
+            // save state for undo
+            pushHistory();
+
             const fromPiece = board[selectedSquare.row][selectedSquare.col];
             const targetPiece = board[move.row][move.col];
+
+            // record textual move
+            const moveText = `${turn === 'w' ? 'W' : 'B'}: ${squareName(selectedSquare)}→${squareName(move)}${targetPiece ? ' x' : ''}`;
+            movesLog.push(moveText);
+            renderMoveLog();
 
             if (targetPiece) {
                 capturedPieces[turn === 'w' ? 'w' : 'b'].push(targetPiece.type);
@@ -276,43 +325,44 @@
             validMoves = [];
             renderBoard();
 
-            if (gameMode === 'pvc' && turn === 'b') {
+            // After move, check for check / checkmate / stalemate
+            checkEndConditions();
+
+            if (gameMode === 'pvc' && turn === 'b' && !isGameOver) {
                 isComputerThinking = true;
                 setTimeout(makeComputerMove, 500);
             }
         }
 
         function makeComputerMove() {
-            // Simple AI: Random move, prioritize capture
-            let allMoves = [];
+            // Simple AI: build legal moves only (avoid leaving king in check)
+            let legalMoves = [];
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     const p = board[r][c];
                     if (p && p.color === 'b') {
                         const moves = getValidMoves(r, c, p);
-                        moves.forEach(m => {
-                            allMoves.push({ from: {r, c}, to: m });
-                        });
+                        for (const m of moves) {
+                            if (simulateMoveAndLeavesKingSafe(r, c, m.row, m.col, 'b')) {
+                                legalMoves.push({ from: { r, c }, to: m });
+                            }
+                        }
                     }
                 }
             }
 
-            if (allMoves.length === 0) {
-                alert("Checkmate or Stalemate!");
+            if (legalMoves.length === 0) {
+                // No legal moves -> handled by checkEndConditions after last move
+                isComputerThinking = false;
                 return;
             }
 
-            // Prioritize captures
-            const captures = allMoves.filter(m => board[m.to.row][m.to.col] !== null);
-            let move;
-            if (captures.length > 0) {
-                move = captures[Math.floor(Math.random() * captures.length)];
-            } else {
-                move = allMoves[Math.floor(Math.random() * allMoves.length)];
-            }
+            // Prefer captures
+            const captures = legalMoves.filter(m => board[m.to.row][m.to.col] !== null);
+            const choice = (captures.length > 0) ? captures[Math.floor(Math.random() * captures.length)] : legalMoves[Math.floor(Math.random() * legalMoves.length)];
 
-            selectedSquare = { row: move.from.r, col: move.from.c };
-            executeMove(move.to);
+            selectedSquare = { row: choice.from.r, col: choice.from.c };
+            executeMove(choice.to);
             isComputerThinking = false;
         }
 
@@ -389,8 +439,111 @@
             selectedSquare = null;
             validMoves = [];
             capturedPieces = { w: [], b: [] };
+            moveHistory = [];
+            movesLog = [];
+            renderMoveLog();
+            document.getElementById('undo-btn').disabled = true;
+            isGameOver = false;
             renderBoard();
         }
+
+        // --- Check / Checkmate logic ---
+        let isGameOver = false;
+
+        function findKingPos(color) {
+            for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (p && p.type === 'k' && p.color === color) return { row: r, col: c };
+            }
+            return null;
+        }
+
+        function isSquareAttacked(row, col, attackerColor) {
+            for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (!p || p.color !== attackerColor) continue;
+                const moves = getValidMoves(r, c, p);
+                if (moves.some(m => m.row === row && m.col === col)) return true;
+            }
+            return false;
+        }
+
+        function isKingInCheck(color) {
+            const king = findKingPos(color);
+            if (!king) return false;
+            const attacker = color === 'w' ? 'b' : 'w';
+            return isSquareAttacked(king.row, king.col, attacker);
+        }
+
+        function simulateMoveAndLeavesKingSafe(fromR, fromC, toR, toC, color) {
+            // save
+            const fromPiece = board[fromR][fromC] ? { ...board[fromR][fromC] } : null;
+            const toPiece = board[toR][toC] ? { ...board[toR][toC] } : null;
+            // apply
+            board[toR][toC] = fromPiece ? { ...fromPiece } : null;
+            board[fromR][fromC] = null;
+            const inCheck = isKingInCheck(color);
+            // revert
+            board[fromR][fromC] = fromPiece ? { ...fromPiece } : null;
+            board[toR][toC] = toPiece ? { ...toPiece } : null;
+            return !inCheck;
+        }
+
+        function hasAnyLegalMove(color) {
+            for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (!p || p.color !== color) continue;
+                const moves = getValidMoves(r, c, p);
+                for (const m of moves) {
+                    if (simulateMoveAndLeavesKingSafe(r, c, m.row, m.col, color)) return true;
+                }
+            }
+            return false;
+        }
+
+        function checkEndConditions() {
+            if (isGameOver) return;
+            const side = turn; // side to move
+            const inCheck = isKingInCheck(side);
+            const hasLegal = hasAnyLegalMove(side);
+            if (inCheck && !hasLegal) {
+                isGameOver = true;
+                const winner = side === 'w' ? 'Black' : 'White';
+                showModal('Checkmate', winner + ' wins by checkmate');
+                return;
+            }
+            if (!inCheck && !hasLegal) {
+                isGameOver = true;
+                showModal('Stalemate', 'Draw by stalemate');
+                return;
+            }
+            if (inCheck) showTempMessage('Check', 1200);
+        }
+
+        function undoMove() {
+            if (moveHistory.length === 0) return;
+            const prev = moveHistory.pop();
+            board = JSON.parse(JSON.stringify(prev.board));
+            turn = prev.turn;
+            capturedPieces = JSON.parse(JSON.stringify(prev.capturedPieces));
+            isGameOver = !!prev.isGameOver;
+            // pop last textual move
+            movesLog.pop();
+            renderMoveLog();
+            renderBoard();
+            document.getElementById('undo-btn').disabled = moveHistory.length === 0;
+        }
+
+        function showTempMessage(text, ms = 1200) { const prev = statusEl.textContent; statusEl.textContent = text; setTimeout(() => { updateStatus(); }, ms); }
+
+        function showModal(title, body) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').textContent = body;
+            document.getElementById('modal').classList.remove('hidden');
+            isComputerThinking = false;
+        }
+
+        function closeModalAndReset() { document.getElementById('modal').classList.add('hidden'); resetGame(); isGameOver = false; }
 
         // Translations
         async function loadTranslations(lang) {

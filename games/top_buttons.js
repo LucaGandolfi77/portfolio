@@ -39,7 +39,27 @@ if (!document.getElementById('site-top-bar')) {
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      try { window.location.href = '../index.html'; } catch(e) { window.location.href = '../index.html'; }
+      try {
+        // Prefer navigating back (like browser back button). If not possible, fall back to referrer or index.
+        if (window.history && window.history.length > 1) {
+          window.history.back();
+        } else if (document.referrer && document.referrer !== '') {
+          try {
+            const ref = new URL(document.referrer, location.href);
+            if (ref.origin === location.origin) {
+              window.location.href = document.referrer;
+            } else {
+              window.location.href = '../index.html';
+            }
+          } catch (e) {
+            window.location.href = '../index.html';
+          }
+        } else {
+          window.location.href = '../index.html';
+        }
+      } catch(e) {
+        try { window.location.href = '../index.html'; } catch(e) { window.location.href = '/index.html'; }
+      }
     });
 
     // Create or reuse language selector (select with options like index.html)

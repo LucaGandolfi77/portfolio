@@ -162,7 +162,7 @@
 </head>
 <body>
 	<div class="header">
-		<a href="index.html#games" class="back-btn" data-i18n="page.back">← Back to Portfolio</a>
+		<script src="top_buttons.js"></script>
 		<h1 data-i18n="games.backgammon.title">Backgammon</h1>
 		<p data-i18n="games.backgammon.lead">Race your checkers to the finish line.</p>
 	</div>
@@ -240,8 +240,214 @@
 			els.rollBtn.disabled = false;
 		}
 
-		// ... rest of original script (omitted for brevity in patch) ...
-		document.addEventListener('DOMContentLoaded', () => { initGame(); });
+
+		function renderBoard() {
+			els.quadTL.innerHTML = '';
+			els.quadTR.innerHTML = '';
+			els.quadBL.innerHTML = '';
+			els.quadBR.innerHTML = '';
+
+			for (let i = 0; i < 24; i++) {
+				const p = document.createElement('div');
+				p.className = 'point';
+				p.dataset.index = i;
+
+				const slot = board[i];
+				if (slot && slot.count > 0) {
+					for (let k = 0; k < slot.count; k++) {
+						const ch = document.createElement('div');
+						ch.className = 'checker ' + (slot.color === 'w' ? 'white' : 'black');
+						p.appendChild(ch);
+					}
+				}
+
+				// map points into quadrants (visual layout)
+				if (i >= 12 && i <= 17) els.quadTL.appendChild(p);
+				else if (i >= 18 && i <= 23) els.quadTR.appendChild(p);
+				else if (i >= 6 && i <= 11) els.quadBL.appendChild(p);
+				else els.quadBR.appendChild(p);
+			}
+		}
+
+		function updateStatus() {
+			els.turn.textContent = turn === 'w' ? "White's Turn" : "Black's Turn";
+			// render dice
+			els.dice.innerHTML = '';
+			for (let d of dice) {
+				const dieEl = document.createElement('div');
+				dieEl.className = 'die';
+				dieEl.textContent = d;
+				els.dice.appendChild(dieEl);
+			}
+		}
+
+		function rollDice() {
+			if (isComputerThinking) return;
+			dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+			movesLeft = [...dice];
+			updateStatus();
+			// small disable to avoid spamming
+			els.rollBtn.disabled = true;
+			setTimeout(() => { els.rollBtn.disabled = false; }, 700);
+		}
+
+		function resetGame() {
+			initGame();
+		}
+
+		function populateModeSelect() {
+			els.mode.innerHTML = '';
+			const opts = [ { v: 'pvp', t: 'Player vs Player' }, { v: 'pve', t: 'Player vs AI' } ];
+			for (const o of opts) {
+				const opt = document.createElement('option');
+				opt.value = o.v;
+				opt.textContent = o.t;
+				els.mode.appendChild(opt);
+			}
+			els.mode.value = gameMode;
+		}
+
+		// --- Move handling and simple AI ---
+
+		function showMessage(text, timeout = 1200) {
+			const prev = els.turn.textContent;
+			els.turn.textContent = text;
+			setTimeout(() => { updateStatus(); }, timeout);
+		}
+
+		function handlePointClick(index) {
+			if (turn !== 'w') return; // player is always white in this simple UI
+			// if player has pieces on bar, require entering first
+			if (bar.w > 0) { showMessage('Enter from bar first'); return; }
+
+			const slot = board[index];
+			if (selectedPoint === null) {
+				if (!slot || slot.count === 0 || slot.color !== 'w') return; // must select own checker
+				selectedPoint = index;
+				renderBoard();
+				const el = document.querySelector(`.point[data-index="${index}"]`);
+				if (el) el.classList.add('highlight');
+				return;
+			}
+
+			if (selectedPoint === index) { selectedPoint = null; renderBoard(); return; }
+
+			// attempt move from selectedPoint -> index
+			const dist = getMoveDistance(selectedPoint, index, 'w');
+			if (dist <= 0) { showMessage('Invalid move'); selectedPoint = null; renderBoard(); return; }
+			const dieIdx = findDieIndexForMove(dist);
+			if (dieIdx === -1) { showMessage('No matching die'); selectedPoint = null; renderBoard(); return; }
+
+			applyMove(selectedPoint, index, dieIdx);
+			selectedPoint = null;
+			renderBoard();
+			updateStatus();
+			if (movesLeft.length === 0) switchTurn();
+		}
+
+		function getMoveDistance(from, to, playerColor) {
+			if (playerColor === 'w') return from - to; // white moves to lower indices
+			return to - from; // black moves to higher indices
+		}
+
+		function findDieIndexForMove(dist) {
+			// consider both single die and, if available, combined move (not implemented)
+			for (let i = 0; i < movesLeft.length; i++) {
+				if (movesLeft[i] === dist) return i;
+			}
+			return -1;
+		}
+
+		function isBlocked(destIndex, playerColor) {
+			if (destIndex < 0 || destIndex > 23) return true;
+			const s = board[destIndex];
+			if (!s || s.count === 0) return false;
+			return s.color !== playerColor && s.count > 1;
+		}
+
+		function applyMove(from, to, dieIdx) {
+			if (isBlocked(to, 'w')) { showMessage('Destination blocked'); return; }
+
+			const fromSlot = board[from];
+			const toSlot = board[to] || { count: 0, color: null };
+
+			// handle hit
+			if (toSlot.count === 1 && toSlot.color === 'b') {
+				// send opponent to bar
+				bar.b += 1;
+				board[to] = { count: 0, color: null };
+			}
+
+			// move checker
+			fromSlot.count -= 1;
+			if (fromSlot.count === 0) fromSlot.color = null;
+			if (!board[to]) board[to] = { count: 0, color: null };
+			if (board[to].count === 0) board[to].color = 'w';
+			board[to].count += 1;
+
+			// consume die
+			movesLeft.splice(dieIdx, 1);
+			return true;
+		}
+
+		function switchTurn() {
+			turn = (turn === 'w') ? 'b' : 'w';
+			dice = [];
+			movesLeft = [];
+			selectedPoint = null;
+			renderBoard();
+			updateStatus();
+			if (turn === 'b' && gameMode === 'pve') {
+				setTimeout(() => { aiTakeTurn(); }, 600);
+			}
+		}
+
+		function aiTakeTurn() {
+			// simple AI: roll if no dice, then play greedy/random moves
+			if (dice.length === 0) {
+				dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+				if (dice[0] === dice[1]) movesLeft = [dice[0], dice[0], dice[0], dice[0]];
+				else movesLeft = [...dice];
+				updateStatus();
+			}
+
+			const makeNext = () => {
+				if (movesLeft.length === 0) { switchTurn(); return; }
+				// find all possible moves for AI (black)
+				let moved = false;
+				for (let from = 0; from < 24 && !moved; from++) {
+					const s = board[from];
+					if (!s || s.count === 0 || s.color !== 'b') continue;
+					for (let i = 0; i < movesLeft.length && !moved; i++) {
+						const dist = movesLeft[i];
+						const to = from + dist; // black moves to higher indices
+						if (to < 0 || to > 23) continue;
+						if (isBlocked(to, 'b')) continue;
+						// prefer hits
+						if (board[to] && board[to].count === 1 && board[to].color === 'w') {
+							applyMove(from, to, i);
+							moved = true;
+							break;
+						}
+						// otherwise take first legal
+						applyMove(from, to, i);
+						moved = true;
+					}
+				}
+				if (!moved) { // no moves possible
+					movesLeft = [];
+					switchTurn();
+					return;
+				}
+				renderBoard();
+				updateStatus();
+				setTimeout(makeNext, 400);
+			};
+
+			makeNext();
+		}
+
+		document.addEventListener('DOMContentLoaded', () => { populateModeSelect(); initGame(); });
 	</script>
 </body>
 </html>
