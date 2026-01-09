@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Space Universe — Gioco</title>
+  <style>
+    html,body{height:100%;margin:0;background:#060814;color:#fff;font-family:Inter,Arial,Helvetica,sans-serif}
+    #gameWrap{position:fixed;inset:0;display:flex;flex-direction:column}
+    canvas{flex:1;display:block;background:radial-gradient(ellipse at center,#071026 0%, #000 60%);touch-action:none}
+    .hud{position:absolute;right:16px;bottom:16px;display:flex;flex-direction:column;gap:10px;z-index:30}
+    #fireBtn{background:#ff3b30;color:#fff;border:none;padding:14px 18px;border-radius:10px;font-weight:700;box-shadow:0 6px 18px rgba(255,59,48,0.24);cursor:pointer}
+    #score{position:absolute;left:16px;top:16px;background:rgba(255,255,255,0.03);padding:8px 12px;border-radius:8px;color:#cfefff}
+    .info{position:absolute;left:16px;bottom:16px;color:#9fcfff;font-size:13px}
+    @media (max-width:600px){#fireBtn{padding:16px 20px;border-radius:12px;font-size:16px}}
+    .ammoBtn{width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid rgba(255,255,255,0.06)}
+    .ammoBtn.selected{outline:2px solid rgba(255,255,255,0.06);box-shadow:0 6px 18px rgba(0,0,0,0.35);transform:translateY(-1px)}
+    .ammoBtn .dot{width:18px;height:18px;border-radius:4px}
+  </style>
+</head>
+<body>
+  <div id="gameWrap">
+    <div id="ammoBar" style="position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:40;display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,0.22);backdrop-filter:blur(6px);">
+      <!-- ammo buttons inserted here by DOM init -->
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">Score: 0</div>
+    <div id="creditsDisplay" style="position:absolute;right:16px;top:16px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#ffd76b;font-weight:700">Credits: 1000000</div>
+    <div id="laserAmmoDisplay" style="position:absolute;left:16px;top:56px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#ffd76b;font-weight:700">Laser Ammo: 0</div>
+    <canvas id="minimap" width="140" height="140" style="position:absolute;right:16px;top:16px;border-radius:8px;background:rgba(0,0,0,0.25);z-index:32;border:1px solid rgba(255,255,255,0.04);"></canvas>
+    <div class="info">Tocca un nemico per selezionarlo. Trascina l'astronave per muoverti.</div>
+    <div class="hud">
+      <button id="fireBtn">SPARA</button>
+      <button id="hangarBtn" class="hangarBtn" title="Hangar (H)" style="margin-left:8px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.04);color:#cfefff;border:1px solid rgba(255,255,255,0.03);">H</button>
+    </div>
+    <!-- Joystick (sticker) per muovere in tutte le direzioni -->
+    <div id="joyWrap" style="position:absolute;left:16px;bottom:86px;width:120px;height:120px;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;z-index:31;touch-action:none;">
+      <div id="joyBase" style="width:86px;height:86px;border-radius:50%;background:rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;">
+        <div id="joyKnob" style="width:40px;height:40px;border-radius:50%;background:rgba(0,212,255,0.9);box-shadow:0 6px 16px rgba(0,212,255,0.12);touch-action:none;"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (()=>{
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const mini = document.getElementById('minimap');
+      const minictx = mini.getContext && mini.getContext('2d');
+        // Debug / global error handlers
+        console.log('Space Universe initializing');
+        window.addEventListener('error', (ev)=>{
+          console.error('Global error:', ev.message, ev.filename+':'+ev.lineno, ev.error);
+        });
+        window.addEventListener('unhandledrejection', (ev)=>{
+          console.error('Unhandled rejection:', ev.reason);
+        });
+
+        // Try to load sample PNGs for player and enemy. Use fallback shapes when load fails.
+        const playerImg = new Image();
+        const enemyImg = new Image();
+        let playerImgLoaded = false; let enemyImgLoaded = false;
+        playerImg.onload = ()=>{ playerImgLoaded = true; console.log('player image loaded:', playerImg.src); };
+        playerImg.onerror = ()=>{
+          console.warn('player image failed to load, generating fallback:', playerImg.src);
+          // generate a small dataURL with a simple ship-like shape
+          try{
+            const c = document.createElement('canvas'); c.width = 96; c.height = 96;
+            const cctx = c.getContext('2d');
+            cctx.fillStyle = 'rgba(15,40,60,0.0)'; cctx.fillRect(0,0,c.width,c.height);
+            cctx.translate(c.width/2, c.height/2);
+            cctx.rotate(-Math.PI/2);
+            cctx.fillStyle = '#9fe8ff';
+            cctx.beginPath(); cctx.moveTo(0,-28); cctx.lineTo(18,16); cctx.lineTo(0,6); cctx.lineTo(-18,16); cctx.closePath(); cctx.fill();
+            cctx.strokeStyle = 'rgba(0,80,120,0.8)'; cctx.lineWidth = 3; cctx.stroke();
+            playerImg.src = c.toDataURL('image/png');
+          }catch(err){ console.error('fallback player image generation failed', err); playerImgLoaded = false; }
+        };
+        enemyImg.onload = ()=>{ enemyImgLoaded = true; console.log('enemy image loaded:', enemyImg.src); };
+        enemyImg.onerror = ()=>{
+          console.warn('enemy image failed to load, generating fallback:', enemyImg.src);
+          try{
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const cctx = c.getContext('2d');
+            cctx.fillStyle = 'rgba(0,0,0,0)'; cctx.fillRect(0,0,c.width,c.height);
+            cctx.translate(c.width/2, c.height/2);
+            cctx.fillStyle = '#ff6b6b'; cctx.beginPath(); cctx.arc(0,0,18,0,Math.PI*2); cctx.fill();
+            cctx.fillStyle = '#ffb3b3'; cctx.beginPath(); cctx.arc(0,0,10,0,Math.PI*2); cctx.fill();
+            enemyImg.src = c.toDataURL('image/png');
+          }catch(err){ console.error('fallback enemy image generation failed', err); enemyImgLoaded = false; }
+        };
+        // Prefer PNG assets if present; fall back to SVG then to runtime-generated fallback
+        playerImg._tried = {png:false,svg:false};
+        enemyImg._tried = {png:false,svg:false};
+        function tryLoadPlayerPNG(){ if(!playerImg._tried.png){ playerImg._tried.png = true; playerImg.src = '../assets/img/space_universe/ship_03.png'; }}
+        function tryLoadPlayerSVG(){ if(!playerImg._tried.svg){ playerImg._tried.svg = true; playerImg.src = 'assets/img/space_universe/player.svg'; }}
+        function tryLoadEnemyPNG(){ if(!enemyImg._tried.png){ enemyImg._tried.png = true; enemyImg.src = 'assets/img/space_universe/enemy.png'; }}
+        function tryLoadEnemySVG(){ if(!enemyImg._tried.svg){ enemyImg._tried.svg = true; enemyImg.src = 'assets/img/space_universe/enemy.svg'; }}
+        playerImg.onerror = ()=>{
+          if(!playerImg._tried.svg) { console.warn('player.png not found, trying SVG'); tryLoadPlayerSVG(); return; }
+          console.warn('player image failed to load, generating fallback:', playerImg.src);
+          // generate a small dataURL with a simple ship-like shape
+          try{
+            const c = document.createElement('canvas'); c.width = 96; c.height = 96;
+            const cctx = c.getContext('2d');
+            cctx.fillStyle = 'rgba(15,40,60,0.0)'; cctx.fillRect(0,0,c.width,c.height);
+            cctx.translate(c.width/2, c.height/2);
+            cctx.rotate(-Math.PI/2);
+            cctx.fillStyle = '#9fe8ff';
+            cctx.beginPath(); cctx.moveTo(0,-28); cctx.lineTo(18,16); cctx.lineTo(0,6); cctx.lineTo(-18,16); cctx.closePath(); cctx.fill();
+            cctx.strokeStyle = 'rgba(0,80,120,0.8)'; cctx.lineWidth = 3; cctx.stroke();
+            playerImg.src = c.toDataURL('image/png');
+          }catch(err){ console.error('fallback player image generation failed', err); playerImgLoaded = false; }
+        };
+        enemyImg.onerror = ()=>{
+          if(!enemyImg._tried.svg) { console.warn('enemy.png not found, trying SVG'); tryLoadEnemySVG(); return; }
+          console.warn('enemy image failed to load, generating fallback:', enemyImg.src);
+          try{
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const cctx = c.getContext('2d');
+            cctx.fillStyle = 'rgba(0,0,0,0)'; cctx.fillRect(0,0,c.width,c.height);
+            cctx.translate(c.width/2, c.height/2);
+            cctx.fillStyle = '#ff6b6b'; cctx.beginPath(); cctx.arc(0,0,18,0,Math.PI*2); cctx.fill();
+            cctx.fillStyle = '#ffb3b3'; cctx.beginPath(); cctx.arc(0,0,10,0,Math.PI*2); cctx.fill();
+            enemyImg.src = c.toDataURL('image/png');
+          }catch(err){ console.error('fallback enemy image generation failed', err); enemyImgLoaded = false; }
+        };
+        // try PNG first
+        tryLoadPlayerPNG(); tryLoadEnemyPNG();
+      let W = 0, H = 0;
+      const world = {w: 2000, h: 1400};
+      // declare ship before resize to avoid TDZ errors when resize runs early
+      let ship = {worldX: world.w/2, worldY: world.h*0.8, r:18, angle: -Math.PI/2, drag:false, autoFireTargetId: null, nextAutoFire: 0, lastOrangeFire: 0};
+      function resize(){
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        // keep world at least twice the viewport
+        world.w = Math.max(1000, W*2);
+        world.h = Math.max(800, H*2);
+        // clamp ship to world if exists
+        if(typeof ship !== 'undefined'){
+          ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
+          ship.worldY = Math.max(0, Math.min(world.h, ship.worldY));
+        }
+      }
+      window.addEventListener('resize',resize);
+      resize();
+
+      // ship already declared above to avoid initialization timing issues
+
+      // Enemies (world coords)
+      const enemies = [];
+      let enemyIdCounter = 1;
+      const bullets = [];
+      const damagePopups = [];
+      const laserBeams = [];
+      let selected = -1;
+      let score = 0;
+      const laserRange = 360; // gittata massima del laser in pixel (world coords)
+
+      // ammo types: multiplier and display color; orange has a cooldown (ms)
+      const AMMO = {
+        red:    {mult:1, color:'#ff6b6b', label:'R'},
+        blue:   {mult:2, color:'#6bb3ff', label:'B'},
+        green:  {mult:3, color:'#6bff8a', label:'G'},
+        white:  {mult:4, color:'#ffffff', label:'W'},
+        orange: {mult:6, color:'#ff9b4d', label:'O', cooldown:2000}
+      };
+      let currentAmmo = 'red';
+
+      function hexToRgba(hex,a){ if(!hex) return 'rgba(255,100,100,'+a+')'; if(hex[0]==='#') hex=hex.slice(1); const r=parseInt(hex.substr(0,2),16); const g=parseInt(hex.substr(2,2),16); const b=parseInt(hex.substr(4,2),16); return `rgba(${r},${g},${b},${a})`; }
+
+      // build ammo bar UI
+      function buildAmmoBar(){
+        const wrap = document.getElementById('ammoBar'); if(!wrap) return;
+        wrap.innerHTML = '';
+        Object.keys(AMMO).forEach(k=>{
+          const info = AMMO[k];
+          const btn = document.createElement('div'); btn.className = 'ammoBtn'; btn.title = `${info.label} — x${info.mult}`;
+          const dot = document.createElement('div'); dot.className = 'dot'; dot.style.background = info.color; btn.appendChild(dot);
+          btn.addEventListener('click', ()=>{ currentAmmo = k; // update selected
+            document.querySelectorAll('#ammoBar .ammoBtn').forEach(n=>n.classList.remove('selected')); btn.classList.add('selected');
+          });
+          if(k===currentAmmo) btn.classList.add('selected');
+          wrap.appendChild(btn);
+        });
+      }
+
+      function spawnEnemy(){
+        const r = 18 + Math.random()*22;
+        // optionally spawn near the ship or anywhere in the world
+        let x, y;
+        if(spawnEnemy.nearShipCount && spawnEnemy.nearShipCount-- > 0){
+          x = Math.max(r, Math.min(world.w - r, ship.worldX + (Math.random()-0.5)*400));
+          y = Math.max(r, Math.min(world.h - r, ship.worldY + (Math.random()-0.5)*300));
+        } else {
+          x = r + Math.random()*(world.w - 2*r);
+          y = 40 + Math.random()*(world.h*0.45);
+        }
+        // enemies now have fixed HP values (20 or 40)
+        const hp = (Math.random() < 0.5) ? 20 : 40;
+        enemies.push({id: enemyIdCounter++, x,y,r,hp,maxHp:hp,hit:false,spawn:Date.now()});
+      }
+
+      // spawn initial (start a few near the ship so they are visible)
+      spawnEnemy.nearShipCount = 3;
+      for(let i=0;i<6;i++) spawnEnemy();
+      setInterval(()=>{ if(enemies.length<10) spawnEnemy()},1800);
+
+      // Input: pointer interactions (select enemies, drag ship)
+      let dragStart = null;
+      canvas.addEventListener('pointerdown', e=>{
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left; const sy = e.clientY - rect.top;
+        // convert to world coords
+        const wx = ship.worldX + (sx - W/2);
+        const wy = ship.worldY + (sy - H/2);
+        // clear selection by default, will be set if an enemy is hit
+        selected = -1;
+        // check if touching an enemy -> select (closest on top)
+        for(let i=enemies.length-1;i>=0;i--){
+          const en = enemies[i];
+          const d = Math.hypot(en.x - wx, en.y - wy);
+          if(d < en.r + 6){ selected = i; return; }
+        }
+
+        // check if touching ship area (center) -> start drag
+        const centerDist = Math.hypot(sx - W/2, sy - H/2);
+        if(centerDist < ship.r + 10){
+          ship.drag = true;
+          dragStart = {sx: e.clientX, sy: e.clientY, worldX: ship.worldX, worldY: ship.worldY};
+          return;
+        }
+      });
+      canvas.addEventListener('pointermove', e=>{
+        if(!ship.drag || !dragStart) return;
+        const dx = e.clientX - dragStart.sx;
+        const dy = e.clientY - dragStart.sy;
+        // moving finger right should move ship to the right => increase worldX
+        ship.worldX = dragStart.worldX + dx;
+        ship.worldY = dragStart.worldY + dy;
+        // clamp
+        ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
+        ship.worldY = Math.max(0, Math.min(world.h, ship.worldY));
+      });
+      canvas.addEventListener('pointerup',()=>{ ship.drag=false; dragStart=null; });
+      canvas.addEventListener('pointercancel',()=>{ ship.drag=false; dragStart=null; });
+
+      // Fire button now toggles auto-fire (no manual shot)
+      document.getElementById('fireBtn').addEventListener('click',()=>{
+        if(ship.autoFireTargetId) stopAutoFire(); else startAutoFireOnSelected();
+      });
+
+      // Hangar modal and pause handling
+      let paused = false;
+      const hangarModal = document.createElement('div');
+      hangarModal.id = 'hangarModal';
+      hangarModal.style.position = 'fixed'; hangarModal.style.inset = '0'; hangarModal.style.display = 'none'; hangarModal.style.alignItems = 'center'; hangarModal.style.justifyContent = 'center'; hangarModal.style.zIndex = 210;
+      hangarModal.innerHTML = `
+        <div style="width:420px;max-width:95%;background:rgba(6,8,12,0.96);border-radius:12px;padding:16px;color:#cfefff;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>Hangar</strong>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="color:#9fcfff;font-size:13px">Storage</span>
+              <button id="closeHangar" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.04);color:#cfefff;padding:6px 8px;border-radius:6px;">Chiudi</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;padding:6px 0;margin-top:6px;">
+            ${Array.from({length:5}).map((_,i)=>`<div class="hangarSlot" data-slot-index="${i}" style="width:64px;height:64px;border:2px dashed rgba(255,255,255,0.06);border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;"></div>`).join('')}
+          </div>
+          <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.03);padding-top:12px;">
+            <div style="margin-bottom:8px;color:#9fcfff;font-size:13px;text-align:center">Magazzino (trascina un'icona in uno slot)</div>
+            <div id="hangarStorage" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:64px;padding:8px;"></div>
+          </div>
+          <div style="text-align:center;margin-top:12px;color:#9fcfff;font-size:13px;">Slot totali: 5</div>
+        </div>`;
+      document.body.appendChild(hangarModal);
+
+      function openHangar(){ paused = true; stopAutoFire(); hangarModal.style.display = 'flex'; renderStorage(); }
+      function closeHangar(){ paused = false; hangarModal.style.display = 'none'; }
+      document.getElementById('hangarBtn').addEventListener('click', ()=>{ if(paused) closeHangar(); else openHangar(); });
+      document.getElementById('closeHangar').addEventListener('click', ()=>{ closeHangar(); });
+      // keyboard H to open/close hangar
+      window.addEventListener('keydown', e=>{ if(e.key==='h' || e.key==='H'){ if(paused) closeHangar(); else openHangar(); } });
+
+      // Storage and drag-drop logic
+      const storage = [];
+      function renderStorage(){
+        const cont = document.getElementById('hangarStorage'); if(!cont) return; cont.innerHTML = '';
+        storage.forEach((type,idx)=>{
+          let info = AMMO[type] || {color:'#888',label:'?'};
+          if(type === 'laser') info = {color:'#ffd76b', label:'LS'};
+          const it = document.createElement('div'); it.className = 'storageItem'; it.draggable = true;
+          it.style.width = '48px'; it.style.height = '48px'; it.style.borderRadius = '8px'; it.style.display='flex'; it.style.alignItems='center'; it.style.justifyContent='center'; it.style.background = info.color; it.style.cursor='grab'; it.style.fontWeight='700'; it.style.color='#000'; it.textContent = info.label;
+          it.dataset.type = type; 
+          it.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.setData('from','storage'); ev.dataTransfer.effectAllowed='move'; });
+          cont.appendChild(it);
+        });
+        // allow dropping into storage (to remove from slot)
+        cont.addEventListener('dragover', e=>{ e.preventDefault(); });
+        cont.addEventListener('drop', e=>{
+          e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const from = e.dataTransfer.getData('from');
+          if(from === 'slot'){
+            const slotIndex = e.dataTransfer.getData('slotIndex');
+            const slot = document.querySelector(`.hangarSlot[data-slot-index="${slotIndex}"]`);
+            if(slot && slot.dataset.item){ storage.push(slot.dataset.item); slot.dataset.item = ''; slot.innerHTML = '';
+              renderStorage();
+            }
+          } else if(from === 'shop'){
+            // from shop buy, simply add
+            if(type) storage.push(type); renderStorage();
+          }
+        });
+
+        // slots drop handlers
+        document.querySelectorAll('.hangarSlot').forEach((slot)=>{
+          slot.ondragover = (e)=>{ e.preventDefault(); };
+          slot.ondrop = (e)=>{
+            e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const from = e.dataTransfer.getData('from');
+            if(!type) return;
+            // if from storage, remove one item and place
+            if(from === 'storage'){
+              const idx = storage.indexOf(type); if(idx>=0) storage.splice(idx,1);
+            }
+            // if from slot, ignore (handled by storage drop)
+            slot.dataset.item = type;
+            let info = AMMO[type] || {color:'#888',label:'?'};
+            if(type === 'laser') info = {color:'#ffd76b', label:'LS'};
+            slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;background:${info.color}">${info.label}</div>`;
+            // make slot item draggable back to storage
+            const si = slot.querySelector('.slotItem');
+            if(si){ si.addEventListener('dragstart', ev=>{ ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.setData('from','slot'); ev.dataTransfer.setData('slotIndex', slot.dataset.slotIndex); ev.dataTransfer.effectAllowed='move'; }); }
+            renderStorage();
+          };
+        });
+      }
+
+      // credits and laser ammo counters
+      let credits = 1000000;
+      function updateCreditsDisplay(){ const el = document.getElementById('creditsDisplay'); if(el) el.textContent = 'Credits: '+credits.toLocaleString(); }
+      let laserAmmo = 0;
+      function updateLaserAmmoDisplay(){ const el = document.getElementById('laserAmmoDisplay'); if(el) el.textContent = 'Laser Ammo: '+laserAmmo; }
+
+      // simple shop modal
+      const shopModal = document.createElement('div');
+      shopModal.id = 'shopModal'; shopModal.style.position='fixed'; shopModal.style.inset='0'; shopModal.style.display='none'; shopModal.style.alignItems='center'; shopModal.style.justifyContent='center'; shopModal.style.zIndex=220;
+      shopModal.innerHTML = `
+        <div style="width:420px;max-width:95%;background:rgba(6,8,12,0.96);border-radius:12px;padding:16px;color:#cfefff;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>Shop</strong>
+            <button id="closeShop" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.04);color:#cfefff;padding:6px 8px;border-radius:6px;">Chiudi</button>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;padding:6px 0;margin-top:6px;flex-wrap:wrap;">
+            ${Object.keys(AMMO).map(k=>{ const info = AMMO[k]; return `<div style="width:88px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;"><div style="width:44px;height:44px;margin:0 auto;border-radius:8px;background:${info.color};display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">${info.label}</div><div style="margin-top:8px"><button class="buyBtn" data-type="${k}" style="padding:6px 8px;border-radius:6px;background:#0b84ff;color:#fff;border:none">Buy</button></div></div>` }).join('')}
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">LS</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="laser" style="padding:6px 8px;border-radius:6px;background:#28c76f;color:#fff;border:none">Buy Laser</button></div>
+            </div>
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#cfcfcf;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">AMMO</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="laserAmmo" style="padding:6px 8px;border-radius:6px;background:#0b84ff;color:#fff;border:none">Buy +5 Ammo</button></div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(shopModal);
+      document.getElementById('closeShop')?.addEventListener('click', ()=>{ shopModal.style.display='none'; paused=false; });
+      document.body.addEventListener('click', (ev)=>{
+        if(ev.target && ev.target.classList && ev.target.classList.contains('buyBtn')){
+          const t = ev.target.dataset.type; if(!t) return;
+          // Prices: laser=50000, ammo types cost = multiplier (1,2,3,4,6), buy+5 = 5 credits
+          if(t === 'laser'){
+            const price = 50000;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); storage.push('laser'); renderStorage(); }
+            else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          } else if(t === 'laserAmmo'){
+            const price = 5; // flat for +5 pack
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); laserAmmo += 5; updateLaserAmmoDisplay(); }
+            else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          } else if(AMMO[t]){
+            const price = AMMO[t].mult || 1;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); // buy one unit of colored ammo -> convert to laserAmmo units
+              laserAmmo += 1; updateLaserAmmoDisplay();
+            } else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          } else {
+            // fallback
+            storage.push(t); renderStorage();
+          }
+        }
+      });
+      // open shop button
+      const shopBtn = document.createElement('button'); shopBtn.id='shopBtn'; shopBtn.innerText='S'; shopBtn.title='Shop (S)'; shopBtn.style.marginLeft='8px'; shopBtn.style.padding='10px 12px'; shopBtn.style.borderRadius='8px'; shopBtn.style.background='rgba(255,255,255,0.04)'; shopBtn.style.color='#cfefff'; shopBtn.style.border='1px solid rgba(255,255,255,0.03)';
+      document.querySelector('.hud').appendChild(shopBtn);
+      shopBtn.addEventListener('click', ()=>{ paused=true; shopModal.style.display='flex'; });
+      window.addEventListener('keydown', e=>{ if(e.key==='p' || e.key==='P'){ if(shopModal.style.display==='flex'){ shopModal.style.display='none'; paused=false; } else { paused=true; shopModal.style.display='flex'; } } });
+
+      function update(){
+        // bullets
+        for(let i=bullets.length-1;i>=0;i--){
+          const b = bullets[i]; b.x += b.vx; b.y += b.vy; b.ttl--;
+          if(b.ttl<=0 || b.x<0 || b.x>world.w || b.y<0 || b.y>world.h){ bullets.splice(i,1); continue; }
+          // if this bullet was fired at a specific target, only that enemy can be hit
+          if(b.targetId != null){
+            const ti = enemies.findIndex(e=>e.id === b.targetId);
+            if(ti === -1){ bullets.splice(i,1); continue; }
+            const te = enemies[ti];
+              if(Math.hypot(b.x - te.x, b.y - te.y) < te.r + 4){
+                const dmg = (b.damage != null) ? b.damage : 1;
+                te.hp = (te.hp || te.maxHp) - dmg; te.hit = Date.now(); te.flashUntil = Date.now() + 160;
+                // damage popup
+                damagePopups.push({x: te.x, y: te.y - te.r - 6, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
+                bullets.splice(i,1);
+                if(te.hp <= 0){ if(ship.autoFireTargetId === te.id) ship.autoFireTargetId = null; enemies.splice(ti,1); if(selected===ti) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; }
+              }
+          } else {
+            // untargeted bullets can hit any enemy as before
+            for(let j=enemies.length-1;j>=0;j--){
+              const e = enemies[j];
+              if(Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4){
+                const dmg = (b.damage != null) ? b.damage : 1;
+                e.hp = (e.hp || e.maxHp) - dmg; e.hit = Date.now(); e.flashUntil = Date.now() + 160;
+                damagePopups.push({x: e.x, y: e.y - e.r - 6, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
+                bullets.splice(i,1);
+                if(e.hp <= 0){ if(ship.autoFireTargetId === e.id) ship.autoFireTargetId = null; enemies.splice(j,1); if(selected===j) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; }
+                break;
+              }
+            }
+          }
+        }
+
+        // update damage popups
+        for(let i=damagePopups.length-1;i>=0;i--){
+          const p = damagePopups[i]; p.y += p.vy; p.ttl--; p.alpha = Math.max(0, p.ttl/48);
+          if(p.ttl<=0) damagePopups.splice(i,1);
+        }
+
+        // update laser beams (advance progress for targeted beams, ttl countdown)
+        for(let i=laserBeams.length-1;i>=0;i--){
+          const L = laserBeams[i];
+          if(L.targetId != null){
+            L.progress = Math.min(1, (L.progress || 0) + (L.speed || 0.04));
+            // keep beam visible a bit after reaching target
+            if(L.progress >= 1) L.ttl--;
+          } else {
+            L.ttl--;
+          }
+          if(L.ttl<=0) laserBeams.splice(i,1);
+        }
+
+        // auto-fire: continue attacking selected target while in range (cadence depends on ammo)
+        if(ship.autoFireTargetId != null){
+          const ti = enemies.findIndex(e=>e.id === ship.autoFireTargetId);
+          if(ti === -1){ ship.autoFireTargetId = null; }
+          else {
+            const te = enemies[ti];
+            const dx = te.x - ship.worldX; const dy = te.y - ship.worldY; const dist = Math.hypot(dx,dy);
+            const ammoInfo = AMMO[currentAmmo] || AMMO.red;
+            const now = Date.now();
+            if(dist > laserRange){ ship.autoFireTargetId = null; }
+            else if(now >= (ship.nextAutoFire || 0)){
+              // orange has special cooldown
+              if(currentAmmo === 'orange' && now < (ship.lastOrangeFire || 0) + (ammoInfo.cooldown||2000)){
+                ship.nextAutoFire = (ship.lastOrangeFire || 0) + (ammoInfo.cooldown||2000);
+              } else {
+                const angle = Math.atan2(dy, dx);
+                // count equipped lasers in hangar slots
+                let lasersEquipped = 0;
+                document.querySelectorAll('.hangarSlot').forEach(s=>{ if(s && s.dataset && s.dataset.item === 'laser') lasersEquipped++; });
+                if(lasersEquipped > 0){
+                  // number of lasers that can fire this round (limited by ammo)
+                  const shots = Math.min(lasersEquipped, laserAmmo || 0);
+                  if(shots <= 0){
+                    // no laser ammo
+                    damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'No Laser Ammo', ttl: 48, vy: -0.6, alpha:1});
+                  } else {
+                    // total damage = number of lasers fired * current ammo multiplier
+                    const totalDamage = shots * (ammoInfo.mult || 1);
+                    bullets.push({x: ship.worldX, y: ship.worldY, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, ttl: 200, targetId: te.id, damage: totalDamage, ammo: currentAmmo});
+                    laserBeams.push({targetId: te.id, ttl: 36, progress:0, speed:0.04, color: ammoInfo.color});
+                    laserAmmo = Math.max(0, laserAmmo - shots); updateLaserAmmoDisplay();
+                    if(currentAmmo === 'orange') ship.lastOrangeFire = now;
+                    const inc = (currentAmmo==='orange') ? (ammoInfo.cooldown||2000) : 500;
+                    ship.nextAutoFire = (ship.nextAutoFire && ship.nextAutoFire > now) ? ship.nextAutoFire + inc : now + inc;
+                  }
+                } else {
+                  // default single-shot behavior when no lasers equipped
+                  const dmg = ammoInfo.mult || 1;
+                  bullets.push({x: ship.worldX, y: ship.worldY, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, ttl: 200, targetId: te.id, damage: dmg, ammo: currentAmmo});
+                  laserBeams.push({targetId: te.id, ttl: 36, progress:0, speed:0.04, color: ammoInfo.color});
+                  if(currentAmmo === 'orange') ship.lastOrangeFire = now;
+                  const inc = (currentAmmo==='orange') ? (ammoInfo.cooldown||2000) : 500;
+                  ship.nextAutoFire = (ship.nextAutoFire && ship.nextAutoFire > now) ? ship.nextAutoFire + inc : now + inc;
+                }
+              }
+            }
+          }
+        }
+
+        // simple enemy drift
+        enemies.forEach((e,idx)=>{
+          e.x += Math.sin((Date.now()+idx*100)/1200)*0.3;
+          e.y += Math.cos((Date.now()+idx*100)/1500)*0.2;
+          // keep enemies inside world
+          e.x = Math.max(0, Math.min(world.w, e.x));
+          e.y = Math.max(0, Math.min(world.h, e.y));
+        });
+
+        // joystick movement influences ship world position
+        if(joy && joy.active && !ship.drag){
+          const speed = 4; // movement speed multiplier
+          ship.worldX += joy.dx * speed;
+          ship.worldY += joy.dy * speed;
+        } else if(!ship.drag){
+          // keyboard (WASD + arrows)
+          const kx = (keys.d||keys.ArrowRight?1:0) - (keys.a||keys.ArrowLeft?1:0);
+          const ky = (keys.s||keys.ArrowDown?1:0) - (keys.w||keys.ArrowUp?1:0);
+          if(kx !== 0 || ky !== 0){
+            const mag = Math.hypot(kx,ky) || 1;
+            const speed = 4;
+            ship.worldX += (kx/mag) * speed;
+            ship.worldY += (ky/mag) * speed;
+          }
+        }
+        // keep ship inside world bounds
+        ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
+        ship.worldY = Math.max(0, Math.min(world.h, ship.worldY));
+      }
+
+      function draw(){
+        ctx.clearRect(0,0,W,H);
+
+        // stars (simple background pattern tied to world)
+        ctx.fillStyle='rgba(255,255,255,0.04)';
+        for(let i=0;i<120;i++){
+          const sx = ((i*37) % world.w) - ship.worldX + W/2;
+          const sy = ((i*73) % world.h) - ship.worldY + H/2;
+          if(sx>=0 && sx<=W && sy>=0 && sy<=H) ctx.fillRect(Math.round(sx), Math.round(sy), 1, 1);
+        }
+
+        // enemies (draw relative to ship center)
+        enemies.forEach((e,i)=>{
+          const sx = e.x - ship.worldX + W/2;
+          const sy = e.y - ship.worldY + H/2;
+          // only draw if visible
+          if(sx < -50 || sx > W+50 || sy < -50 || sy > H+50) return;
+          if(enemyImgLoaded){
+            try{
+              const size = e.r*2.2;
+              ctx.drawImage(enemyImg, sx - size/2, sy - size/2, size, size);
+            }catch(err){ console.error('drawImage enemy failed', err); enemyImgLoaded = false; }
+          }
+          if(!enemyImgLoaded){
+            ctx.beginPath(); ctx.arc(sx,sy,e.r,0,Math.PI*2); ctx.fillStyle='rgba(255,80,80,0.28)'; ctx.fill();
+            ctx.beginPath(); ctx.arc(sx,sy,e.r-6,0,Math.PI*2); ctx.fillStyle='rgba(255,80,80,0.5)'; ctx.fill();
+          }
+          // hit flash overlay
+          if(e.flashUntil && e.flashUntil > Date.now()){
+            const alpha = (e.flashUntil - Date.now()) / 160;
+            ctx.save(); ctx.globalAlpha = Math.min(0.9, alpha); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(sx,sy,e.r+2,0,Math.PI*2); ctx.fill(); ctx.restore();
+          }
+          // health bar above enemy
+          if(e.hp != null){
+            const barW = e.r*2; const barH = 6;
+            const bx = sx - barW/2; const by = sy - e.r - 12;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx-1, by-1, barW+2, barH+2);
+            const ratio = Math.max(0, (e.hp / e.maxHp));
+            ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, barW * ratio, barH);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, barW, barH);
+          }
+          if(i===selected){
+            const now = Date.now();
+            if(enemies[i].outOfRangeUntil && enemies[i].outOfRangeUntil > now){ ctx.strokeStyle='rgba(255,80,80,0.95)'; }
+            else ctx.strokeStyle='rgba(0,212,255,0.9)';
+            ctx.lineWidth=3; ctx.beginPath(); ctx.arc(sx,sy,e.r+6,0,Math.PI*2); ctx.stroke();
+          }
+        });
+
+        // ship (always centered on screen)
+        const shipScreenX = W/2; const shipScreenY = H/2;
+        // draw laser range circle (faint)
+        ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, laserRange, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(0,200,255,0.08)'; ctx.lineWidth = 2; ctx.stroke();
+        // draw player image if available
+        if(playerImgLoaded){
+          try{
+            const size = ship.r*3.2;
+            ctx.drawImage(playerImg, shipScreenX - size/2, shipScreenY - size/2, size, size);
+          }catch(err){ console.error('drawImage player failed', err); playerImgLoaded = false; }
+        }
+        if(!playerImgLoaded){
+          ctx.save(); ctx.translate(shipScreenX, shipScreenY);
+          ctx.rotate(ship.angle);
+          ctx.fillStyle='#9fe8ff';
+          ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(14,12); ctx.lineTo(0,6); ctx.lineTo(-14,12); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle='rgba(0,80,120,0.8)'; ctx.lineWidth=2; ctx.stroke();
+          ctx.restore();
+        }
+
+        // bullets (world coords -> screen)
+        bullets.forEach(b=>{
+          const sx = b.x - ship.worldX + W/2;
+          const sy = b.y - ship.worldY + H/2;
+          if(sx < -20 || sx > W+20 || sy < -20 || sy > H+20) return;
+          const color = (b.ammo && AMMO[b.ammo] && AMMO[b.ammo].color) ? AMMO[b.ammo].color : '#ff6b6b';
+          ctx.beginPath(); ctx.fillStyle = color; ctx.arc(sx,sy,5,0,Math.PI*2); ctx.fill();
+        });
+
+        // draw laser beams (visuals) - color depends on ammo
+        laserBeams.forEach(L=>{
+          const sx = W/2, sy = H/2;
+          if(L.targetId != null){
+            const ti = enemies.findIndex(e=>e.id===L.targetId);
+            if(ti === -1) return;
+            const e = enemies[ti];
+            const ex = e.x - ship.worldX + W/2; const ey = e.y - ship.worldY + H/2;
+            // progress indicates how far the visible beam has reached (0..1)
+            const p = L.progress != null ? L.progress : 1;
+            const ix = sx + (ex - sx) * p;
+            const iy = sy + (ey - sy) * p;
+            // glow (wide, soft)
+            const base = L.color || '#ff6b6b';
+            ctx.save(); ctx.lineCap = 'round'; ctx.shadowBlur = 20; ctx.shadowColor = hexToRgba(base,0.35);
+            const grad = ctx.createLinearGradient(sx,sy,ix,iy);
+            grad.addColorStop(0, hexToRgba(base,0.0));
+            grad.addColorStop(0.6, hexToRgba(base,0.25));
+            grad.addColorStop(1, hexToRgba(base,0.7));
+            ctx.strokeStyle = grad; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ix,iy); ctx.stroke();
+            // core (thinner)
+            const grad2 = ctx.createLinearGradient(sx,sy,ix,iy);
+            grad2.addColorStop(0, hexToRgba(base,0.0));
+            grad2.addColorStop(1, hexToRgba(base,0.95));
+            ctx.strokeStyle = grad2; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ix,iy); ctx.stroke();
+            ctx.restore();
+          } else {
+            // untargeted short red flash forward
+            const ex = sx + (L.vx||0)*12; const ey = sy + (L.vy||0)*12;
+            const base = L.color || '#ff6b6b';
+            ctx.save(); ctx.lineCap='round'; ctx.shadowBlur = 8; ctx.shadowColor = hexToRgba(base,0.35); ctx.strokeStyle = hexToRgba(base,0.95); ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke(); ctx.restore();
+          }
+        });
+
+        // draw damage popups
+        damagePopups.forEach(p=>{
+          const sx = p.x - ship.worldX + W/2; const sy = p.y - ship.worldY + H/2;
+          ctx.save(); ctx.globalAlpha = p.alpha; ctx.font = '700 16px Inter, Arial, sans-serif'; ctx.fillStyle = 'rgba(255,80,80,1)'; ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=3;
+          ctx.strokeText(p.text, sx, sy);
+          ctx.fillText(p.text, sx, sy);
+          ctx.restore();
+        });
+
+        // Draw joystick visual feedback (move knob)
+        if(joy){
+          const knob = document.getElementById('joyKnob');
+          if(knob){ knob.style.transform = `translate(${joy.dx*joy.max}px, ${joy.dy*joy.max}px)`; }
+        }
+
+        // draw minimap
+        if(minictx){
+          const mw = mini.width; const mh = mini.height;
+          minictx.clearRect(0,0,mw,mh);
+          minictx.fillStyle = 'rgba(2,8,18,0.9)'; minictx.fillRect(0,0,mw,mh);
+          const pad = 6; const mapW = mw - pad*2; const mapH = mh - pad*2;
+          const scaleX = mapW / world.w; const scaleY = mapH / world.h;
+          // enemies
+          enemies.forEach(e=>{
+            const mx = pad + e.x * scaleX; const my = pad + e.y * scaleY;
+            minictx.fillStyle = '#ff6b6b'; minictx.beginPath(); minictx.arc(mx,my,3,0,Math.PI*2); minictx.fill();
+          });
+          // ship
+          const sxm = pad + ship.worldX * scaleX; const sym = pad + ship.worldY * scaleY;
+          minictx.fillStyle = '#9fe8ff'; minictx.beginPath(); minictx.arc(sxm,sym,4,0,Math.PI*2); minictx.fill();
+          // viewport rect
+          minictx.strokeStyle = 'rgba(159,232,255,0.6)'; minictx.lineWidth = 1;
+          minictx.strokeRect(pad + (ship.worldX - W/2)*scaleX, pad + (ship.worldY - H/2)*scaleY, W*scaleX, H*scaleY);
+        }
+      }
+
+      function loop(){
+        try{
+          if(!paused) update();
+          draw();
+        }catch(err){
+          console.error('Error in game loop:', err);
+        }
+        requestAnimationFrame(loop);
+      }
+      // joystick state
+      const joy = {active:false,dx:0,dy:0,max:28};
+
+      // joystick event handling
+      (function setupJoy(){
+        const wrap = document.getElementById('joyWrap');
+        const knob = document.getElementById('joyKnob');
+        if(!wrap||!knob) return;
+
+        let rect = wrap.getBoundingClientRect();
+        function refreshRect(){ rect = wrap.getBoundingClientRect(); }
+        window.addEventListener('resize', refreshRect);
+
+        function pointerDown(e){
+          e.preventDefault();
+          joy.active = true;
+          wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId);
+        }
+        function pointerMove(e){
+          if(!joy.active) return;
+          const cx = rect.left + rect.width/2;
+          const cy = rect.top + rect.height/2;
+          const x = e.clientX - cx;
+          const y = e.clientY - cy;
+          const max = joy.max;
+          const dist = Math.hypot(x,y);
+          const nx = dist>max ? x/dist*max : x;
+          const ny = dist>max ? y/dist*max : y;
+          // normalize [-1,1]
+          joy.dx = nx / max;
+          joy.dy = ny / max;
+        }
+        function pointerUp(e){
+          joy.active = false; joy.dx = 0; joy.dy = 0;
+        }
+
+        wrap.addEventListener('pointerdown', pointerDown);
+        window.addEventListener('pointermove', pointerMove);
+        window.addEventListener('pointerup', pointerUp);
+        window.addEventListener('pointercancel', pointerUp);
+      })();
+
+      // create ammo bar now
+      try{ buildAmmoBar(); }catch(e){ console.error('ammo bar build failed', e); }
+      try{ updateLaserAmmoDisplay(); updateCreditsDisplay(); }catch(e){}
+
+      // input keys map for WASD + arrows; press `L` to toggle auto-fire on selected/nearest target
+      const keys = {w:false,a:false,s:false,d:false,ArrowLeft:false,ArrowRight:false,ArrowUp:false,ArrowDown:false};
+      function startAutoFireOnSelected(){
+        if(selected<0){ let nearest=-1, nd=Infinity; for(let i=0;i<enemies.length;i++){ const e=enemies[i]; const d=Math.hypot(e.x-ship.worldX,e.y-ship.worldY); if(d<nd){ nd=d; nearest=i;} } if(nearest!==-1) selected=nearest; }
+        if(selected>=0 && enemies[selected]){
+          ship.autoFireTargetId = enemies[selected].id;
+          const now = Date.now();
+          const ammoInfo = AMMO[currentAmmo] || AMMO.red;
+          if(currentAmmo === 'orange' && now < (ship.lastOrangeFire || 0) + (ammoInfo.cooldown||2000)){
+            ship.nextAutoFire = (ship.lastOrangeFire || 0) + (ammoInfo.cooldown||2000);
+          } else {
+            ship.nextAutoFire = now;
+          }
+        }
+      }
+      function stopAutoFire(){ ship.autoFireTargetId = null; }
+      window.addEventListener('keydown', e=>{
+        const k = e.key;
+        if(k==='w' || k==='W') keys.w = true;
+        if(k==='a' || k==='A') keys.a = true;
+        if(k==='s' || k==='S') keys.s = true;
+        if(k==='d' || k==='D') keys.d = true;
+        if(k==='ArrowLeft' || k==='ArrowRight' || k==='ArrowUp' || k==='ArrowDown') keys[k] = true;
+        // toggle auto-fire on L key press
+        if(k==='l' || k==='L'){
+          if(ship.autoFireTargetId) stopAutoFire(); else startAutoFireOnSelected();
+        }
+      });
+      window.addEventListener('keyup', e=>{
+        const k = e.key;
+        if(k==='w' || k==='W') keys.w = false;
+        if(k==='a' || k==='A') keys.a = false;
+        if(k==='s' || k==='S') keys.s = false;
+        if(k==='d' || k==='D') keys.d = false;
+        if(k==='ArrowLeft' || k==='ArrowRight' || k==='ArrowUp' || k==='ArrowDown') keys[k] = false;
+      });
+
+      // start loop
+      loop();
+      
+
+    })();
+  </script>
+</body>
+</html>

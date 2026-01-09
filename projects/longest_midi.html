@@ -249,7 +249,9 @@
         // collect notes from all tracks
         midiObj.tracks.forEach(track=>{
           track.notes.forEach(n=>{
-            notes.push({time: n.time, note: n.name, duration: n.duration, velocity: n.velocity});
+            // try to preserve channel information if available; default to 0
+            const ch = (typeof n.channel !== 'undefined') ? n.channel : (typeof track.channel !== 'undefined' ? track.channel : 0);
+            notes.push({time: n.time, note: n.name, duration: n.duration, velocity: n.velocity, channel: ch});
           });
         });
       } else {
@@ -274,14 +276,14 @@
         parsedFallback.events.forEach(ev => {
           if (ev.type === 'noteOn') {
             const key = ev.channel + ':' + ev.note;
-            active[key] = {start: ev._seconds, velocity: (ev.velocity||0)/127};
+            active[key] = {start: ev._seconds, velocity: (ev.velocity||0)/127, channel: ev.channel};
           } else if (ev.type === 'noteOff') {
             const key = ev.channel + ':' + ev.note;
             const a = active[key];
             if (a) {
               const start = a.start;
               const duration = Math.max(0.001, ev._seconds - start);
-              notes.push({time: start, note: midiNoteToName(ev.note), duration, velocity: a.velocity});
+              notes.push({time: start, note: midiNoteToName(ev.note), duration, velocity: a.velocity, channel: a.channel});
               delete active[key];
             }
           }
@@ -291,7 +293,7 @@
         const lastSec = parsedFallback.events.length? parsedFallback.events[parsedFallback.events.length-1]._seconds : 0;
         for (const k in active) {
           const a = active[k];
-          notes.push({time: a.start, note: midiNoteToName(parseInt(k.split(':')[1],10)), duration: Math.max(0.001, lastSec - a.start), velocity: a.velocity});
+          notes.push({time: a.start, note: midiNoteToName(parseInt(k.split(':')[1],10)), duration: Math.max(0.001, lastSec - a.start), velocity: a.velocity, channel: a.channel});
         }
         total = lastSec;
       }
@@ -349,16 +351,17 @@
   }
 
   // Format seconds as fixed "000.000"
-  function formatSecondsFixed(sec) {
-    const s = Number.isFinite(sec) ? sec : 0;
-    const intPart = Math.floor(Math.max(0, s));
-    const frac = Math.round((s - intPart) * 1000);
-    const intStr = String(intPart).padStart(3, '0');
-    const fracStr = String(Math.abs(frac)).padStart(3, '0');
-    return `${intStr}.${fracStr}`;
+  // Format seconds as MM:SS (no milliseconds)
+  function formatSecondsMMSS(sec) {
+    const s = Number.isFinite(sec) ? Math.max(0, Math.floor(sec)) : 0;
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    const mmStr = String(mm).padStart(2, '0');
+    const ssStr = String(ss).padStart(2, '0');
+    return `${mmStr}:${ssStr}`;
   }
   function formatPlayTime(current, total) {
-    return `${formatSecondsFixed(current)} / ${formatSecondsFixed(total)} s`;
+    return `${formatSecondsMMSS(current)} / ${formatSecondsMMSS(total)}`;
   }
 
   // Wire file load & example load to also prepare audio
@@ -503,13 +506,13 @@
     let gIndex = 0;
     for (let i=0;i<sorted.length;i++){
       const n = sorted[i];
-      if (groups.length===0) { groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++}]}); }
+      if (groups.length===0) { groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++}]}); }
       else {
         const last = groups[groups.length-1];
         if (Math.abs(n.time - last.time) <= eps) {
-          last.notes.push({note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++});
+          last.notes.push({note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++});
         } else {
-          groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++}]});
+          groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++}]});
         }
       }
     }
@@ -546,6 +549,43 @@
     const staffSpacing = 16; // px — larger spacing between staff lines
     const refYOffsetInLine = 56; // top offset for staff within line (gives room above staff)
     const semitoneToY = staffSpacing/2;
+    // channel color palette
+    const channelColors = ['#1976d2','#e91e63','#388e3c','#f57c00','#6a1b9a','#009688','#455a64','#d32f2f','#ff8f00','#7b1fa2','#00796b','#c62828','#2e7d32','#6d4c41','#0288d1','#ad1457'];
+    function getChannelColor(ch) { if (typeof ch !== 'number') return '#111'; return channelColors[ch % channelColors.length] || '#111'; }
+
+    // map duration (s) -> note type given bpm
+    function durationToNoteType(durationSec, bpm) {
+      if (!Number.isFinite(durationSec) || durationSec <= 0) return '32nd';
+      const beats = durationSec * (bpm/60);
+      // assume 4/4 where whole = 4 beats
+      if (beats >= 3.5) return 'whole';
+      if (beats >= 1.75) return 'half';
+      if (beats >= 0.9) return 'quarter';
+      if (beats >= 0.45) return 'eighth';
+      if (beats >= 0.22) return '16th';
+      return '32nd';
+    }
+
+    function drawFlags(ctx, x, y, up, count) {
+      // draw simple flag shapes; up=true means flags near top of stem pointing right
+      ctx.fillStyle = ctx.fillStyle || '#000';
+      for (let i=0;i<count;i++) {
+        const offset = i * 6;
+        ctx.beginPath();
+        if (up) {
+          // flag starts at (x,y + offset) curves right-down
+          ctx.moveTo(x, y + offset);
+          ctx.quadraticCurveTo(x + 10, y + 6 + offset, x + 4, y + 12 + offset);
+          ctx.lineTo(x + 6, y + 10 + offset);
+        } else {
+          // downward stem flags to left, mirrored
+          ctx.moveTo(x, y - offset);
+          ctx.quadraticCurveTo(x - 10, y - 6 - offset, x - 4, y - 12 - offset);
+          ctx.lineTo(x - 6, y - 10 - offset);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+    }
 
     // render each line
     for (let line=0; line<lines; line++){
@@ -577,18 +617,58 @@
           ctx.beginPath(); ctx.moveTo(x - 18, y); ctx.lineTo(x + 18, y); ctx.stroke();
         }
         // note head (slightly larger for visibility with increased spacing)
-        ctx.beginPath(); const rx=9, ry=6; ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
+        const rx=9, ry=6;
+        const noteType = durationToNoteType(nEntry.duration || 0, bpm);
+        const isHollow = (noteType === 'whole' || noteType === 'half');
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
         const isActive = (typeof activeIndex === 'number') && (nEntry.globalIndex === activeIndex);
-        if (isActive) { ctx.fillStyle = '#e91e63'; ctx.fill(); ctx.strokeStyle = '#c2185b'; ctx.stroke(); }
-        else { ctx.fillStyle = '#000'; ctx.fill(); }
+        if (isHollow) { ctx.strokeStyle = isActive ? '#c2185b' : '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
+        else { ctx.fillStyle = isActive ? '#e91e63' : '#000'; ctx.fill(); }
+        // draw stem and flags for non-whole notes
+        if (noteType !== 'whole') {
+          const middleY = staffTop + 2*staffSpacing;
+          const stemUp = (y > middleY);
+          const stemLen = 48;
+          if (stemUp) {
+            const sx = x + rx;
+            const sy1 = y;
+            const sy2 = y - stemLen;
+            ctx.beginPath(); ctx.moveTo(sx, sy1); ctx.lineTo(sx, sy2); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            // flags (eighth/16th/32nd)
+            if (noteType === 'eighth') drawFlags(ctx, sx, sy2, true, 1);
+            else if (noteType === '16th') drawFlags(ctx, sx, sy2, true, 2);
+            else if (noteType === '32nd') drawFlags(ctx, sx, sy2, true, 3);
+          } else {
+            const sx = x - rx;
+            const sy1 = y;
+            const sy2 = y + stemLen;
+            ctx.beginPath(); ctx.moveTo(sx, sy1); ctx.lineTo(sx, sy2); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            if (noteType === 'eighth') drawFlags(ctx, sx, sy2, false, 1);
+            else if (noteType === '16th') drawFlags(ctx, sx, sy2, false, 2);
+            else if (noteType === '32nd') drawFlags(ctx, sx, sy2, false, 3);
+          }
+        }
         // accidental
         if (nEntry.note && nEntry.note.includes('#')) { ctx.fillStyle='#000'; ctx.font='12px serif'; ctx.fillText('#', x-16, y+4); }
-        // duration text
+        // note description + channel (draw channel in distinct color)
+        const chText = (typeof nEntry.channel !== 'undefined') ? ('ch' + (Number(nEntry.channel) + 1)) : '';
+        ctx.font='12px monospace';
+        const noteLabel = nEntry.note || '';
+        const noteLabelX = x - 18;
+        ctx.fillStyle = '#111';
+        ctx.fillText(noteLabel, noteLabelX, y - 12);
+        if (chText) {
+          const noteW = ctx.measureText(noteLabel).width;
+          const chX = noteLabelX + noteW + 6;
+          ctx.fillStyle = getChannelColor(Number(nEntry.channel));
+          ctx.fillText(chText, chX, y - 12);
+        }
+        // duration text (seconds) under staff
         ctx.fillStyle='#333'; ctx.font='11px monospace'; ctx.fillText((nEntry.duration||0).toFixed(2)+'s', x-14, lineTop + refYOffsetInLine + 5*staffSpacing + 14);
       });
-      // small time label under column
+      // small time label under column (MM:SS)
       ctx.fillStyle='#444'; ctx.font='10px monospace';
-      ctx.fillText(formatSecondsFixed(g.time), x-18, lineTop + refYOffsetInLine + 5*staffSpacing + 28);
+      ctx.fillText(formatSecondsMMSS(g.time), x-18, lineTop + refYOffsetInLine + 5*staffSpacing + 28);
     });
   }
   </script>
