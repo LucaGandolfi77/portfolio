@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Longest MIDI — analizza durata e note</title>
+  <title>Longest MIDI — length analyzer</title>
   <style>
     body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
     textarea{width:100%;height:260px}
     .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.min.js"></script>
 </head>
 <body>
-  <h1>Longest MIDI — durata e log delle note</h1>
+  <h1>Longest MIDI — length analyzer</h1>
   <div class="controls">
     <input id="file" type="file" accept=".mid,.midi" />
     <button id="loadExample">Carica esempio</button>
@@ -19,10 +20,22 @@
     <a id="downloadExample" href="#">Scarica esempio .mid</a>
   </div>
   <div>
-    <strong>Risultato:</strong> <span id="duration">—</span> secondi
+    <strong>Risultato:</strong> <span id="duration">—</span> secondi · <strong>Note:</strong> <span id="noteCount">—</span>
   </div>
   <h3>Log eventi</h3>
   <textarea id="log" readonly></textarea>
+
+  <div id="playerControls" style="margin-top:12px">
+    <button id="playBtn" disabled>Play</button>
+    <button id="stopBtn" disabled>Stop</button>
+    <span id="playTime">0.000 / 0.000 s</span>
+  </div>
+  <div id="volumeControls" style="margin-top:6px">
+    <label>Volume <input id="volume" type="range" min="0" max="100" step="1" value="80"></label>
+  </div>
+  <div id="staveContainer" style="margin-top:18px; background:#fff; padding:10px; border-radius:6px;">
+    <div id="stave" ></div>
+  </div>
 
   <script>
   function hexToUint8Array(hex) {
@@ -197,6 +210,387 @@
       logEl.value = res.log;
     } catch (err) { logEl.value = 'Parsing error: '+err.message; }
   });
+  </script>
+  <script>
+  // MIDI playback using Tone.js + @tonejs/midi
+  const playBtn = document.getElementById('playBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const playTime = document.getElementById('playTime');
+  const volumeInput = document.getElementById('volume');
+
+  let midiObj = null;
+  let tonePart = null;
+  let synth = null;
+  let volNode = null;
+  let playbackTotal = 0;
+  let loadedNotes = null;
+  let prepared = false;
+  let currentRenderedNotes = null;
+  let currentBpm = 120;
+  let lastHighlightedIndex = -1;
+  
+
+  function enablePlayerControls(enabled) {
+    playBtn.disabled = !enabled;
+    stopBtn.disabled = !enabled;
+  }
+
+  async function loadMidiArrayBuffer(arrayBuffer) {
+    try {
+      let parsedFallback = null;
+      // If @tonejs/midi provided a global Midi constructor, use it
+      let notes = [];
+      let total = 0;
+
+      if (typeof Midi === 'function' || (typeof Midi === 'object' && typeof Midi.default === 'function')) {
+        const MidiCtor = (typeof Midi === 'function') ? Midi : Midi.default;
+        midiObj = new MidiCtor(arrayBuffer);
+        total = midiObj.duration || 0;
+        // collect notes from all tracks
+        midiObj.tracks.forEach(track=>{
+          track.notes.forEach(n=>{
+            notes.push({time: n.time, note: n.name, duration: n.duration, velocity: n.velocity});
+          });
+        });
+      } else {
+        // Fallback: use our parseMIDI to build a notes list (tick->seconds conversion)
+        parsedFallback = parseMIDI(arrayBuffer);
+        // convert parsed events (ticks) into seconds and extract noteOn/noteOff pairs
+        const division = parsedFallback.division;
+        let currentTempo = 500000; // µs per quarter
+        let lastTick = 0;
+        let currentSeconds = 0;
+        // annotate events with seconds
+        parsedFallback.events.forEach(ev => {
+          const delta = ev.tick - lastTick;
+          currentSeconds += (delta * currentTempo) / 1_000_000 / division;
+          lastTick = ev.tick;
+          ev._seconds = currentSeconds;
+          if (ev.type === 'tempo') currentTempo = ev.tempo;
+        });
+
+        // track active notes by channel+note
+        const active = Object.create(null);
+        parsedFallback.events.forEach(ev => {
+          if (ev.type === 'noteOn') {
+            const key = ev.channel + ':' + ev.note;
+            active[key] = {start: ev._seconds, velocity: (ev.velocity||0)/127};
+          } else if (ev.type === 'noteOff') {
+            const key = ev.channel + ':' + ev.note;
+            const a = active[key];
+            if (a) {
+              const start = a.start;
+              const duration = Math.max(0.001, ev._seconds - start);
+              notes.push({time: start, note: midiNoteToName(ev.note), duration, velocity: a.velocity});
+              delete active[key];
+            }
+          }
+        });
+
+        // close any remaining active notes to last event time
+        const lastSec = parsedFallback.events.length? parsedFallback.events[parsedFallback.events.length-1]._seconds : 0;
+        for (const k in active) {
+          const a = active[k];
+          notes.push({time: a.start, note: midiNoteToName(parseInt(k.split(':')[1],10)), duration: Math.max(0.001, lastSec - a.start), velocity: a.velocity});
+        }
+        total = lastSec;
+      }
+
+      // store notes for playback; actual AudioNodes will be created on user gesture
+      loadedNotes = notes;
+
+      // set tempo if present (use first tempo if available)
+      if (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0) {
+        Tone.Transport.bpm.value = midiObj.header.tempos[0].bpm;
+      } else if (!midiObj && parsedFallback) {
+        // find first tempo event in parsedFallback events
+        const tEv = parsedFallback.events.find(e=>e.type==='tempo');
+        if (tEv) Tone.Transport.bpm.value = Math.round(60000000 / tEv.tempo);
+      }
+
+      // do not create audio graph now (will be created on Play)
+      tonePart = null;
+      prepared = false;
+
+      // update UI
+      playbackTotal = total;
+      playTime.textContent = formatPlayTime(0, playbackTotal);
+      // update note count
+      const noteCountEl = document.getElementById('noteCount');
+      if (noteCountEl) noteCountEl.textContent = String(notes.length);
+      // render staff with notes (treble clef / G)
+      try {
+        const bpm = (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0)
+          ? midiObj.header.tempos[0].bpm
+          : (parsedFallback ? (parsedFallback.events.find(e=>e.type==='tempo') ? Math.round(60000000/parsedFallback.events.find(e=>e.type==='tempo').tempo) : 120) : 120);
+        currentRenderedNotes = notes.slice().sort((a,b)=>a.time - b.time);
+        currentBpm = bpm;
+        lastHighlightedIndex = -1;
+        renderStave(currentRenderedNotes, currentBpm, -1);
+      } catch(err) { console.error('Stave render error', err); }
+      enablePlayerControls(true);
+      // update download link as well
+      const blob = new Blob([new Uint8Array(arrayBuffer)], {type:'audio/midi'});
+      downloadExample.href = URL.createObjectURL(blob);
+      downloadExample.download = 'loaded.mid';
+    } catch (e) {
+      console.error('Error preparing MIDI for playback', e);
+      logEl.value += '\nPlayback prepare error: '+e.message;
+      enablePlayerControls(false);
+    }
+  }
+
+  // helper: convert midi note number to name (C4 style)
+  function midiNoteToName(n) {
+    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const octave = Math.floor(n/12)-1;
+    const name = names[n%12];
+    return name + octave;
+  }
+
+  // Format seconds as fixed "000.000"
+  function formatSecondsFixed(sec) {
+    const s = Number.isFinite(sec) ? sec : 0;
+    const intPart = Math.floor(Math.max(0, s));
+    const frac = Math.round((s - intPart) * 1000);
+    const intStr = String(intPart).padStart(3, '0');
+    const fracStr = String(Math.abs(frac)).padStart(3, '0');
+    return `${intStr}.${fracStr}`;
+  }
+  function formatPlayTime(current, total) {
+    return `${formatSecondsFixed(current)} / ${formatSecondsFixed(total)} s`;
+  }
+
+  // Wire file load & example load to also prepare audio
+  fileInput.addEventListener('change', (e)=>{
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      currentArrayBuffer = reader.result;
+      logEl.value = 'File caricato: ' + f.name;
+      durationEl.textContent='—';
+      await loadMidiArrayBuffer(currentArrayBuffer);
+    };
+    reader.readAsArrayBuffer(f);
+  });
+
+  loadExample.addEventListener('click', async ()=>{
+    try {
+      const res = await fetch('longest_midi.hex');
+      if (!res.ok) throw new Error('Impossibile caricare esempio');
+      const hex = await res.text();
+      const bytes = hexToUint8Array(hex);
+      currentArrayBuffer = bytes.buffer;
+      // prepare download link
+      const blob = new Blob([bytes], {type:'audio/midi'});
+      downloadExample.href = URL.createObjectURL(blob);
+      downloadExample.download = 'longest_midi_example.mid';
+      logEl.value = 'Esempio caricato in memoria.';
+      durationEl.textContent='—';
+      await loadMidiArrayBuffer(currentArrayBuffer);
+    } catch (err) { logEl.value = 'Errore: '+err.message; }
+  });
+
+  // Play / stop handlers
+  playBtn.addEventListener('click', async ()=>{
+    if (!loadedNotes) return;
+    // Ensure audio context started after user gesture
+    if (Tone.context.state !== 'running') await Tone.start();
+
+    // prepare audio graph and Tone.Part on first play
+    if (!prepared) {
+      try {
+        // create volume and synth
+        if (volNode) { volNode.dispose(); volNode = null; }
+        if (synth) { synth.dispose(); synth = null; }
+        volNode = new Tone.Volume(0).toDestination();
+        synth = new Tone.PolySynth(Tone.Synth).connect(volNode);
+        // set initial volume from UI
+        const vPercent = parseInt(volumeInput?.value || 80, 10);
+        const vDb = (vPercent === 0) ? -100 : (-60 + (vPercent/100)*60);
+        volNode.volume.value = vDb;
+
+        // set transport BPM if available
+        if (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0) {
+          Tone.Transport.bpm.value = midiObj.header.tempos[0].bpm;
+        } else if (!midiObj && currentBpm) {
+          Tone.Transport.bpm.value = currentBpm;
+        }
+
+        // create the Tone.Part from loadedNotes
+          tonePart = new Tone.Part((time, val) => {
+            // create a short-lived synth per note to avoid polyphony limits
+            try {
+              const noteSynth = new Tone.Synth().connect(volNode);
+              noteSynth.triggerAttackRelease(val.note, val.duration, time, val.velocity);
+              // dispose after expected duration (wall-clock fallback)
+              setTimeout(() => { try { noteSynth.dispose(); } catch (e) {} }, (val.duration + 0.5) * 1000);
+            } catch (e) {
+              console.error('Note playback error', e);
+            }
+          }, loadedNotes).start(0);
+        tonePart.loop = false;
+        prepared = true;
+      } catch (err) {
+        console.error('Error preparing playback on gesture', err);
+      }
+    }
+
+    if (Tone.Transport.state !== 'started') {
+      Tone.Transport.start();
+      playBtn.textContent = 'Pause';
+      // do not auto-scroll; user will control page scrolling
+      requestAnimationFrame(updatePlayTime);
+    } else {
+      Tone.Transport.pause();
+      playBtn.textContent = 'Play';
+    }
+  });
+
+  stopBtn.addEventListener('click', ()=>{
+    Tone.Transport.stop();
+    Tone.Transport.position = '0:0:0';
+    playBtn.textContent = 'Play';
+    playTime.textContent = formatPlayTime(0, playbackTotal);
+    
+  });
+
+  // speed control removed
+
+  // Volume control
+  volumeInput.addEventListener('input', ()=>{
+    const p = parseInt(volumeInput.value, 10);
+    if (!volNode) return;
+    const db = (p === 0) ? -100 : (-60 + (p/100)*60);
+    volNode.volume.value = db;
+  });
+
+  function updatePlayTime(){
+    const s = Tone.Transport.seconds * (Tone.Transport.playbackRate || 1);
+    const total = playbackTotal || 0;
+    playTime.textContent = formatPlayTime(s, total);
+    // highlight currently playing note
+    if (currentRenderedNotes && currentRenderedNotes.length>0) {
+      // find highest index with time <= s
+      let idx = -1;
+      for (let i=0;i<currentRenderedNotes.length;i++) {
+        if (currentRenderedNotes[i].time <= s) idx = i;
+        else break;
+      }
+      if (idx !== lastHighlightedIndex) {
+        lastHighlightedIndex = idx;
+        try { renderStave(currentRenderedNotes, currentBpm, idx); } catch(e) { console.error(e); }
+      }
+    }
+    if (Tone.Transport.state === 'started') requestAnimationFrame(updatePlayTime);
+  }
+
+  // --- Simple Canvas rendering (replaces VexFlow) ---
+  function renderStave(notes, bpm=120, activeIndex=-1) {
+    // notes: [{time, note: 'C4' or 'C#4', duration (s), velocity}]
+    const container = document.getElementById('stave');
+    if (!container) return;
+    container.innerHTML = '';
+    // sizing: use container width if available
+    const containerWidth = Math.max(600, Math.min(1200, container.clientWidth || window.innerWidth - 80));
+    const margin = 24;
+    const colWidth = 64; // minimum space per time column (wider for readability)
+    // group notes by time (within epsilon)
+    const eps = 0.001;
+    const sorted = notes.slice().sort((a,b)=>a.time - b.time);
+    const groups = [];
+    let gIndex = 0;
+    for (let i=0;i<sorted.length;i++){
+      const n = sorted[i];
+      if (groups.length===0) { groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++}]}); }
+      else {
+        const last = groups[groups.length-1];
+        if (Math.abs(n.time - last.time) <= eps) {
+          last.notes.push({note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++});
+        } else {
+          groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, globalIndex:gIndex++}]});
+        }
+      }
+    }
+
+    const columnsPerLine = Math.max(1, Math.floor((containerWidth - margin*2) / colWidth));
+    const lineHeight = 220; // increased line height to leave ample vertical space between staves
+    const lines = Math.max(1, Math.ceil(groups.length / columnsPerLine));
+    const width = containerWidth;
+    const height = lines * lineHeight + 20;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    // background
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,height);
+
+    // helpers
+    function noteNameToMidi(name) {
+      const m = String(name).match(/^([A-G])(#?)(-?\d+)$/i);
+      if (!m) return 60;
+      const letters = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+      const letter = m[1].toUpperCase();
+      const accidental = m[2] || '';
+      const octave = parseInt(m[3], 10);
+      let base = letters[letter]; if (accidental === '#') base += 1;
+      return (octave + 1) * 12 + base;
+    }
+
+    const refMidi = 64; // E4 on bottom line
+    const staffSpacing = 16; // px — larger spacing between staff lines
+    const refYOffsetInLine = 56; // top offset for staff within line (gives room above staff)
+    const semitoneToY = staffSpacing/2;
+
+    // render each line
+    for (let line=0; line<lines; line++){
+      const lineTop = line * lineHeight;
+      // draw staff lines
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
+      for (let i=0;i<5;i++){
+        const y = lineTop + refYOffsetInLine + i*staffSpacing;
+        ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width - margin, y); ctx.stroke();
+      }
+      // clef
+      ctx.font = '24px serif'; ctx.fillStyle = '#000';
+      ctx.fillText('𝄞', margin + 2, lineTop + refYOffsetInLine + 2*staffSpacing);
+    }
+
+    // draw groups into columns, wrapping to next line
+    groups.forEach((g, gi) => {
+      const col = gi % columnsPerLine;
+      const row = Math.floor(gi / columnsPerLine);
+      const x = margin + col * colWidth + colWidth/2;
+      const lineTop = row * lineHeight;
+      const staffTop = lineTop + refYOffsetInLine;
+      // for simultaneous notes, stack vertically by pitch
+      g.notes.forEach((nEntry, ni) => {
+        const midi = noteNameToMidi(nEntry.note);
+        const y = staffTop + 4*staffSpacing - (midi - refMidi) * semitoneToY;
+        // draw ledger if outside
+        if (y < staffTop - staffSpacing || y > staffTop + 4*staffSpacing + staffSpacing) {
+          ctx.beginPath(); ctx.moveTo(x - 18, y); ctx.lineTo(x + 18, y); ctx.stroke();
+        }
+        // note head (slightly larger for visibility with increased spacing)
+        ctx.beginPath(); const rx=9, ry=6; ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
+        const isActive = (typeof activeIndex === 'number') && (nEntry.globalIndex === activeIndex);
+        if (isActive) { ctx.fillStyle = '#e91e63'; ctx.fill(); ctx.strokeStyle = '#c2185b'; ctx.stroke(); }
+        else { ctx.fillStyle = '#000'; ctx.fill(); }
+        // accidental
+        if (nEntry.note && nEntry.note.includes('#')) { ctx.fillStyle='#000'; ctx.font='12px serif'; ctx.fillText('#', x-16, y+4); }
+        // duration text
+        ctx.fillStyle='#333'; ctx.font='11px monospace'; ctx.fillText((nEntry.duration||0).toFixed(2)+'s', x-14, lineTop + refYOffsetInLine + 5*staffSpacing + 14);
+      });
+      // small time label under column
+      ctx.fillStyle='#444'; ctx.font='10px monospace';
+      ctx.fillText(formatSecondsFixed(g.time), x-18, lineTop + refYOffsetInLine + 5*staffSpacing + 28);
+    });
+  }
   </script>
 </body>
 </html>
