@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Tamagotchi — Cute 3D virtual pet with progression, skins and items — Luca Gandolfi" />
+    <title>Tamagotchi 3D — Luca Gandolfi</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root{--bg:linear-gradient(135deg,#e8f4f8 0%,#f0e6f6 50%,#fef6e4 100%);--card:#ffffff;--muted:#8a9bab;--accent:#7ecec5;--accent-2:#c4b5fd;--accent-3:#fbbf77;--shadow:rgba(120,100,140,0.08)}
+        *{box-sizing:border-box}
+        body{background:var(--bg);min-height:100vh;color:#2d3748;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0}
+        .tama-container{max-width:980px;margin:28px auto;padding:24px;border-radius:20px;background:rgba(255,255,255,0.85);backdrop-filter:blur(12px);box-shadow:0 8px 40px var(--shadow)}
+        .tama-header{display:flex;align-items:center;gap:18px;margin-bottom:18px;flex-wrap:wrap}
+        .tama-title{font-size:1.8rem;font-weight:800;background:linear-gradient(90deg,#6fbfbc,#a78bfa,#fbbf77);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 2px 12px rgba(127,206,197,0.18)}
+        .tama-sub{color:var(--muted);font-size:0.95rem}
+        .tama-main{display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start}
+        .stage{background:linear-gradient(180deg,#fff,#f8fafc);border-radius:16px;padding:20px;border:1px solid rgba(0,0,0,0.04);box-shadow:0 4px 20px var(--shadow)}
+        .pet-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+        #petCanvas{width:100%;max-width:340px;aspect-ratio:1;border-radius:16px;background:radial-gradient(circle at 50% 40%,#f0fbfa,#e6f0fa 60%,#f8f4ff);box-shadow:inset 0 0 60px rgba(127,206,197,0.08)}
+        .controls{display:flex;flex-direction:column;gap:12px}
+        .actions{display:flex;gap:8px;flex-wrap:wrap}
+        .btn{background:#fff;border:1.5px solid rgba(0,0,0,0.06);padding:10px 14px;border-radius:12px;font-weight:600;color:#2d3748;cursor:pointer;min-width:80px;transition:all .2s ease;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+        .btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(127,206,197,0.18)}
+        .btn.primary{background:linear-gradient(135deg,var(--accent),#a0e9e3);border:none;color:#065;box-shadow:0 4px 16px rgba(126,206,197,0.25)}
+        .btn.secondary{background:linear-gradient(135deg,var(--accent-2),#ddd6fe);border:none;color:#4c1d95}
+        .btn.warn{background:linear-gradient(135deg,var(--accent-3),#fde68a);border:none;color:#92400e}
+        .btn.ghost{background:transparent;border:1.5px dashed rgba(0,0,0,0.1)}
+        .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+        .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+        .stat{background:linear-gradient(180deg,#fff,#fafbfc);padding:12px;border-radius:12px;border:1px solid rgba(0,0,0,0.04);position:relative;overflow:hidden}
+        .stat .bar{position:absolute;bottom:0;left:0;height:3px;border-radius:0 3px 0 0;transition:width .4s ease}
+        .stat .label{font-size:0.78rem;color:var(--muted);margin-bottom:2px}
+        .stat .value{font-weight:700;font-size:1.15rem;color:#2d3748}
+        .stat.hunger .bar{background:linear-gradient(90deg,#fbbf77,#f59e0b)}
+        .stat.happy .bar{background:linear-gradient(90deg,#a78bfa,#8b5cf6)}
+        .stat.clean .bar{background:linear-gradient(90deg,#7ecec5,#14b8a6)}
+        .stat.energy .bar{background:linear-gradient(90deg,#60a5fa,#3b82f6)}
+        .inventory{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+        .item{display:flex;gap:6px;align-items:center;padding:8px 12px;border-radius:10px;background:#fff;border:1px solid rgba(0,0,0,0.04);box-shadow:0 2px 8px rgba(0,0,0,0.03);font-size:0.95rem}
+        .item .count{font-weight:700;color:#2d3748}
+        .side-right{display:flex;flex-direction:column;gap:14px}
+        .progress{padding:14px;border-radius:14px;background:linear-gradient(180deg,#fff,#fefefe);border:1px solid rgba(0,0,0,0.04)}
+        .xpbar{background:linear-gradient(90deg,#e0f2fe,#ede9fe);border-radius:10px;height:14px;overflow:hidden}
+        .xpfill{height:100%;background:linear-gradient(90deg,#7ecec5,#a78bfa);transition:width .4s ease}
+        .log{font-size:0.92rem;color:var(--muted);min-height:48px;padding:10px;background:rgba(255,255,255,0.6);border-radius:10px;text-align:center}
+        .skin-selector{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+        .skin-btn{width:36px;height:36px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .2s ease;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+        .skin-btn:hover{transform:scale(1.1)}
+        .skin-btn.active{border-color:#2d3748;box-shadow:0 0 0 3px rgba(127,206,197,0.3)}
+        .skin-btn.locked{opacity:0.4;cursor:not-allowed;filter:grayscale(1)}
+        .footer-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+        .section-title{font-weight:700;margin-bottom:10px;font-size:0.95rem;display:flex;align-items:center;gap:8px}
+        .badge{font-size:0.7rem;padding:3px 8px;border-radius:20px;background:linear-gradient(90deg,#a78bfa,#c4b5fd);color:#fff;font-weight:600}
+        @media (max-width:900px){.tama-main{grid-template-columns:1fr}#petCanvas{max-width:280px}}
+    </style>
+</head>
+<body>
+    <main class="tama-container">
+        <header class="tama-header">
+            <div>
+                <div class="tama-title">🐣 Tamagotchi 3D</div>
+                <div class="tama-sub">Prenditi cura del tuo pet virtuale — nutrilo, gioca, puliscilo e fallo crescere!</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+                <a class="btn ghost" href="webgl_diagnostics.html" title="Diagnostica WebGL" style="padding:6px 10px;font-size:0.85rem">Diagnostica WebGL</a>
+                <span class="badge" id="badge-skin">Skin: Default</span>
+                <span style="color:var(--muted);font-size:0.85rem">💾 Auto-save</span>
+            </div>
+        </header>
+
+        <section class="tama-main">
+            <div class="stage">
+                <div class="pet-wrap">
+                    <canvas id="petCanvas"></canvas>
+                    <div class="log" id="log">Benvenuto! Usa i pulsanti per interagire con il tuo pet 3D.</div>
+                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center">
+                        <button class="btn" id="btn-look"><i class="fa-solid fa-magnifying-glass"></i> Ispeziona</button>
+                        <button class="btn" id="btn-rotate"><i class="fa-solid fa-rotate"></i> Ruota</button>
+                        <button class="btn" id="btn-jump"><i class="fa-solid fa-arrow-up"></i> Salta</button>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="side-right">
+                <div class="stage">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <div class="section-title">📊 Status</div>
+                        <div style="color:var(--muted);font-size:0.85rem;font-weight:700" id="status-level">Lv. 1</div>
+                    </div>
+                    <div class="stats">
+                        <div class="stat hunger"><div class="label">🍎 Fame</div><div class="value" id="val-hunger">80%</div><div class="bar" style="width:80%"></div></div>
+                        <div class="stat happy"><div class="label">😊 Felicità</div><div class="value" id="val-happy">90%</div><div class="bar" style="width:90%"></div></div>
+                        <div class="stat clean"><div class="label">🧼 Pulizia</div><div class="value" id="val-clean">95%</div><div class="bar" style="width:95%"></div></div>
+                        <div class="stat energy"><div class="label">⚡ Energia</div><div class="value" id="val-energy">80%</div><div class="bar" style="width:80%"></div></div>
+                    </div>
+
+                    <div style="margin-top:14px">
+                        <div class="section-title">✨ Progressione</div>
+                        <div class="progress">
+                            <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px">
+                                <div style="font-weight:700">XP</div>
+                                <div style="color:var(--muted);font-size:0.9rem" id="xp-text">0 / 100</div>
+                            </div>
+                            <div class="xpbar"><div class="xpfill" id="xpfill"></div></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:14px">
+                        <div class="section-title">🎮 Azioni</div>
+                        <div class="actions">
+                            <button class="btn primary" id="feed"><i class="fa-solid fa-apple-whole"></i> Nutri</button>
+                            <button class="btn secondary" id="play"><i class="fa-solid fa-gamepad"></i> Gioca</button>
+                            <button class="btn primary" id="clean"><i class="fa-solid fa-soap"></i> Pulisci</button>
+                            <button class="btn warn" id="sleep"><i class="fa-solid fa-moon"></i> Dormi</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:14px">
+                        <div class="section-title">🎨 Skin <span class="badge" id="skin-unlock-info">Sblocca con i livelli</span></div>
+                        <div class="skin-selector" id="skin-selector"></div>
+                    </div>
+
+                    <div style="margin-top:14px">
+                        <div class="section-title">🎒 Inventario</div>
+                        <div class="inventory" id="inventory">
+                            <div class="item"><span>🍎</span> <span class="count" data-item="apple">2</span></div>
+                            <div class="item"><span>🧸</span> <span class="count" data-item="toy">1</span></div>
+                            <div class="item"><span>🧼</span> <span class="count" data-item="soap">1</span></div>
+                            <div class="item"><span>🍰</span> <span class="count" data-item="cake">0</span></div>
+                            <div class="item"><span>💎</span> <span class="count" data-item="gem">0</span></div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                            <button class="btn" id="use-item"><i class="fa-solid fa-hand"></i> Usa Item</button>
+                            <button class="btn ghost" id="buy-item"><i class="fa-solid fa-cart-shopping"></i> Compra (15 XP)</button>
+                        </div>
+                    </div>
+
+                    <div class="footer-actions">
+                        <button class="btn ghost" id="reset"><i class="fa-solid fa-trash"></i> Reset</button>
+                        <button class="btn" id="save"><i class="fa-solid fa-floppy-disk"></i> Salva</button>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section style="margin-top:20px;display:flex;gap:14px;flex-wrap:wrap">
+            <div class="stage" style="flex:1;min-width:260px">
+                <div class="section-title">📖 Come Giocare</div>
+                <div style="color:var(--muted);line-height:1.6;font-size:0.9rem">
+                    Tamagotchi 3D è un pet virtuale con sistema di progressione. Le azioni danno XP e modificano le statistiche.
+                    Salendo di livello il pet cresce e sblocchi nuove skin cosmetiche!
+                </div>
+            </div>
+            <div class="stage" style="min-width:280px">
+                <div class="section-title">💡 Suggerimenti</div>
+                <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:0.9rem;line-height:1.7">
+                    <li><b>Nutri</b> per mantenere la Fame alta (+XP)</li>
+                    <li><b>Gioca</b> per aumentare la Felicità (+più XP)</li>
+                    <li><b>Pulisci</b> per evitare il decadimento</li>
+                    <li><b>Dormi</b> per recuperare Energia</li>
+                    <li>Sblocca <b>skin</b> raggiungendo nuovi livelli!</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ========== WEBGL DETECTION ==========
+        function isWebGLAvailable() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch (e) { return false; }
+        }
+
+        const webglAvailable = isWebGLAvailable();
+        const canvas = document.getElementById('petCanvas');
+        
+        // CSS Fallback pet (shown if WebGL not available)
+        let cssPet = null;
+        if (!webglAvailable) {
+            canvas.style.display = 'none';
+            cssPet = document.createElement('div');
+            cssPet.id = 'cssPet';
+            cssPet.innerHTML = `
+                <style>
+                    #cssPet{width:280px;height:280px;position:relative;display:flex;align-items:center;justify-content:center}
+                    .css-body{width:180px;height:160px;border-radius:45% 45% 40% 40% / 50% 50% 50% 50%;background:linear-gradient(180deg,#7ecec5,#5db8ae);box-shadow:0 15px 40px rgba(126,206,197,0.3);position:relative;animation:cssBreathe 3s ease-in-out infinite}
+                    @keyframes cssBreathe{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.03) translateY(-5px)}}
+                    .css-face{position:absolute;top:35%;left:50%;transform:translateX(-50%);display:flex;gap:30px;align-items:center}
+                    .css-eye{width:20px;height:20px;background:#2d3748;border-radius:50%;position:relative;animation:cssBlink 4s infinite}
+                    .css-eye::after{content:'';position:absolute;width:6px;height:6px;background:#fff;border-radius:50%;top:3px;right:3px}
+                    @keyframes cssBlink{0%,45%,55%,100%{transform:scaleY(1)}50%{transform:scaleY(0.1)}}
+                    .css-mouth{position:absolute;top:60%;left:50%;transform:translateX(-50%);width:40px;height:15px;background:#f87171;border-radius:0 0 20px 20px}
+                    .css-ear{width:35px;height:50px;background:linear-gradient(180deg,#7ecec5,#5db8ae);border-radius:50% 50% 40% 40%;position:absolute;top:-25px;animation:cssEarWiggle 2s ease-in-out infinite}
+                    .css-ear.left{left:15px;transform:rotate(-15deg)}
+                    .css-ear.right{right:15px;transform:rotate(15deg)}
+                    @keyframes cssEarWiggle{0%,100%{transform:rotate(-15deg)}50%{transform:rotate(-10deg)}}
+                    .css-blush{width:25px;height:15px;background:rgba(253,164,175,0.6);border-radius:50%;position:absolute;top:50%}
+                    .css-blush.left{left:5px}
+                    .css-blush.right{right:5px}
+                    .css-foot{width:40px;height:20px;background:#5db8ae;border-radius:50%;position:absolute;bottom:-10px}
+                    .css-foot.left{left:30px}
+                    .css-foot.right{right:30px}
+                </style>
+                <div class="css-body" id="cssBody">
+                    <div class="css-ear left"></div>
+                    <div class="css-ear right"></div>
+                    <div class="css-face">
+                        <div class="css-eye"></div>
+                        <div class="css-eye"></div>
+                    </div>
+                    <div class="css-mouth"></div>
+                    <div class="css-blush left"></div>
+                    <div class="css-blush right"></div>
+                    <div class="css-foot left"></div>
+                    <div class="css-foot right"></div>
+                </div>
+                <style>
+                    /* Fallback animations for non-WebGL */
+                    #cssBody.jump{animation:cssJump .5s ease-in-out}
+                    @keyframes cssJump{0%{transform:translateY(0)}50%{transform:translateY(-18px)}100%{transform:translateY(0)}}
+                    #cssBody.spin{animation:cssSpin .7s linear}
+                    @keyframes cssSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+                    #cssBody.wiggle{animation:cssWiggle .6s ease}
+                    @keyframes cssWiggle{0%{transform:rotate(0)}25%{transform:rotate(10deg)}75%{transform:rotate(-10deg)}100%{transform:rotate(0)}}
+                    #cssBody.sleep{opacity:.6;filter:grayscale(.2)}
+                </style>
+            `;
+            canvas.parentNode.insertBefore(cssPet, canvas);
+            console.log('WebGL not available, using CSS fallback pet');
+        }
+
+        // ========== THREE.JS 3D PET ==========
+        let renderer, scene, camera, petGroup, bodyMesh, leftEye, rightEye, mouth, leftEar, rightEar;
+        let animTime = 0, targetRotY = 0, jumpVel = 0, isJumping = false;
+
+        // Skins configuration (global)
+        const SKINS = [
+            { id: 'default', name: 'Default', color: 0x7ecec5, eyeColor: 0x2d3748, unlockLevel: 1 },
+            { id: 'pink', name: 'Rosa', color: 0xf9a8d4, eyeColor: 0x831843, unlockLevel: 2 },
+            { id: 'gold', name: 'Oro', color: 0xfbbf77, eyeColor: 0x78350f, unlockLevel: 3 },
+            { id: 'lavender', name: 'Lavanda', color: 0xc4b5fd, eyeColor: 0x4c1d95, unlockLevel: 5 },
+            { id: 'ocean', name: 'Oceano', color: 0x60a5fa, eyeColor: 0x1e3a8a, unlockLevel: 7 },
+            { id: 'sunset', name: 'Tramonto', color: 0xfb7185, eyeColor: 0x881337, unlockLevel: 10 },
+            { id: 'galaxy', name: 'Galassia', color: 0x8b5cf6, eyeColor: 0xfbbf24, unlockLevel: 15 },
+            { id: 'rainbow', name: 'Arcobaleno', color: 0x34d399, eyeColor: 0xec4899, unlockLevel: 20 }
+        ];
+
+        if (webglAvailable) {
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+            camera.position.set(0, 1.5, 5);
+            camera.lookAt(0, 0.5, 0);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(3, 5, 4);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 512;
+        dirLight.shadow.mapSize.height = 512;
+        scene.add(dirLight);
+        const fillLight = new THREE.DirectionalLight(0xa78bfa, 0.3);
+        fillLight.position.set(-3, 2, -2);
+        scene.add(fillLight);
+
+        // Ground plane
+        const groundGeo = new THREE.CircleGeometry(2.5, 32);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0xe8f4f8, roughness: 0.9 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+
+
+        // Pet group
+        petGroup = new THREE.Group();
+        scene.add(petGroup);
+
+        // Create pet parts
+
+        function createPet(skinId = 'default') {
+            // Clear existing
+            while(petGroup.children.length > 0) petGroup.remove(petGroup.children[0]);
+            
+            const skin = SKINS.find(s => s.id === skinId) || SKINS[0];
+            
+            // Body (rounded blob)
+            const bodyGeo = new THREE.SphereGeometry(1, 32, 32);
+            bodyGeo.scale(1, 0.9, 0.85);
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: skin.color, 
+                roughness: 0.4, 
+                metalness: 0.1 
+            });
+            bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+            bodyMesh.castShadow = true;
+            bodyMesh.position.y = 0.4;
+            petGroup.add(bodyMesh);
+
+            // Belly (lighter)
+            const bellyGeo = new THREE.SphereGeometry(0.6, 24, 24);
+            bellyGeo.scale(1, 0.85, 0.5);
+            const bellyMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff, 
+                roughness: 0.5,
+                transparent: true,
+                opacity: 0.7
+            });
+            const belly = new THREE.Mesh(bellyGeo, bellyMat);
+            belly.position.set(0, 0.3, 0.35);
+            petGroup.add(belly);
+
+            // Eyes
+            const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+            const eyeMat = new THREE.MeshStandardMaterial({ color: skin.eyeColor, roughness: 0.3 });
+            const eyeWhiteGeo = new THREE.SphereGeometry(0.18, 16, 16);
+            const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+            
+            // Left eye
+            const leftEyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+            leftEyeWhite.position.set(-0.28, 0.6, 0.7);
+            petGroup.add(leftEyeWhite);
+            leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.28, 0.6, 0.8);
+            petGroup.add(leftEye);
+            
+            // Right eye
+            const rightEyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+            rightEyeWhite.position.set(0.28, 0.6, 0.7);
+            petGroup.add(rightEyeWhite);
+            rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.28, 0.6, 0.8);
+            petGroup.add(rightEye);
+
+            // Eye shine
+            const shineGeo = new THREE.SphereGeometry(0.04, 8, 8);
+            const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const leftShine = new THREE.Mesh(shineGeo, shineMat);
+            leftShine.position.set(-0.22, 0.65, 0.88);
+            petGroup.add(leftShine);
+            const rightShine = new THREE.Mesh(shineGeo, shineMat);
+            rightShine.position.set(0.34, 0.65, 0.88);
+            petGroup.add(rightShine);
+
+            // Mouth
+            const mouthGeo = new THREE.TorusGeometry(0.12, 0.03, 8, 16, Math.PI);
+            const mouthMat = new THREE.MeshStandardMaterial({ color: 0xf87171, roughness: 0.5 });
+            mouth = new THREE.Mesh(mouthGeo, mouthMat);
+            mouth.position.set(0, 0.35, 0.78);
+            mouth.rotation.x = Math.PI;
+            petGroup.add(mouth);
+
+            // Ears
+            const earGeo = new THREE.SphereGeometry(0.25, 16, 16);
+            earGeo.scale(0.8, 1.2, 0.6);
+            const earMat = new THREE.MeshStandardMaterial({ color: skin.color, roughness: 0.4 });
+            leftEar = new THREE.Mesh(earGeo, earMat);
+            leftEar.position.set(-0.55, 1.1, 0.1);
+            leftEar.rotation.z = 0.3;
+            leftEar.castShadow = true;
+            petGroup.add(leftEar);
+            rightEar = new THREE.Mesh(earGeo, earMat);
+            rightEar.position.set(0.55, 1.1, 0.1);
+            rightEar.rotation.z = -0.3;
+            rightEar.castShadow = true;
+            petGroup.add(rightEar);
+
+            // Blush
+            const blushGeo = new THREE.CircleGeometry(0.1, 16);
+            const blushMat = new THREE.MeshBasicMaterial({ color: 0xfda4af, transparent: true, opacity: 0.6 });
+            blush1 = new THREE.Mesh(blushGeo, blushMat);
+            blush1.position.set(-0.5, 0.45, 0.72);
+            blush1.rotation.y = 0.3;
+            petGroup.add(blush1);
+            blush2 = new THREE.Mesh(blushGeo, blushMat);
+            blush2.position.set(0.5, 0.45, 0.72);
+            blush2.rotation.y = -0.3;
+            petGroup.add(blush2);
+
+            // Feet
+            const footGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            footGeo.scale(1.2, 0.6, 1);
+            const footMat = new THREE.MeshStandardMaterial({ color: skin.color, roughness: 0.4 });
+            const leftFoot = new THREE.Mesh(footGeo, footMat);
+            leftFoot.position.set(-0.4, -0.4, 0.3);
+            leftFoot.castShadow = true;
+            petGroup.add(leftFoot);
+            const rightFoot = new THREE.Mesh(footGeo, footMat);
+            rightFoot.position.set(0.4, -0.4, 0.3);
+            rightFoot.castShadow = true;
+            petGroup.add(rightFoot);
+        }
+
+        createPet('default');
+
+        // Animation state
+        let animTime = 0;
+        let targetRotY = 0;
+        let jumpVel = 0;
+        let isJumping = false;
+
+        function resizeRenderer() {
+            const rect = canvas.getBoundingClientRect();
+            const size = Math.min(rect.width, rect.height);
+            renderer.setSize(size, size);
+            camera.aspect = 1;
+            camera.updateProjectionMatrix();
+        }
+        resizeRenderer();
+        window.addEventListener('resize', resizeRenderer);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            animTime += 0.016;
+
+            // Idle breathing
+            if (bodyMesh) {
+                bodyMesh.scale.y = 0.9 + Math.sin(animTime * 2) * 0.03;
+                bodyMesh.position.y = 0.4 + Math.sin(animTime * 2) * 0.02;
+            }
+
+            // Ear wiggle
+            if (leftEar && rightEar && leftEar.rotation && rightEar.rotation) {
+                leftEar.rotation.z = 0.3 + Math.sin(animTime * 3) * 0.05;
+                rightEar.rotation.z = -0.3 - Math.sin(animTime * 3) * 0.05;
+            }
+
+            // Blink
+            if (leftEye && rightEye && leftEye.scale && rightEye.scale) {
+                const blinkPhase = animTime % 4;
+                const blinkScale = (blinkPhase > 3.8 && blinkPhase < 4) ? 0.2 : 1;
+                leftEye.scale.y = blinkScale;
+                rightEye.scale.y = blinkScale;
+            }
+
+            // Smooth rotation
+            if (petGroup && petGroup.rotation) {
+                petGroup.rotation.y += (targetRotY - petGroup.rotation.y) * 0.1;
+            }
+
+            // Jump physics
+            if (isJumping && petGroup && petGroup.position) {
+                petGroup.position.y += jumpVel;
+                jumpVel -= 0.015;
+                if (petGroup.position.y <= 0) {
+                    petGroup.position.y = 0;
+                    isJumping = false;
+                    jumpVel = 0;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+        }
+
+        // Pet animations
+        function petBounce() {
+            if (webglAvailable) {
+                jumpVel = 0.18;
+                isJumping = true;
+            } else {
+                const b = document.getElementById('cssBody');
+                if (b) { b.classList.add('jump'); setTimeout(()=>b.classList.remove('jump'),500); }
+            }
+        }
+        function petSpin() {
+            if (webglAvailable) {
+                targetRotY += Math.PI * 2;
+            } else {
+                const b = document.getElementById('cssBody');
+                if (b) { b.classList.add('spin'); setTimeout(()=>b.classList.remove('spin'),700); }
+            }
+        }
+        function petWiggle() {
+            if (webglAvailable) {
+                let t = 0;
+                const wiggle = setInterval(() => {
+                    t += 0.1;
+                    if (petGroup && petGroup.rotation) petGroup.rotation.z = Math.sin(t * 10) * 0.15;
+                    if (t > 0.5) {
+                        clearInterval(wiggle);
+                        if (petGroup && petGroup.rotation) petGroup.rotation.z = 0;
+                    }
+                }, 16);
+            } else {
+                const b = document.getElementById('cssBody');
+                if (b) { b.classList.add('wiggle'); setTimeout(()=>b.classList.remove('wiggle'),600); }
+            }
+        }
+        function petSleep() {
+            if (webglAvailable) {
+                if (leftEye && rightEye) {
+                    leftEye.scale.y = 0.1;
+                    rightEye.scale.y = 0.1;
+                    setTimeout(() => {
+                        leftEye.scale.y = 1;
+                        rightEye.scale.y = 1;
+                    }, 1500);
+                }
+            } else {
+                const b = document.getElementById('cssBody');
+                if (b) { b.classList.add('sleep'); setTimeout(()=>b.classList.remove('sleep'),1500); }
+            }
+        }
+
+        // ========== GAME LOGIC ==========
+        const stateKey = 'tama3d_state_v2';
+        const defaultState = {
+            hunger: 80, happy: 90, clean: 95, energy: 80,
+            xp: 0, level: 1,
+            items: { apple: 2, toy: 1, soap: 1, cake: 0, gem: 0 },
+            skin: 'default',
+            totalActions: 0
+        };
+        let state = load();
+
+        const EL = {
+            hunger: document.getElementById('val-hunger'),
+            happy: document.getElementById('val-happy'),
+            clean: document.getElementById('val-clean'),
+            energy: document.getElementById('val-energy'),
+            xpfill: document.getElementById('xpfill'),
+            xptext: document.getElementById('xp-text'),
+            log: document.getElementById('log'),
+            level: document.getElementById('status-level'),
+            inventory: document.getElementById('inventory'),
+            skinSelector: document.getElementById('skin-selector'),
+            badgeSkin: document.getElementById('badge-skin')
+        };
+
+        function load() {
+            try {
+                const s = JSON.parse(localStorage.getItem(stateKey));
+                return s ? { ...defaultState, ...s, items: { ...defaultState.items, ...s.items } } : { ...defaultState };
+            } catch (e) { return { ...defaultState }; }
+        }
+        function save() { localStorage.setItem(stateKey, JSON.stringify(state)); flash('💾 Salvato!'); }
+        function reset() { 
+            if (confirm('Vuoi davvero resettare tutti i progressi?')) {
+                localStorage.removeItem(stateKey); 
+                state = { ...defaultState }; 
+                createPet('default');
+                render(); 
+                flash('🔄 Reset completato'); 
+            }
+        }
+
+        function render() {
+            const h = Math.max(0, Math.min(100, Math.round(state.hunger)));
+            const hp = Math.max(0, Math.min(100, Math.round(state.happy)));
+            const c = Math.max(0, Math.min(100, Math.round(state.clean)));
+            const e = Math.max(0, Math.min(100, Math.round(state.energy)));
+            
+            EL.hunger.textContent = h + '%';
+            EL.happy.textContent = hp + '%';
+            EL.clean.textContent = c + '%';
+            EL.energy.textContent = e + '%';
+            
+            // Update stat bars
+            document.querySelector('.stat.hunger .bar').style.width = h + '%';
+            document.querySelector('.stat.happy .bar').style.width = hp + '%';
+            document.querySelector('.stat.clean .bar').style.width = c + '%';
+            document.querySelector('.stat.energy .bar').style.width = e + '%';
+            
+            const cap = levelXp(state.level);
+            const pct = Math.min(100, Math.round(100 * state.xp / cap));
+            EL.xpfill.style.width = pct + '%';
+            EL.xptext.textContent = `${Math.floor(state.xp)} / ${cap}`;
+            EL.level.textContent = `Lv. ${state.level}`;
+            
+            // Scale pet based on level
+            const scale = 1 + (state.level - 1) * 0.05;
+            if (webglAvailable && typeof petGroup !== 'undefined') {
+                petGroup.scale.set(Math.min(scale, 1.5), Math.min(scale, 1.5), Math.min(scale, 1.5));
+            } else {
+                const b = document.getElementById('cssBody');
+                if (b) b.style.transform = `scale(${Math.min(scale,1.5)})`;
+            }
+            
+            // Inventory
+            [...EL.inventory.querySelectorAll('.count')].forEach(node => {
+                const key = node.getAttribute('data-item');
+                node.textContent = state.items[key] || 0;
+            });
+            
+            // Skin selector
+            renderSkinSelector();
+            
+            // Update badge
+            const skinData = SKINS.find(s => s.id === state.skin);
+            EL.badgeSkin.textContent = `Skin: ${skinData ? skinData.name : 'Default'}`;
+        }
+
+        function renderSkinSelector() {
+            EL.skinSelector.innerHTML = '';
+            SKINS.forEach(skin => {
+                const btn = document.createElement('button');
+                btn.className = 'skin-btn';
+                btn.style.background = '#' + skin.color.toString(16).padStart(6, '0');
+                btn.title = `${skin.name} (Lv. ${skin.unlockLevel})`;
+                
+                const isUnlocked = state.level >= skin.unlockLevel;
+                const isActive = state.skin === skin.id;
+                
+                if (!isUnlocked) btn.classList.add('locked');
+                if (isActive) btn.classList.add('active');
+                
+                btn.onclick = () => {
+                    if (isUnlocked) {
+                        state.skin = skin.id;
+                        createPet(skin.id);
+                        render();
+                        flash(`🎨 Skin: ${skin.name}`);
+                    } else {
+                        flash(`🔒 Raggiungi Lv. ${skin.unlockLevel} per sbloccare!`);
+                    }
+                };
+                EL.skinSelector.appendChild(btn);
+            });
+        }
+
+        function levelXp(l) { return 100 + (l - 1) * 60; }
+        function giveXp(v) {
+            state.xp += v;
+            state.totalActions++;
+            checkLevel();
+            render();
+        }
+        function checkLevel() {
+            const cap = levelXp(state.level);
+            if (state.xp >= cap) {
+                state.xp -= cap;
+                state.level++;
+                petBounce();
+                flash(`🎉 Level Up! Ora sei Lv. ${state.level}!`);
+                
+                // Check for new skin unlock
+                const newSkin = SKINS.find(s => s.unlockLevel === state.level);
+                if (newSkin) {
+                    setTimeout(() => flash(`🎨 Nuova skin sbloccata: ${newSkin.name}!`), 2500);
+                }
+            }
+        }
+
+        function flash(txt) {
+            EL.log.textContent = txt;
+            EL.log.style.background = 'rgba(126,206,197,0.15)';
+            setTimeout(() => {
+                EL.log.style.background = 'rgba(255,255,255,0.6)';
+            }, 300);
+            setTimeout(() => { EL.log.textContent = ''; }, 2800);
+        }
+
+        // Actions
+        function actionFeed() {
+            if (state.items.apple > 0) {
+                state.items.apple--;
+                state.hunger = Math.min(100, state.hunger + 30);
+                giveXp(15);
+                petWiggle();
+                flash('🍎 Gnam gnam! Delizioso!');
+            } else {
+                flash('❌ Niente mele! Comprane con XP.');
+            }
+        }
+        function actionPlay() {
+            if (state.energy < 10) {
+                flash('😴 Troppo stanco per giocare...');
+                return;
+            }
+            state.happy = Math.min(100, state.happy + 25);
+            state.energy = Math.max(0, state.energy - 15);
+            giveXp(25);
+            petBounce();
+            flash('🎮 Che divertimento!');
+        }
+        function actionClean() {
+            if (state.items.soap > 0) {
+                state.items.soap--;
+                state.clean = Math.min(100, state.clean + 45);
+                giveXp(12);
+                petSpin();
+                flash('🧼 Splendente e pulito!');
+            } else {
+                flash('❌ Niente sapone! Comprane con XP.');
+            }
+        }
+        function actionSleep() {
+            state.energy = Math.min(100, state.energy + 50);
+            state.hunger = Math.max(0, state.hunger - 8);
+            giveXp(10);
+            petSleep();
+            flash('💤 Zzz... Buonanotte!');
+        }
+
+        // Decay
+        setInterval(() => {
+            state.hunger = Math.max(0, state.hunger - 0.25 - state.level * 0.015);
+            state.happy = Math.max(0, state.happy - 0.1);
+            state.clean = Math.max(0, state.clean - 0.06);
+            state.energy = Math.max(0, state.energy - 0.05);
+            if (state.hunger < 25) state.happy = Math.max(0, state.happy - 0.15);
+            if (state.clean < 20) state.happy = Math.max(0, state.happy - 0.1);
+            render();
+        }, 4000);
+
+        // Auto-save
+        setInterval(() => { localStorage.setItem(stateKey, JSON.stringify(state)); }, 20000);
+
+        // Event listeners
+        document.getElementById('feed').onclick = () => { actionFeed(); render(); };
+        document.getElementById('play').onclick = () => { actionPlay(); render(); };
+        document.getElementById('clean').onclick = () => { actionClean(); render(); };
+        document.getElementById('sleep').onclick = () => { actionSleep(); render(); };
+        document.getElementById('save').onclick = save;
+        document.getElementById('reset').onclick = reset;
+        
+        document.getElementById('buy-item').onclick = () => {
+            if (state.xp >= 15) {
+                state.xp -= 15;
+                const items = ['apple', 'soap', 'toy', 'cake', 'gem'];
+                const weights = [35, 25, 20, 15, 5];
+                const total = weights.reduce((a, b) => a + b, 0);
+                let rand = Math.random() * total;
+                let chosen = items[0];
+                for (let i = 0; i < items.length; i++) {
+                    rand -= weights[i];
+                    if (rand <= 0) { chosen = items[i]; break; }
+                }
+                state.items[chosen] = (state.items[chosen] || 0) + 1;
+                const names = { apple: '🍎 Mela', soap: '🧼 Sapone', toy: '🧸 Giocattolo', cake: '🍰 Torta', gem: '💎 Gemma' };
+                flash(`🛒 Hai comprato: ${names[chosen]}!`);
+                render();
+            } else {
+                flash('❌ XP insufficienti (servono 15)');
+            }
+        };
+        
+        document.getElementById('use-item').onclick = () => {
+            if (state.items.cake > 0) {
+                state.items.cake--;
+                state.hunger = Math.min(100, state.hunger + 50);
+                state.happy = Math.min(100, state.happy + 20);
+                giveXp(20);
+                petBounce();
+                flash('🍰 Torta deliziosa! +Fame +Felicità');
+            } else if (state.items.gem > 0) {
+                state.items.gem--;
+                giveXp(50);
+                petSpin();
+                flash('💎 Gemma usata! +50 XP bonus!');
+            } else if (state.items.apple > 0) {
+                state.items.apple--;
+                state.hunger = Math.min(100, state.hunger + 35);
+                giveXp(8);
+                flash('🍎 Mela usata!');
+            } else if (state.items.toy > 0) {
+                state.items.toy--;
+                state.happy = Math.min(100, state.happy + 40);
+                giveXp(10);
+                petBounce();
+                flash('🧸 Gioco con il peluche!');
+            } else if (state.items.soap > 0) {
+                state.items.soap--;
+                state.clean = Math.min(100, state.clean + 55);
+                giveXp(8);
+                flash('🧼 Pulito!');
+            } else {
+                flash('🎒 Inventario vuoto!');
+            }
+            render();
+        };
+
+        document.getElementById('btn-rotate').onclick = () => { targetRotY += Math.PI / 2; };
+        document.getElementById('btn-jump').onclick = () => { petBounce(); flash('🦘 Hop!'); };
+        document.getElementById('btn-look').onclick = () => {
+            const mood = state.happy > 70 ? 'felice 😊' : (state.happy > 40 ? 'ok 😐' : 'triste 😢');
+            flash(`Il pet sembra ${mood}`);
+            petWiggle();
+        };
+
+        // Initialize with saved skin
+        // Ensure createPet exists also for CSS fallback
+        if (!webglAvailable) {
+            // fallback createPet for CSS
+            function createPet(skinId = 'default'){
+                const b = document.getElementById('cssBody');
+                if(!b) return;
+                const skin = (SKINS && SKINS.find(s=>s.id===skinId)) || { color:0x7ecec5 };
+                const hex = (skin.color || 0x7ecec5).toString(16).padStart(6,'0');
+                b.style.background = `linear-gradient(180deg,#${hex}, #ffffff)`;
+            }
+        }
+        createPet(state.skin || 'default');
+        render();
+    </script>
+</body>
+</html>
