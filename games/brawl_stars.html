@@ -47,12 +47,546 @@
 		<button id="btn-retry">Play Again</button>
 		<button id="btn-exit" style="background:#34495e; margin-top:10px;">Exit</button>
 	</div>
+	<script src="brawl_map.js"></script>
 	<script>
-		// Simplified gameplay script
-		const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d'); function fit(){ canvas.width=innerWidth; canvas.height=innerHeight; } addEventListener('resize',fit); fit();
-		let running=false; let score=0; document.getElementById('btn-retry').onclick=()=>location.reload(); document.getElementById('btn-exit').onclick=()=>location.href='index.html';
-		function startGame(mode){ document.getElementById('startScreen').style.display='none'; running=true; score=0; loop(); }
-		function loop(){ if(!running) return; ctx.fillStyle='#2c3e50'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle='white'; ctx.fillText('Brawl Arena — Demo',20,40); requestAnimationFrame(loop); }
+		/**
+		 * BRAWL ARENA - Game Logic
+		 * Enhanced with Error Logging and Full Gameplay
+		 */
+
+		// Error Logging
+		window.onerror = function(message, source, lineno, colno, error) {
+			console.error(`[GAME ERROR] ${message} at ${source}:${lineno}`);
+			// Fallback rendering
+			const d = document.createElement('div');
+			d.style.position = 'absolute'; d.style.top = '0'; d.style.left = '0'; d.style.color = 'red'; d.style.background='black'; d.style.zIndex='9999';
+			d.innerText = `Error: ${message}`;
+			document.body.appendChild(d);
+		};
+
+		const canvas = document.getElementById('gameCanvas');
+		const ctx = canvas.getContext('2d');
+		
+		function fit(){ 
+			canvas.width = window.innerWidth; 
+			canvas.height = window.innerHeight; 
+		} 
+		window.addEventListener('resize', fit); 
+		fit();
+
+		// Game Constants & State
+		let running = false;
+		let gameMode = 'npc'; 
+		let lastTime = 0;
+		const PLAYER_SPEED = 5; // Pixels per frame approx
+		const CAMERA_LERP = 0.1;
+
+		// Entities
+		const player = { x: 2500, y: 2500, radius: 20, speed: 0, angle: 0, vx: 0, vy: 0, hp: 100, maxHp: 100, shield: 50, maxShield: 50 };
+		let bullets = [];
+		let enemies = [];
+		let crates = [];
+		let pickups = [];
+		let particles = [];
+		
+		// Camera
+		const camera = { x: 0, y: 0 };
+
+		// Inputs
+		const input = {
+			move: { x: 0, y: 0, active: false },
+			aim: { x: 0, y: 0, active: false }
+		};
+
+		// UI Elements
+		const uiScore = document.getElementById('scoreVal');
+		const uiHp = document.getElementById('hp-bar');
+		const uiShield = document.getElementById('shield-bar');
+		const uiShieldCont = document.getElementById('shield-container');
+		const btnRetry = document.getElementById('btn-retry');
+		const btnExit = document.getElementById('btn-exit');
+
+		btnRetry.onclick = () => location.reload();
+		btnExit.onclick = () => location.href = 'index.html';
+
+		// Joystick Logic
+		class Joystick {
+			constructor(elementId, outputObj) {
+				this.el = document.getElementById(elementId);
+				this.out = outputObj;
+				this.startPos = { x: 0, y: 0 };
+				this.rect = this.el.getBoundingClientRect();
+				this.touchId = null;
+				this.knob = document.createElement('div');
+				
+				// Visual knob
+				this.knob.style.width = '50px'; this.knob.style.height = '50px';
+				this.knob.style.background = 'rgba(255,255,255,0.5)';
+				this.knob.style.borderRadius = '50%';
+				this.knob.style.position = 'absolute';
+				this.knob.style.top = '50%'; this.knob.style.left = '50%';
+				this.knob.style.transform = 'translate(-50%, -50%)';
+				this.knob.style.pointerEvents = 'none';
+				this.el.appendChild(this.knob);
+
+				this.el.addEventListener('touchstart', e => this.start(e), {passive: false});
+				this.el.addEventListener('touchmove', e => this.move(e), {passive: false});
+				this.el.addEventListener('touchend', e => this.end(e));
+				
+				// Mouse fallback
+				this.el.addEventListener('mousedown', e => this.startMouse(e));
+			}
+
+			start(e) {
+				e.preventDefault();
+				if (this.touchId !== null) return;
+				const touch = e.changedTouches[0];
+				this.touchId = touch.identifier;
+				this.updatePos(touch.clientX, touch.clientY);
+				this.out.active = true;
+			}
+			
+			move(e) {
+				e.preventDefault();
+				for (let i = 0; i < e.changedTouches.length; i++) {
+					if (e.changedTouches[i].identifier === this.touchId) {
+						this.updatePos(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+						break;
+					}
+				}
+			}
+
+			end(e) {
+				for (let i = 0; i < e.changedTouches.length; i++) {
+					if (e.changedTouches[i].identifier === this.touchId) {
+						this.touchId = null;
+						this.reset();
+						break;
+					}
+				}
+			}
+
+			startMouse(e) {
+				e.preventDefault();
+				this.updatePos(e.clientX, e.clientY);
+				this.out.active = true;
+				const moveHandler = (ev) => this.updatePos(ev.clientX, ev.clientY);
+				const upHandler = () => {
+					this.reset();
+					window.removeEventListener('mousemove', moveHandler);
+					window.removeEventListener('mouseup', upHandler);
+				};
+				window.addEventListener('mousemove', moveHandler);
+				window.addEventListener('mouseup', upHandler);
+			}
+
+			updatePos(cx, cy) {
+				this.rect = this.el.getBoundingClientRect();
+				const centerX = this.rect.left + this.rect.width / 2;
+				const centerY = this.rect.top + this.rect.height / 2;
+				let dx = cx - centerX;
+				let dy = cy - centerY;
+				
+				const maxDist = this.rect.width / 2;
+				const dist = Math.sqrt(dx*dx + dy*dy);
+				
+				// Normalize output
+				if (dist > 0) {
+					this.out.x = dx / dist;
+					this.out.y = dy / dist;
+				}
+				
+				// Clamp visual
+				if (dist > maxDist) {
+					dx = (dx / dist) * maxDist;
+					dy = (dy / dist) * maxDist;
+				}
+				
+				this.knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+			}
+
+			reset() {
+				this.out.x = 0; this.out.y = 0; this.out.active = false;
+				this.knob.style.transform = 'translate(-50%, -50%)';
+			}
+		}
+
+		// Initialize Joysticks
+		new Joystick('stick-left', input.move);
+		new Joystick('stick-right', input.aim);
+
+		// Helper Functions
+		function checkCollisionMap(x, y, r) {
+			if (typeof isSolid === 'undefined') return false; // Fallback if map not loaded
+			// Check 4 corners
+			return isSolid(x + r, y) || isSolid(x - r, y) || isSolid(x, y + r) || isSolid(x, y - r);
+		}
+
+		// Game Logic
+		function startGame(mode) {
+			console.log('Starting game in mode:', mode);
+			gameMode = mode;
+			document.getElementById('startScreen').style.display = 'none';
+			
+			// Initialize Player
+			player.x = (typeof MAP_WIDTH !== 'undefined') ? MAP_WIDTH/2 : 2500;
+			player.y = (typeof MAP_HEIGHT !== 'undefined') ? MAP_HEIGHT/2 : 2500;
+			player.hp = 100;
+			
+			// Initialize World
+			bullets = []; enemies = []; pickups = []; crates = [];
+			
+			// Spawn Random Crates
+			const w = (typeof MAP_WIDTH !== 'undefined') ? MAP_WIDTH : 5000;
+			const h = (typeof MAP_HEIGHT !== 'undefined') ? MAP_HEIGHT : 5000;
+			for(let i=0; i<40; i++) {
+				let cx = Math.random() * w;
+				let cy = Math.random() * h;
+				if(!checkCollisionMap(cx, cy, 20)) {
+					crates.push({ x: cx, y: cy, w: 40, h: 40, hp: 60 });
+				}
+			}
+
+			running = true;
+			requestAnimationFrame(loop);
+		}
+
+		function update() {
+			// Player Movement
+			if (input.move.active) {
+				const nextX = player.x + input.move.x * PLAYER_SPEED;
+				const nextY = player.y + input.move.y * PLAYER_SPEED;
+				
+				// Simple Collision
+				if (!checkCollisionMap(nextX, player.y, player.radius)) player.x = nextX;
+				if (!checkCollisionMap(player.x, nextY, player.radius)) player.y = nextY;
+			}
+
+			// Shooting
+			if (input.aim.active) {
+				player.angle = Math.atan2(input.aim.y, input.aim.x);
+				if (player.coolDown <= 0) {
+					shoot(player.x, player.y, player.angle, 'player');
+					player.coolDown = 15;
+				}
+			} else if (input.move.active) {
+				// Face movement direction if not aiming
+				player.angle = Math.atan2(input.move.y, input.move.x);
+			}
+
+			if (player.coolDown > 0) player.coolDown--;
+
+			// Shield Regen
+			if (player.shield < player.maxShield && player.hp > 0) {
+				player.shield += 0.05;
+			}
+			
+			// Pickups Collection
+			for (let i = pickups.length - 1; i >= 0; i--) {
+				let p = pickups[i];
+				let dx = player.x - p.x;
+				let dy = player.y - p.y;
+				if (Math.sqrt(dx*dx + dy*dy) < player.radius + p.r) {
+					// Collect
+					if (p.type === 'shield') {
+						player.shield = player.maxShield;
+					} else if (p.type === 'weapon') {
+						// Temporarily boost (simulated by just healing for now or score)
+						player.hp = Math.min(player.maxHp, player.hp + 20);
+					}
+					pickups.splice(i, 1);
+					score += 50;
+					document.getElementById('scoreVal').innerText = score;
+				}
+			}
+
+			// Camera Follow
+			const targetCamX = player.x - canvas.width / 2;
+			const targetCamY = player.y - canvas.height / 2;
+			camera.x += (targetCamX - camera.x) * CAMERA_LERP;
+			camera.y += (targetCamY - camera.y) * CAMERA_LERP;
+
+			// Clamp Camera
+			if (typeof MAP_WIDTH !== 'undefined') {
+				camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
+				camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+			}
+
+			// Update Bullets
+			for (let i = bullets.length - 1; i >= 0; i--) {
+				let b = bullets[i];
+				b.x += Math.cos(b.angle) * b.speed;
+				b.y += Math.sin(b.angle) * b.speed;
+				b.life--;
+				
+				let hit = false;
+				// Wall Collision
+				if (b.life <= 0 || checkCollisionMap(b.x, b.y, 2)) {
+					bullets.splice(i, 1);
+					continue;
+				}
+				
+				// Crate Collision
+				if (b.owner === 'player') {
+					for (let k = crates.length - 1; k >= 0; k--) {
+						let c = crates[k];
+						// Simple Box Check
+						if (b.x > c.x && b.x < c.x + c.w && b.y > c.y && b.y < c.y + c.h) {
+							c.hp -= 20;
+							hit = true;
+							if (c.hp <= 0) {
+								// Drop item
+								pickups.push({
+									x: c.x + c.w/2, 
+									y: c.y + c.h/2, 
+									type: Math.random() < 0.5 ? 'shield' : 'weapon',
+									r: 15
+								});
+								crates.splice(k, 1);
+							}
+							break;
+						}
+					}
+				}
+
+				if (hit) {
+					bullets.splice(i, 1);
+					continue;
+				}
+
+				// Enemy Collision (b.owner === 'player')
+				if (b.owner === 'player') {
+					for (let j = enemies.length - 1; j >= 0; j--) {
+						let e = enemies[j];
+						const dx = b.x - e.x, dy = b.y - e.y;
+						if (dx*dx + dy*dy < 25*25) { // Hit radius
+							e.hp -= 10; // Damage
+							hit = true;
+							// Knockback
+							e.x += Math.cos(b.angle) * 5;
+							e.y += Math.sin(b.angle) * 5;
+							
+							if (e.hp <= 0) {
+								enemies.splice(j, 1);
+								score += 100;
+								document.getElementById('scoreVal').innerText = score;
+							}
+							break;
+						}
+					}
+				}
+				if(hit) bullets.splice(i, 1);
+			}
+			
+			// Update Enemies
+			if (gameMode === 'npc' && enemies.length < 15 && Math.random() < 0.03) {
+				spawnEnemy('zombie');
+			} else if (gameMode === 'bot' && enemies.length < 8 && Math.random() < 0.02) {
+				spawnEnemy('bot');
+			}
+			
+			for (let i = enemies.length - 1; i >= 0; i--) {
+				let e = enemies[i];
+				const dx = player.x - e.x;
+				const dy = player.y - e.y;
+				const dist = Math.sqrt(dx*dx + dy*dy);
+				if (dist > 0) {
+					// Move towards player
+					let mx = (dx/dist) * e.speed;
+					let my = (dy/dist) * e.speed;
+					if (!checkCollisionMap(e.x + mx, e.y, 20)) e.x += mx;
+					if (!checkCollisionMap(e.x, e.y + my, 20)) e.y += my;
+				}
+				
+				// Player Damage
+				if (dist < player.radius + 20) {
+					takeDamage(0.5);
+				}
+			}
+
+			// Check Game Over
+			if (player.hp <= 0) {
+				running = false;
+				document.getElementById('gameOverScreen').style.display = 'flex';
+				document.getElementById('finalScore').innerText = Math.floor(score);
+			}
+		}
+
+		function takeDamage(amount) {
+			if (player.shield > 0) {
+				player.shield -= amount;
+				if (player.shield < 0) {
+					player.hp += player.shield;
+					player.shield = 0;
+				}
+			} else {
+				player.hp -= amount;
+			}
+		}
+
+		function spawnEnemy(type) {
+			const angle = Math.random() * Math.PI * 2;
+			const dist = 700;
+			let e = {
+				x: player.x + Math.cos(angle) * dist,
+				y: player.y + Math.sin(angle) * dist,
+				hp: 30,
+				speed: 1.5 + Math.random(),
+				color: '#e74c3c',
+				type: type
+			};
+
+			if (type === 'bot') {
+				e.hp = 60;
+				e.speed = 2.5 + Math.random();
+				e.color = '#9b59b6'; // Purple
+			} else {
+				// zombie defaults
+				e.hp = 30;
+				e.speed = 1.0 + Math.random();
+				e.color = '#e74c3c'; // Red
+			}
+			enemies.push(e);
+		}
+
+		function shoot(x, y, angle, owner) {
+			bullets.push({ x, y, angle, speed: 12, life: 60, owner });
+		}
+
+		function draw() {
+			// Clear Screen
+			ctx.fillStyle = '#111';
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+			// Draw Map (Visible area only)
+			ctx.save();
+			ctx.translate(-camera.x, -camera.y);
+
+			if (typeof map !== 'undefined') {
+				const startCol = Math.floor(camera.x / TILE_SIZE);
+				const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 1;
+				const startRow = Math.floor(camera.y / TILE_SIZE);
+				const endRow = startRow + Math.ceil(canvas.height / TILE_SIZE) + 1;
+				
+				for (let r = startRow; r < endRow; r++) {
+					for (let c = startCol; c < endCol; c++) {
+						if (r>=0 && r<ROWS && c>=0 && c<COLS) {
+							const tile = map[r * COLS + c];
+							// Colors based on brawl_map.js types
+							if (tile === 0) ctx.fillStyle = '#2ecc71'; // Grass
+							else if (tile === 1) ctx.fillStyle = '#27ae60'; // Wall Grass
+							else if (tile === 2) ctx.fillStyle = '#f1c40f'; // Sand
+							else if (tile === 3) ctx.fillStyle = '#d35400'; // Wall Sand
+							else if (tile === 4) ctx.fillStyle = '#ecf0f1'; // Snow
+							else if (tile === 5) ctx.fillStyle = '#bdc3c7'; // Wall Snow
+							else if (tile === 6) ctx.fillStyle = '#8e44ad'; // Dark
+							else if (tile === 7) ctx.fillStyle = '#2c3e50'; // Wall Dark
+							else ctx.fillStyle = '#000';
+							
+							ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+							
+							// Render decorative border for walls
+							if (tile % 2 !== 0) {
+								ctx.fillStyle = 'rgba(0,0,0,0.2)';
+								ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE + TILE_SIZE - 10, TILE_SIZE, 10);
+							}
+						}
+					}
+				}
+			}
+			
+			// Draw Crates
+			crates.forEach(c => {
+				ctx.fillStyle = '#8d6e63';
+				ctx.fillRect(c.x, c.y, c.w, c.h);
+				ctx.strokeStyle = '#5d4037';
+				ctx.lineWidth = 2;
+				ctx.strokeRect(c.x, c.y, c.w, c.h);
+				// X mark
+				ctx.beginPath();
+				ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + c.w, c.y + c.h);
+				ctx.moveTo(c.x + c.w, c.y); ctx.lineTo(c.x, c.y + c.h);
+				ctx.stroke();
+			});
+
+			// Draw Pickups
+			pickups.forEach(p => {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+				if (p.type === 'shield') ctx.fillStyle = '#3498db'; // Blue
+				else ctx.fillStyle = '#e74c3c'; // Red
+				ctx.fill();
+				ctx.strokeStyle = 'white';
+				ctx.lineWidth = 2;
+				ctx.stroke();
+				// Icon text
+				ctx.fillStyle = 'white';
+				ctx.font = '12px Arial';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText(p.type === 'shield' ? 'S' : 'W', p.x, p.y);
+			});
+
+			// Draw Player
+			ctx.beginPath();
+			ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+			ctx.fillStyle = '#3498db';
+			ctx.fill();
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = '#fff';
+			ctx.stroke();
+			
+			// Player gun direction
+			ctx.beginPath();
+			ctx.moveTo(player.x, player.y);
+			ctx.lineTo(player.x + Math.cos(player.angle) * 35, player.y + Math.sin(player.angle) * 35);
+			ctx.strokeStyle = '#3498db';
+			ctx.lineWidth = 10;
+			ctx.stroke();
+			
+			// Draw Enemies
+			enemies.forEach(e => {
+				ctx.beginPath();
+				ctx.arc(e.x, e.y, 20, 0, Math.PI * 2);
+				ctx.fillStyle = e.color;
+				ctx.fill();
+				// Health bar for enemy
+				ctx.fillStyle = 'red';
+				ctx.fillRect(e.x - 20, e.y - 35, 40, 5);
+				ctx.fillStyle = '#0f0';
+				ctx.fillRect(e.x - 20, e.y - 35, 40 * (e.hp/30), 5);
+			});
+			
+			// Draw Bullets
+			ctx.fillStyle = '#ff0';
+			bullets.forEach(b => {
+				ctx.beginPath();
+				ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+				ctx.fill();
+			});
+
+			ctx.restore();
+			
+			// Update UI
+			if (uiHp) uiHp.style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+			if (uiShield && uiShieldCont) {
+				uiShieldCont.style.display = player.shield > 0 ? 'block' : 'none';
+				uiShield.style.width = Math.max(0, (player.shield / player.maxShield) * 100) + '%';
+			}
+		}
+
+		function loop() {
+			if (!running) return;
+			try {
+				update();
+				draw();
+				requestAnimationFrame(loop);
+			} catch (e) {
+				console.error(e);
+				running = false;
+				alert('Game Loop Error: ' + e.message);
+			}
+		}
 	</script>
 </body>
 </html>
