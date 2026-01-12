@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Generatore Sankey — Diagrammi Sankey</title>
+    <style>
+      :root {
+        --bg-color: #121212; --panel-bg: #1e1e1e; --text-color: #e0e0e0; --accent-color: #00d4ff; --border-color: #333; --input-bg: #2d2d2d;
+      }
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg-color);color:var(--text-color)}
+      header{padding:16px;background:var(--panel-bg);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between}
+      nav a{color:var(--accent-color);text-decoration:none;font-weight:600}
+      main{flex:1;padding:20px;max-width:1400px;margin:0 auto;display:flex;gap:20px;flex-wrap:wrap}
+      .panel{background:var(--panel-bg);padding:20px;border-radius:12px;border:1px solid var(--border-color);box-shadow:0 4px 6px rgba(0,0,0,0.3);min-width:300px;flex:1}
+      h1{margin:0 0 8px 0}
+      textarea{width:100%;height:160px;padding:12px;font-size:0.95rem;background:var(--input-bg);color:#fff;border:1px solid var(--border-color);border-radius:8px;resize:vertical}
+      .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
+      label{font-size:0.9rem;color:#aaa}
+      input,select{padding:8px;border-radius:6px;background:var(--input-bg);color:#fff;border:1px solid var(--border-color)}
+      button{padding:10px 16px;border-radius:6px;background:var(--accent-color);border:none;color:#fff;font-weight:700;cursor:pointer}
+      #canvasWrap{background:#0b0b0b;padding:12px;border-radius:8px;border:1px solid var(--border-color);min-height:320px;display:flex;align-items:center;justify-content:center;position:relative}
+      .overlay-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);font-size:0.95rem}
+      .hint{color:#888;margin-top:8px;font-size:0.9rem}
+      /* node value label styles */
+      .nodeValueText{fill:#fff;font-size:10px;pointer-events:none}
+      .nodeValueBg{fill:#000;opacity:0.95;pointer-events:none}
+      @media (max-width:768px){main{padding:12px;flex-direction:column}}
+    </style>
+  </head>
+  <body>
+    <header>
+      <div style="font-weight:700">Generatore Sankey</div>
+      <nav><a href="/">Home</a></nav>
+    </header>
+    <main>
+      <div class="panel">
+        <h1>Generatore di diagrammi Sankey</h1>
+        <p class="hint">Inserisci le relazioni come righe <code>source,target,value</code>. Premi <strong>Render</strong> per vedere il grafico e <strong>Download JPEG</strong> per scaricarlo come immagine.</p>
+        <textarea id="dataInput">A,B,10
+A,C,5
+B,D,7
+C,D,3
+D,Out,2</textarea>
+        <div class="controls">
+          <label for="nodeWidth">Node width</label>
+          <input id="nodeWidth" type="number" value="20" style="width:90px">
+          <label for="nodePadding">Node padding</label>
+          <input id="nodePadding" type="number" value="10" style="width:90px">
+          <label for="height">Height</label>
+          <input id="height" type="number" value="420" style="width:110px">
+
+          <label for="align">Align</label>
+          <select id="align" style="width:120px">
+            <option value="justify">Justify</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+            <option value="center">Center</option>
+          </select>
+
+          <label for="colorScheme">Palette</label>
+          <select id="colorScheme" style="width:140px">
+            <option value="category10">Category (default)</option>
+            <option value="pastel">Pastel</option>
+            <option value="greens">Greens</option>
+            <option value="monochrome">Monochrome</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input id="nodeColor" type="color" value="#1e90ff" title="Colore nodi" style="width:48px">
+          <label for="linkColor">Link</label>
+          <input id="linkColor" type="color" value="#8ac6ff" title="Colore link" style="width:48px">
+
+          <label for="showValues" title="Mostra valori dei nodi">Show values</label>
+          <input id="showValues" type="checkbox" checked>
+          <label for="showLinkValues" title="Mostra valori dei link">Show link values</label>
+          <input id="showLinkValues" type="checkbox">
+
+          <button id="render">Render</button>
+          <button id="download">Download JPEG</button>
+          <button id="downloadSVG">Download SVG</button>
+        </div>
+        <div class="hint">Formato esempio: <code>Entrate,Costi,150</code>. Nomi liberi, numeri positivi.</div>
+      </div>
+      <div class="panel" style="flex:1.5;min-width:380px">
+        <h2>Anteprima</h2>
+        <div id="canvasWrap">
+          <svg id="sankeySVG" width="100%" height="420"></svg>
+        </div>
+      </div>
+    </main>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <script>
+      function parseInput(text){
+        const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+        const links = [];
+        for(const l of lines){
+          const parts = l.split(',').map(p=>p.trim());
+          if(parts.length<3) continue;
+          const v = parseFloat(parts[2]);
+          if(isNaN(v)) continue;
+          links.push({source: parts[0], target: parts[1], value: v});
+        }
+        const nodesMap = new Map();
+        links.forEach(l=>{ nodesMap.set(l.source, {}); nodesMap.set(l.target, {}); });
+        const nodes = Array.from(nodesMap.keys()).map(k=>({name:k}));
+        // convert links to indices
+        const nodeIndex = new Map(nodes.map((n,i)=>[n.name,i]));
+        const convLinks = links.map(l=>({source: l.source, target: l.target, value: l.value}));
+        return {nodes, links: convLinks};
+      }
+
+      function render(){
+        const svg = d3.select('#sankeySVG');
+        const width = svg.node().clientWidth;
+        const height = parseInt(document.getElementById('height').value) || 420;
+        svg.attr('height', height);
+        const nodeWidth = parseInt(document.getElementById('nodeWidth').value) || 20;
+        const nodePadding = parseInt(document.getElementById('nodePadding').value) || 10;
+
+        const align = document.getElementById('align').value;
+        let nodeAlign = d3.sankeyJustify;
+        if(align === 'left') nodeAlign = d3.sankeyLeft;
+        else if(align === 'right') nodeAlign = d3.sankeyRight;
+        else if(align === 'center') nodeAlign = d3.sankeyCenter;
+
+        const colorScheme = document.getElementById('colorScheme').value;
+        const nodeColorInput = document.getElementById('nodeColor').value;
+        const linkColorInput = document.getElementById('linkColor').value;
+
+        // simple palettes
+        const palettes = {
+          pastel: ['#ffd1dc','#ffefc4','#cdeac0','#cde8ff','#e6dfff','#f0f5ff'],
+          greens: ['#00441b','#006d2c','#238b45','#41ab5d','#78c679'],
+          monochrome: ['#1e90ff','#1976d2','#145ea8','#0b3f7e','#042a55']
+        };
+
+        let colorScale;
+        if(colorScheme === 'category10') colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+        else if(colorScheme in palettes) colorScale = d3.scaleOrdinal(palettes[colorScheme]);
+        else colorScale = () => nodeColorInput; // custom
+
+        const {nodes, links} = parseInput(document.getElementById('dataInput').value);
+        // index nodes
+        const nameToNode = new Map(nodes.map(n=>[n.name, Object.assign({}, n)]));
+        const graph = {nodes: Array.from(nameToNode.values()), links: links.map(l=>({source: l.source, target: l.target, value: l.value}))};
+
+        // d3-sankey requires numeric source/target indices
+        graph.nodes = graph.nodes.map(n=>({name:n.name}));
+        const nodeByName = new Map(graph.nodes.map((d,i)=>[d.name,i]));
+        const sankeyLinks = graph.links.map(l=>({source: nodeByName.get(l.source), target: nodeByName.get(l.target), value: l.value}));
+
+        const sankeyGen = d3.sankey()
+          .nodeWidth(nodeWidth)
+          .nodePadding(nodePadding)
+          .extent([[1,1],[width-1,height-6]]);
+        if(typeof sankeyGen.nodeAlign === 'function' && nodeAlign) sankeyGen.nodeAlign(nodeAlign);
+
+        const sankeyData = {nodes: graph.nodes.map(d=>Object.assign({}, d)), links: sankeyLinks.map(d=>Object.assign({}, d))};
+        sankeyGen(sankeyData);
+
+        svg.selectAll('*').remove();
+
+        // clear overlays
+        const canvasWrapEl = document.getElementById('canvasWrap');
+        canvasWrapEl.querySelectorAll('.overlay-msg').forEach(n=>n.remove());
+
+        // show helpful message if no links
+        if(!sankeyData.links || sankeyData.links.length === 0){
+          const msg = document.createElement('div');
+          msg.className = 'overlay-msg';
+          msg.textContent = 'Nessun flusso trovato: controlla il formato (source,target,value)';
+          canvasWrapEl.appendChild(msg);
+          return;
+        }
+
+        // links
+        // debug: log link info to help diagnose visibility issues
+        try{ console.debug('Sankey links', sankeyData.links.map(l=>({source: l.source && l.source.name, target: l.target && l.target.name, width: l.width, value: l.value}))); } catch(e){}
+
+        const maxLinkValue = d3.max(sankeyData.links, d => d.value) || 1;
+        const widthScale = d3.scaleLinear().domain([0, maxLinkValue]).range([1, Math.max(1, nodeWidth)]);
+
+        const link = svg.append('g')
+          .attr('fill','none')
+          .selectAll('path')
+          .data(sankeyData.links)
+          .enter().append('path')
+          .attr('id', (d,i) => 'link-path-' + i)
+          .attr('d', d3.sankeyLinkHorizontal())
+          .attr('stroke', d => linkColorInput || '#8ac6ff')
+          .attr('stroke-width', d => Math.max(1, d.width || widthScale(d.value || 0)))
+          .attr('stroke-linecap','round')
+          .style('mix-blend-mode','multiply')
+          .attr('fill','none');
+
+        // nodes
+        const node = svg.append('g')
+          .selectAll('g')
+          .data(sankeyData.nodes)
+          .enter().append('g');
+
+        node.append('rect')
+          .attr('x', d => d.x0)
+          .attr('y', d => d.y0)
+          .attr('height', d => Math.max(1, d.y1 - d.y0))
+          .attr('width', d => Math.max(1, d.x1 - d.x0))
+          .attr('fill', d => colorScale(d.name))
+          .attr('stroke', d => {
+            try{ return d3.color(colorScale(d.name)).darker(0.8).formatHex(); } catch(e){ return '#033a63'; }
+          });
+
+        node.append('text')
+          .attr('x', d => d.x0 - 6)
+          .attr('y', d => (d.y1 + d.y0) / 2)
+          .attr('dy', '0.35em')
+          .attr('text-anchor', 'end')
+          .attr('fill', '#fff')
+          .attr('font-size', 12)
+          .text(d => d.name)
+          .filter(d => d.x0 < width / 2)
+          .attr('x', d => d.x1 + 6)
+          .attr('text-anchor', 'start');
+
+        // node values (optional)
+        svg.selectAll('g.nodeValueGroup').remove();
+        if(document.getElementById('showValues').checked){
+          const groups = svg.append('g').attr('class','nodeValues').selectAll('g.nodeValueGroup').data(sankeyData.nodes).enter().append('g').attr('class','nodeValueGroup');
+
+          groups.append('text')
+            .attr('class','nodeValueText')
+            .attr('x', d => (d.x0 + d.x1)/2)
+            .attr('y', d => d.y1 + 14)
+            .attr('text-anchor', 'middle')
+            .text(d => d.value);
+
+          // insert background rects behind each text after rendering
+          groups.each(function(d){
+            const g = d3.select(this);
+            const t = g.select('text.nodeValueText');
+            try{
+              const bbox = t.node().getBBox();
+              g.insert('rect','text.nodeValueText')
+                .attr('class','nodeValueBg')
+                .attr('x', bbox.x - 6)
+                .attr('y', bbox.y - 2)
+                .attr('width', bbox.width + 12)
+                .attr('height', bbox.height + 4)
+                .attr('rx', 4);
+            }catch(e){ /* measurement failed; ignore */ }
+          });
+        }
+
+        // link labels (optional)
+        svg.selectAll('g.linkLabels').remove();
+        if(document.getElementById('showLinkValues').checked){
+          const labelsGroup = svg.append('g').attr('class','linkLabels');
+
+          // outline for readability
+          labelsGroup.selectAll('text.linkValueOutline')
+            .data(sankeyData.links)
+            .enter().append('text')
+            .attr('class','linkValue outline')
+            .attr('font-size',10)
+            .attr('text-anchor','middle')
+            .attr('stroke','#000')
+            .attr('stroke-width',3)
+            .attr('paint-order','stroke')
+            .filter((d,i)=>{ const p=document.getElementById('link-path-'+i); return p && p.getTotalLength()>40; })
+            .append('textPath')
+            .attr('href', (d,i)=> '#link-path-'+i)
+            .attr('startOffset','50%')
+            .text(d => d.value);
+
+          // actual text
+          labelsGroup.selectAll('text.linkValue')
+            .data(sankeyData.links)
+            .enter().append('text')
+            .attr('class','linkValue')
+            .attr('font-size',10)
+            .attr('text-anchor','middle')
+            .attr('fill','#fff')
+            .filter((d,i)=>{ const p=document.getElementById('link-path-'+i); return p && p.getTotalLength()>40; })
+            .append('textPath')
+            .attr('href', (d,i)=> '#link-path-'+i)
+            .attr('startOffset','50%')
+            .text(d => d.value);
+        }
+      }
+
+      function downloadJPEG(){
+        const svgEl = document.getElementById('sankeySVG');
+        const serializer = new XMLSerializer();
+        let svgStr = serializer.serializeToString(svgEl);
+        const img = new Image();
+        const svgData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = svgEl.clientWidth * devicePixelRatio;
+          canvas.height = svgEl.clientHeight * devicePixelRatio;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#0b0b0b'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const data = canvas.toDataURL('image/jpeg', 0.92);
+          const a = document.createElement('a'); a.href = data; a.download = 'sankey.jpg'; a.click();
+        };
+        img.onerror = (e)=>{ alert('Errore durante la conversione dell\'SVG in immagine. Assicurati che il diagramma sia visibile e riprova.'); };
+        img.src = svgData;
+      }
+
+      document.getElementById('render').addEventListener('click', ()=>{ render(); });
+      document.getElementById('download').addEventListener('click', ()=>{ downloadJPEG(); });
+
+      function downloadSVG(){
+        const svgEl = document.getElementById('sankeySVG');
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svgEl);
+        const blob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'sankey.svg'; a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 1500);
+      }
+
+      document.getElementById('downloadSVG').addEventListener('click', downloadSVG);
+
+      // UI listeners
+      document.getElementById('colorScheme').addEventListener('change', ()=>{ document.getElementById('nodeColor').style.display = document.getElementById('colorScheme').value === 'custom' ? 'inline-block' : 'none'; render(); });
+      ['nodeColor','linkColor','align','nodeWidth','nodePadding','height','showValues','showLinkValues'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('input', render);
+        if(el) el.addEventListener('change', render);
+      });
+
+      // initial control visibility + render
+      document.getElementById('nodeColor').style.display = document.getElementById('colorScheme').value === 'custom' ? 'inline-block' : 'none';
+      render();
+    </script>
+  </body>
+</html>
