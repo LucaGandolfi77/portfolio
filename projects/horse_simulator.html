@@ -271,47 +271,82 @@
             constructor(def) {
                 this.name = def.name;
                 this.color = def.color;
-                // Stats (0-100)
-                this.speed = 80 + Math.random() * 15; // Top Speed
-                this.accel = 70 + Math.random() * 20; // Acceleration
-                this.stamina = 70 + Math.random() * 30; // Resistance to fatigue
-                this.consistency = Math.random(); 
+                
+                // Stats - Tightened for closer races
+                // Base Speed roughly maps to game units
+                this.baseSpeed = 95 + Math.random() * 5; // 95-100 range
+                this.accel = 20 + Math.random() * 10;    // Acceleration
+                this.stamina = Math.random();            // 0-1 measure for late game
 
                 // Race State
-                this.distance = 0; // Total meters run
-                this.progress = 0; // 0 to TRACK_LAPS
+                this.distance = 0; 
+                this.progress = 0; 
                 this.currentSpeed = 0;
-                this.fatigue = 0;
-                this.lane = 0; // assigned later
+                this.lane = 0; 
                 this.lapsCompleted = 0;
+
+                // Dynamic Mechanics
+                this.surgeState = 0; // 0=Normal, 1=Boost, -1=Lull
+                this.stateTimer = 0;
             }
 
             update(dt) {
-                // Determine target speed
-                // Max speed depends on Base Speed - Fatigue
-                // Fatigue grows with distance, mitigated by Stamina
-                
-                // Fatigue Factor (0 to 1) increases over race
-                let fatigueRate = (100 - this.stamina) * 0.0005;
-                this.fatigue += this.currentSpeed * fatigueRate * dt; 
-                
-                let perfVar = (Math.random() - 0.5) * (1 - this.consistency) * 2; // Random burst/lag
-                
-                let targetSpeedMps = (this.speed / 3.6) * (1 - Math.min(this.fatigue*0.001, 0.4)) + perfVar; 
-
-                // Accel
-                if (this.currentSpeed < targetSpeedMps) {
-                    this.currentSpeed += (this.accel * 0.1) * dt;
-                } else {
-                    this.currentSpeed -= (2.0) * dt; // Decel natural
+                // 1. Update State (Surges and Lulls)
+                this.stateTimer -= dt;
+                if (this.stateTimer <= 0) {
+                    const r = Math.random();
+                    if (r < 0.3) {
+                        // Boost!
+                        this.surgeState = 1;
+                        this.stateTimer = 1 + Math.random() * 2; // 1-3s duration
+                    } else if (r < 0.5) {
+                        // Lull / Catch breath
+                        this.surgeState = -1;
+                        this.stateTimer = 1 + Math.random() * 2;
+                    } else {
+                        // Cruising
+                        this.surgeState = 0;
+                        this.stateTimer = 2 + Math.random() * 3;
+                    }
                 }
 
-                // Move
+                // 2. Calculate Target Velocity
+                // Convert base stat to m/s approx.
+                // 2000m race. Target time ~50-60s => ~35-40 m/s
+                let targetMps = this.baseSpeed / 2.6; 
+
+                // Apply Surge modifiers
+                if (this.surgeState === 1) targetMps *= 1.15; // +15% burst
+                if (this.surgeState === -1) targetMps *= 0.85; // -15% lag
+
+                // Apply Fatigue/Stamina effects logic
+                // Horses slow down slightly as race progresses, stamina mitigates this
+                const raceProgress = Math.min(1, this.distance / (TRACK_LAPS * TRACK_LENGTH_M));
+                
+                // Fatigue curve starting after 50% distance
+                if (raceProgress > 0.5) {
+                    // Factor rises 0 to 0.2
+                    let fatigueFactor = (raceProgress - 0.5) * 0.4; 
+                    // High stamina reduces the impact (stamina 1.0 -> 0 impact)
+                    let effectiveFatigue = fatigueFactor * (1 - (this.stamina * 0.8));
+                    targetMps *= (1 - effectiveFatigue);
+                }
+
+                // 3. Physics update
+                // Smooth interpolation for velocity
+                const approachRate = this.accel * dt;
+                if (this.currentSpeed < targetMps) {
+                    this.currentSpeed = Math.min(targetMps, this.currentSpeed + approachRate);
+                } else {
+                    this.currentSpeed = Math.max(targetMps, this.currentSpeed - approachRate);
+                }
+
+                // 4. Move
                 this.distance += this.currentSpeed * dt;
                 
-                // One lap is TRACK_LENGTH_M meters
                 this.progress = this.distance / TRACK_LENGTH_M;
                 
+                // Check Lap
                 if (Math.floor(this.progress) > this.lapsCompleted) {
                     this.lapsCompleted = Math.floor(this.progress);
                     if (this.lapsCompleted < TRACK_LAPS) {
