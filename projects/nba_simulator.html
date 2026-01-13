@@ -325,7 +325,7 @@
                 { name: "Daniel Gafford", ovr: 80, off: 75, def: 85, pos: "C" },
                 { name: "Tim Hardaway Jr.", ovr: 78, off: 82, def: 68, pos: "SF" }
             ]},
-            "PBC": { name: "Piacenza Basket Club", color: "#98002E", players: [
+            "PBC": { name: "Basket Club Piacenza", color: "#98002E", players: [
                 { name: "Enrico Massari", ovr: 79, off: 78, def: 81, pos: "PG" },
                 { name: "Luca Roljic", ovr: 83, off: 89, def: 72, pos: "SG" },
                 { name: "Umberto Livelli", ovr: 94, off: 96, def: 80, pos: "SG" },
@@ -356,33 +356,42 @@
         
         const COMMENTARY_TEMPLATES = {
             make2: [
-                "{player} drives to the lane... and lays it in!",
-                "{player} pulls up for a mid-range jumper... SWISH!",
-                "{player} posts up, spins... and scores easily.",
-                "Beautiful pass finds {player} for the easy bucket.",
-                "{player} fades away... GOT IT!"
+                "{player} penetra in area... e appoggia a canestro!",
+                "{player} si arresta dalla media... CIUFF!",
+                "{player} in post basso, si gira... e segna facilmente.",
+                "Bellissimo passaggio per {player} che segna un canestro facile.",
+                "{player} in allontanamento... PRESO!",
+                "{player} usa il tabellone... canestro!",
+                "{player} galleggia in aria e segna!"
             ],
             make3: [
-                "{player} from downtown... BANG!",
-                "{player} steps back for three... IT'S GOOD!",
-                "{player} catches in the corner... fires... SPLASH!",
-                "Way downtown... {player} hits the deep three!"
+                "{player} da lontanissimo... BANG!",
+                "{player} step back da tre... È BUONO!",
+                "{player} riceve nell'angolo... tira... SOLO RETE!",
+                "Dalla lunga distanza... {player} mette la tripla!",
+                "Mano calda per {player}! Un'altra tripla!",
+                "{player} da casa sua! INCREDIBILE!"
             ],
             dunk: [
-                "{player} takes off... OH MY GOODNESS! MONSTER SLAM!",
-                "Clear lane for {player}... throws it down with authority!",
-                "{player} rises up and hammers it home!"
+                "{player} decolla... MAMMA MIA! CHE SCHIACCIATA!",
+                "Autostrada per {player}... e affonda la schiacciata!",
+                "{player} salta più in alto di tutti e schiaccia!",
+                "{player} fa tremare il ferro!"
             ],
             miss: [
-                "{player} forces a tough shot... no good.",
-                "{player}'s jumper hits the back iron.",
-                "Blocked! Great defense stops {player}.",
-                "{player} tries a floater but it spills out."
+                "{player} forza il tiro... corto.",
+                "{player} sbaglia la conclusione.",
+                "Stoppata! Grande difesa su {player}.",
+                "{player} prova il floater ma la palla esce.",
+                "Ferro! Nulla di fatto per {player}.",
+                "{player} spara a salve."
             ],
             turnover: [
-                "{player} loses the handle... turnover.",
-                "Bad pass by {player}, intercepted!",
-                "{player} steps out of bounds."
+                "{player} perde il controllo... palla persa.",
+                "Passaggio sbagliato di {player}, intercettato!",
+                "{player} calpesta la linea laterale.",
+                "Infrazione di passi per {player}.",
+                "{player} commette fallo in attacco."
             ]
         };
 
@@ -390,72 +399,104 @@
 
         // --- INIT ---
         window.onload = function() {
-            const sels = [document.getElementById('home-select'), document.getElementById('away-select')];
-            // Populate selects
-            Object.keys(TEAMS).forEach(k => {
-                sels.forEach(s => {
+            try {
+                console.log("Loading NBA Simulator...");
+                const sels = [document.getElementById('home-select'), document.getElementById('away-select')];
+                const fragment = document.createDocumentFragment();
+
+                // Populate fragment
+                Object.keys(TEAMS).forEach(k => {
                     let opt = document.createElement('option');
                     opt.value = k;
                     opt.textContent = TEAMS[k].name;
-                    s.appendChild(opt);
+                    fragment.appendChild(opt);
                 });
-            });
-            
-            if (sels[1].options.length > 1) {
-                sels[1].selectedIndex = 1; // Default different team
+
+                // Append to selects
+                sels[0].appendChild(fragment.cloneNode(true));
+                sels[1].appendChild(fragment);
+                
+                if (sels[1].options.length > 1) {
+                    sels[1].selectedIndex = 1; // Default different team
+                }
+                console.log("Teams loaded successfully.");
+            } catch (e) {
+                console.error("Error in onload:", e);
+                alert("Error loading game: " + e.message);
             }
         };
 
         function toggleSpeed() {
+
             if (speedMult === 1) { speedMult = 5; document.getElementById('speed-btn').innerText = "Speed: 5x"; }
             else if (speedMult === 5) { speedMult = 20; document.getElementById('speed-btn').innerText = "Speed: 20x (Fast)"; }
             else { speedMult = 1; document.getElementById('speed-btn').innerText = "Speed: 1x"; }
         }
 
         function startMatch() {
-            const hKey = document.getElementById('home-select').value;
-            const aKey = document.getElementById('away-select').value;
-            
-            if(hKey === aKey) { alert("Please select different teams."); return; }
-            
-            homeTeam = JSON.parse(JSON.stringify(TEAMS[hKey])); // Clone
-            awayTeam = JSON.parse(JSON.stringify(TEAMS[aKey])); // Clone
-            
-            // Setup UI
-            document.getElementById('board-home-name').innerText = homeTeam.name.split(' ').pop().toUpperCase();
-            document.getElementById('board-away-name').innerText = awayTeam.name.split(' ').pop().toUpperCase();
-            document.getElementById('setup-screen').style.display = 'none';
-            document.getElementById('game-screen').style.display = 'block';
-            
-            // Init stats
-            playerStats = {};
-            [...homeTeam.players, ...awayTeam.players].forEach(p => {
-                playerStats[p.name] = { pts: 0, team: p === homeTeam.players.find(x=>x.name===p.name) ? 'home' : 'away' };
-            });
+            try {
+                const hKey = document.getElementById('home-select').value;
+                const aKey = document.getElementById('away-select').value;
+                
+                console.log("Starting match:", hKey, "vs", aKey);
 
-            log("Welcome to tonight's matchup!", "intro");
-            log(`${homeTeam.name} vs ${awayTeam.name}`, "intro");
-            
-            gameActive = true;
-            gameLoop();
+                if(hKey === aKey) { alert("Please select different teams."); return; }
+                
+                homeTeam = JSON.parse(JSON.stringify(TEAMS[hKey])); // Clone
+                awayTeam = JSON.parse(JSON.stringify(TEAMS[aKey])); // Clone
+                
+                // Setup UI
+                document.getElementById('board-home-name').innerText = homeTeam.name.split(' ').pop().toUpperCase();
+                document.getElementById('board-away-name').innerText = awayTeam.name.split(' ').pop().toUpperCase();
+                document.getElementById('setup-screen').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'block';
+                
+                // Init stats
+                playerStats = {};
+                [...homeTeam.players, ...awayTeam.players].forEach(p => {
+                    playerStats[p.name] = { 
+                        pts: 0, 
+                        fga: 0, 
+                        fgm: 0, 
+                        threes_a: 0, 
+                        threes_m: 0,
+                        team: p === homeTeam.players.find(x=>x.name===p.name) ? 'home' : 'away' 
+                    };
+                });
+
+                log("Welcome to tonight's matchup!", "intro");
+                log(`${homeTeam.name} vs ${awayTeam.name}`, "intro");
+                
+                gameActive = true;
+                gameLoop();
+            } catch (e) {
+                console.error("Error in startMatch:", e);
+                alert("Game failed to start: " + e.message);
+            }
         }
 
         async function gameLoop() {
-            while (gameActive && quarter <= 4) {
-                await new Promise(r => setTimeout(r, simulationSpeed / speedMult));
-                
-                // Simulate Possession
-                // 1 possession takes roughly 15-24 seconds off clock
-                let timeElapsed = Math.floor(Math.random() * 10) + 14; 
-                timeRemaining -= timeElapsed;
+            console.log("Game loop started");
+            try {
+                while (gameActive && quarter <= 4) {
+                    await new Promise(r => setTimeout(r, simulationSpeed / speedMult));
+                    
+                    // Simulate Possession
+                    // 1 possession takes roughly 15-24 seconds off clock
+                    let timeElapsed = Math.floor(Math.random() * 10) + 14; 
+                    timeRemaining -= timeElapsed;
 
-                if (timeRemaining <= 0) {
-                    endQuarter();
-                    continue;
+                    if (timeRemaining <= 0) {
+                        endQuarter();
+                        continue;
+                    }
+                    
+                    updateClock();
+                    simulatePossession();
                 }
-                
-                updateClock();
-                simulatePossession();
+            } catch (e) {
+                console.error("Error in gameLoop:", e);
+                gameActive = false;
             }
         }
 
@@ -481,64 +522,106 @@
         }
 
         function simulatePossession() {
-            // Who attacks? flip coin 50/50 approx for simplicity in this loop
-            // In real sim, track possession. Here we just do one random event per loop to simulate flow.
-            
             let isHome = Math.random() > 0.5;
             let attTeam = isHome ? homeTeam : awayTeam;
-            let defTeam = isHome ? awayTeam : homeTeam;
             
-            // Pick random shooter weighted by Offense stat could be better, but pure random for now
+            // Pick random shooter
             let pData = attTeam.players[Math.floor(Math.random() * attTeam.players.length)];
+            let stats = playerStats[pData.name];
             
-            // Logic based on stats
-            // Base chance to score ~ 45% + (Off - 80)/2
+            // Roll for turnover
+            if (Math.random() < 0.10) {
+                 log(randArr(COMMENTARY_TEMPLATES.turnover).replace("{player}", pData.name), "commentary");
+                 return;
+            }
+
+            // Shot Type Selection
+            // Curry logic (high shooters prefer 3s)
+            let threeTendency = (pData.name === "Stephen Curry" || pData.name === "Damian Lillard") ? 0.6 : 0.3;
+            let isThree = Math.random() < threeTendency;
+            
+            // Update Attempts
+            stats.fga++;
+            if (isThree) stats.threes_a++;
+            
+            // Calculate Make Chance
+            // Base ~ 45% + offense adjustment. Threes are harder (-10% approx)
             let makeChance = 45 + ((pData.off - 80) * 0.8);
+            if (isThree) makeChance -= 10;
             
-            // Roll
             let roll = Math.random() * 100;
             
-            let eventText = "";
-            let eventType = "commentary";
-            
-            if (roll < 10) { 
-                // Turnover
-                eventText = randArr(COMMENTARY_TEMPLATES.turnover).replace("{player}", pData.name);
-            } 
-            else if (roll > makeChance + 10) {
-                // Miss
-                eventText = randArr(COMMENTARY_TEMPLATES.miss).replace("{player}", pData.name);
-            }
-            else {
-                // Score!
-                // 3pt, Dunk or Jumper
-                let shotType = Math.random();
-                let pts = 2;
+            if (roll <= makeChance) {
+                // MADE BASKET
+                let pts = isThree ? 3 : 2;
+                stats.fgm++;
+                stats.pts += pts;
+                if (isThree) stats.threes_m++;
                 
-                // Curry logic (high shooters prefer 3s)
-                let threeTendency = pData.name === "Stephen Curry" || pData.name === "Damian Lillard" ? 0.6 : 0.3;
+                if (isHome) homeScore += pts; else awayScore += pts;
                 
-                if (Math.random() < threeTendency) {
-                    pts = 3;
+                // Text
+                let eventText = "";
+                if (isThree) {
                     eventText = randArr(COMMENTARY_TEMPLATES.make3).replace("{player}", pData.name);
-                } else if (Math.random() < 0.2) {
+                } else if (!isThree && Math.random() < 0.2) {
                     eventText = randArr(COMMENTARY_TEMPLATES.dunk).replace("{player}", pData.name);
-                    pts = 2;
                 } else {
                     eventText = randArr(COMMENTARY_TEMPLATES.make2).replace("{player}", pData.name);
-                    pts = 2;
                 }
                 
-                // Update Score
-                if (isHome) homeScore += pts; else awayScore += pts;
-                playerStats[pData.name].pts += pts;
-                eventType = "score-update";
-                
+                log(eventText, "score-update");
                 updateScoreboard();
                 updateTopScorers();
+            } else {
+                // MISSED
+                log(randArr(COMMENTARY_TEMPLATES.miss).replace("{player}", pData.name), "commentary");
             }
             
-            log(eventText, eventType);
+            updateGameStats();
+        }
+
+        function updateGameStats() {
+            // Aggrega stats per team
+            let homeStats = { fga:0, fgm:0, tha:0, thm:0, pts: homeScore };
+            let awayStats = { fga:0, fgm:0, tha:0, thm:0, pts: awayScore };
+            
+            Object.values(playerStats).forEach(s => {
+                let target = s.team === 'home' ? homeStats : awayStats;
+                target.fga += s.fga;
+                target.fgm += s.fgm;
+                target.tha += s.threes_a;
+                target.thm += s.threes_m;
+            });
+            
+            let getPerc = (m, a) => a === 0 ? "0%" : (Math.round((m/a)*100)) + "%";
+            
+            let html = `
+                <table style="width:100%; color:#ccc; font-size:0.9rem; text-align:center;">
+                    <tr style="color:#888; border-bottom:1px solid #444;">
+                        <td>STAT</td>
+                        <td style="color:${homeTeam.color}">${homeTeam.name.substring(0,3).toUpperCase()}</td>
+                        <td style="color:${awayTeam.color}">${awayTeam.name.substring(0,3).toUpperCase()}</td>
+                    </tr>
+                    <tr>
+                        <td>PTS</td>
+                        <td>${homeStats.pts}</td>
+                        <td>${awayStats.pts}</td>
+                    </tr>
+                    <tr>
+                        <td>FG%</td>
+                        <td>${getPerc(homeStats.fgm, homeStats.fga)} <small>(${homeStats.fgm}/${homeStats.fga})</small></td>
+                        <td>${getPerc(awayStats.fgm, awayStats.fga)} <small>(${awayStats.fgm}/${awayStats.fga})</small></td>
+                    </tr>
+                    <tr>
+                        <td>3P%</td>
+                        <td>${getPerc(homeStats.thm, homeStats.tha)} <small>(${homeStats.thm}/${homeStats.tha})</small></td>
+                        <td>${getPerc(awayStats.thm, awayStats.tha)} <small>(${awayStats.thm}/${awayStats.tha})</small></td>
+                    </tr>
+                </table>
+            `;
+            
+            document.getElementById('game-stats-list').innerHTML = html;
         }
 
         function updateScoreboard() {
