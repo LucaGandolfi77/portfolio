@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Builder</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --deck-bg: #34495e;
+            --slot-bg: #2c3e50;
+            --accent: #e67e22;
+            --text: #ecf0f1;
+            --nav-height: 60px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent body scroll, use inner scroll */
+        }
+
+        /* Main Content Areas */
+        main {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            width: 100%;
+            display: none; /* Hidden by default */
+            padding-bottom: var(--nav-height); /* Space for nav */
+        }
+
+        main.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Navigation Bar */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: var(--nav-height);
+            background: #1abc9c;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        nav button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            width: 50%;
+            height: 100%;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        nav button:hover, nav button.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        nav i {
+            font-size: 1.5rem;
+            margin-bottom: 2px;
+        }
+
+        /* Deck Styles */
+        #deck-view {
+            background-color: var(--deck-bg);
+            padding: 20px;
+        }
+
+        h2 {
+            margin-top: 10px;
+            color: var(--accent);
+        }
+
+        .stats-bar {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .deck-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 80px;
+        }
+
+        .deck-slot {
+            aspect-ratio: 1;
+            background: rgba(255,255,255,0.1);
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .deck-slot:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: var(--text);
+        }
+
+        .deck-slot.filled {
+            border-style: solid;
+            background: rgba(39, 174, 96, 0.2);
+            border-color: #27ae60;
+        }
+
+        .slot-symbol {
+            font-size: 2rem;
+        }
+
+        .slot-value {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+        }
+
+        /* Editor Modal */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .modal-content {
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .emoji-picker {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin: 15px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .picker-btn {
+            font-size: 1.5rem;
+            border: 1px solid #eee;
+            background: #fff;
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .picker-btn.selected {
+            background-color: #b2dfdb;
+            border-color: #009688;
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            color: white;
+            background: var(--accent);
+            margin-top: 10px;
+        }
+
+        /* Slot Machine Styles */
+        #slot-view {
+            padding: 20px;
+        }
+
+        .machine-container {
+            background: #2c3e50;
+            padding: 15px;
+            border: 5px solid #f1c40f;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            background: #000;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .reel-cell {
+            width: 60px;
+            height: 60px;
+            background: #fff;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .reel-cell.win-anim {
+            animation: winPulse 0.5s infinite alternate;
+            background: #f1c40f;
+        }
+
+        @keyframes winPulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+
+        .spin-btn {
+            width: 100%;
+            max-width: 300px;
+            padding: 20px;
+            font-size: 1.5rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            box-shadow: 0 5px 0 #c0392b;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .spin-btn:active {
+            transform: translateY(5px);
+            box-shadow: none;
+        }
+        
+        .spin-btn:disabled {
+            background: #95a5a6;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: translateY(5px);
+        }
+
+        .score-display {
+            font-size: 2rem;
+            font-family: 'Courier New', monospace;
+            color: #f1c40f;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .log-area {
+            width: 100%;
+            max-width: 350px;
+            height: 100px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 80px;
+            font-family: monospace;
+        }
+
+        @media (max-width: 400px) {
+            .reel-cell {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- DECK VIEW -->
+    <main id="deck-view">
+        <div class="stats-bar">
+            <span>Deck Size: <strong id="deck-count">0</strong>/50</span>
+            <span>Unlocks: All</span>
+        </div>
+        <h2>Costruisci il tuo Deck</h2>
+        <p style="font-size: 0.9rem; opacity: 0.8; text-align: center;">Clicca sugli slot per aggiungere simboli e valori. Questi simboli appariranno nella Slot Machine!</p>
+        
+        <div class="deck-grid" id="deck-grid">
+            <!-- 50 slots generated by JS -->
+        </div>
+    </main>
+
+    <!-- SLOT VIEW -->
+    <main id="slot-view">
+        <div class="score-display">SCORE: <span id="score-val">0</span></div>
+        
+        <div class="machine-container">
+            <div class="slot-grid" id="slot-grid">
+                <!-- 25 cells 5x5 -->
+            </div>
+        </div>
+
+        <button class="spin-btn" id="spin-btn" onclick="spin()">SPIN!</button>
+        
+        <div class="log-area" id="game-log">
+            <div>Benvenuto! Carica il Deck e inizia a giocare.</div>
+        </div>
+    </main>
+
+    <!-- NAVIGATION -->
+    <nav>
+        <button id="nav-deck" onclick="switchTab('deck')" class="active">
+            <i>🃏</i>
+            Deck
+        </button>
+        <button id="nav-slot" onclick="switchTab('slot')">
+            <i>🎰</i>
+            Slot
+        </button>
+    </nav>
+
+    <!-- EDITOR MODAL -->
+    <div id="editor-modal" class="modal">
+        <div class="modal-content">
+            <h3>Modifica Slot #<span id="modal-slot-id"></span></h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label>Valore (Punti):</label>
+                <input type="number" id="symbol-value" value="10" min="1" max="1000" style="padding: 5px; width: 60px;">
+            </div>
+
+            <div style="text-align: left;">Scegli Simbolo:</div>
+            <div class="emoji-picker" id="emoji-picker">
+                <!-- Emojis injected by JS -->
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="action-btn" style="background:#e74c3c" onclick="clearSlot()">Rimuovi</button>
+                <button class="action-btn" onclick="saveSlot()">Salva</button>
+            </div>
+            <button onclick="closeModal()" style="margin-top:10px; background:none; border:none; color:#7f8c8d; cursor:pointer;">Annulla</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME STATE ---
+        const DECK_SIZE = 50;
+        const GRID_ROWS = 5;
+        const GRID_COLS = 5;
+        let deck = new Array(DECK_SIZE).fill(null); // Objects: { symbol, value }
+        let score = 0;
+        let isSpinning = false;
+        
+        // --- CONFIG ---
+        const AVAILABLE_ICONS = [
+            '🍒','🍋','🍊','🍇','🍉','🍓',
+            '💎','7️⃣','🔔','🍀','⭐','💰',
+            '🧩','🎲','🎯','🎪','🎨','🎭',
+            '🐶','🐱','🐭','🐹','🐰','🦊'
+        ];
+        
+        let currentEditingIndex = -1;
+        let selectedEmoji = '🍒';
+
+        // --- INIT ---
+        window.onload = () => {
+            initDeckGrid();
+            initSlotGrid();
+            initEmojiPicker();
+            updateStats();
+            // Pre-fill a few slots for demo
+            for(let i=0; i<5; i++) {
+                deck[i] = { symbol: '🍒', value: 10 };
+            }
+            for(let i=5; i<10; i++) {
+                deck[i] = { symbol: '7️⃣', value: 50 };
+            }
+            renderDeck();
+            switchTab('deck');
+        };
+
+        // --- NAVIGATION ---
+        function switchTab(tab) {
+            document.querySelectorAll('main').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`${tab}-view`).classList.add('active');
+            document.getElementById(`nav-${tab}`).classList.add('active');
+        }
+
+        // --- DECK LOGIC ---
+        function initDeckGrid() {
+            const grid = document.getElementById('deck-grid');
+            grid.innerHTML = '';
+            for (let i = 0; i < DECK_SIZE; i++) {
+                const div = document.createElement('div');
+                div.className = 'deck-slot';
+                div.onclick = () => openEditor(i);
+                grid.appendChild(div);
+            }
+        }
+
+        function renderDeck() {
+            const slots = document.getElementById('deck-grid').children;
+            for (let i = 0; i < DECK_SIZE; i++) {
+                const data = deck[i];
+                const el = slots[i];
+                el.className = 'deck-slot' + (data ? ' filled' : '');
+                if (data) {
+                    el.innerHTML = `
+                        <div class="slot-symbol">${data.symbol}</div>
+                        <div class="slot-value">${data.value}pts</div>
+                    `;
+                } else {
+                    el.innerHTML = `<div style="color:rgba(255,255,255,0.3); font-size:1.5rem;">+</div>`;
+                }
+            }
+            updateStats();
+        }
+
+        function updateStats() {
+            const count = deck.filter(x => x !== null).length;
+            document.getElementById('deck-count').textContent = count;
+        }
+
+        // --- EDITOR MODAL ---
+        function initEmojiPicker() {
+            const container = document.getElementById('emoji-picker');
+            AVAILABLE_ICONS.forEach(icon => {
+                const btn = document.createElement('div');
+                btn.className = 'picker-btn';
+                btn.textContent = icon;
+                btn.onclick = () => {
+                    document.querySelectorAll('.picker-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedEmoji = icon;
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function openEditor(index) {
+            currentEditingIndex = index;
+            const data = deck[index];
+            document.getElementById('modal-slot-id').textContent = index + 1;
+            document.getElementById('symbol-value').value = data ? data.value : 10;
+            selectedEmoji = data ? data.symbol : AVAILABLE_ICONS[0]; // Reset or load
+            
+            // Visual selection update
+            document.querySelectorAll('.picker-btn').forEach(b => {
+                b.classList.toggle('selected', b.textContent === selectedEmoji);
+            });
+
+            document.getElementById('editor-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('editor-modal').style.display = 'none';
+        }
+
+        function saveSlot() {
+            const val = parseInt(document.getElementById('symbol-value').value) || 10;
+            deck[currentEditingIndex] = {
+                symbol: selectedEmoji,
+                value: val
+            };
+            renderDeck();
+            closeModal();
+        }
+
+        function clearSlot() {
+            deck[currentEditingIndex] = null;
+            renderDeck();
+            closeModal();
+        }
+
+        // --- SLOT MACHINE LOGIC ---
+        function initSlotGrid() {
+            const grid = document.getElementById('slot-grid');
+            for (let i = 0; i < 25; i++) { // 5x5
+                const div = document.createElement('div');
+                div.className = 'reel-cell';
+                div.id = `cell-${i}`;
+                div.textContent = '?';
+                grid.appendChild(div);
+            }
+        }
+
+        async function spin() {
+            const validDeck = deck.filter(item => item !== null);
+            if (validDeck.length < 5) {
+                alert("Il Deck è troppo vuoto! Aggiungi almeno 5 simboli per giocare.");
+                switchTab('deck');
+                return;
+            }
+            if (isSpinning) return;
+            
+            isSpinning = true;
+            document.getElementById('spin-btn').disabled = true;
+            log("Spinning...");
+            
+            // Visual effect: random symbols flicker
+            const spinDuration = 1000;
+            const interval = setInterval(() => {
+                for(let i=0; i<25; i++) {
+                    const rand = validDeck[Math.floor(Math.random() * validDeck.length)];
+                    document.getElementById(`cell-${i}`).textContent = rand.symbol;
+                    document.getElementById(`cell-${i}`).classList.remove('win-anim');
+                }
+            }, 50);
+
+            // Stop and calculate result
+            setTimeout(() => {
+                clearInterval(interval);
+                finalizeSpin(validDeck);
+            }, spinDuration);
+        }
+
+        function finalizeSpin(validDeck) {
+            isSpinning = false;
+            document.getElementById('spin-btn').disabled = false;
+            
+            // Generate final grid
+            const gridData = [];
+            for(let i=0; i<25; i++) {
+                // Weighted random? No, simple uniform from User Deck
+                const item = validDeck[Math.floor(Math.random() * validDeck.length)];
+                gridData.push(item);
+                const cell = document.getElementById(`cell-${i}`);
+                cell.textContent = item.symbol;
+            }
+
+            checkWins(gridData);
+        }
+
+        function checkWins(gridData) {
+            let totalWin = 0;
+            let winDetails = [];
+
+            // Check Horizontal Rows (5 rows, 5 cols)
+            for (let r = 0; r < GRID_ROWS; r++) {
+                // Get row symbols
+                const rowStartIndex = r * GRID_COLS;
+                const rowItems = [];
+                for(let c=0; c<GRID_COLS; c++) {
+                    rowItems.push(gridData[rowStartIndex + c]);
+                }
+
+                // Find sequences. Try to find 3+ matches.
+                // Simple logic: check if the first 3 match, or mid 3 match?
+                // Standard slot: Left-to-Right consecutive.
+                
+                // Let's count consecutive same symbols
+                // e.g. A A A B C -> 3
+                // A B B B A -> Standard slots usually require starting from left, aka Reel 1.
+                // BUT "Deck building" games might be more improved. Let's do: "3+ consecutive anywhere in row"
+                
+                let currentRun = 1;
+                for (let c = 1; c < GRID_COLS; c++) {
+                    if (rowItems[c].symbol === rowItems[c-1].symbol) {
+                        currentRun++;
+                    } else {
+                        if (currentRun >= 3) {
+                            // Calculate Score
+                            const symbolVal = rowItems[c-1].value;
+                            const win = symbolVal * currentRun;
+                            totalWin += win;
+                            winDetails.push(`${currentRun}x ${rowItems[c-1].symbol} (+${win})`);
+                            
+                            // Highlight
+                            for(let k=1; k<=currentRun; k++) {
+                                const idx = rowStartIndex + (c - k);
+                                document.getElementById(`cell-${idx}`).classList.add('win-anim');
+                            }
+                        }
+                        currentRun = 1;
+                    }
+                }
+                // Check end rule
+                if (currentRun >= 3) {
+                     const symbolVal = rowItems[GRID_COLS-1].value;
+                     const win = symbolVal * currentRun;
+                     totalWin += win;
+                     winDetails.push(`${currentRun}x ${rowItems[GRID_COLS-1].symbol} (+${win})`);
+                     
+                     for(let k=0; k<currentRun; k++) {
+                        const idx = rowStartIndex + (GRID_COLS - 1 - k);
+                        document.getElementById(`cell-${idx}`).classList.add('win-anim');
+                    }
+                }
+            }
+
+            if (totalWin > 0) {
+                score += totalWin;
+                document.getElementById('score-val').textContent = score;
+                log(`WIN! ${winDetails.join(', ')}`);
+            } else {
+                log("Nessuna vincita.");
+            }
+        }
+
+        function log(msg) {
+            const area = document.getElementById('game-log');
+            const line = document.createElement('div');
+            line.textContent = `> ${msg}`;
+            area.prepend(line);
+        }
+
+    </script>
+</body>
+</html>

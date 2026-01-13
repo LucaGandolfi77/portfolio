@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Duel - Sfida Matematica</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --accent-color: #0f3460;
+            --text-color: #e94560;
+            --p1-color: #4cc9f0;
+            --p2-color: #f72585;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Menu Screen */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .title {
+            font-size: 3rem;
+            color: var(--text-color);
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 250px;
+            font-weight: bold;
+        }
+
+        .mode-btn:active { transform: scale(0.95); }
+        .mode-easy { background: #4caf50; color: white; }
+        .mode-medium { background: #ff9800; color: white; }
+        .mode-hard { background: #f44336; color: white; }
+
+        /* Game Screen */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .player-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            position: relative;
+            border-bottom: 2px solid white;
+        }
+
+        .player-area.top {
+            transform: rotate(180deg);
+            border-bottom: none;
+            border-top: 2px solid white;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 10px;
+        }
+
+        .score { color: #ffd700; }
+        .timer { color: #fff; }
+
+        .question-box {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .input-display {
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            margin: 5px 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            letter-spacing: 3px;
+        }
+
+        .numpad {
+            height: 40%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            padding: 5px;
+        }
+
+        .key {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .key:active { background: rgba(255,255,255,0.3); }
+        .key.enter { background: #4caf50; grid-row: span 2; }
+        .key.delete { background: #f44336; }
+        .key.decimal { background: #ff9800; }
+
+        /* Animations */
+        @keyframes flashGreen { 0% { background: transparent; } 50% { background: rgba(76, 175, 80, 0.5); } 100% { background: transparent; } }
+        @keyframes flashRed { 0% { background: transparent; } 50% { background: rgba(244, 67, 54, 0.5); } 100% { background: transparent; } }
+
+        .correct-anim { animation: flashGreen 0.3s ease-out; }
+        .wrong-anim { animation: flashRed 0.3s ease-out; }
+
+        /* Numpad Layout Customization */
+        .numpad-row { display: flex; gap: 5px; flex: 1; }
+        
+        /* Revised grid layout for numpad */
+        .grid-pad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 columns for decimal support */
+            grid-template-rows: repeat(4, 1fr);
+            gap: 4px;
+            height: 180px; 
+            margin-top: auto;
+        }
+
+        .g-btn {
+            background: #333;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .g-enter { background: #2e7d32; grid-column: 4; grid-row: 3 / span 2; }
+        .g-del { background: #c62828; grid-column: 4; grid-row: 1 / span 2; }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <div class="title">Math Duel</div>
+        <button class="mode-btn mode-easy" onclick="startGame('easy')">EASY (+ , -)</button>
+        <button class="mode-btn mode-medium" onclick="startGame('medium')">MEDIUM (× , ÷)</button>
+        <button class="mode-btn mode-hard" onclick="startGame('hard')">HARD (Power, √, Dec)</button>
+        <button class="mode-btn" style="background:#555;margin-top:20px" onclick="location.href='../index.html'">BACK</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100; flex-direction:column; justify-content:center; align-items:center;">
+        <h1 id="winner-text" style="color:white; font-size:3rem;">PLAYER 1 WINS!</h1>
+        <div style="display:flex; gap:20px; font-size:1.5rem; margin:20px 0;">
+             <div>P1 Score: <span id="end-p1-score">0</span></div>
+             <div>P2 Score: <span id="end-p2-score">0</span></div>
+        </div>
+        <button class="mode-btn" style="background:#2196F3" onclick="location.reload()">PLAY AGAIN</button>
+    </div>
+
+    <div id="game-container" style="filter:blur(10px)"> <!-- Initially blurred -->
+        
+        <!-- Player 1 Region (Top - Rotated) -->
+        <div class="player-area top" id="p1-area">
+            <div class="grid-pad">
+                <div class="g-btn" onclick="input('p1', 7)">7</div>
+                <div class="g-btn" onclick="input('p1', 8)">8</div>
+                <div class="g-btn" onclick="input('p1', 9)">9</div>
+                <div class="g-btn g-del" onclick="del('p1')">DEL</div>
+                
+                <div class="g-btn" onclick="input('p1', 4)">4</div>
+                <div class="g-btn" onclick="input('p1', 5)">5</div>
+                <div class="g-btn" onclick="input('p1', 6)">6</div>
+                
+                <div class="g-btn" onclick="input('p1', 1)">1</div>
+                <div class="g-btn" onclick="input('p1', 2)">2</div>
+                <div class="g-btn" onclick="input('p1', 3)">3</div>
+                <div class="g-btn g-enter" onclick="submit('p1')">OK</div>
+
+                <div class="g-btn" onclick="input('p1', '-')">-</div>
+                <div class="g-btn" onclick="input('p1', 0)">0</div>
+                <div class="g-btn" onclick="input('p1', '.')">.</div>
+            </div>
+            
+            <div class="input-display" id="p1-input"></div>
+            <div class="question-box" id="p1-q">Ready?</div>
+            <div class="info-bar">
+                <div class="score">pts: <span id="p1-score">0</span></div>
+                <div class="timer">Player 1</div>
+            </div>
+        </div>
+
+        <!-- Player 2 Region (Bottom) -->
+        <div class="player-area" id="p2-area">
+            <div class="info-bar">
+                <div class="timer">Player 2</div>
+                <div class="score">pts: <span id="p2-score">0</span></div>
+            </div>
+            <div class="question-box" id="p2-q">Ready?</div>
+            <div class="input-display" id="p2-input"></div>
+            
+            <div class="grid-pad">
+                <div class="g-btn" onclick="input('p2', 7)">7</div>
+                <div class="g-btn" onclick="input('p2', 8)">8</div>
+                <div class="g-btn" onclick="input('p2', 9)">9</div>
+                <div class="g-btn g-del" onclick="del('p2')">DEL</div>
+                
+                <div class="g-btn" onclick="input('p2', 4)">4</div>
+                <div class="g-btn" onclick="input('p2', 5)">5</div>
+                <div class="g-btn" onclick="input('p2', 6)">6</div>
+                
+                <div class="g-btn" onclick="input('p2', 1)">1</div>
+                <div class="g-btn" onclick="input('p2', 2)">2</div>
+                <div class="g-btn" onclick="input('p2', 3)">3</div>
+                <div class="g-btn g-enter" onclick="submit('p2')">OK</div>
+
+                <div class="g-btn" onclick="input('p2', '-')">-</div>
+                <div class="g-btn" onclick="input('p2', 0)">0</div>
+                <div class="g-btn" onclick="input('p2', '.')">.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'easy';
+        let p1Score = 0;
+        let p2Score = 0;
+        let p1Answer = 0;
+        let p2Answer = 0;
+        let winningScore = 15;
+        let p1CurrentInput = "";
+        let p2CurrentInput = "";
+
+        // Math Config
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateProblem(mode) {
+            let q = "", a = 0;
+            if (mode === 'easy') {
+                // Sums and Subtractions up to 50
+                let op = Math.random() > 0.5 ? '+' : '-';
+                let x = getRandomInt(1, 40);
+                let y = getRandomInt(1, 40);
+                if (op === '-') { 
+                    if (x < y) [x, y] = [y, x]; // Ensure positive result for ease
+                }
+                q = `${x} ${op} ${y}`;
+                a = (op === '+') ? x + y : x - y;
+            } 
+            else if (mode === 'medium') {
+                // Multiplications up to 12*12, Divisions
+                let opType = Math.random();
+                if (opType < 0.4) { // 40% Mult (Standard)
+                    let x = getRandomInt(2, 12);
+                    let y = getRandomInt(2, 12);
+                    q = `${x} × ${y}`;
+                    a = x * y;
+                } else if (opType < 0.7) { // 30% Mult (3 digits)
+                    let x = getRandomInt(10, 30);
+                    let y = getRandomInt(2, 9);
+                    q = `${x} × ${y}`;
+                    a = x * y;
+                } else { // 30% Div
+                    let y = getRandomInt(2, 12);
+                    let ans = getRandomInt(2, 20); // The answer
+                    let x = y * ans;
+                    q = `${x} ÷ ${y}`;
+                    a = ans;
+                }
+            } 
+            else if (mode === 'hard') {
+                // Powers, Roots, Decimals, Trig
+                let type = Math.random();
+                if (type < 0.25) { // Powers
+                    let base = getRandomInt(2, 9);
+                    let exp = getRandomInt(2, 3);
+                    q = `${base}<sup>${exp}</sup>`
+                    a = Math.pow(base, exp);
+                } else if (type < 0.5) { // Roots
+                    let ans = getRandomInt(2, 25);
+                    let x = ans * ans;
+                    q = `√${x}`;
+                    a = ans;
+                } else if (type < 0.75) { // Decimals (+ or -)
+                    let x = getRandomInt(1, 50) + (getRandomInt(1, 9)/10);
+                    let y = getRandomInt(1, 50) + (getRandomInt(1, 9)/10);
+                    let op = Math.random() > 0.5 ? '+' : '-';
+                    // Simplify decimals to 1 decimal place to avoid float errors
+                    x = parseFloat(x.toFixed(1));
+                    y = parseFloat(y.toFixed(1));
+                    
+                    if (op === '-') if (x < y) [x, y] = [y, x];
+                    
+                    q = `${x} ${op} ${y}`;
+                    a = op === '+' ? x + y : x - y;
+                    a = parseFloat(a.toFixed(1)); // Fix JS float math
+                } else { // Simple Trig
+                   let trigOpts = [
+                       {q: 'sin(0)', a: 0},
+                       {q: 'cos(0)', a: 1},
+                       {q: 'sin(90°)', a: 1},
+                       {q: 'cos(180°)', a: -1},
+                       {q: 'sin(30°)', a: 0.5},
+                       {q: '(10)²+5', a: 105}
+                   ];
+                   let item = trigOpts[getRandomInt(0, trigOpts.length-1)];
+                   q = item.q;
+                   a = item.a;
+                }
+            }
+            return { q, a };
+        }
+
+        function startGame(mode) {
+            currentMode = mode;
+            p1Score = 0;
+            p2Score = 0;
+            updateScores();
+            
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('game-container').style.filter = 'none';
+            
+            nextRound();
+        }
+
+        function nextRound() {
+            // Check win condition
+            if (p1Score >= winningScore) return gameOver(1);
+            if (p2Score >= winningScore) return gameOver(2);
+
+            let prob = generateProblem(currentMode);
+            // Same problem for both? Or different?
+            // "Chi lo fa prima" (who does it first) implies same problem race.
+            
+            p1Answer = prob.a;
+            p2Answer = prob.a;
+
+            document.getElementById('p1-q').innerHTML = prob.q;
+            document.getElementById('p2-q').innerHTML = prob.q;
+
+            // Clear inputs
+            p1CurrentInput = "";
+            p2CurrentInput = "";
+            updateInputs();
+        }
+
+        function input(player, val) {
+            if (player === 'p1') {
+                if (p1CurrentInput.length < 8) p1CurrentInput += val;
+            } else {
+                if (p2CurrentInput.length < 8) p2CurrentInput += val;
+            }
+            updateInputs();
+        }
+
+        function del(player) {
+            if (player === 'p1') {
+                p1CurrentInput = p1CurrentInput.slice(0, -1);
+            } else {
+                p2CurrentInput = p2CurrentInput.slice(0, -1);
+            }
+            updateInputs();
+        }
+
+        function updateInputs() {
+            document.getElementById('p1-input').innerText = p1CurrentInput;
+            document.getElementById('p2-input').innerText = p2CurrentInput;
+        }
+
+        function submit(player) {
+            let val, correctVal, areaId;
+            if (player === 'p1') {
+                val = parseFloat(p1CurrentInput);
+                correctVal = p1Answer;
+                areaId = 'p1-area';
+            } else {
+                val = parseFloat(p2CurrentInput);
+                correctVal = p2Answer;
+                areaId = 'p2-area';
+            }
+
+            if (isNaN(val)) return;
+
+            // Simple float comparison tolerance
+            if (Math.abs(val - correctVal) < 0.001) {
+                // Correct!
+                document.getElementById(areaId).classList.add('correct-anim');
+                if (player === 'p1') p1Score++; else p2Score++;
+                
+                // Speed bonus? prompt says "base alla velocità". 
+                // Currently implementing "first to solve gets point".
+                // Since it calls nextRound immediately, only one gets the point.
+                
+                updateScores();
+                
+                setTimeout(() => {
+                    document.getElementById(areaId).classList.remove('correct-anim');
+                    nextRound();
+                }, 300);
+            } else {
+                // Wrong
+                document.getElementById(areaId).classList.add('wrong-anim');
+                setTimeout(() => {
+                    document.getElementById(areaId).classList.remove('wrong-anim');
+                }, 300);
+                
+                // Penalty? No, just clear input
+                if (player === 'p1') p1CurrentInput = ""; else p2CurrentInput = "";
+                updateInputs();
+            }
+        }
+
+        function updateScores() {
+            document.getElementById('p1-score').innerText = p1Score;
+            document.getElementById('p2-score').innerText = p2Score;
+        }
+
+        function gameOver(winner) {
+            document.getElementById('game-over-screen').style.display = 'flex';
+            document.getElementById('winner-text').innerText = `PLAYER ${winner} WINS!`;
+            document.getElementById('end-p1-score').innerText = p1Score;
+            document.getElementById('end-p2-score').innerText = p2Score;
+        }
+
+        // Keyboard support (optional, for P2 usually on desktop)
+        document.addEventListener('keydown', (e) => {
+            // Simple mapping for P2 (NumPad or standard numbers)
+            if ((e.key >= '0' && e.key <= '9') || e.key == '.' || e.key == '-') {
+                input('p2', e.key);
+            }
+            if (e.key === 'Backspace') del('p2');
+            if (e.key === 'Enter') submit('p2');
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Match Simulator</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --accent-color: #e94560;
+            --text-color: #ffffff;
+            --court-color: #c98a58;
+            --court-lines: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            text-decoration: none;
+            color: #a0c0e0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Setup Screen */
+        #setup-screen {
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .team-selector {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            background: #0f3460;
+            color: white;
+            border: 2px solid #533483;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn:hover { transform: scale(1.05); }
+
+        /* Game Screen */
+        #game-screen {
+            display: none;
+            width: 100%;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #333;
+        }
+
+        .team-score-box {
+            text-align: center;
+            width: 150px;
+        }
+
+        .team-name { font-size: 1.2rem; color: #aaa; margin-bottom: 5px; }
+        .score-display { font-size: 3rem; font-weight: bold; font-family: 'Courier New', monospace; color: #f00; }
+        
+        .game-info {
+            text-align: center;
+            color: #e0e0e0;
+        }
+        .quarter { font-size: 1.2rem; font-weight: bold; color: #ffeb3b; }
+        .time { font-size: 2rem; font-family: 'Courier New', monospace; }
+
+        .game-layout {
+            display: flex;
+            gap: 20px;
+            /* Height controlled by children */
+        }
+
+        /* Feed */
+        .feed-container {
+            flex: 2;
+            height: 400px; /* Fixed predefined height */
+            background: var(--card-color);
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto; /* Scroll inside box */
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .feed-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            animation: fadeIn 0.3s ease-out;
+            line-height: 1.4;
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        .feed-item.score-update { color: #4cd137; font-weight: bold; }
+        .feed-item.commentary { color: #dcdde1; }
+        .feed-item.intro { color: #fbc531; font-style: italic; border-bottom: 1px dashed #555; }
+        
+        /* Stats Panel */
+        .stats-panel {
+            flex: 1;
+            height: 400px; /* Fixed predefined height */
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.9rem;
+            overflow-y: auto;
+        }
+        
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #333; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Media Queries */
+        @media (max-width: 768px) {
+            .game-layout { flex-direction: column; height: auto; }
+            .feed-container { height: 300px; }
+            .stats-panel { height: 200px; }
+            .scoreboard { padding: 10px; }
+            .team-score-box { width: auto; }
+            .score-display { font-size: 2rem; }
+            .time { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="back-link">← Portfolio</a>
+
+    <div class="container">
+        <header>
+            <h1 style="font-size: 2.5rem; margin-bottom: 5px;">NBA SIMULATOR 2K26</h1>
+            <p style="color: #888;">AI Text Generation • Real Stats • Live Commentary</p>
+        </header>
+
+        <!-- SETUP -->
+        <div id="setup-screen">
+            <h2>Select Matchup</h2>
+            <div class="team-selector">
+                <div>
+                    <label style="display:block; margin-bottom:10px; color:#aaa">HOME TEAM</label>
+                    <select id="home-select"></select>
+                </div>
+                <div style="display:flex; align-items:center; font-size:1.5rem; font-weight:bold; color:#555">VS</div>
+                <div>
+                    <label style="display:block; margin-bottom:10px; color:#aaa">AWAY TEAM</label>
+                    <select id="away-select"></select>
+                </div>
+            </div>
+            
+            <button class="btn" onclick="startMatch()">TIP OFF</button>
+        </div>
+
+        <!-- GAME -->
+        <div id="game-screen">
+            <div class="scoreboard">
+                <div class="team-score-box">
+                    <div class="team-name" id="board-home-name">LAKERS</div>
+                    <div class="score-display" id="board-home-score">0</div>
+                </div>
+                <div class="game-info">
+                    <div class="quarter" id="board-quarter">1st QTR</div>
+                    <div class="time" id="board-time">12:00</div>
+                </div>
+                <div class="team-score-box">
+                    <div class="team-name" id="board-away-name">CELTICS</div>
+                    <div class="score-display" id="board-away-score">0</div>
+                </div>
+            </div>
+
+            <div class="game-layout">
+                <div class="feed-container" id="game-feed">
+                    <!-- Text logs go here -->
+                </div>
+                
+                <div class="stats-panel">
+                    <h3 style="margin-top:0; color:#4cd137">Top Scorers</h3>
+                    <div id="top-scorers-list"></div>
+                    <br>
+                    <h3 style="margin-top:0; color:#e94560">Game Stats</h3>
+                    <div id="game-stats-list"></div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button onclick="toggleSpeed()" id="speed-btn" style="padding: 5px 10px; background:#444; border:none; color:white; border-radius:4px; cursor:pointer;">Speed: 1x</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button onclick="location.reload()" style="background:transparent; border:1px solid #555; color:#888; padding:10px 20px; border-radius:30px; cursor:pointer;">Reset Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA DATABASE (Simplified for Demo) ---
+        const TEAMS = {
+            "LAL": { name: "Los Angeles Lakers", color: "#FDB927", players: [
+                { name: "LeBron James", ovr: 96, off: 94, def: 88, pos: "SF" },
+                { name: "Anthony Davis", ovr: 94, off: 89, def: 96, pos: "C" },
+                { name: "Austin Reaves", ovr: 82, off: 84, def: 75, pos: "SG" },
+                { name: "D'Angelo Russell", ovr: 81, off: 83, def: 70, pos: "PG" },
+                { name: "Rui Hachimura", ovr: 79, off: 78, def: 74, pos: "PF" }
+            ]},
+            "GSW": { name: "Golden State Warriors", color: "#1D428A", players: [
+                { name: "Stephen Curry", ovr: 96, off: 98, def: 70, pos: "PG" },
+                { name: "Klay Thompson", ovr: 84, off: 85, def: 76, pos: "SG" },
+                { name: "Draymond Green", ovr: 82, off: 70, def: 92, pos: "PF" },
+                { name: "Andrew Wiggins", ovr: 80, off: 78, def: 81, pos: "SF" },
+                { name: "Kevon Looney", ovr: 77, off: 70, def: 80, pos: "C" }
+            ]},
+            "BOS": { name: "Boston Celtics", color: "#007A33", players: [
+                { name: "Jayson Tatum", ovr: 95, off: 94, def: 88, pos: "SF" },
+                { name: "Jaylen Brown", ovr: 89, off: 88, def: 82, pos: "SG" },
+                { name: "Jrue Holiday", ovr: 87, off: 80, def: 94, pos: "PG" },
+                { name: "Kristaps Porzingis", ovr: 86, off: 85, def: 84, pos: "C" },
+                { name: "Derrick White", ovr: 84, off: 80, def: 86, pos: "SG" }
+            ]},
+            "CHI": { name: "Chicago Bulls", color: "#CE1141", players: [
+                { name: "DeMar DeRozan", ovr: 86, off: 88, def: 70, pos: "SF" },
+                { name: "Zach LaVine", ovr: 85, off: 87, def: 72, pos: "SG" },
+                { name: "Nikola Vucevic", ovr: 83, off: 84, def: 78, pos: "C" },
+                { name: "Coby White", ovr: 80, off: 80, def: 72, pos: "PG" },
+                { name: "Alex Caruso", ovr: 79, off: 70, def: 90, pos: "PF" }
+            ]},
+            "MIL": { name: "Milwaukee Bucks", color: "#00471B", players: [
+                { name: "Giannis Antetokounmpo", ovr: 97, off: 96, def: 94, pos: "PF" },
+                { name: "Damian Lillard", ovr: 92, off: 94, def: 70, pos: "PG" },
+                { name: "Khris Middleton", ovr: 83, off: 82, def: 76, pos: "SF" },
+                { name: "Brook Lopez", ovr: 82, off: 78, def: 88, pos: "C" },
+                { name: "Malik Beasley", ovr: 77, off: 76, def: 70, pos: "SG" }
+            ]},
+             "DEN": { name: "Denver Nuggets", color: "#0E2240", players: [
+                { name: "Nikola Jokic", ovr: 98, off: 98, def: 82, pos: "C" },
+                { name: "Jamal Murray", ovr: 88, off: 89, def: 74, pos: "PG" },
+                { name: "Aaron Gordon", ovr: 84, off: 80, def: 86, pos: "PF" },
+                { name: "MPJ", ovr: 83, off: 85, def: 72, pos: "SF" },
+                { name: "KCP", ovr: 78, off: 76, def: 80, pos: "SG" }
+            ]}
+        };
+
+        // --- GAME LOGIC ---
+        let homeTeam = null;
+        let awayTeam = null;
+        let homeScore = 0;
+        let awayScore = 0;
+        let quarter = 1;
+        let timeRemaining = 720; // 12 mins in seconds
+        let gameActive = false;
+        let simulationSpeed = 1000; // ms per possession interaction
+        let speedMult = 1;
+        
+        let playerStats = {}; // To track points
+        
+        const COMMENTARY_TEMPLATES = {
+            make2: [
+                "{player} drives to the lane... and lays it in!",
+                "{player} pulls up for a mid-range jumper... SWISH!",
+                "{player} posts up, spins... and scores easily.",
+                "Beautiful pass finds {player} for the easy bucket.",
+                "{player} fades away... GOT IT!"
+            ],
+            make3: [
+                "{player} from downtown... BANG!",
+                "{player} steps back for three... IT'S GOOD!",
+                "{player} catches in the corner... fires... SPLASH!",
+                "Way downtown... {player} hits the deep three!"
+            ],
+            dunk: [
+                "{player} takes off... OH MY GOODNESS! MONSTER SLAM!",
+                "Clear lane for {player}... throws it down with authority!",
+                "{player} rises up and hammers it home!"
+            ],
+            miss: [
+                "{player} forces a tough shot... no good.",
+                "{player}'s jumper hits the back iron.",
+                "Blocked! Great defense stops {player}.",
+                "{player} tries a floater but it spills out."
+            ],
+            turnover: [
+                "{player} loses the handle... turnover.",
+                "Bad pass by {player}, intercepted!",
+                "{player} steps out of bounds."
+            ]
+        };
+
+        function randArr(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        // --- INIT ---
+        window.onload = function() {
+            const sels = [document.getElementById('home-select'), document.getElementById('away-select')];
+            // Populate selects
+            for (let k in TEAMS) {
+                sels.forEach(s => {
+                    let opt = document.createElement('option');
+                    opt.value = k;
+                    opt.textContent = TEAMS[k].name;
+                    s.appendChild(opt);
+                });
+            }
+            sels[1].selectedIndex = 1; // Default different team
+        };
+
+        function toggleSpeed() {
+            if (speedMult === 1) { speedMult = 5; document.getElementById('speed-btn').innerText = "Speed: 5x"; }
+            else if (speedMult === 5) { speedMult = 20; document.getElementById('speed-btn').innerText = "Speed: 20x (Fast)"; }
+            else { speedMult = 1; document.getElementById('speed-btn').innerText = "Speed: 1x"; }
+        }
+
+        function startMatch() {
+            const hKey = document.getElementById('home-select').value;
+            const aKey = document.getElementById('away-select').value;
+            
+            if(hKey === aKey) { alert("Please select different teams."); return; }
+            
+            homeTeam = JSON.parse(JSON.stringify(TEAMS[hKey])); // Clone
+            awayTeam = JSON.parse(JSON.stringify(TEAMS[aKey])); // Clone
+            
+            // Setup UI
+            document.getElementById('board-home-name').innerText = homeTeam.name.split(' ').pop().toUpperCase();
+            document.getElementById('board-away-name').innerText = awayTeam.name.split(' ').pop().toUpperCase();
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            
+            // Init stats
+            playerStats = {};
+            [...homeTeam.players, ...awayTeam.players].forEach(p => {
+                playerStats[p.name] = { pts: 0, team: p === homeTeam.players.find(x=>x.name===p.name) ? 'home' : 'away' };
+            });
+
+            log("Welcome to tonight's matchup!", "intro");
+            log(`${homeTeam.name} vs ${awayTeam.name}`, "intro");
+            
+            gameActive = true;
+            gameLoop();
+        }
+
+        async function gameLoop() {
+            while (gameActive && quarter <= 4) {
+                await new Promise(r => setTimeout(r, simulationSpeed / speedMult));
+                
+                // Simulate Possession
+                // 1 possession takes roughly 15-24 seconds off clock
+                let timeElapsed = Math.floor(Math.random() * 10) + 14; 
+                timeRemaining -= timeElapsed;
+
+                if (timeRemaining <= 0) {
+                    endQuarter();
+                    continue;
+                }
+                
+                updateClock();
+                simulatePossession();
+            }
+        }
+
+        function updateClock() {
+            let m = Math.floor(timeRemaining / 60);
+            let s = timeRemaining % 60;
+            document.getElementById('board-time').innerText = `${m}:${s < 10 ? '0'+s : s}`;
+        }
+
+        function endQuarter() {
+            log(`--- END OF QUARTER ${quarter} ---`, "intro");
+            if (quarter === 4) {
+                gameActive = false;
+                log(`GAME OVER! Final Score: ${homeScore} - ${awayScore}`, "score-update");
+                if (homeScore > awayScore) log(`${homeTeam.name} Wins!`, "intro");
+                else log(`${awayTeam.name} Wins!`, "intro");
+                return;
+            }
+            quarter++;
+            timeRemaining = 720;
+            document.getElementById('board-quarter').innerText = `${quarter}${["st","nd","rd","th"][quarter-1]} QTR`;
+            document.getElementById('board-time').innerText = "12:00";
+        }
+
+        function simulatePossession() {
+            // Who attacks? flip coin 50/50 approx for simplicity in this loop
+            // In real sim, track possession. Here we just do one random event per loop to simulate flow.
+            
+            let isHome = Math.random() > 0.5;
+            let attTeam = isHome ? homeTeam : awayTeam;
+            let defTeam = isHome ? awayTeam : homeTeam;
+            
+            // Pick random shooter weighted by Offense stat could be better, but pure random for now
+            let pData = attTeam.players[Math.floor(Math.random() * attTeam.players.length)];
+            
+            // Logic based on stats
+            // Base chance to score ~ 45% + (Off - 80)/2
+            let makeChance = 45 + ((pData.off - 80) * 0.8);
+            
+            // Roll
+            let roll = Math.random() * 100;
+            
+            let eventText = "";
+            let eventType = "commentary";
+            
+            if (roll < 10) { 
+                // Turnover
+                eventText = randArr(COMMENTARY_TEMPLATES.turnover).replace("{player}", pData.name);
+            } 
+            else if (roll > makeChance + 10) {
+                // Miss
+                eventText = randArr(COMMENTARY_TEMPLATES.miss).replace("{player}", pData.name);
+            }
+            else {
+                // Score!
+                // 3pt, Dunk or Jumper
+                let shotType = Math.random();
+                let pts = 2;
+                
+                // Curry logic (high shooters prefer 3s)
+                let threeTendency = pData.name === "Stephen Curry" || pData.name === "Damian Lillard" ? 0.6 : 0.3;
+                
+                if (Math.random() < threeTendency) {
+                    pts = 3;
+                    eventText = randArr(COMMENTARY_TEMPLATES.make3).replace("{player}", pData.name);
+                } else if (Math.random() < 0.2) {
+                    eventText = randArr(COMMENTARY_TEMPLATES.dunk).replace("{player}", pData.name);
+                    pts = 2;
+                } else {
+                    eventText = randArr(COMMENTARY_TEMPLATES.make2).replace("{player}", pData.name);
+                    pts = 2;
+                }
+                
+                // Update Score
+                if (isHome) homeScore += pts; else awayScore += pts;
+                playerStats[pData.name].pts += pts;
+                eventType = "score-update";
+                
+                updateScoreboard();
+                updateTopScorers();
+            }
+            
+            log(eventText, eventType);
+        }
+
+        function updateScoreboard() {
+            document.getElementById('board-home-score').innerText = homeScore;
+            document.getElementById('board-away-score').innerText = awayScore;
+        }
+
+        function log(msg, type) {
+            let div = document.createElement('div');
+            div.className = `feed-item ${type}`;
+            div.innerText = msg;
+            
+            // Add time stamp
+            let m = Math.floor(timeRemaining / 60);
+            let s = timeRemaining % 60;
+            let timeStr = `[${m}:${s < 10 ? '0'+s : s}] `;
+            div.prepend(timeStr);
+
+            let feed = document.getElementById('game-feed');
+            feed.prepend(div);
+        }
+
+        function updateTopScorers() {
+            let sorted = Object.entries(playerStats)
+                .sort(([,a], [,b]) => b.pts - a.pts)
+                .slice(0, 5);
+            
+            let html = sorted.map(([name, stats]) => {
+                return `<div class="stat-row"><span>${name}</span> <span>${stats.pts}</span></div>`;
+            }).join('');
+            
+            document.getElementById('top-scorers-list').innerHTML = html;
+        }
+
+    </script>
+</body>
+</html>

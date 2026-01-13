@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horse Racing Manager</title>
+    <style>
+        :root {
+            --bg-color: #1e272e;
+            --panel-color: #2f3640;
+            --accent-color: #4cd137;
+            --text-color: #f5f6fa;
+            --track-color: #2F4F4F;
+            --grass-color: #0b6623;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            padding: 20px;
+            gap: 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* LEFT: Track Visualization */
+        .track-view {
+            flex: 2;
+            background: #abce8a; /* Grass */
+            border-radius: 15px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.3);
+            border: 5px solid #5a4b41; /* Fence */
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* RIGHT: Info Panel */
+        .info-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 300px;
+        }
+
+        .box {
+            background: var(--panel-color);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Leaderboard */
+        .leaderboard {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .horse-row {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s;
+        }
+        .horse-row:last-child { border-bottom: none; }
+        
+        .rank-badge {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #444;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .rank-1 { background: #ffd700; color: black; }
+        .rank-2 { background: #c0c0c0; color: black; }
+        .rank-3 { background: #cd7f32; color: black; }
+
+        .horse-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid white;
+        }
+
+        .horse-name { flex: 1; font-weight: bold; }
+        .splits {font-family: monospace; font-size: 0.9rem; color: #aaa;}
+
+        /* Commentary */
+        .commentary-box {
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .feed-content {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            padding-right: 5px;
+        }
+
+        .feed-msg {
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 3px solid #555;
+            line-height: 1.3;
+        }
+        .feed-msg.important { border-left-color: #e94560; color: #ff9f43; }
+        .feed-msg.lap { border-left-color: #4cd137; color: #4cd137; }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn.secondary { background: #57606f; }
+
+        .back-link {
+            text-decoration: none;
+            color: #a0c0e0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+
+        /* Stats Modal/Overlay if needed, skipping for now */
+
+        @media (max-width: 900px) {
+            .container { flex-direction: column; overflow-y: auto; }
+            .track-view { height: 300px; flex: none; }
+            .info-panel { height: auto; }
+            .commentary-box { height: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="../index.html" class="back-link">← Back to Portfolio</a>
+        <h2 style="margin:0">Royal Derby Simulator</h2>
+        <div style="width: 100px"><!-- Spacer --></div>
+    </header>
+
+    <div class="container">
+        <!-- Race Track -->
+        <div class="track-view" id="track-container">
+            <canvas id="trackCanvas"></canvas>
+            <div id="countdown" style="position: absolute; font-size: 5rem; font-weight: bold; color: white; text-shadow: 2px 2px 4px black; display: none;">3</div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="info-panel">
+            
+            <div class="box controls">
+                <button class="btn" id="startBtn" onclick="prepareRace()">Start Race</button>
+                <button class="btn secondary" onclick="resetRace()">Reset</button>
+            </div>
+
+            <div class="box leaderboard">
+                <h3 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:5px;">Leaderboard</h3>
+                <div id="leaderboard-list">
+                    <!-- Rows injected here -->
+                </div>
+            </div>
+
+            <div class="box commentary-box">
+                <h3 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:5px;">Live Commentary</h3>
+                <div class="feed-content" id="comm-feed">
+                    <div class="feed-msg">Welcome to the Royal Derby! Press Start to begin.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & DATA ---
+        const TRACK_LAPS = 2;
+        const TRACK_LENGTH_M = 1000; // meters per lap approx for logic
+        
+        // Horses Generation
+        const HORSE_VARS = [
+            { name: "Thunder Bolt", color: "#e74c3c" },
+            { name: "Shadowfax", color: "#ecf0f1" },
+            { name: "Black Pearl", color: "#2d3436" },
+            { name: "Secretariat", color: "#e67e22" },
+            { name: "Pegasus", color: "#3498db" },
+            { name: "Golden Wind", color: "#f1c40f" },
+            { name: "Comet", color: "#9b59b6" },
+            { name: "Biscuit", color: "#95a5a6" }
+        ];
+
+        let horses = [];
+        let raceActive = false;
+        let raceFinished = false;
+        let timer = 0;
+        let lastCommentaryTime = 0;
+
+        // Canvas
+        const canvas = document.getElementById('trackCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize handling
+        let cvsW, cvsH;
+        function resize() {
+            const container = document.getElementById('track-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            cvsW = canvas.width;
+            cvsH = canvas.height;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+        
+        // --- CLASS ---
+        class Horse {
+            constructor(def) {
+                this.name = def.name;
+                this.color = def.color;
+                // Stats (0-100)
+                this.speed = 80 + Math.random() * 15; // Top Speed
+                this.accel = 70 + Math.random() * 20; // Acceleration
+                this.stamina = 70 + Math.random() * 30; // Resistance to fatigue
+                this.consistency = Math.random(); 
+
+                // Race State
+                this.distance = 0; // Total meters run
+                this.progress = 0; // 0 to TRACK_LAPS
+                this.currentSpeed = 0;
+                this.fatigue = 0;
+                this.lane = 0; // assigned later
+                this.lapsCompleted = 0;
+            }
+
+            update(dt) {
+                // Determine target speed
+                // Max speed depends on Base Speed - Fatigue
+                // Fatigue grows with distance, mitigated by Stamina
+                
+                // Fatigue Factor (0 to 1) increases over race
+                let fatigueRate = (100 - this.stamina) * 0.0005;
+                this.fatigue += this.currentSpeed * fatigueRate * dt; 
+                
+                let perfVar = (Math.random() - 0.5) * (1 - this.consistency) * 2; // Random burst/lag
+                
+                let targetSpeedMps = (this.speed / 3.6) * (1 - Math.min(this.fatigue*0.001, 0.4)) + perfVar; 
+
+                // Accel
+                if (this.currentSpeed < targetSpeedMps) {
+                    this.currentSpeed += (this.accel * 0.1) * dt;
+                } else {
+                    this.currentSpeed -= (2.0) * dt; // Decel natural
+                }
+
+                // Move
+                this.distance += this.currentSpeed * dt;
+                
+                // One lap is TRACK_LENGTH_M meters
+                this.progress = this.distance / TRACK_LENGTH_M;
+                
+                if (Math.floor(this.progress) > this.lapsCompleted) {
+                    this.lapsCompleted = Math.floor(this.progress);
+                    if (this.lapsCompleted < TRACK_LAPS) {
+                        return "lap";
+                    } else {
+                        return "finish";
+                    }
+                }
+                return null;
+            }
+        }
+
+        // --- GAME LOOP ---
+        function init() {
+            resize();
+            resetRace();
+        }
+
+        function resetRace() {
+            raceActive = false;
+            raceFinished = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('countdown').style.display = 'none';
+            timer = 0;
+            
+            // Re-gen stats slightly or just reset pos
+            horses = HORSE_VARS.map((def, i) => {
+                let h = new Horse(def);
+                h.lane = i;
+                return h;
+            });
+
+            updateLeaderboard();
+            addLog("Race conditions look good. Waiting for start.", false);
+            draw();
+        }
+
+        function prepareRace() {
+            document.getElementById('startBtn').disabled = true;
+            let count = 3;
+            const cdEl = document.getElementById('countdown');
+            cdEl.style.display = 'block';
+            cdEl.innerText = count;
+
+            let int = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    cdEl.innerText = count;
+                } else {
+                    clearInterval(int);
+                    cdEl.innerText = "GO!";
+                    setTimeout(() => cdEl.style.display = 'none', 1000);
+                    startRace();
+                }
+            }, 1000);
+        }
+
+        function startRace() {
+            raceActive = true;
+            addLog("AND THEY'RE OFF!", true);
+            lastCommentaryTime = Date.now();
+            requestAnimationFrame(loop);
+        }
+
+        let lastTime = 0;
+        function loop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (raceActive) {
+                update(dt);
+                draw();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function update(dt) {
+            timer += dt;
+            let finishedCount = 0;
+            
+            // Sort for race logic (who is leading)
+            let sortedHorses = [...horses].sort((a,b) => b.distance - a.distance);
+
+            horses.forEach(h => {
+                if (h.progress >= TRACK_LAPS) {
+                    finishedCount++;
+                    return; // Already finished
+                }
+
+                let event = h.update(dt);
+                
+                if (event === "lap") {
+                    addLog(`${h.name} completes lap ${h.lapsCompleted}!`, "lap");
+                }
+                if (event === "finish") {
+                    addLog(`${h.name} CROSSES THE LINE!`, "important");
+                    h.finishTime = timer.toFixed(2);
+                }
+            });
+
+            // Random commentary
+            if (Date.now() - lastCommentaryTime > 3000) {
+                if (Math.random() > 0.6) {
+                    generateCommentary(sortedHorses);
+                }
+                lastCommentaryTime = Date.now();
+            }
+
+            updateLeaderboard(sortedHorses);
+
+            if (finishedCount === horses.length) {
+                raceActive = false;
+                raceFinished = true;
+                addLog("Race Finished! Check results.", "important");
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        function generateCommentary(sorted) {
+            let leader = sorted[0];
+            let last = sorted[sorted.length-1];
+            
+            const lines = [
+                `${leader.name} is holding the lead strongly!`,
+                `${last.name} is struggling at the back.`,
+                `${sorted[1].name} is trying to close the gap!`,
+                `Look at ${sorted[2].name} go!`,
+                `${leader.name} looks unstoppable right now.`,
+                `A fierce battle for the second place!`
+            ];
+            
+            addLog(lines[Math.floor(Math.random() * lines.length)]);
+        }
+
+        function draw() {
+            // Background Track
+            ctx.fillStyle = '#659c3f'; // grass in canvas if needed, but we have div bg
+            ctx.clearRect(0, 0, cvsW, cvsH);
+
+            // Shape of track: Oval
+            // Center
+            const cx = cvsW / 2;
+            const cy = cvsH / 2;
+            const radiusX = cvsW * 0.4; // width radius
+            const radiusY = cvsH * 0.35; // height radius
+
+            // Draw Track Surface
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            ctx.ellipse(cx, cy, radiusX * 0.6, radiusY * 0.5, 0, 0, 2 * Math.PI); // hole
+            ctx.fillStyle = "#8d6e63"; // Dirt track color
+            ctx.fill("evenodd");
+            
+            // Draw lines
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, radiusX * 0.6, radiusY * 0.5, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+
+            // Finish Line (at right side)
+            ctx.beginPath();
+            ctx.moveTo(cx + radiusX * 0.6, cy);
+            ctx.lineTo(cx + radiusX, cy);
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            // Checker pattern
+            // (Simplified line for now)
+
+            // Draw Horses
+            horses.forEach((h, i) => {
+                // Calculate position on ellipse
+                // normalize progress % 1 (for current lap pos)
+                let lapProg = h.progress % 1; 
+                // In canvas ellipse: 0 is right, goes clockwise
+                let angle = lapProg * Math.PI * 2; 
+
+                // Lane offset: different radius per lane
+                // Track width = radiusX * 0.4
+                // we divide by horses count
+                let trackWidth = radiusX * 0.4;
+                let laneWidth = trackWidth / horses.length;
+                let laneRadiusX = (radiusX * 0.6) + (laneWidth * h.lane) + (laneWidth/2);
+                let laneRadiusY = (radiusY * 0.5) + (laneWidth * h.lane * (radiusY/radiusX)) + (laneWidth/2 * (radiusY/radiusX));
+
+                let px = cx + Math.cos(angle) * laneRadiusX;
+                let py = cy + Math.sin(angle) * laneRadiusY;
+
+                // Draw Horse Dot
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, Math.PI*2);
+                ctx.fillStyle = h.color;
+                ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Name Tag (if space allows or hover? simplify: number)
+                ctx.fillStyle = "white";
+                ctx.font = "bold 10px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(h.lane+1, px, py);
+            });
+        }
+
+        // --- UI UPDATERS ---
+        function updateLeaderboard(sorted) {
+            const list = document.getElementById('leaderboard-list');
+            if(!sorted) sorted = horses;
+            
+            let html = sorted.map((h, i) => {
+                let badgeClass = i===0 ? 'rank-1' : (i===1 ? 'rank-2' : (i===2 ? 'rank-3' : ''));
+                let status = h.finishTime ? `🏁 ${h.finishTime}s` : `L${Math.floor(h.lapsCompleted)+1}`;
+                
+                return `
+                <div class="horse-row">
+                    <div class="rank-badge ${badgeClass}">${i+1}</div>
+                    <div class="horse-color-dot" style="background:${h.color}"></div>
+                    <div class="horse-name">${h.name}</div>
+                    <div class="splits">${status}</div>
+                </div>
+                `;
+            }).join('');
+            list.innerHTML = html;
+        }
+
+        function addLog(msg, type) {
+            const feed = document.getElementById('comm-feed');
+            const div = document.createElement('div');
+            div.className = `feed-msg ${type === 'important' ? 'important' : ''} ${type === 'lap' ? 'lap' : ''}`;
+            
+            let time = raceActive ? timer.toFixed(1) + "s" : "";
+            div.innerText = (time ? `[${time}] ` : "") + msg;
+            
+            feed.prepend(div);
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

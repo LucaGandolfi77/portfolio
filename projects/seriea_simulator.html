@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serie A Match Simulator</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --accent-color: #0fb9b1;
+            --text-color: #ffffff;
+            --pitch-color: #20bf6b;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            text-decoration: none;
+            color: #a0c0e0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Setup Screen */
+        #setup-screen {
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .team-selector {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            background: #0f3460;
+            color: white;
+            border: 2px solid #533483;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(15, 185, 177, 0.4);
+        }
+
+        .btn:hover { transform: scale(1.05); }
+
+        /* Game Screen */
+        #game-screen {
+            display: none;
+            width: 100%;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #333;
+            background: linear-gradient(to bottom, #333, #111);
+        }
+
+        .team-score-box {
+            text-align: center;
+            width: 150px;
+        }
+
+        .team-name { font-size: 1.2rem; color: #fff; margin-bottom: 5px; font-weight:bold; }
+        .score-display { font-size: 3rem; font-weight: bold; font-family: 'Courier New', monospace; color: #0fb9b1; }
+        
+        .game-info {
+            text-align: center;
+            color: #e0e0e0;
+        }
+        .half-indicator { font-size: 1rem; font-weight: bold; color: #ffeb3b; }
+        .time { font-size: 2rem; font-family: 'Courier New', monospace; }
+
+        .game-layout {
+            display: flex;
+            gap: 20px;
+            /* Height controlled by children */
+        }
+
+        /* Feed */
+        .feed-container {
+            flex: 2;
+            height: 400px;
+            background: var(--card-color);
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .feed-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            animation: fadeIn 0.3s ease-out;
+            line-height: 1.4;
+            flex-shrink: 0;
+            display: flex;
+        }
+        .feed-timestamp { color: #888; margin-right: 10px; min-width: 40px; }
+        .feed-text { flex: 1; }
+        
+        .feed-item.goal { color: #2ecc71; font-weight: bold; background: rgba(46, 204, 113, 0.1); border-left: 4px solid #2ecc71; }
+        .feed-item.chance { color: #f1c40f; }
+        .feed-item.card { color: #e74c3c; }
+        .feed-item.intro { color: #3498db; font-style: italic; border-bottom: 1px dashed #555; }
+        
+        /* Stats Panel */
+        .stats-panel {
+            flex: 1;
+            height: 400px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.9rem;
+            overflow-y: auto;
+        }
+        
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 2px;}
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 768px) {
+            .game-layout { flex-direction: column; height: auto; }
+            .feed-container { height: 300px; }
+            .stats-panel { height: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="back-link">← Portfolio</a>
+
+    <div class="container">
+        <header>
+            <h1 style="font-size: 2.5rem; margin-bottom: 5px;">SERIE A SIMULATOR</h1>
+            <p style="color: #888;">Live Text Commentary • Official Teams • Player Stats</p>
+        </header>
+
+        <!-- SETUP -->
+        <div id="setup-screen">
+            <h2>Match Setup</h2>
+            <div class="team-selector">
+                <div>
+                    <label style="display:block; margin-bottom:10px; color:#aaa">HOME</label>
+                    <select id="home-select"></select>
+                </div>
+                <div style="display:flex; align-items:center; font-size:1.5rem; font-weight:bold; color:#555">VS</div>
+                <div>
+                    <label style="display:block; margin-bottom:10px; color:#aaa">AWAY</label>
+                    <select id="away-select"></select>
+                </div>
+            </div>
+            
+            <button class="btn" onclick="startMatch()">KICK OFF</button>
+        </div>
+
+        <!-- GAME -->
+        <div id="game-screen">
+            <div class="scoreboard">
+                <div class="team-score-box">
+                    <div class="team-name" id="board-home-name">INTER</div>
+                    <div class="score-display" id="board-home-score">0</div>
+                </div>
+                <div class="game-info">
+                    <div class="half-indicator" id="board-half">1st HALF</div>
+                    <div class="time" id="board-time">00:00</div>
+                </div>
+                <div class="team-score-box">
+                    <div class="team-name" id="board-away-name">MILAN</div>
+                    <div class="score-display" id="board-away-score">0</div>
+                </div>
+            </div>
+
+            <div class="game-layout">
+                <div class="feed-container" id="game-feed">
+                    <!-- Text logs go here -->
+                </div>
+                
+                <div class="stats-panel">
+                    <h3 style="margin-top:0; color:#2ecc71">Goalscorers</h3>
+                    <div id="scorers-list"></div>
+                    <br>
+                    <h3 style="margin-top:0; color:#3498db">Match Stats</h3>
+                    <div id="game-stats-list">
+                        <div class="stat-row"><span>Possession</span> <span id="stat-possession">50% - 50%</span></div>
+                        <div class="stat-row"><span>Shots</span> <span id="stat-shots">0 - 0</span></div>
+                        <div class="stat-row"><span>On Target</span> <span id="stat-target">0 - 0</span></div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button onclick="toggleSpeed()" id="speed-btn" style="padding: 5px 10px; background:#444; border:none; color:white; border-radius:4px; cursor:pointer;">Speed: 1x</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button onclick="location.reload()" style="background:transparent; border:1px solid #555; color:#888; padding:10px 20px; border-radius:30px; cursor:pointer;">New Match</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const TEAMS = {
+            "INT": { name: "Inter", color: "#0066b2", players: [
+                { name: "L. Martínez", att: 92, def: 50, pos: "FW" },
+                { name: "M. Thuram", att: 86, def: 45, pos: "FW" },
+                { name: "N. Barella", att: 84, def: 78, pos: "MF" },
+                { name: "H. Calhanoglu", att: 85, def: 70, pos: "MF" },
+                { name: "A. Bastoni", att: 60, def: 88, pos: "DF" }
+            ]},
+            "MIL": { name: "Milan", color: "#fb3b3b", players: [
+                { name: "R. Leão", att: 89, def: 40, pos: "FW" },
+                { name: "C. Pulisic", att: 85, def: 50, pos: "FW" },
+                { name: "T. Hernandez", att: 82, def: 80, pos: "DF" },
+                { name: "T. Reijnders", att: 80, def: 75, pos: "MF" },
+                { name: "M. Maignan", att: 10, def: 94, pos: "GK" }
+            ]},
+            "JUV": { name: "Juventus", color: "#ffffff", players: [
+                { name: "D. Vlahovic", att: 88, def: 40, pos: "FW" },
+                { name: "F. Chiesa", att: 86, def: 45, pos: "FW" }, # Note: Assuming current/recent roster context
+                { name: "A. Rabiot", att: 82, def: 80, pos: "MF" },
+                { name: "Bremer", att: 60, def: 88, pos: "DF" },
+                { name: "W. Szczesny", att: 10, def: 90, pos: "GK" }
+            ]},
+            "NAP": { name: "Napoli", color: "#00a8ff", players: [
+                { name: "V. Osimhen", att: 91, def: 45, pos: "FW" },
+                { name: "K. Kvaratskhelia", att: 88, def: 40, pos: "FW" },
+                { name: "G. Di Lorenzo", att: 75, def: 84, pos: "DF" },
+                { name: "S. Lobotka", att: 78, def: 78, pos: "MF" },
+                { name: "A. Meret", att: 10, def: 85, pos: "GK" }
+            ]},
+            "ROM": { name: "Roma", color: "#c0392b", players: [
+                { name: "P. Dybala", att: 89, def: 40, pos: "FW" },
+                { name: "R. Lukaku", att: 87, def: 45, pos: "FW" },
+                { name: "L. Pellegrini", att: 83, def: 70, pos: "MF" },
+                { name: "G. Mancini", att: 50, def: 82, pos: "DF" },
+                { name: "M. Svilar", att: 10, def: 80, pos: "GK" }
+            ]},
+            "ATA": { name: "Atalanta", color: "#2c3e50", players: [
+                { name: "G. Scamacca", att: 84, def: 40, pos: "FW" },
+                { name: "T. Koopmeiners", att: 85, def: 75, pos: "MF" },
+                { name: "A. Lookman", att: 83, def: 45, pos: "FW" },
+                { name: "G. Scalvini", att: 60, def: 85, pos: "DF" },
+                { name: "Ederson", att: 80, def: 78, pos: "MF" }
+            ]}
+        };
+
+        const EVENTS = {
+            goal: [
+                "GOAL! {player} fires it into the top corner!",
+                "GOAL! A beautiful finish by {player}!",
+                "GOAL! {player} taps it in after a great cross.",
+                "WHAT A SCREAMER! {player} scores from outside the box!"
+            ],
+            miss: [
+                "{player} shoots... just wide of the post.",
+                "{player} hits the woodwork! So close!",
+                "{player} finds space but shoots over the bar.",
+                "Great save by the goalkeeper denies {player}."
+            ],
+            chance: [
+                "{player} takes on the defender...",
+                "Great through ball towards {player}...",
+                "{player} is in a dangerous position..."
+            ],
+            card: [
+                "Yellow card for {player} after a rough tackle.",
+                "The referee books {player} for dissent."
+            ]
+        };
+
+        function randArr(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        // --- GAME STATE ---
+        let homeTeam, awayTeam;
+        let homeScore = 0, awayScore = 0;
+        let matchTime = 0; // minutes
+        let gameActive = false;
+        let speedMult = 1;
+        let stats = { hShots:0, aShots:0, hTarget:0, aTarget:0, hPoss:50 };
+        let scorers = [];
+
+        window.onload = function() {
+            const hSel = document.getElementById('home-select');
+            const aSel = document.getElementById('away-select');
+            for(let k in TEAMS) {
+                hSel.innerHTML += `<option value="${k}">${TEAMS[k].name}</option>`;
+                aSel.innerHTML += `<option value="${k}">${TEAMS[k].name}</option>`;
+            }
+            aSel.selectedIndex = 1;
+        };
+
+        function toggleSpeed() {
+            if (speedMult === 1) { speedMult = 5; document.getElementById('speed-btn').innerText = "Speed: 5x"; }
+            else if (speedMult === 5) { speedMult = 20; document.getElementById('speed-btn').innerText = "Speed: 20x"; }
+            else { speedMult = 1; document.getElementById('speed-btn').innerText = "Speed: 1x"; }
+        }
+
+        function startMatch() {
+            const hVal = document.getElementById('home-select').value;
+            const aVal = document.getElementById('away-select').value;
+            if(hVal === aVal) { alert("Select different teams"); return; }
+
+            homeTeam = TEAMS[hVal];
+            awayTeam = TEAMS[aVal];
+
+            document.getElementById('board-home-name').textContent = homeTeam.name.toUpperCase();
+            document.getElementById('board-away-name').textContent = awayTeam.name.toUpperCase();
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+
+            log("Match Kick-off!", "intro");
+            log(`${homeTeam.name} vs ${awayTeam.name}`, "intro");
+
+            gameActive = true;
+            matchLoop();
+        }
+
+        async function matchLoop() {
+            while(gameActive && matchTime <= 90) {
+                // Wait basic tick
+                await new Promise(r => setTimeout(r, 500 / speedMult));
+                matchTime++;
+                
+                updateUI();
+                simulateMinute();
+
+                if(matchTime === 45) {
+                    log("--- HALF TIME ---", "intro");
+                    document.getElementById('board-half').textContent = "HALF TIME";
+                    await new Promise(r => setTimeout(r, 2000 / speedMult));
+                    document.getElementById('board-half').textContent = "2nd HALF";
+                }
+            }
+            
+            log("--- FULL TIME ---", "intro");
+            log(`Final Score: ${homeTeam.name} ${homeScore} - ${awayScore} ${awayTeam.name}`, "intro");
+            gameActive = false;
+        }
+
+        function simulateMinute() {
+            // Chance calculation (lower than basketball)
+            // 5% chance of highlight per minute
+            if(Math.random() > 0.15) return; 
+
+            // Who gets the chance?
+            let isHome = Math.random() < (stats.hPoss / 100); // Simple possession logic
+            let attTeam = isHome ? homeTeam : awayTeam;
+            let defTeam = isHome ? awayTeam : homeTeam;
+
+            // Pick a player
+            let p = randArr(attTeam.players.filter(x => x.pos !== 'GK'));
+            
+            // Generate event
+            let roll = Math.random() * 100;
+            // Weighted by ATT stat
+            let goalChance = (p.att / 10) - 4; // e.g. 90 att -> 5% chance relative
+            let shotChance = goalChance * 4;
+
+            if (roll < goalChance) {
+                // GOAL
+                if(isHome) { homeScore++; stats.hShots++; stats.hTarget++; }
+                else { awayScore++; stats.aShots++; stats.aTarget++; }
+                
+                scorers.push({name: p.name, time: matchTime, team: attTeam.color});
+                updateScorers();
+                log(randArr(EVENTS.goal).replace("{player}", p.name), "goal");
+            } 
+            else if (roll < shotChance) {
+                // MISS or SAVE
+                if(isHome) stats.hShots++; else stats.aShots++;
+                if(Math.random() > 0.5) {
+                   if(isHome) stats.hTarget++; else stats.aTarget++; // Save
+                }
+                log(randArr(EVENTS.miss).replace("{player}", p.name), "default");
+            }
+            else if (roll > 98) {
+                // Card
+                log(randArr(EVENTS.card).replace("{player}", p.name), "card");
+            }
+            else {
+                // Just a chance/action
+                // log(randArr(EVENTS.chance).replace("{player}", p.name), "default");
+            }
+            
+            // Randomly fluctuate possession
+            if(matchTime % 5 === 0) {
+                let shift = Math.floor(Math.random() * 5) - 2;
+                stats.hPoss = Math.max(30, Math.min(70, stats.hPoss + shift));
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('board-time').textContent = matchTime + "'";
+            document.getElementById('board-home-score').textContent = homeScore;
+            document.getElementById('board-away-score').textContent = awayScore;
+
+            // Stats
+            document.getElementById('stat-possession').textContent = `${stats.hPoss}% - ${100-stats.hPoss}%`;
+            document.getElementById('stat-shots').textContent = `${stats.hShots} - ${stats.aShots}`;
+            document.getElementById('stat-target').textContent = `${stats.hTarget} - ${stats.aTarget}`;
+        }
+
+        function updateScorers() {
+            let html = scorers.map(s => 
+                `<div class="stat-row" style="border:none">
+                    <span style="color:${s.team}">⚽ ${s.name}</span> <span>${s.time}'</span>
+                 </div>`
+            ).join('');
+            document.getElementById('scorers-list').innerHTML = html;
+        }
+
+        function log(msg, type) {
+            const div = document.createElement('div');
+            div.className = `feed-item ${type}`;
+            div.innerHTML = `
+                <div class="feed-timestamp">${matchTime}'</div>
+                <div class="feed-text">${msg}</div>
+            `;
+            const feed = document.getElementById('game-feed');
+            feed.prepend(div);
+        }
+
+    </script>
+</body>
+</html>
