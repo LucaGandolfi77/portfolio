@@ -16,28 +16,10 @@
     .poem h2{color:#cfefff;margin:0 0 8px}
     .poem pre{white-space:pre-wrap;font-family:inherit;color:#eaf8ff;margin:0}
     .back{display:inline-block;margin-top:12px;padding:8px 12px;border-radius:999px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);text-decoration:none}
-    .lang-top-left { position: fixed; top: 16px; left: 16px; z-index: 1003; }
-    .lang-top-left select { background: transparent; border: none; color: white; font-weight: 600; cursor: pointer; font-size: 0.95rem; padding: 6px 8px; border-radius:6px; }
     @media (max-width:600px){ .hero h1{font-size:1.3rem} }
   </style>
 </head>
 <body>
-  <div class="lang-top-left">
-    <label for="langSelect" class="visually-hidden">Select language</label>
-    <select id="langSelect" aria-label="Select language" title="Change language">
-        <option value="en">🇬🇧 EN</option>
-        <option value="it">🇮🇹 IT</option>
-        <option value="fr">🇫🇷 FR</option>
-        <option value="es">🇪🇸 ES</option>
-        <option value="zh">🇨🇳 中</option>
-        <option value="ru">🇷🇺 RU</option>
-        <option value="de">🇩🇪 DE</option>
-        <option value="ja">🇯🇵 日本</option>
-        <option value="sv">🇸🇪 SV</option>
-        <option value="ar">🇸🇦 AR</option>
-        <option value="he">🇮🇱 HE</option>
-    </select>
-  </div>
 
   <div class="container">
     <div class="hero">
@@ -82,26 +64,57 @@
       const t = await loadTranslations(lang);
       const wrap = document.getElementById('poemsWrap');
       wrap.innerHTML = '';
-      const keys = ['because_i_could_not','the_second_coming','macbeth_tomorrow','do_not_go_gentle'];
+      const keys = ['because_i_could_not','the_second_coming','macbeth_tomorrow','do_not_go_gentle', 'escapril2020_01'];
       keys.forEach(k => {
         const poem = getNested(t, `poems.${k}`) || getNested(embedded, `en.poems.${k}`);
         if (!poem) return;
         const title = poem.title || k;
         const text = poem.text || '';
-        const node = document.createElement('div'); node.className = 'poem';
-        node.innerHTML = `<h2>${escapeHtml(title)}</h2><pre>${escapeHtml(text)}</pre>`;
+
+        const lines = text.split('\n');
+        const preview = lines.slice(0, 3).join('\n') + (lines.length > 3 ? '\n...' : '');
+
+        const node = document.createElement('div'); 
+        node.className = 'poem';
+        node.style.cursor = 'pointer';
+
+        node.innerHTML = `<h2>${escapeHtml(title)}</h2><pre>${escapeHtml(preview)}</pre>`;
+        
+        let expanded = false;
+        node.onclick = () => {
+          expanded = !expanded;
+          const pre = node.querySelector('pre');
+          pre.textContent = expanded ? text : preview;
+        };
+
         wrap.appendChild(node);
       });
     }
 
     function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    // Wire language selector
-    const select = document.getElementById('langSelect');
-    const savedLang = localStorage.getItem('lang') || 'en';
-    select.value = savedLang;
-    renderPoems(savedLang);
-    select.addEventListener('change', async (e)=>{ const v = e.target.value||'en'; localStorage.setItem('lang', v); renderPoems(v); });
+    // Init with top_buttons.js integration
+    const checkInterval = setInterval(() => {
+        const siteSelect = document.getElementById('siteLangSelect');
+        if (siteSelect) {
+            // Initial render
+            renderPoems(siteSelect.value || 'en');
+            // Listener
+            siteSelect.addEventListener('change', (e) => {
+                renderPoems(e.target.value);
+            });
+            clearInterval(checkInterval);
+        }
+    }, 50);
+
+    // Fallback if top_buttons fails or takes too long (e.g. 1 sec)
+    setTimeout(() => {
+        if (!document.getElementById('siteLangSelect')) {
+            const saved = localStorage.getItem('lang') || 'en';
+            renderPoems(saved);
+        }
+    }, 1000);
   </script>
+  <script src="top_buttons.js"></script>
 </body>
 </html>

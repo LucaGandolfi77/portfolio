@@ -85,22 +85,6 @@
     </style>
 </head>
 <body>
-    <div class="lang-top-left">
-        <label for="langSelect" class="visually-hidden">Select language</label>
-        <select id="langSelect" aria-label="Select language" title="Change language">
-            <option value="en">🇬🇧 EN</option>
-            <option value="it">🇮🇹 IT</option>
-            <option value="fr">🇫🇷 FR</option>
-            <option value="es">🇪🇸 ES</option>
-            <option value="zh">🇨🇳 中</option>
-            <option value="ru">🇷🇺 RU</option>
-            <option value="de">🇩🇪 DE</option>
-            <option value="ja">🇯🇵 日本</option>
-            <option value="sv">🇸🇪 SV</option>
-            <option value="ar">🇸🇦 AR</option>
-            <option value="he">🇮🇱 HE</option>
-        </select>
-    </div>
 
     <!-- Quick navigation (links to main portfolio sections) -->
     <nav class="quick-nav" aria-label="Quick navigation">
@@ -288,13 +272,34 @@
             document.title = getNested(t, 'books.page.title') || document.title;
         }
 
-        document.addEventListener('DOMContentLoaded', async ()=>{
-            const t = await loadTranslations(savedLang);
-            // load CSV of read books first, then apply translations and build UI
-            try { await loadCSV(); } catch (e) { console.warn('CSV load failed', e); }
+        async function renderPage(lang) {
+            const t = await loadTranslations(lang);
+             // load CSV of read books if not loaded
+            if (!window.csvBooks) {
+                try { await loadCSV(); } catch (e) { console.warn('CSV load failed', e); }
+            }
             applyPageTranslations(t);
             buildAccordion(t);
-        });
+        }
+
+        // Init with top_buttons.js integration
+        const checkInterval = setInterval(() => {
+            const siteSelect = document.getElementById('siteLangSelect');
+            if (siteSelect) {
+                renderPage(siteSelect.value || 'en');
+                siteSelect.addEventListener('change', (e) => {
+                    renderPage(e.target.value);
+                });
+                clearInterval(checkInterval);
+            }
+        }, 50);
+
+        setTimeout(() => {
+            if (!document.getElementById('siteLangSelect')) {
+                const saved = localStorage.getItem('lang') || 'en';
+                renderPage(saved);
+            }
+        }, 1000);
 
         // Load and parse CSV '/old_books.csv'
         async function loadCSV() {
@@ -447,18 +452,6 @@
 
             function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-        // Wire language selector on this page (persist to localStorage and re-apply translations)
-        const langSelect = document.getElementById('langSelect');
-        if (langSelect) {
-            langSelect.value = savedLang;
-            langSelect.addEventListener('change', async (e) => {
-                const v = e.target.value || 'en';
-                localStorage.setItem('lang', v);
-                const t = await loadTranslations(v);
-                applyPageTranslations(t);
-                buildAccordion(t);
-            });
-        }
 
         // Handle window resize to re-render books table/cards when orientation changes
         window.addEventListener('resize', () => {
@@ -475,5 +468,6 @@
             }
         });
     </script>
+    <script src="top_buttons.js"></script>
 </body>
 </html>
