@@ -574,17 +574,33 @@
         let myHand = [];
         let pendingWildCard = null;
 
+        function generateRandomCode(length = 6) {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
         // Initialize PeerJS
-        function initPeer() {
+        function initPeer(customId = null) {
             return new Promise((resolve, reject) => {
-                peer = new Peer({
+                if (peer) {
+                    peer.destroy();
+                }
+
+                const options = {
+                    debug: 2,
                     config: {
                         iceServers: [
                             { urls: 'stun:stun.l.google.com:19302' },
                             { urls: 'stun:stun1.l.google.com:19302' }
                         ]
                     }
-                });
+                };
+
+                peer = customId ? new Peer(customId, options) : new Peer(options);
 
                 peer.on('open', (id) => {
                     myPeerId = id;
@@ -594,10 +610,20 @@
 
                 peer.on('error', (err) => {
                     console.error('Peer error:', err);
-                    reject(err);
+                    // Special handling for unavailable ID during creation
+                    if (customId && err.type === 'unavailable-id') {
+                        reject(err);
+                    } else if (customId) {
+                         // Other errors during init with custom ID
+                        reject(err);
+                    } else {
+                        // General runtime errors
+                        // alert('Peer error: ' + err.type);
+                    }
                 });
 
                 peer.on('connection', (conn) => {
+                    console.log('Incoming connection from ' + conn.peer);
                     handleIncomingConnection(conn);
                 });
             });
@@ -632,20 +658,40 @@
             myName = name;
             isHost = true;
 
-            try {
-                await initPeer();
-                roomCode = generateRoomCode();
-                
-                // Initialize host as first player
-                players = [{
-                    id: myPeerId,
-                    name: myName,
-                    cardCount: 0,
-                    calledUno: false
-                }];
+            let created = false;
+            let attempts = 0;
 
-                showLobby();
-                logLobby(`Room created! Code: ${roomCode}`);
+            // Try to create a short ID room
+            while (!created && attempts < 5) {
+                try {
+                    const code = generateRandomCode(6);
+                    console.log('Attempting to create room with code:', code);
+                    await initPeer(code);
+                    roomCode = code;
+                    created = true;
+                } catch (e) {
+                    console.log('Room creation attempt failed (collision likely):', e);
+                    attempts++;
+                }
+            }
+
+            if (!created) {
+                alert('Could not find a free room code. Please try again.');
+                return;
+            }
+                
+            // Initialize host as first player
+            players = [{
+                id: myPeerId,
+                name: myName,
+                cardCount: 0,
+                calledUno: false
+            }];
+
+            showLobby();
+            logLobby(`Room created! Code: ${roomCode}`);
+            updateLobby(); // Ensure button state is correct
+        }
             } catch (error) {
                 alert('Failed to create room: ' + error.message);
             }
@@ -654,17 +700,15 @@
         // Join Room
         async function joinRoom() {
             const name = document.getElementById('playerName').value.trim();
-            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            const codeInput = document.getElementById('roomCodeInput').value.trim();
             
-            if (!name || !code) {
+            if (!name || !codeInput) {
                 alert('Please enter your name and room code');
                 return;
             }
 
-            if (code.length !== 4) {
-                alert('Room code must be 4 characters');
-                return;
-            }
+            // Code is used as Peer ID directly
+            const code = codeInput.toUpperCase();
 
             myName = name;
             roomCode = code;
@@ -672,20 +716,20 @@
             try {
                 await initPeer();
                 
-                // Connect to host (room code is the host's peer ID prefix)
-                // We'll use a simple mapping: room code directly is part of peer ID
                 const hostPeerId = code;
+                console.log('Connecting to host:', hostPeerId);
                 
                 const conn = peer.connect(hostPeerId);
                 
                 conn.on('open', () => {
+                    console.log('Connection open to host');
                     connections.set(hostPeerId, conn);
                     conn.send({
                         type: 'join',
                         playerId: myPeerId,
                         playerName: myName
                     });
-                    logLobby('Connecting to room...');
+                    logLobby('Connected to host, joining...');
                 });
 
                 conn.on('data', (data) => {
@@ -697,9 +741,11 @@
                     alert('Connection to host lost');
                     showHome();
                 });
-
+                
+                // Show lobby immediately, waiting for roomState
                 showLobby();
             } catch (error) {
+                console.error('Join error:', error);
                 alert('Failed to join room: ' + error.message);
             }
         }
@@ -734,14 +780,21 @@
 
         // Handle messages
         function handleMessage(data, conn) {
-            console.log('Received message:', data);
+            console.log('Received message:', data.type, data);
 
             switch (data.type) {
                 case 'join':
                     if (isHost) {
+                        console.log('Host received JOIN request from', data.playerName);
                         if (players.length >= 4) {
                             conn.send({ type: 'error', message: 'Room is full' });
                             return;
+                        }
+
+                        // Check if already joined
+                        if (players.find(p => p.id === data.playerId)) {
+                             console.log('Player already in list');
+                             return;
                         }
 
                         // Add player
@@ -864,6 +917,7 @@
 
         // Update lobby
         function updateLobby() {
+            console.log('Update Lobby called. Players:', players.length, 'Is Host:', isHost);
             document.getElementById('playerCount').textContent = players.length;
             
             const container = document.getElementById('playersContainer');
@@ -881,7 +935,10 @@
 
             // Enable start button if host and at least 2 players
             if (isHost) {
-                document.getElementById('startGameBtn').disabled = players.length < 2;
+                const btn = document.getElementById('startGameBtn');
+                const canStart = players.length >= 2;
+                console.log('Setting Start Button disabled:', !canStart);
+                btn.disabled = !canStart;
             }
         }
 
