@@ -12,7 +12,7 @@
     #fireBtn{background:#ff3b30;color:#fff;border:none;padding:14px 18px;border-radius:10px;font-weight:700;box-shadow:0 6px 18px rgba(255,59,48,0.24);cursor:pointer}
     #score{position:absolute;left:16px;top:16px;background:rgba(255,255,255,0.03);padding:8px 12px;border-radius:8px;color:#cfefff}
     .info{position:absolute;left:16px;bottom:16px;color:#9fcfff;font-size:13px}
-    @media (max-width:600px){#fireBtn{padding:16px 20px;border-radius:12px;font-size:16px}}
+    @media (max-width:600px){#fireBtn,#jumpBtn{padding:16px 20px;border-radius:12px;font-size:16px}}
     .ammoBtn{width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid rgba(255,255,255,0.06)}
     .ammoBtn.selected{outline:2px solid rgba(255,255,255,0.06);box-shadow:0 6px 18px rgba(0,0,0,0.35);transform:translateY(-1px)}
     .ammoBtn .dot{width:18px;height:18px;border-radius:4px}
@@ -26,12 +26,17 @@
     <canvas id="gameCanvas"></canvas>
     <div id="score">Score: 0</div>
     <div id="creditsDisplay" style="position:absolute;right:16px;top:16px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#ffd76b;font-weight:700">Credits: 1000000</div>
+    <div id="levelDisplay" style="position:absolute;right:16px;top:56px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#9ff7ff;font-weight:700">Level: 1 — XP: 0/10</div>
+    <div id="speedDisplay" style="position:absolute;right:16px;top:96px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#b7ffb3;font-weight:700">Speed: 2</div>
+    <div id="shieldDisplay" style="position:absolute;right:16px;top:136px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#6bb3ff;font-weight:700">Shield: 0/0</div>
     <div id="laserAmmoDisplay" style="position:absolute;left:16px;top:56px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px;color:#ffd76b;font-weight:700">Laser Ammo: 0</div>
-    <canvas id="minimap" width="140" height="140" style="position:absolute;right:16px;top:16px;border-radius:8px;background:rgba(0,0,0,0.25);z-index:32;border:1px solid rgba(255,255,255,0.04);"></canvas>
+    <canvas id="minimap" width="160" height="160" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);border-radius:8px;background:rgba(0,0,0,0.25);z-index:32;border:1px solid rgba(255,255,255,0.04);"></canvas>
     <div class="info">Tocca un nemico per selezionarlo. Trascina l'astronave per muoverti.</div>
-    <div class="hud">
+      <div class="hud">
       <button id="fireBtn">SPARA</button>
-      <button id="hangarBtn" class="hangarBtn" title="Hangar (H)" style="margin-left:8px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.04);color:#cfefff;border:1px solid rgba(255,255,255,0.03);">H</button>
+      <button id="jumpBtn" style="margin-left:8px;padding:14px 18px;border-radius:10px;font-weight:700;border:none;background:rgba(255,255,255,0.1);color:#fff;backdrop-filter:blur(4px);box-shadow:0 6px 18px rgba(0,0,0,0.2);cursor:pointer;">SALTO <span style="font-size:11px;opacity:0.8">(J)</span></button>
+      <button id="hangarBtn" class="hangarBtn" title="Hangar (H)" style="margin-left:8px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.04);color:#cfefff;border:1px solid rgba(255,255,255,0.03);">Hangar <span style="font-size:11px;margin-left:6px;opacity:0.9">(H)</span></button>
+      <button id="storageBtn" class="storageBtn" title="Shop (I)" style="margin-left:8px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.04);color:#cfefff;border:1px solid rgba(255,255,255,0.03);">Shop <span style="font-size:11px;margin-left:6px;opacity:0.9">(I)</span></button>
     </div>
     <!-- Joystick (sticker) per muovere in tutte le direzioni -->
     <div id="joyWrap" style="position:absolute;left:16px;bottom:86px;width:120px;height:120px;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;z-index:31;touch-action:none;">
@@ -51,15 +56,34 @@
         window.addEventListener('error', (ev)=>{
           console.error('Global error:', ev.message, ev.filename+':'+ev.lineno, ev.error);
         });
+
         window.addEventListener('unhandledrejection', (ev)=>{
           console.error('Unhandled rejection:', ev.reason);
         });
 
         // Try to load sample PNGs for player and enemy. Use fallback shapes when load fails.
         const playerImg = new Image();
+        const playerTilesetImg = new Image();
         const enemyImg = new Image();
-        let playerImgLoaded = false; let enemyImgLoaded = false;
+        let playerImgLoaded = false; let enemyImgLoaded = false; let tilesetLoaded = false;
+        let mapsData = [];
+
+        // Load maps from JSON
+        fetch('space_universe_maps.json')
+          .then(r=>r.json())
+          .then(data=>{ 
+             mapsData = data; 
+             console.log('Maps loaded:', mapsData.length);
+             if(mapsData.length > 0) setMap(0);
+          })
+          .catch(err=>{ console.warn('Failed to load maps json, using fallback:', err); });
+        
         playerImg.onload = ()=>{ playerImgLoaded = true; console.log('player image loaded:', playerImg.src); };
+        playerTilesetImg.onload = ()=>{ tilesetLoaded = true; console.log('tileset loaded'); };
+        playerTilesetImg.onerror = ()=>{ console.warn('Tileset failed to load'); tilesetLoaded = false; };
+        // Tileset matches ship_03.png style (UP facing at index 0)
+        playerTilesetImg.src = '../assets/img/space_universe/spaceship_tileset.svg';
+
         playerImg.onerror = ()=>{
           console.warn('player image failed to load, generating fallback:', playerImg.src);
           // generate a small dataURL with a simple ship-like shape
@@ -127,15 +151,16 @@
         // try PNG first
         tryLoadPlayerPNG(); tryLoadEnemyPNG();
       let W = 0, H = 0;
-      const world = {w: 2000, h: 1400};
+      // make the world much larger for extended exploration
+      const world = {w: 12000, h: 8000};
       // declare ship before resize to avoid TDZ errors when resize runs early
-      let ship = {worldX: world.w/2, worldY: world.h*0.8, r:18, angle: -Math.PI/2, drag:false, autoFireTargetId: null, nextAutoFire: 0, lastOrangeFire: 0};
+      let ship = {worldX: world.w/2, worldY: world.h*0.8, r:18, angle: -Math.PI/2, drag:false, autoFireTargetId: null, nextAutoFire: 0, lastOrangeFire: 0, maxHp:100, hp:100, shieldCurrent:0, shieldMax:0};
       function resize(){
         W = canvas.width = window.innerWidth;
         H = canvas.height = window.innerHeight;
-        // keep world at least twice the viewport
-        world.w = Math.max(1000, W*2);
-        world.h = Math.max(800, H*2);
+        // keep world significantly larger than the viewport for long-range maps
+        world.w = Math.max(6000, W*6);
+        world.h = Math.max(4000, H*6);
         // clamp ship to world if exists
         if(typeof ship !== 'undefined'){
           ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
@@ -145,17 +170,210 @@
       window.addEventListener('resize',resize);
       resize();
 
+      // Diagnostic logging to help debug visibility issues (prints every 2s)
+      setInterval(()=>{
+        try{
+          console.log('DIAG space_universe', {
+            time: Date.now(),
+            playerImgLoaded: !!playerImgLoaded,
+            playerImgSrc: playerImg && playerImg.src,
+            enemyImgLoaded: !!enemyImgLoaded,
+            enemyImgSrc: enemyImg && enemyImg.src,
+            ship: {x: ship.worldX, y: ship.worldY, hp: ship.hp, shieldCurrent: ship.shieldCurrent, shieldMax: ship.shieldMax},
+            enemiesCount: enemies.length,
+            enemiesSample: enemies.slice(0,3).map(e=>({id:e.id,x:Math.round(e.x),y:Math.round(e.y),hp: Math.floor(e.hp||0), shield: Math.floor(e.shield||0)}))
+          });
+        }catch(err){ console.warn('DIAG log failed', err); }
+      }, 2000);
+
       // ship already declared above to avoid initialization timing issues
 
       // Enemies (world coords)
       const enemies = [];
       let enemyIdCounter = 1;
+      // Portals: places that change the map when the ship enters them
+      const portals = [];
+      // current map index and background color (null -> default space gradient)
+      let mapIndex = 0;
+      let mapBackgroundColor = null; // when set, draw solid background color for that map
+
+      // Configure portal positions and background for a given map index
+      function setMap(mi){
+        mapIndex = mi || 0;
+        portals.length = 0;
+        
+        let m = null;
+        if(mapsData && mapsData.length > 0){
+          m = mapsData.find(x => x.id === mapIndex);
+        }
+
+        if(m){
+          if(m.width) world.w = m.width;
+          if(m.height) world.h = m.height;
+          mapBackgroundColor = m.backgroundColor || null;
+          if(m.portals && Array.isArray(m.portals)){
+            m.portals.forEach(p => {
+              portals.push({
+                x: p.x, 
+                y: p.y, 
+                r: p.r || 48, 
+                label: p.label || 'Warp', 
+                targetMapIndex: p.targetMapIndex
+              });
+            });
+          }
+        } else {
+          // Fallback logic if JSON not loaded or map ID not found
+          if(mapIndex % 2 === 1){
+            mapBackgroundColor = '#02240f';
+            portals.push({x: Math.max(150, world.w * 0.25), y: Math.max(150, world.h * 0.25), r: 48, label: 'Warp', targetMapIndex: mapIndex+1});
+          } else {
+            mapBackgroundColor = null;
+            portals.push({x: Math.max(200, world.w - 280), y: Math.max(200, world.h - 220), r: 48, label: 'Warp', targetMapIndex: mapIndex+1});
+          }
+        }
+        
+        // Ensure ship is within new world bounds
+        ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
+        ship.worldY = Math.max(0, Math.min(world.h, ship.worldY));
+      }
+
+      // Enemy definitions
+      const ENEMY_TYPES = [
+        {name: "Streuner", hp: 800, shield: 400, credits: 400, uridium: 1},
+        {name: "Recruit Streuner", hp: 600, shield: 800, credits: 500, uridium: 2},
+        {name: "Aider Streuner", hp: 1500, shield: 1000, credits: 700, uridium: 2},
+        {name: "Boss Streuner", hp: 3200, shield: 1600, credits: 1600, uridium: 4},
+        {name: "Uber Streuner", hp: 6400, shield: 3200, credits: 3200, uridium: 4},
+        {name: "Lordakia", hp: 2000, shield: 2000, credits: 800, uridium: 2},
+        {name: "Lordakium Spore", hp: 4000, shield: 4000, credits: 800, uridium: 3},
+        {name: "Boss Lordakia", hp: 8000, shield: 8000, credits: 3200, uridium: 8},
+        {name: "Uber Lordakia", hp: 16000, shield: 16000, credits: 6400, uridium: 16},
+        {name: "Saimon", hp: 6000, shield: 6000, credits: 1600, uridium: 4},
+        {name: "Boss Saimon", hp: 24000, shield: 12000, credits: 6400, uridium: 16},
+        {name: "Uber Saimon", hp: 48000, shield: 24000, credits: 12800, uridium: 16},
+        {name: "Mordon", hp: 20000, shield: 10000, credits: 6400, uridium: 8},
+        {name: "Boss Mordon", hp: 80000, shield: 40000, credits: 25600, uridium: 32},
+        {name: "Uber Mordon", hp: 160000, shield: 80000, credits: 51200, uridium: 64},
+        {name: "Devolarium", hp: 100000, shield: 100000, credits: 51200, uridium: 16},
+        {name: "Boss Devolarium", hp: 400000, shield: 400000, credits: 204800, uridium: 64},
+        {name: "Uber Devolarium", hp: 800000, shield: 800000, credits: 409600, uridium: 128},
+        {name: "Sibelon", hp: 200000, shield: 200000, credits: 102400, uridium: 32},
+        {name: "Boss Sibelon", hp: 800000, shield: 800000, credits: 409600, uridium: 128},
+        {name: "Uber Sibelon", hp: 1600000, shield: 1600000, credits: 819200, uridium: 256},
+        {name: "Sibelonit", hp: 40000, shield: 40000, credits: 12800, uridium: 12},
+        {name: "Boss Sibelonit", hp: 160000, shield: 160000, credits: 102400, uridium: 48},
+        {name: "Uber Sibelonit", hp: 320000, shield: 320000, credits: 204800, uridium: 96},
+        {name: "Lordakium", hp: 300000, shield: 200000, credits: 204800, uridium: 64},
+        {name: "Boss Lordakium", hp: 1200000, shield: 800000, credits: 819200, uridium: 256},
+        {name: "Uber Lordakium", hp: 2400000, shield: 1600000, credits: 1638400, uridium: 512},
+        {name: "Kristallin", hp: 50000, shield: 40000, credits: 12800, uridium: 16},
+        {name: "Boss Kristallin", hp: 200000, shield: 160000, credits: 51200, uridium: 64},
+        {name: "Uber Kristallin", hp: 400000, shield: 320000, credits: 102400, uridium: 128},
+        {name: "Kristallon", hp: 400000, shield: 300000, credits: 409600, uridium: 128},
+        {name: "Boss Kristallon", hp: 1600000, shield: 1200000, credits: 1638400, uridium: 512},
+        {name: "Uber Kristallon", hp: 3200000, shield: 2400000, credits: 3276800, uridium: 1024},
+        {name: "StreuneR", hp: 40000, shield: 30000, credits: 12000, uridium: 15},
+        {name: "Boss StreuneR", hp: 80000, shield: 40000, credits: 25600, uridium: 32},
+        {name: "Uber StreuneR", hp: 320000, shield: 240000, credits: 96000, uridium: 120},
+        {name: "Protegit", hp: 50000, shield: 40000, credits: 12800, uridium: 16},
+        {name: "Uber Protegit", hp: 400000, shield: 320000, credits: 102400, uridium: 128},
+        {name: "Cubikon", hp: 1600000, shield: 1200000, credits: 1638400, uridium: 1024}
+      ];
+
+      // helper to trigger portal behavior (reused by collision and keypress)
+      function usePortal(p){
+        const now = Date.now();
+        if(!p || (p._lastUsed && (now - p._lastUsed) <= (p.cooldown || 2000))) return false;
+        p._lastUsed = now;
+        
+        // determine next map index
+        let next = 0;
+        if(typeof p.targetMapIndex !== 'undefined') next = p.targetMapIndex;
+        else next = (mapIndex || 0) + 1;
+
+        const prevMap = mapIndex;
+        setMap(next);
+
+        // Try to place ship near the portal in the destination map that points back to the origin map
+        let placed = false;
+        try{
+          const dest = portals.find(pl => typeof pl.targetMapIndex !== 'undefined' && pl.targetMapIndex === prevMap);
+          if(dest){
+            const ang = Math.random() * Math.PI * 2;
+            const dist = (dest.r || 48) + (ship.r || 18) + 40;
+            ship.worldX = Math.max(0, Math.min(world.w, dest.x + Math.cos(ang) * dist));
+            ship.worldY = Math.max(0, Math.min(world.h, dest.y + Math.sin(ang) * dist));
+            placed = true;
+          }
+        }catch(err){ console.warn('Failed to place at matching portal', err); }
+
+        // fallback: move the ship to a safe random location on the new map (avoiding edges)
+        if(!placed){
+          ship.worldX = Math.max(300, Math.min(world.w-300, Math.random()*(world.w-100)));
+          ship.worldY = Math.max(300, Math.min(world.h-300, Math.random()*(world.h-100)));
+        }
+        
+        enemies.length = 0;
+        for(let i=0;i<6;i++) spawnEnemy();
+        damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 18, text: `Warped to Sector ${mapIndex}`, ttl: 90, vy: -0.6, alpha:1});
+        return true;
+      }
       const bullets = [];
       const damagePopups = [];
       const laserBeams = [];
       let selected = -1;
       let score = 0;
       const laserRange = 360; // gittata massima del laser in pixel (world coords)
+      let lastUpdate = Date.now();
+
+      // Player progression
+      let playerLevel = 1;
+      let playerXP = 0;
+      let xpToNext = 10;
+      function updateLevelDisplay(){ const el = document.getElementById('levelDisplay'); if(!el) return; el.textContent = `Level: ${playerLevel} — XP: ${playerXP}/${xpToNext}`; }
+      function awardXP(amount){ playerXP += amount; damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 18, text: `+${amount} XP`, ttl: 48, vy: -0.6, alpha:1});
+        while(playerXP >= xpToNext){ playerXP -= xpToNext; playerLevel++; xpToNext = Math.max(5, Math.floor(xpToNext * 1.5)); // increase next threshold
+          credits += playerLevel * 1000; updateCreditsDisplay(); damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 36, text: `Level Up! ${playerLevel}`, ttl: 80, vy: -0.6, alpha:1}); }
+        updateLevelDisplay(); }
+      // Speed / engines
+      let baseSpeed = 2; // reduced base speed without engines
+      function computeEngineBonus(){ return generatorSlots.reduce((acc,s)=> acc + ((s && s.kind==='engine') ? (s.speed||0) : 0), 0); }
+      function updateSpeedDisplay(){ const el = document.getElementById('speedDisplay'); if(!el) return; const total = (baseSpeed + computeEngineBonus()); el.textContent = 'Speed: '+total.toFixed(1); }
+
+      // equipment/shield helper: compute total shield capacity from equipped items (now checking generatorSlots too)
+      function computeShipShieldBonus(){ 
+         const equipBonus = equipSlots.reduce((acc,s)=> acc + ((s && s.kind==='shield') ? (s.capacity||0) : 0), 0);
+         const genBonus = generatorSlots.reduce((acc,s)=> acc + ((s && s.kind==='shield') ? (s.capacity||0) : 0), 0);
+         return equipBonus + genBonus;
+      }
+      function updateShipShieldDisplay(){ const el = document.getElementById('shieldDisplay'); if(!el) return; const cap = computeShipShieldBonus(); // recalc ship shield max/current when equipment changes
+        ship.shieldMax = cap;
+        if(typeof ship.shieldCurrent === 'undefined' || ship.shieldCurrent === null) ship.shieldCurrent = ship.shieldMax;
+        // clamp current shield to max
+        ship.shieldCurrent = Math.max(0, Math.min(ship.shieldMax, ship.shieldCurrent || 0));
+        el.textContent = `Shield: ${Math.floor(ship.shieldCurrent)}/${Math.floor(ship.shieldMax)}`; }
+
+      // apply damage to ship: shields absorb 80% rounded down, shields are consumed first
+      function applyDamageToShip(damage){ if(!damage || damage <= 0) return; const now = Date.now();
+        // calculate shield absorption (80% rounded down)
+        const shieldAbsorbDesired = Math.floor(damage * 0.8);
+        const shieldAvailable = Math.floor(ship.shieldCurrent || 0);
+        const shieldUsed = Math.min(shieldAbsorbDesired, shieldAvailable);
+        ship.shieldCurrent = Math.max(0, (ship.shieldCurrent||0) - shieldUsed);
+        const remaining = damage - shieldUsed;
+        ship.hp = (ship.hp || ship.maxHp) - remaining;
+        // record last damaged time and reset regen accumulator
+        ship._lastDamaged = now;
+        ship._shieldRegenAcc = 0;
+        // if regen was active, stop it and show feedback
+        if(ship._regenActive){ ship._regenActive = false; damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: `Regen Stopped`, ttl: 48, vy: -0.6, alpha:1}); }
+        // show popups: shield absorbed (if any) and hull damage
+        if(shieldUsed > 0) damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 12, text: `-${shieldUsed}⍟`, ttl: 48, vy: -0.6, alpha:1});
+        if(remaining > 0) damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 28, text: `-${remaining}`, ttl: 48, vy: -0.6, alpha:1});
+        updateShipShieldDisplay();
+        if(ship.hp <= 0){ damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 48, text: `Ship Destroyed`, ttl: 80, vy: -0.6, alpha:1}); ship.hp = ship.maxHp; }
+      }
 
       // ammo types: multiplier and display color; orange has a cooldown (ms)
       const AMMO = {
@@ -176,35 +394,111 @@
         Object.keys(AMMO).forEach(k=>{
           const info = AMMO[k];
           const btn = document.createElement('div'); btn.className = 'ammoBtn'; btn.title = `${info.label} — x${info.mult}`;
+          btn.dataset.ammo = k;
           const dot = document.createElement('div'); dot.className = 'dot'; dot.style.background = info.color; btn.appendChild(dot);
+          const count = document.createElement('div'); count.className = 'ammoCount'; count.style.fontSize='12px'; count.style.marginTop='6px'; count.style.color='#cfefff'; count.style.fontWeight='700'; count.textContent = '0'; btn.appendChild(count);
           btn.addEventListener('click', ()=>{ currentAmmo = k; // update selected
-            document.querySelectorAll('#ammoBar .ammoBtn').forEach(n=>n.classList.remove('selected')); btn.classList.add('selected');
+            document.querySelectorAll('#ammoBar .ammoBtn').forEach(n=>n.classList.remove('selected')); btn.classList.add('selected'); updateAmmoCounts(); updateLaserAmmoDisplay();
           });
           if(k===currentAmmo) btn.classList.add('selected');
           wrap.appendChild(btn);
         });
       }
 
+      function updateAmmoCounts(){
+        Object.keys(AMMO).forEach(k=>{
+          let total = 0;
+          storage.forEach(it=>{ if(it && it.kind==='ammo' && it.type === k) total++; });
+          // include ammo loaded into lasers in weaponSlots
+          weaponSlots.forEach(s=>{ if(s && s.kind==='laser' && s.type === k) total += (s.ammo||0); });
+          const btn = document.querySelector(`#ammoBar .ammoBtn[data-ammo="${k}"]`);
+          if(btn){ const cnt = btn.querySelector('.ammoCount'); if(cnt) cnt.textContent = total.toLocaleString(); }
+        });
+      }
+
       function spawnEnemy(){
-        const r = 18 + Math.random()*22;
+        // pick random enemy type based on mapIndex difficulty scaling
+        // Map 0: Low tier. Map 1: Med. Map 2: High. etc.
+        // Or just pick from ENEMY_TYPES safely
+        
+        // Let's filter available enemies by "tier" roughly estimated by HP
+        // mapIndex 0 -> max HP ~5000
+        // mapIndex 1 -> max HP ~20000
+        // mapIndex 2 -> max HP ~100000
+        // mapIndex > 3 -> All
+        // Prefer map-defined maxEnemyHP if available
+        let maxHP = 5000;
+        try{
+          const m = (mapsData && mapsData.length) ? mapsData.find(x => x.id === mapIndex) : null;
+          if(m && typeof m.maxEnemyHP === 'number'){
+            maxHP = m.maxEnemyHP;
+          } else {
+            if(mapIndex === 1) maxHP = 20000;
+            else if(mapIndex === 2) maxHP = 100000;
+            else if(mapIndex > 2) maxHP = 999999999;
+          }
+        }catch(e){ /* fallback */ }
+
+        const candidates = ENEMY_TYPES.filter(t => t.hp <= maxHP);
+        const choice = candidates.length > 0 ? candidates[Math.floor(Math.random()*candidates.length)] : ENEMY_TYPES[0];
+        
+        const r = 24 + Math.sqrt(choice.hp) * 0.15; // larger enemies are bigger
+        // limit size
+        const radius = Math.min(80, Math.max(20, r));
+
         // optionally spawn near the ship or anywhere in the world
         let x, y;
         if(spawnEnemy.nearShipCount && spawnEnemy.nearShipCount-- > 0){
-          x = Math.max(r, Math.min(world.w - r, ship.worldX + (Math.random()-0.5)*400));
-          y = Math.max(r, Math.min(world.h - r, ship.worldY + (Math.random()-0.5)*300));
+          x = Math.max(radius, Math.min(world.w - radius, ship.worldX + (Math.random()-0.5)*400));
+          y = Math.max(radius, Math.min(world.h - radius, ship.worldY + (Math.random()-0.5)*300));
         } else {
-          x = r + Math.random()*(world.w - 2*r);
+          x = radius + Math.random()*(world.w - 2*radius);
           y = 40 + Math.random()*(world.h*0.45);
         }
-        // enemies now have fixed HP values (20 or 40)
-        const hp = (Math.random() < 0.5) ? 20 : 40;
-        enemies.push({id: enemyIdCounter++, x,y,r,hp,maxHp:hp,hit:false,spawn:Date.now()});
+        
+        // enemy types: name determines behavior logic simply
+        let type = 'chaser';
+        const nameLc = choice.name.toLowerCase();
+        if(nameLc.includes('streuner')) type = 'fleer';
+        else if(nameLc.includes('mordon')) type = 'chaser';
+        else if(nameLc.includes('sibelon') || nameLc.includes('devolarium')) type = 'shield';
+        else if(nameLc.includes('lordak')) type = 'chaser';
+        else if(nameLc.includes('kristall')) type = 'shield';
+        else if(Math.random() > 0.5) type = 'chaser'; else type = 'fleer';
+
+        // Speed adjustment: High HP -> Slower
+        let speed = 2000 / (choice.hp + 500); 
+        if(speed < 0.2) speed = 0.2;
+        if(speed > 1.2) speed = 1.2;
+        if(type === 'fleer') speed *= 1.3;
+
+        // assign unique ID
+        const suffix = Math.floor(Math.random()*999);
+        
+        enemies.push({
+          id: enemyIdCounter++, 
+          x,y,r: radius, 
+          type, 
+          hp: choice.hp, 
+          maxHp: choice.hp, 
+          shield: choice.shield || 0,
+          shieldMax: choice.shield || 0,
+          hit: false, 
+          spawn: Date.now(),
+          speed: speed, 
+          name: choice.name, // display name
+          creditsReward: choice.credits,
+          uridiumReward: choice.uridium
+        });
       }
 
       // spawn initial (start a few near the ship so they are visible)
       spawnEnemy.nearShipCount = 3;
       for(let i=0;i<6;i++) spawnEnemy();
       setInterval(()=>{ if(enemies.length<10) spawnEnemy()},1800);
+
+      // initialize current map (places portals and background)
+      setMap(0);
 
       // Input: pointer interactions (select enemies, drag ship)
       let dragStart = null;
@@ -249,6 +543,15 @@
       document.getElementById('fireBtn').addEventListener('click',()=>{
         if(ship.autoFireTargetId) stopAutoFire(); else startAutoFireOnSelected();
       });
+      // Jump button
+      document.getElementById('jumpBtn').addEventListener('click',()=>{
+        for(const p of portals){
+          const d = Math.hypot(ship.worldX - p.x, ship.worldY - p.y);
+          if(d < (p.r||48) + ship.r + 50){ // allow jump if reasonably close
+             if(usePortal(p)) break;
+          }
+        }
+      });
 
       // Hangar modal and pause handling
       let paused = false;
@@ -256,7 +559,7 @@
       hangarModal.id = 'hangarModal';
       hangarModal.style.position = 'fixed'; hangarModal.style.inset = '0'; hangarModal.style.display = 'none'; hangarModal.style.alignItems = 'center'; hangarModal.style.justifyContent = 'center'; hangarModal.style.zIndex = 210;
       hangarModal.innerHTML = `
-        <div style="width:420px;max-width:95%;background:rgba(6,8,12,0.96);border-radius:12px;padding:16px;color:#cfefff;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
+        <div style="width:540px;max-width:95%;background:rgba(6,8,12,0.96);border-radius:12px;padding:16px;color:#cfefff;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <strong>Hangar</strong>
             <div style="display:flex;gap:8px;align-items:center">
@@ -264,81 +567,299 @@
               <button id="closeHangar" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.04);color:#cfefff;padding:6px 8px;border-radius:6px;">Chiudi</button>
             </div>
           </div>
-          <div style="display:flex;gap:10px;justify-content:center;padding:6px 0;margin-top:6px;">
-            ${Array.from({length:5}).map((_,i)=>`<div class="hangarSlot" data-slot-index="${i}" style="width:64px;height:64px;border:2px dashed rgba(255,255,255,0.06);border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;"></div>`).join('')}
+          <div style="display:flex;gap:18px;justify-content:space-between;padding:6px 0;margin-top:6px;flex-wrap:wrap;">
+            <div style="width:100%;margin-bottom:12px;">
+              <div style="color:#9fcfff;margin-bottom:6px">Weapons</div>
+              <div style="display:flex;gap:6px;justify-content:flex-start;flex-wrap:wrap;padding:6px 0;">
+                ${Array.from({length:15}).map((_,i)=>`<div class="hangarSlot" data-slot-type="weapon" data-slot-index="${i}" style="width:52px;height:52px;border:2px dashed rgba(255,255,255,0.06);border-radius:6px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;"></div>`).join('')}
+              </div>
+            </div>
+            
+            <div style="width:100%;">
+              <div style="color:#9fcfff;margin-bottom:6px">Generators (Engines/Shields)</div>
+              <div style="display:flex;gap:6px;justify-content:flex-start;flex-wrap:wrap;padding:6px 0;">
+                ${Array.from({length:15}).map((_,i)=>`<div class="hangarSlot" data-slot-type="generator" data-slot-index="${i}" style="width:52px;height:52px;border:2px dashed rgba(255,255,255,0.06);border-radius:6px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;"></div>`).join('')}
+              </div>
+            </div>
+            
+            <div style="display:none">
+              <div style="color:#9fcfff;margin-bottom:6px">Equipments</div>
+              <div style="display:flex;gap:10px;justify-content:flex-start;padding:6px 0;">
+                ${Array.from({length:2}).map((_,i)=>`<div class="hangarSlot" data-slot-type="equipment" data-slot-index="${i}" style="width:64px;height:64px;border:2px dashed rgba(255,255,255,0.06);border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;"></div>`).join('')}
+              </div>
+            </div>
           </div>
-          <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.03);padding-top:12px;">
+            <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.03);padding-top:12px;">
             <div style="margin-bottom:8px;color:#9fcfff;font-size:13px;text-align:center">Magazzino (trascina un'icona in uno slot)</div>
-            <div id="hangarStorage" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:64px;padding:8px;"></div>
+            <div id="hangarStorage" style="display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap;min-height:64px;padding:8px;max-height:160px;overflow:auto;"></div>
           </div>
-          <div style="text-align:center;margin-top:12px;color:#9fcfff;font-size:13px;">Slot totali: 5</div>
+          <div style="display:flex;justify-content:space-between;margin-top:12px;color:#9fcfff;font-size:13px;"><span>Weapon slots: 15</span><span>Generator slots: 15</span></div>
         </div>`;
       document.body.appendChild(hangarModal);
+      // (Storage modal removed — shop will be toggled with I key)
 
-      function openHangar(){ paused = true; stopAutoFire(); hangarModal.style.display = 'flex'; renderStorage(); }
+      function openHangar(){ paused = true; stopAutoFire(); hangarModal.style.display = 'flex'; renderStorage(); renderSlots(); }
       function closeHangar(){ paused = false; hangarModal.style.display = 'none'; }
       document.getElementById('hangarBtn').addEventListener('click', ()=>{ if(paused) closeHangar(); else openHangar(); });
       document.getElementById('closeHangar').addEventListener('click', ()=>{ closeHangar(); });
-      // keyboard H to open/close hangar
-      window.addEventListener('keydown', e=>{ if(e.key==='h' || e.key==='H'){ if(paused) closeHangar(); else openHangar(); } });
+      // storageBtn repurposed as Shop (I) button — toggle shop modal
+      document.getElementById('storageBtn').addEventListener('click', ()=>{ if(shopModal.style.display==='flex'){ shopModal.style.display='none'; paused=false; } else { paused=true; shopModal.style.display='flex'; } });
+      // keyboard: H toggles hangar; I toggles shop
+      window.addEventListener('keydown', e=>{ if(e.key==='h' || e.key==='H'){ if(paused) closeHangar(); else openHangar(); } if(e.key==='i' || e.key==='I'){ if(shopModal.style.display==='flex'){ shopModal.style.display='none'; paused=false; } else { paused=true; shopModal.style.display='flex'; } } });
 
-      // Storage and drag-drop logic
+      // Storage and drag-drop logic (storage holds objects: {kind:'ammo',type:'red'} or {kind:'laser',type:'red',ammo:0})
       const storage = [];
-      function renderStorage(){
-        const cont = document.getElementById('hangarStorage'); if(!cont) return; cont.innerHTML = '';
-        storage.forEach((type,idx)=>{
-          let info = AMMO[type] || {color:'#888',label:'?'};
-          if(type === 'laser') info = {color:'#ffd76b', label:'LS'};
+      // separate slots: 15 weapon slots for lasers, 15 generator slots for engines/shields, 2 equipment slots (hidden/unused for now)
+      const weaponSlots = Array.from({length:15}).map(()=>null);
+      const generatorSlots = Array.from({length:15}).map(()=>null);
+      const equipSlots = Array.from({length:2}).map(()=>null);
+      // populate storage with 1000 units of each ammo type for testing/play
+      (function populateInitialAmmo(){
+        Object.keys(AMMO).forEach(k=>{
+          for(let i=0;i<1000;i++) storage.push({kind:'ammo', type: k});
+        });
+      })();
+      function renderStorage(containerId){
+        const contId = containerId || 'hangarStorage';
+        const cont = document.getElementById(contId); if(!cont) return; cont.innerHTML = '';
+        // aggregate ammo counts by type to render stacks
+        const ammoCounts = {};
+        for(let i=0;i<storage.length;i++){ const it = storage[i]; if(it && it.kind === 'ammo'){ ammoCounts[it.type] = (ammoCounts[it.type]||0) + 1; } }
+        // render one stack per ammo type (if present)
+        Object.keys(ammoCounts).forEach(type=>{
+          const info = AMMO[type] || {color:'#888', label:'?'};
+          const stack = document.createElement('div'); stack.className = 'storageStack'; stack.draggable = true;
+          stack.style.width = '56px'; stack.style.height = '56px'; stack.style.borderRadius = '8px'; stack.style.display='flex'; stack.style.alignItems='center'; stack.style.justifyContent='center'; stack.style.background = info.color; stack.style.cursor='grab'; stack.style.fontWeight='700'; stack.style.color='#000';
+          stack.innerHTML = `<div style="text-align:center;width:100%">${info.label}<div style='font-size:11px;margin-top:6px;color:#000;font-weight:700'>x${ammoCounts[type].toLocaleString()}</div></div>`;
+          stack.dataset.ammoType = type;
+          stack.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', 'storageAmmo:'+type); ev.dataTransfer.setData('from','storage'); ev.dataTransfer.effectAllowed='move'; });
+          // click: try to load one ammo into first laser with ammo slot, or place an ammo marker in first empty weapon slot
+          stack.addEventListener('click', ()=>{
+            // try load into a laser in weaponSlots
+            const laserIdx = weaponSlots.findIndex(s=>s && s.kind==='laser');
+            if(laserIdx !== -1){
+              // remove one ammo from storage
+              const idxToRemove = storage.findIndex(s=>s && s.kind==='ammo' && s.type===type);
+              if(idxToRemove !== -1){
+                storage.splice(idxToRemove,1);
+                const L = weaponSlots[laserIdx]; if(L){ if(L.type === type) L.ammo = (L.ammo||0)+1; else { L.type = type; L.ammo = (L.ammo||0)+1; } }
+                renderStorage(); renderSlots(); return;
+              }
+            }
+            // otherwise place an ammo marker into first empty weapon slot
+            const emptyW = weaponSlots.findIndex(s=>!s);
+            if(emptyW !== -1){ const idxToRemove2 = storage.findIndex(s=>s && s.kind==='ammo' && s.type===type); if(idxToRemove2 !== -1){ storage.splice(idxToRemove2,1); weaponSlots[emptyW] = {kind:'ammo', type:type}; renderStorage(); renderSlots(); return; } }
+          });
+          cont.appendChild(stack);
+        });
+        // render non-ammo items individually (lasers, engines, etc.)
+        storage.forEach((item,idx)=>{
+          if(!item || item.kind === 'ammo') return; // already represented by stacks
+          let info = {color:'#ffd76b', label:'?'};
+          if(item.kind === 'laser'){ info = {color:'#ffd76b', label:'LS'}; }
+          if(item.kind === 'engine'){ info = {color:'#a0d4ff', label:'EN'}; }
+          if(item.kind === 'shield'){ info = {color:'#6bb3ff', label:'SH'}; }
           const it = document.createElement('div'); it.className = 'storageItem'; it.draggable = true;
-          it.style.width = '48px'; it.style.height = '48px'; it.style.borderRadius = '8px'; it.style.display='flex'; it.style.alignItems='center'; it.style.justifyContent='center'; it.style.background = info.color; it.style.cursor='grab'; it.style.fontWeight='700'; it.style.color='#000'; it.textContent = info.label;
-          it.dataset.type = type; 
-          it.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.setData('from','storage'); ev.dataTransfer.effectAllowed='move'; });
+          it.style.width = '56px'; it.style.height = '56px'; it.style.borderRadius = '8px'; it.style.display='flex'; it.style.alignItems='center'; it.style.justifyContent='center'; it.style.background = info.color; it.style.cursor='grab'; it.style.fontWeight='700'; it.style.color='#000';
+          if(item.kind === 'laser'){
+            it.innerHTML = `<div style=\"text-align:center;width:100%\">${item.model||'LF1'}<div style='font-size:11px;margin-top:6px;color:#000;font-weight:700'>${item.ammo||0}</div></div>`;
+          } else if(item.kind === 'engine'){
+            it.innerHTML = `<div style=\"text-align:center;width:100%\">EN<div style='font-size:11px;margin-top:6px;color:#000;font-weight:700'>+${item.speed||0}</div></div>`;
+          } else if(item.kind === 'shield'){
+            it.innerHTML = `<div style=\"text-align:center;width:100%\">SH<div style='font-size:11px;margin-top:6px;color:#000;font-weight:700'>${item.capacity||0}</div></div>`;
+          } else {
+            it.textContent = info.label;
+          }
+          it.dataset.index = idx;
+          it.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', 'storage:'+idx); ev.dataTransfer.setData('from','storage'); ev.dataTransfer.effectAllowed='move'; });
+          // click to equip into first available appropriate slot
+          it.addEventListener('click', ()=>{
+            if(item.kind === 'laser'){
+              const empty = weaponSlots.findIndex(s=>!s);
+              if(empty !== -1){ weaponSlots[empty] = item; storage.splice(idx,1); renderStorage(); renderSlots(); return; }
+            }
+            if(item.kind === 'engine'){
+              const empty = generatorSlots.findIndex(s=>!s);
+              if(empty !== -1){ generatorSlots[empty] = item; storage.splice(idx,1); renderStorage(); renderSlots(); return; }
+            }
+            if(item.kind === 'shield'){
+              const empty = equipSlots.findIndex(s=>!s);
+              if(empty !== -1){ equipSlots[empty] = item; storage.splice(idx,1); renderStorage(); renderSlots(); updateShipShieldDisplay(); return; }
+            }
+            // clicking an individual ammo item behaves like clicking its stack: try load into first laser or place into empty weapon slot
+            if(item.kind === 'ammo'){
+              const type = item.type;
+              const laserIdx = weaponSlots.findIndex(s=>s && s.kind==='laser');
+              if(laserIdx !== -1){
+                storage.splice(idx,1);
+                const L = weaponSlots[laserIdx]; if(L){ if(L.type === type) L.ammo = (L.ammo||0)+1; else { L.type = type; L.ammo = (L.ammo||0)+1; } }
+                renderStorage(); renderSlots(); return;
+              }
+              const emptyW = weaponSlots.findIndex(s=>!s);
+              if(emptyW !== -1){ storage.splice(idx,1); weaponSlots[emptyW] = {kind:'ammo', type:type}; renderStorage(); renderSlots(); return; }
+            }
+          });
           cont.appendChild(it);
         });
+        // update ammo display after storage render
+        try{ updateLaserAmmoDisplay(); }catch(e){}
         // allow dropping into storage (to remove from slot)
         cont.addEventListener('dragover', e=>{ e.preventDefault(); });
         cont.addEventListener('drop', e=>{
-          e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const from = e.dataTransfer.getData('from');
+          e.preventDefault(); const data = e.dataTransfer.getData('text/plain')||''; const from = e.dataTransfer.getData('from');
           if(from === 'slot'){
-            const slotIndex = e.dataTransfer.getData('slotIndex');
-            const slot = document.querySelector(`.hangarSlot[data-slot-index="${slotIndex}"]`);
-            if(slot && slot.dataset.item){ storage.push(slot.dataset.item); slot.dataset.item = ''; slot.innerHTML = '';
-              renderStorage();
+            const slotIndex = parseInt(e.dataTransfer.getData('slotIndex')||'-1',10);
+            const slotType = e.dataTransfer.getData('slotType') || '';
+            if(slotIndex>=0){
+              if(slotType === 'weapon' && weaponSlots[slotIndex]){ storage.push(weaponSlots[slotIndex]); weaponSlots[slotIndex]=null; const slot = document.querySelector(`.hangarSlot[data-slot-type="weapon"][data-slot-index="${slotIndex}"]`); if(slot) slot.innerHTML=''; }
+              if(slotType === 'generator' && generatorSlots[slotIndex]){ storage.push(generatorSlots[slotIndex]); generatorSlots[slotIndex]=null; const slot = document.querySelector(`.hangarSlot[data-slot-type="generator"][data-slot-index="${slotIndex}"]`); if(slot) slot.innerHTML=''; }
+              if(slotType === 'equipment' && equipSlots[slotIndex]){ storage.push(equipSlots[slotIndex]); equipSlots[slotIndex]=null; const slot = document.querySelector(`.hangarSlot[data-slot-type="equipment"][data-slot-index="${slotIndex}"]`); if(slot) slot.innerHTML=''; updateShipShieldDisplay(); }
+              renderStorage(); renderSlots();
             }
           } else if(from === 'shop'){
             // from shop buy, simply add
-            if(type) storage.push(type); renderStorage();
+            if(data.indexOf('shop:')===0){ const val = data.slice(5); if(val==='laser') storage.push({kind:'laser', type:'red', ammo:0}); else if(val==='laserAmmo'){
+                for(let i=0;i<5;i++) storage.push({kind:'ammo', type: currentAmmo});
+              } else if(AMMO[val]){ storage.push({kind:'ammo', type: val}); }
+            }
+            renderStorage();
           }
         });
 
-        // slots drop handlers
+        // slots drop handlers (handle both storage:idx and storageAmmo:type)
         document.querySelectorAll('.hangarSlot').forEach((slot)=>{
           slot.ondragover = (e)=>{ e.preventDefault(); };
           slot.ondrop = (e)=>{
             e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const from = e.dataTransfer.getData('from');
-            if(!type) return;
-            // if from storage, remove one item and place
-            if(from === 'storage'){
-              const idx = storage.indexOf(type); if(idx>=0) storage.splice(idx,1);
+            const data = type||'';
+            if(!data) return;
+            const slotType = slot.dataset.slotType;
+            const slotIndex = parseInt(slot.dataset.slotIndex,10);
+            // storage index (non-ammo items)
+            if(data.indexOf('storage:')===0){ const sidx = parseInt(data.split(':')[1],10); const item = storage[sidx]; if(!item) return;
+                if(slotType === 'weapon'){
+                  if(weaponSlots[slotIndex] && weaponSlots[slotIndex].kind === 'laser' && item.kind === 'ammo'){
+                    if(weaponSlots[slotIndex].type === item.type) weaponSlots[slotIndex].ammo = (weaponSlots[slotIndex].ammo || 0) + 1;
+                    else { weaponSlots[slotIndex].type = item.type; weaponSlots[slotIndex].ammo = (weaponSlots[slotIndex].ammo || 0) + 1; }
+                    storage.splice(sidx,1);
+                  } else if(item.kind === 'laser'){
+                    weaponSlots[slotIndex] = item; storage.splice(sidx,1);
+                  }
+                } else if(slotType === 'generator'){
+                  // generator slots now accept engines AND shields
+                  if(item.kind === 'engine'){
+                    generatorSlots[slotIndex] = item; storage.splice(sidx,1); updateSpeedDisplay();
+                  } else if(item.kind === 'shield'){
+                    generatorSlots[slotIndex] = item; storage.splice(sidx,1); updateShipShieldDisplay();
+                  }
+                } else if(slotType === 'equipment'){
+                  // equipment slots accept shields (and potentially other equipment types)
+                  if(item.kind === 'shield'){
+                    equipSlots[slotIndex] = item; storage.splice(sidx,1); updateShipShieldDisplay();
+                  }
+                }
             }
-            // if from slot, ignore (handled by storage drop)
-            slot.dataset.item = type;
-            let info = AMMO[type] || {color:'#888',label:'?'};
-            if(type === 'laser') info = {color:'#ffd76b', label:'LS'};
-            slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;background:${info.color}">${info.label}</div>`;
-            // make slot item draggable back to storage
-            const si = slot.querySelector('.slotItem');
-            if(si){ si.addEventListener('dragstart', ev=>{ ev.dataTransfer.setData('text/plain', type); ev.dataTransfer.setData('from','slot'); ev.dataTransfer.setData('slotIndex', slot.dataset.slotIndex); ev.dataTransfer.effectAllowed='move'; }); }
-            renderStorage();
+            // storage ammo stack (remove one unit from storage of that type)
+            if(data.indexOf('storageAmmo:')===0){ const atype = data.split(':')[1];
+                // find and remove one ammo item of that type from storage
+                const idxToRemove = storage.findIndex(s=>s && s.kind==='ammo' && s.type===atype);
+                if(idxToRemove !== -1){ storage.splice(idxToRemove,1); }
+                // if slot has laser -> load into laser (only for weapon slots)
+                if(slotType === 'weapon'){
+                  if(weaponSlots[slotIndex] && weaponSlots[slotIndex].kind === 'laser'){
+                    if(weaponSlots[slotIndex].type === atype) weaponSlots[slotIndex].ammo = (weaponSlots[slotIndex].ammo || 0) + 1;
+                    else { weaponSlots[slotIndex].type = atype; weaponSlots[slotIndex].ammo = (weaponSlots[slotIndex].ammo || 0) + 1; }
+                  } else if(!weaponSlots[slotIndex]){
+                    // place a single ammo marker in slot
+                    weaponSlots[slotIndex] = {kind:'ammo', type: atype};
+                  }
+                } else if(slotType === 'generator'){
+                  // placing ammo into generator slot is allowed but simply stores an ammo marker
+                  if(!generatorSlots[slotIndex]) generatorSlots[slotIndex] = {kind:'ammo', type: atype};
+                }
+            }
+            // if dragging from another slot (swap/move)
+            if(data.indexOf('slot:')===0){ const parts = data.split(':'); const fromSlot = parseInt(parts[1],10); const fromType = parts[2] || '';
+              let obj = null;
+              if(fromType === 'weapon') obj = weaponSlots[fromSlot];
+              if(fromType === 'generator') obj = generatorSlots[fromSlot];
+              if(fromType === 'equipment') obj = equipSlots[fromSlot];
+              if(obj){
+                if(slotType === 'weapon'){ weaponSlots[slotIndex] = obj; }
+                if(slotType === 'generator'){ generatorSlots[slotIndex] = obj; }
+                if(slotType === 'equipment'){ equipSlots[slotIndex] = obj; }
+                if(fromType === 'weapon') weaponSlots[fromSlot]=null; if(fromType === 'generator') generatorSlots[fromSlot]=null; if(fromType === 'equipment') equipSlots[fromSlot]=null;
+                updateShipShieldDisplay();
+              }
+            }
+            renderStorage(); renderSlots();
           };
         });
       }
 
-      // credits and laser ammo counters
+      function renderSlots(){
+        document.querySelectorAll('.hangarSlot').forEach((slot)=>{
+          const idx = parseInt(slot.dataset.slotIndex,10);
+          const sType = slot.dataset.slotType || 'weapon';
+          let it = null;
+          if(sType === 'weapon') it = weaponSlots[idx];
+          else if(sType === 'generator') it = generatorSlots[idx];
+          else if(sType === 'equipment') it = equipSlots[idx];
+          if(!it){ slot.innerHTML = ''; slot.dataset.item = ''; }
+          else {
+            if(it.kind === 'laser'){
+              const ammoCount = it.ammo || 0; const ammoType = it.type || 'red'; const color = (AMMO[ammoType] && AMMO[ammoType].color) || '#ffd76b';
+              const model = it.model || 'LF1';
+              slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;color:#000;background:${color}"><div style="font-size:10px">${model}</div><div style='font-size:11px;margin-top:2px;color:#000'>${ammoCount}</div></div>`;
+            } else if(it.kind === 'ammo'){
+              const color = (AMMO[it.type] && AMMO[it.type].color) || '#888'; slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;background:${color}">${(AMMO[it.type]&&AMMO[it.type].label)||'?'}</div>`;
+            } else if(it.kind === 'engine'){
+              const color = '#a0d4ff'; slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;color:#000;background:${color}"><div>EN</div><div style='font-size:11px;margin-top:6px;color:#000'>+${it.speed||0}</div></div>`;
+            } else if(it.kind === 'shield'){
+              const color = '#6bb3ff'; slot.innerHTML = `<div class="slotItem" draggable="true" style="width:100%;height:100%;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;color:#000;background:${color}"><div>SH</div><div style='font-size:11px;margin-top:6px;color:#000'>${it.capacity||0}</div></div>`;
+            }
+            const si = slot.querySelector('.slotItem');
+            if(si){
+              si.addEventListener('dragstart', ev=>{ ev.dataTransfer.setData('text/plain', 'slot:'+idx+':'+sType); ev.dataTransfer.setData('from','slot'); ev.dataTransfer.setData('slotIndex', String(idx)); ev.dataTransfer.setData('slotType', sType); ev.dataTransfer.effectAllowed='move'; });
+              // click on equipped item -> unequip back to storage
+              si.addEventListener('click', ()=>{
+                try{
+                  let removed = null;
+                  if(sType === 'weapon' && weaponSlots[idx]){ removed = weaponSlots[idx]; weaponSlots[idx] = null; }
+                  else if(sType === 'generator' && generatorSlots[idx]){ removed = generatorSlots[idx]; generatorSlots[idx] = null; }
+                  else if(sType === 'equipment' && equipSlots[idx]){ removed = equipSlots[idx]; equipSlots[idx] = null; }
+                  if(removed){ storage.push(removed); renderStorage(); renderSlots(); }
+                }catch(err){ console.error('Unequip click failed', err); }
+              });
+            }
+          }
+        });
+        // update ammo and speed display after slots render
+        try{ updateLaserAmmoDisplay(); }catch(e){}
+        try{ updateSpeedDisplay(); }catch(e){}
+        try{ updateShipShieldDisplay(); }catch(e){}
+      }
+
+      // credits counter (ammo now tracked per-object)
       let credits = 1000000;
-      function updateCreditsDisplay(){ const el = document.getElementById('creditsDisplay'); if(el) el.textContent = 'Credits: '+credits.toLocaleString(); }
-      let laserAmmo = 0;
-      function updateLaserAmmoDisplay(){ const el = document.getElementById('laserAmmoDisplay'); if(el) el.textContent = 'Laser Ammo: '+laserAmmo; }
+      let uridium = 1000000;
+      function updateCreditsDisplay(){ const el = document.getElementById('creditsDisplay'); if(el) el.textContent = 'Credits: '+credits.toLocaleString() + ' — Uridium: '+uridium.toLocaleString(); }
+      function updateLaserAmmoDisplay(){
+        // Update the global ammo display with the current ammo type count
+        const el = document.getElementById('laserAmmoDisplay'); 
+        if(el) {
+           el.style.display = 'block';
+           // Count ammo of current type in storage
+           let total = 0;
+           for(let i=0; i<storage.length; i++){ if(storage[i] && storage[i].kind==='ammo' && storage[i].type===currentAmmo) total++; }
+           // Add ammo loaded in weapon slots
+           weaponSlots.forEach(s=>{ if(s && s.kind==='laser' && s.type===currentAmmo) total += (s.ammo||0); });
+           
+           const info = AMMO[currentAmmo] || {label:'?'};
+           el.textContent = `Ammo (${info.label}): ${total.toLocaleString()}`;
+        }
+        try{ updateAmmoCounts(); }catch(e){}
+      }
 
       // simple shop modal
       const shopModal = document.createElement('div');
@@ -352,12 +873,29 @@
           <div style="display:flex;gap:10px;justify-content:center;padding:6px 0;margin-top:6px;flex-wrap:wrap;">
             ${Object.keys(AMMO).map(k=>{ const info = AMMO[k]; return `<div style="width:88px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;"><div style="width:44px;height:44px;margin:0 auto;border-radius:8px;background:${info.color};display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">${info.label}</div><div style="margin-top:8px"><button class="buyBtn" data-type="${k}" style="padding:6px 8px;border-radius:6px;background:#0b84ff;color:#fff;border:none">Buy</button></div></div>` }).join('')}
             <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
-              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">LS</div>
-              <div style="margin-top:8px"><button class="buyBtn" data-type="laser" style="padding:6px 8px;border-radius:6px;background:#28c76f;color:#fff;border:none">Buy Laser</button></div>
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#a0d4ff;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">EN</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="engine" style="padding:6px 8px;border-radius:6px;background:#7b61ff;color:#fff;border:none">Buy Engine</button></div>
             </div>
             <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
-              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#cfcfcf;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">AMMO</div>
-              <div style="margin-top:8px"><button class="buyBtn" data-type="laserAmmo" style="padding:6px 8px;border-radius:6px;background:#0b84ff;color:#fff;border:none">Buy +5 Ammo</button></div>
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">SF1</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="laser_lf1" style="padding:6px 8px;border-radius:6px;background:#e2b609;color:#fff;border:none">LF1 (10k C)</button></div>
+            </div>
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">LF2</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="laser_lf2" style="padding:6px 8px;border-radius:6px;background:#e29109;color:#fff;border:none">LF2 (200k C)</button></div>
+            </div>
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+               <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">LF3</div>
+               <div style="margin-top:8px"><button class="buyBtn" data-type="laser_lf3" style="padding:6px 8px;border-radius:6px;background:#28c76f;color:#fff;border:none">LF3 (5k U)</button></div>
+            </div>
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+               <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#ffd76b;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">LF4</div>
+               <div style="margin-top:8px"><button class="buyBtn" data-type="laser_lf4" style="padding:6px 8px;border-radius:6px;background:#ff3b30;color:#fff;border:none">LF4 (15k U)</button></div>
+            </div>
+
+            <div style="width:120px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;">
+              <div style="width:64px;height:44px;margin:0 auto;border-radius:6px;background:#6bb3ff;display:flex;align-items:center;justify-content:center;font-weight:700;color:#000">SH</div>
+              <div style="margin-top:8px"><button class="buyBtn" data-type="shield" style="padding:6px 8px;border-radius:6px;background:#2b9cff;color:#fff;border:none">Buy Shield</button></div>
             </div>
           </div>
         </div>`;
@@ -366,33 +904,58 @@
       document.body.addEventListener('click', (ev)=>{
         if(ev.target && ev.target.classList && ev.target.classList.contains('buyBtn')){
           const t = ev.target.dataset.type; if(!t) return;
-          // Prices: laser=50000, ammo types cost = multiplier (1,2,3,4,6), buy+5 = 5 credits
-          if(t === 'laser'){
-            const price = 50000;
-            if(credits >= price){ credits -= price; updateCreditsDisplay(); storage.push('laser'); renderStorage(); }
-            else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          
+          if(t.startsWith('laser_lf')){
+            let cost=0, curr='credits', model='LF1';
+            if(t==='laser_lf1'){ cost=10000; curr='credits'; model='LF1'; }
+            else if(t==='laser_lf2'){ cost=200000; curr='credits'; model='LF2'; }
+            else if(t==='laser_lf3'){ cost=5000; curr='uridium'; model='LF3'; }
+            else if(t==='laser_lf4'){ cost=15000; curr='uridium'; model='LF4'; }
+
+            if(curr==='credits'){
+               if(credits >= cost){ credits-=cost; updateCreditsDisplay(); storage.push({kind:'laser', model:model, type: currentAmmo, ammo:0}); renderStorage(); }
+               else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+            } else {
+               if(uridium >= cost){ uridium-=cost; updateCreditsDisplay(); storage.push({kind:'laser', model:model, type: currentAmmo, ammo:0}); renderStorage(); }
+               else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough uridium', ttl: 48, vy: -0.6, alpha:1}); }
+            }
           } else if(t === 'laserAmmo'){
-            const price = 5; // flat for +5 pack
-            if(credits >= price){ credits -= price; updateCreditsDisplay(); laserAmmo += 5; updateLaserAmmoDisplay(); }
+            // buy 100 units of the currently selected ammo at once; price proportional to ammo multiplier
+            const amt = 100;
+            const unitPrice = (AMMO[currentAmmo] && AMMO[currentAmmo].mult) ? AMMO[currentAmmo].mult : 1;
+            const price = unitPrice * amt;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); for(let i=0;i<amt;i++) storage.push({kind:'ammo', type: currentAmmo}); renderStorage(); }
+            else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          } else if(t === 'engine'){
+            const price = 25000;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); // add an engine model with speed bonus
+              storage.push({kind:'engine', model:'mk1', speed:2}); renderStorage(); updateSpeedDisplay(); }
+            else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
+          } else if(t === 'shield'){
+            const price = 15000;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); // add a shield item with capacity
+              storage.push({kind:'shield', capacity:100}); renderStorage(); }
             else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
           } else if(AMMO[t]){
-            const price = AMMO[t].mult || 1;
-            if(credits >= price){ credits -= price; updateCreditsDisplay(); // buy one unit of colored ammo -> convert to laserAmmo units
-              laserAmmo += 1; updateLaserAmmoDisplay();
+            // buy 1000 units of this ammo type
+            const qty = 1000;
+            const unitPrice = AMMO[t].mult || 1;
+            const price = unitPrice * qty;
+            if(credits >= price){ credits -= price; updateCreditsDisplay(); // add qty ammo items to storage
+              for(let i=0;i<qty;i++) storage.push({kind:'ammo', type: t}); renderStorage(); try{ updateLaserAmmoDisplay(); }catch(e){}
             } else { damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'Not enough credits', ttl: 48, vy: -0.6, alpha:1}); }
           } else {
             // fallback
-            storage.push(t); renderStorage();
+            storage.push({kind: 'misc', value: t}); renderStorage();
           }
         }
       });
-      // open shop button
-      const shopBtn = document.createElement('button'); shopBtn.id='shopBtn'; shopBtn.innerText='S'; shopBtn.title='Shop (S)'; shopBtn.style.marginLeft='8px'; shopBtn.style.padding='10px 12px'; shopBtn.style.borderRadius='8px'; shopBtn.style.background='rgba(255,255,255,0.04)'; shopBtn.style.color='#cfefff'; shopBtn.style.border='1px solid rgba(255,255,255,0.03)';
-      document.querySelector('.hud').appendChild(shopBtn);
-      shopBtn.addEventListener('click', ()=>{ paused=true; shopModal.style.display='flex'; });
-      window.addEventListener('keydown', e=>{ if(e.key==='p' || e.key==='P'){ if(shopModal.style.display==='flex'){ shopModal.style.display='none'; paused=false; } else { paused=true; shopModal.style.display='flex'; } } });
+      // shop is toggled by the Shop (I) HUD button and by the I key
 
       function update(){
+        const now = Date.now();
+        const dt = now - (lastUpdate || now);
+        lastUpdate = now;
         // bullets
         for(let i=bullets.length-1;i>=0;i--){
           const b = bullets[i]; b.x += b.vx; b.y += b.vy; b.ttl--;
@@ -403,23 +966,62 @@
             if(ti === -1){ bullets.splice(i,1); continue; }
             const te = enemies[ti];
               if(Math.hypot(b.x - te.x, b.y - te.y) < te.r + 4){
-                const dmg = (b.damage != null) ? b.damage : 1;
-                te.hp = (te.hp || te.maxHp) - dmg; te.hit = Date.now(); te.flashUntil = Date.now() + 160;
-                // damage popup
-                damagePopups.push({x: te.x, y: te.y - te.r - 6, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
-                bullets.splice(i,1);
-                if(te.hp <= 0){ if(ship.autoFireTargetId === te.id) ship.autoFireTargetId = null; enemies.splice(ti,1); if(selected===ti) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; }
+                let dmg = (b.damage != null) ? b.damage : 1;
+                // record last damaged time for regen logic
+                te.lastDamaged = now;
+                // apply to shield first if present
+                if(te.shield && te.shield > 0){
+                  const sHit = Math.min(te.shield, dmg);
+                  te.shield = Math.max(0, te.shield - sHit);
+                  dmg -= sHit;
+                  damagePopups.push({x: te.x, y: te.y - te.r - 6, text: `-${sHit}⍟`, ttl: 48, vy: -0.6, alpha:1});
+                }
+                if(dmg > 0){
+                  te.hp = (te.hp || te.maxHp) - dmg;
+                  damagePopups.push({x: te.x, y: te.y - te.r - 18, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
+                }
+                te.hit = now; te.flashUntil = now + 160;
+// Enemy Update: when enemy dies appy rewards
+                  bullets.splice(i,1);
+                  if(te.hp <= 0){ 
+                    if(ship.autoFireTargetId === te.id) ship.autoFireTargetId = null; 
+                    // award XP based on HP
+                    const xpGain = Math.max(1, Math.floor((te.maxHp||20)/40)); // reduced xp scaling as HP is high
+                    awardXP(xpGain);
+                    if(te.creditsReward){ credits += te.creditsReward; }
+                    if(te.uridiumReward){ uridium += te.uridiumReward; }
+                    updateCreditsDisplay();
+                    enemies.splice(ti,1); if(selected===ti) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; 
+                  }
               }
           } else {
-            // untargeted bullets can hit any enemy as before
+            // untargeted bullets
             for(let j=enemies.length-1;j>=0;j--){
               const e = enemies[j];
               if(Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4){
-                const dmg = (b.damage != null) ? b.damage : 1;
-                e.hp = (e.hp || e.maxHp) - dmg; e.hit = Date.now(); e.flashUntil = Date.now() + 160;
-                damagePopups.push({x: e.x, y: e.y - e.r - 6, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
+                let dmg = (b.damage != null) ? b.damage : 1;
+                e.lastDamaged = now;
+                if(e.shield && e.shield > 0){
+                  const sHit = Math.min(e.shield, dmg);
+                  e.shield = Math.max(0, e.shield - sHit);
+                  dmg -= sHit;
+                  damagePopups.push({x: e.x, y: e.y - e.r - 6, text: `-${sHit}⍟`, ttl: 48, vy: -0.6, alpha:1});
+                }
+                if(dmg > 0){
+                  e.hp = (e.hp || e.maxHp) - dmg;
+                  damagePopups.push({x: e.x, y: e.y - e.r - 18, text: `-${dmg}`, ttl: 48, vy: -0.6, alpha:1});
+                }
+                e.hit = now; e.flashUntil = now + 160;
                 bullets.splice(i,1);
-                if(e.hp <= 0){ if(ship.autoFireTargetId === e.id) ship.autoFireTargetId = null; enemies.splice(j,1); if(selected===j) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; }
+                    if(e.hp <= 0){ 
+                      if(ship.autoFireTargetId === e.id) ship.autoFireTargetId = null; 
+                      const xpGain = Math.max(1, Math.floor((e.maxHp||20)/40)); 
+                      awardXP(xpGain); 
+                      if(e.creditsReward){ credits += e.creditsReward; }
+                      if(e.uridiumReward){ uridium += e.uridiumReward; }
+                      updateCreditsDisplay();
+                      enemies.splice(j,1); if(selected===j) selected=-1; score++; document.getElementById('score').textContent = 'Score: '+score; 
+                    }
                 break;
               }
             }
@@ -462,27 +1064,62 @@
               } else {
                 const angle = Math.atan2(dy, dx);
                 // count equipped lasers in hangar slots
-                let lasersEquipped = 0;
-                document.querySelectorAll('.hangarSlot').forEach(s=>{ if(s && s.dataset && s.dataset.item === 'laser') lasersEquipped++; });
-                if(lasersEquipped > 0){
-                  // number of lasers that can fire this round (limited by ammo)
-                  const shots = Math.min(lasersEquipped, laserAmmo || 0);
-                  if(shots <= 0){
-                    // no laser ammo
+                // collect lasers equipped in slots
+                const lasersArr = weaponSlots.filter(s=>s && s.kind === 'laser');
+                if(lasersArr.length > 0){
+                  // pick lasers that have at least 1 ammo
+                  let lasersWithAmmo = lasersArr.filter(l=> (l.ammo||0) > 0);
+                  // prioritize the currently selected ammo: if the player switched ammo while attacking,
+                  // try to load one unit of `currentAmmo` into lasers (consuming from storage) so the new ammo is used immediately
+                  if(currentAmmo){
+                    for(let li=0; li<lasersArr.length; li++){
+                      const L = lasersArr[li];
+                      if(L.type !== currentAmmo){
+                        const idxToRemoveCur = storage.findIndex(s=>s && s.kind==='ammo' && s.type === currentAmmo);
+                        if(idxToRemoveCur !== -1){ storage.splice(idxToRemoveCur,1); L.type = currentAmmo; L.ammo = (L.ammo||0) + 1; }
+                      }
+                    }
+                    lasersWithAmmo = lasersArr.filter(l=> (l.ammo||0) > 0);
+                  }
+                  // if still no loaded ammo but storage has ammo, try to auto-load one unit per laser from storage
+                  if(lasersWithAmmo.length === 0){
+                    // attempt to load from storage into lasers (prefer same type already on laser)
+                    for(let li=0; li<lasersArr.length; li++){
+                      const L = lasersArr[li];
+                      let idxToRemove = storage.findIndex(s=>s && s.kind==='ammo' && s.type === (L.type||'') );
+                      if(idxToRemove === -1) idxToRemove = storage.findIndex(s=>s && s.kind==='ammo');
+                      if(idxToRemove !== -1){ const amm = storage.splice(idxToRemove,1)[0]; L.type = amm.type; L.ammo = (L.ammo||0) + 1; }
+                    }
+                    lasersWithAmmo = lasersArr.filter(l=> (l.ammo||0) > 0);
+                  }
+                  if(lasersWithAmmo.length === 0){
                     damagePopups.push({x: ship.worldX, y: ship.worldY - ship.r - 6, text: 'No Laser Ammo', ttl: 48, vy: -0.6, alpha:1});
                   } else {
-                    // total damage = number of lasers fired * current ammo multiplier
-                    const totalDamage = shots * (ammoInfo.mult || 1);
-                    bullets.push({x: ship.worldX, y: ship.worldY, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, ttl: 200, targetId: te.id, damage: totalDamage, ammo: currentAmmo});
-                    laserBeams.push({targetId: te.id, ttl: 36, progress:0, speed:0.04, color: ammoInfo.color});
-                    laserAmmo = Math.max(0, laserAmmo - shots); updateLaserAmmoDisplay();
-                    if(currentAmmo === 'orange') ship.lastOrangeFire = now;
-                    const inc = (currentAmmo==='orange') ? (ammoInfo.cooldown||2000) : 500;
+                    // total damage = sum of (laserBase * ammoMultiplier)
+                    let totalDamage = 0; let usedAnyOrange = false; let beamColor = null;
+                    const LASER_DMG = { 'LF1': 70, 'LF2': 140, 'LF3': 175, 'LF4': 200 };
+
+                    lasersWithAmmo.forEach((L, idx)=>{
+                      const mult = (AMMO[L.type] && AMMO[L.type].mult) || 1;
+                      const base = LASER_DMG[L.model] || 70;
+                      totalDamage += (base * mult);
+
+                      if(idx===0) beamColor = (AMMO[L.type] && AMMO[L.type].color) || '#ff6b6b';
+                      if(L.type === 'orange') usedAnyOrange = true;
+                      L.ammo = Math.max(0, (L.ammo||0) - 1);
+                    });
+                    bullets.push({x: ship.worldX, y: ship.worldY, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, ttl: 200, targetId: te.id, damage: totalDamage, ammo: 'multi'});
+                    laserBeams.push({targetId: te.id, ttl: 36, progress:0, speed:0.04, color: beamColor});
+                    renderSlots();
+                    // Update global ammo display after firing
+                    try{ updateLaserAmmoDisplay(); }catch(e){}
+                    if(usedAnyOrange) ship.lastOrangeFire = now;
+                    const inc = usedAnyOrange ? (AMMO['orange'].cooldown||2000) : 500;
                     ship.nextAutoFire = (ship.nextAutoFire && ship.nextAutoFire > now) ? ship.nextAutoFire + inc : now + inc;
                   }
                 } else {
-                  // default single-shot behavior when no lasers equipped
-                  const dmg = ammoInfo.mult || 1;
+                  // default single-shot behavior when no lasers equipped -> use basic damage
+                  const dmg = (ammoInfo.mult || 1) * 50; // default weak shot 50dmg * mul
                   bullets.push({x: ship.worldX, y: ship.worldY, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, ttl: 200, targetId: te.id, damage: dmg, ammo: currentAmmo});
                   laserBeams.push({targetId: te.id, ttl: 36, progress:0, speed:0.04, color: ammoInfo.color});
                   if(currentAmmo === 'orange') ship.lastOrangeFire = now;
@@ -494,38 +1131,124 @@
           }
         }
 
-        // simple enemy drift
+        // enemy behaviors: chaser, fleer, shield
         enemies.forEach((e,idx)=>{
-          e.x += Math.sin((Date.now()+idx*100)/1200)*0.3;
-          e.y += Math.cos((Date.now()+idx*100)/1500)*0.2;
+          const dx = ship.worldX - e.x; const dy = ship.worldY - e.y; const dist = Math.hypot(dx,dy) || 1;
+          if(e.type === 'chaser'){
+            const s = e.speed || 0.8;
+            e.x += (dx/dist) * s * 0.9;
+            e.y += (dy/dist) * s * 0.9;
+          } else if(e.type === 'fleer'){
+            const s = e.speed || 1.0;
+            if(dist < 220){
+              e.x -= (dx/dist) * s * 1.4;
+              e.y -= (dy/dist) * s * 1.4;
+            } else {
+              e.x += Math.sin((Date.now()+idx*123)/1300)*0.25;
+              e.y += Math.cos((Date.now()+idx*97)/1500)*0.18;
+            }
+          } else if(e.type === 'shield'){
+            const s = e.speed || 0.4;
+            const desired = 180;
+            if(dist > desired){ e.x += (dx/dist) * s * 0.45; e.y += (dy/dist) * s * 0.45; }
+            else if(dist < desired - 30){ e.x -= (dx/dist) * s * 0.6; e.y -= (dy/dist) * s * 0.6; }
+            // gentle wobble
+            e.x += Math.sin((Date.now()+idx*77)/1400)*0.18;
+            e.y += Math.cos((Date.now()+idx*61)/1600)*0.12;
+          } else {
+            // fallback gentle wander
+            e.x += Math.sin((Date.now()+idx*100)/1200)*0.3;
+            e.y += Math.cos((Date.now()+idx*100)/1500)*0.2;
+          }
           // keep enemies inside world
           e.x = Math.max(0, Math.min(world.w, e.x));
           e.y = Math.max(0, Math.min(world.h, e.y));
+          
+          // Repel enemies from portals (Safe Zone)
+          for(const p of portals){
+             const pdx = e.x - p.x; const pdy = e.y - p.y; const pdist = Math.hypot(pdx,pdy);
+             const safeR = (p.r||48) + 200; // 200px buffer around portal
+             if(pdist < safeR){
+               // push away
+               const force = (safeR - pdist) / safeR;
+               e.x += (pdx/pdist) * force * 3.0;
+               e.y += (pdy/pdist) * force * 3.0;
+             }
+          }
+
+            // collide with ship: if close enough and not recently collided, apply damage to ship
+            const now = Date.now();
+            const dxs = ship.worldX - e.x; const dys = ship.worldY - e.y; const dship = Math.hypot(dxs,dys);
+            if(dship < e.r + ship.r + 2){
+              if(!e._lastHitAt || (now - e._lastHitAt) > 800){
+                e._lastHitAt = now;
+                let dmg = 5;
+                if(e.type === 'chaser') dmg = 8;
+                else if(e.type === 'fleer') dmg = 6;
+                else if(e.type === 'shield') dmg = 10;
+                applyDamageToShip(dmg);
+              }
+            }
+        });
+
+        // shield regeneration: after 5s without taking damage, regen gradually
+        enemies.forEach((e)=>{
+          if(!e.shieldMax || e.shieldMax <= 0) return;
+          const last = e.lastDamaged || 0;
+          if((now - last) >= 5000 && (e.shield || 0) < e.shieldMax){
+            e._shieldRegenAcc = (e._shieldRegenAcc || 0) + dt;
+            const regenInterval = 400; // ms per 1 shield point
+            if(e._shieldRegenAcc >= regenInterval){
+              const add = Math.floor(e._shieldRegenAcc / regenInterval);
+              e.shield = Math.min(e.shield + add, e.shieldMax);
+              e._shieldRegenAcc -= add * regenInterval;
+            }
+          } else {
+            // reset accumulator if recently damaged
+            if((now - last) < 5000) e._shieldRegenAcc = 0;
+          }
         });
 
         // joystick movement influences ship world position
         if(joy && joy.active && !ship.drag){
-          const speed = 4; // movement speed multiplier
+          const speed = baseSpeed + computeEngineBonus();
           ship.worldX += joy.dx * speed;
           ship.worldY += joy.dy * speed;
+          if(Math.abs(joy.dx) > 0.05 || Math.abs(joy.dy) > 0.05) ship.angle = Math.atan2(joy.dy, joy.dx);
         } else if(!ship.drag){
           // keyboard (WASD + arrows)
           const kx = (keys.d||keys.ArrowRight?1:0) - (keys.a||keys.ArrowLeft?1:0);
           const ky = (keys.s||keys.ArrowDown?1:0) - (keys.w||keys.ArrowUp?1:0);
           if(kx !== 0 || ky !== 0){
             const mag = Math.hypot(kx,ky) || 1;
-            const speed = 4;
+            const speed = baseSpeed + computeEngineBonus();
             ship.worldX += (kx/mag) * speed;
             ship.worldY += (ky/mag) * speed;
+            ship.angle = Math.atan2(ky, kx);
           }
         }
         // keep ship inside world bounds
         ship.worldX = Math.max(0, Math.min(world.w, ship.worldX));
         ship.worldY = Math.max(0, Math.min(world.h, ship.worldY));
+        // portal collision: teleport removed, must use J or Jump button
+        /*
+        portals.forEach(p=>{
+          const dx = ship.worldX - p.x; const dy = ship.worldY - p.y; const d = Math.hypot(dx,dy);
+          if(d < (p.r || 48) + ship.r){ usePortal(p); }
+        });
+        */
       }
 
       function draw(){
-        ctx.clearRect(0,0,W,H);
+        // draw background — either a solid map color or the default space radial gradient
+        if(mapBackgroundColor){
+          ctx.fillStyle = mapBackgroundColor; ctx.fillRect(0,0,W,H);
+        } else {
+          // default deep-space radial gradient
+          const g = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.05, W/2, H/2, Math.max(W,H)*0.7);
+          g.addColorStop(0, '#071026'); g.addColorStop(0.6, '#000000');
+          ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+        }
 
         // stars (simple background pattern tied to world)
         ctx.fillStyle='rgba(255,255,255,0.04)';
@@ -556,14 +1279,42 @@
             const alpha = (e.flashUntil - Date.now()) / 160;
             ctx.save(); ctx.globalAlpha = Math.min(0.9, alpha); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(sx,sy,e.r+2,0,Math.PI*2); ctx.fill(); ctx.restore();
           }
-          // health bar above enemy
+          // shield bar (if present) and health bar above enemy
           if(e.hp != null){
             const barW = e.r*2; const barH = 6;
-            const bx = sx - barW/2; const by = sy - e.r - 12;
+            const bx = sx - barW/2; let by = sy - e.r - 12;
+            // draw shield bar above health if present
+            if(e.shield && e.shieldMax && e.shieldMax > 0){
+              const sBarH = 5;
+              const sBy = by - sBarH - 6;
+              ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx-1, sBy-1, barW+2, sBarH+2);
+              const shieldRatio = Math.max(0, e.shield / e.shieldMax);
+              ctx.fillStyle = '#6bb3ff'; ctx.fillRect(bx, sBy, barW * shieldRatio, sBarH);
+              ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.strokeRect(bx, sBy, barW, sBarH);
+              // shield glow ring
+              ctx.save(); ctx.globalAlpha = 0.6; ctx.strokeStyle = hexToRgba('#6bb3ff',0.85); ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(sx,sy,e.r+6,0,Math.PI*2); ctx.stroke(); ctx.restore();
+              // shield numbers
+              try{
+                ctx.font = '700 10px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.fillStyle = '#ffffff';
+                const sText = `${Math.floor(e.shield)}/${Math.floor(e.shieldMax)}`;
+                ctx.strokeText(sText, bx + barW/2, sBy + sBarH/2);
+                ctx.fillText(sText, bx + barW/2, sBy + sBarH/2);
+              }catch(err){}
+              by = sBy - 8;
+            }
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx-1, by-1, barW+2, barH+2);
             const ratio = Math.max(0, (e.hp / e.maxHp));
             ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, barW * ratio, barH);
             ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, barW, barH);
+            // health numbers
+            try{
+              ctx.font = '700 11px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.fillStyle = '#ffffff';
+              const hText = `${Math.floor(e.hp)}/${Math.floor(e.maxHp)}`;
+              ctx.strokeText(hText, bx + barW/2, by + barH/2);
+              ctx.fillText(hText, bx + barW/2, by + barH/2);
+            }catch(err){}
           }
           if(i===selected){
             const now = Date.now();
@@ -571,18 +1322,84 @@
             else ctx.strokeStyle='rgba(0,212,255,0.9)';
             ctx.lineWidth=3; ctx.beginPath(); ctx.arc(sx,sy,e.r+6,0,Math.PI*2); ctx.stroke();
           }
+          // draw enemy name in red under the enemy
+          try{
+            const name = e.name || (e.type ? (e.type.charAt(0).toUpperCase() + e.type.slice(1)) : 'Enemy');
+            ctx.font = '600 12px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.fillStyle = '#ff4d4d';
+            ctx.strokeText(name, sx, sy + e.r + 6);
+            ctx.fillText(name, sx, sy + e.r + 6);
+          }catch(err){}
         });
 
         // ship (always centered on screen)
         const shipScreenX = W/2; const shipScreenY = H/2;
+        // draw portals (world coords -> screen)
+        portals.forEach((p,i)=>{
+          const psx = p.x - ship.worldX + W/2;
+          const psy = p.y - ship.worldY + H/2;
+          if(psx < -100 || psx > W+100 || psy < -100 || psy > H+100) return;
+          // outer rotating ring
+          ctx.save();
+          ctx.translate(psx, psy);
+          ctx.rotate((Date.now()/900) + i);
+          const grad = ctx.createRadialGradient(0,0,p.r*0.3,0,0,p.r);
+          grad.addColorStop(0,'rgba(160,220,255,0.95)');
+          grad.addColorStop(0.6,'rgba(100,160,255,0.25)');
+          grad.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(100,180,255,0.9)'; ctx.beginPath(); ctx.arc(0,0,p.r+6,0,Math.PI*2); ctx.stroke();
+          ctx.restore();
+          // label
+          try{ ctx.font = '600 12px Inter, Arial, sans-serif'; ctx.fillStyle = '#9fe8ff'; ctx.textAlign='center'; ctx.fillText(p.label || 'Portal', psx, psy + p.r + 6); }catch(err){}
+        });
+
+      // allow pressing 'J' near a portal to jump (map change)
+      window.addEventListener('keydown', (e)=>{
+        if((e.key === 'j' || e.key === 'J')){
+          for(const p of portals){
+            const d = Math.hypot(ship.worldX - p.x, ship.worldY - p.y);
+            if(d < (p.r || 48) + ship.r + 12){ // small margin
+              if(usePortal(p)) break;
+            }
+          }
+        }
+      });
         // draw laser range circle (faint)
         ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, laserRange, 0, Math.PI*2);
         ctx.strokeStyle = 'rgba(0,200,255,0.08)'; ctx.lineWidth = 2; ctx.stroke();
         // draw player image if available
-        if(playerImgLoaded){
+        if(tilesetLoaded){
+          // Draw using 8-direction tileset
+          try{
+            // ship.angle is radians math angle (0=Right, PI/2=Down, -PI/2=Up)
+            // Tileset was generated from UP facing image rotated clockwise
+            // Frame 0: Up (0 deg relative to image source)
+            // Frame 1: Up-Right (45 deg)
+            // Frame 2: Right (90 deg)
+            // ...
+            
+            // Compute rotation from Up (-PI/2)
+            // angle - (-PI/2) = angle + PI/2.
+            let deg = (ship.angle + Math.PI/2) * (180/Math.PI);
+            // normalize 0-360
+            deg = (deg % 360 + 360) % 360;
+            // index 0..7
+            const tileIdx = Math.round(deg / 45) % 8;
+            
+            const size = ship.r*3.2;
+            const sx = tileIdx * 96;
+            ctx.drawImage(playerTilesetImg, sx, 0, 96, 96, shipScreenX - size/2, shipScreenY - size/2, size, size);
+          } catch(err){ tilesetLoaded = false; }
+        } else if(playerImgLoaded){
           try{
             const size = ship.r*3.2;
-            ctx.drawImage(playerImg, shipScreenX - size/2, shipScreenY - size/2, size, size);
+            ctx.save();
+            ctx.translate(shipScreenX, shipScreenY);
+            // rotate valid PNG source (if it is UP facing)
+            ctx.rotate(ship.angle + Math.PI/2);
+            ctx.drawImage(playerImg, -size/2, -size/2, size, size);
+            ctx.restore();
           }catch(err){ console.error('drawImage player failed', err); playerImgLoaded = false; }
         }
         if(!playerImgLoaded){
@@ -593,6 +1410,57 @@
           ctx.strokeStyle='rgba(0,80,120,0.8)'; ctx.lineWidth=2; ctx.stroke();
           ctx.restore();
         }
+
+        // draw ship shield visuals: current shield arc and regen pulse
+        if((ship.shieldMax || 0) > 0){
+          const ratio = ((ship.shieldCurrent||0) / (ship.shieldMax||1));
+          // background ring for max
+          ctx.save(); ctx.globalAlpha = 0.12; ctx.strokeStyle = '#6bb3ff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, ship.r+14, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+          // filled arc for current shield
+          if(ratio > 0){
+            ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = '#6bb3ff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, ship.r+14, -Math.PI/2, (-Math.PI/2) + (Math.PI*2)*ratio); ctx.stroke(); ctx.restore();
+          }
+          // regen pulsing glow when active
+          if(ship._regenActive){
+            const pulse = 0.35 + Math.abs(Math.sin(Date.now()/320)) * 0.65; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = pulse*0.6; ctx.strokeStyle = hexToRgba('#6bb3ff', 0.95); ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, ship.r+22, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+          }
+        }
+
+        // draw ship health and shield bars above the ship (similar style to enemies)
+        (function(){
+          const barW = ship.r * 4; const barH = 8;
+          const bx = shipScreenX - barW/2; let by = shipScreenY - ship.r - 18;
+          // shield bar above health if exists
+          if((ship.shieldMax || 0) > 0){
+            const sBarH = 6; const sBy = by - sBarH - 6;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx-1, sBy-1, barW+2, sBarH+2);
+            const shieldRatio = Math.max(0, (ship.shieldCurrent||0) / (ship.shieldMax||1));
+            ctx.fillStyle = '#6bb3ff'; ctx.fillRect(bx, sBy, barW * shieldRatio, sBarH);
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.strokeRect(bx, sBy, barW, sBarH);
+            by = sBy - 8;
+            // shield numbers on ship
+            try{
+              ctx.font = '700 12px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.fillStyle = '#ffffff';
+              const sText = `${Math.floor(ship.shieldCurrent)}/${Math.floor(ship.shieldMax)}`;
+              ctx.strokeText(sText, bx + barW/2, sBy + sBarH/2);
+              ctx.fillText(sText, bx + barW/2, sBy + sBarH/2);
+            }catch(err){}
+          }
+          // health bar
+          ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx-1, by-1, barW+2, barH+2);
+          const hpRatio = Math.max(0, (ship.hp || ship.maxHp) / (ship.maxHp || 1));
+          ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, barW * hpRatio, barH);
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, barW, barH);
+          // health numbers on ship
+          try{
+            ctx.font = '700 12px Inter, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.fillStyle = '#ffffff';
+            const hText = `${Math.floor(ship.hp)}/${Math.floor(ship.maxHp)}`;
+            ctx.strokeText(hText, bx + barW/2, by + barH/2);
+            ctx.fillText(hText, bx + barW/2, by + barH/2);
+          }catch(err){}
+        })();
 
         // bullets (world coords -> screen)
         bullets.forEach(b=>{
@@ -667,6 +1535,18 @@
           // ship
           const sxm = pad + ship.worldX * scaleX; const sym = pad + ship.worldY * scaleY;
           minictx.fillStyle = '#9fe8ff'; minictx.beginPath(); minictx.arc(sxm,sym,4,0,Math.PI*2); minictx.fill();
+          // portals on minimap
+          portals.forEach(p=>{
+            const px = pad + p.x * scaleX; const py = pad + p.y * scaleY;
+            minictx.save();
+            minictx.beginPath(); minictx.arc(px,py,6,0,Math.PI*2);
+            minictx.strokeStyle = '#9fe8ff'; minictx.lineWidth = 2; minictx.stroke();
+            minictx.fillStyle = 'rgba(159,232,255,0.12)'; minictx.fill();
+            // small P label
+            minictx.font = '600 10px Inter, Arial, sans-serif'; minictx.fillStyle = '#9fe8ff'; minictx.textAlign = 'center'; minictx.textBaseline = 'middle';
+            minictx.fillText('P', px, py);
+            minictx.restore();
+          });
           // viewport rect
           minictx.strokeStyle = 'rgba(159,232,255,0.6)'; minictx.lineWidth = 1;
           minictx.strokeRect(pad + (ship.worldX - W/2)*scaleX, pad + (ship.worldY - H/2)*scaleY, W*scaleX, H*scaleY);
@@ -726,7 +1606,7 @@
 
       // create ammo bar now
       try{ buildAmmoBar(); }catch(e){ console.error('ammo bar build failed', e); }
-      try{ updateLaserAmmoDisplay(); updateCreditsDisplay(); }catch(e){}
+      try{ updateLaserAmmoDisplay(); updateCreditsDisplay(); updateShipShieldDisplay(); }catch(e){}
 
       // input keys map for WASD + arrows; press `L` to toggle auto-fire on selected/nearest target
       const keys = {w:false,a:false,s:false,d:false,ArrowLeft:false,ArrowRight:false,ArrowUp:false,ArrowDown:false};
@@ -754,6 +1634,10 @@
         // toggle auto-fire on L key press
         if(k==='l' || k==='L'){
           if(ship.autoFireTargetId) stopAutoFire(); else startAutoFireOnSelected();
+        }
+        // numeric keys 1..5 select ammo types in the ammo bar
+        if(k>='1' && k<='5'){
+          const idx = parseInt(k,10)-1; const key = Object.keys(AMMO)[idx]; if(key){ currentAmmo = key; document.querySelectorAll('#ammoBar .ammoBtn').forEach(n=>n.classList.remove('selected')); const b = document.querySelector(`#ammoBar .ammoBtn[data-ammo="${key}"]`); if(b) b.classList.add('selected'); updateAmmoCounts(); }
         }
       });
       window.addEventListener('keyup', e=>{
