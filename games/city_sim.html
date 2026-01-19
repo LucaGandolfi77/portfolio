@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>City Sim - Mobile</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      background: #1a1a2e;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #topPanel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 8px 10px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #clockRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    #clock {
+      font-size: 28px;
+      font-weight: bold;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+
+    #dayIndicator {
+      font-size: 14px;
+      color: #aaa;
+      margin-left: 10px;
+    }
+
+    #speedControls {
+      display: flex;
+      gap: 5px;
+    }
+
+    .speedBtn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      background: #333;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .speedBtn.active {
+      background: #4ecdc4;
+      color: #000;
+    }
+
+    #countersRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .counter {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .counter .icon {
+      font-size: 14px;
+    }
+
+    .counter .value {
+      font-weight: bold;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    #simPopup {
+      position: fixed;
+      display: none;
+      background: rgba(0, 0, 0, 0.9);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 16px;
+      z-index: 200;
+      min-width: 200px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    #simPopup.visible {
+      display: block;
+    }
+
+    #simPopup h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #simPopup .simColor {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    #simPopup .stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+    }
+
+    #simPopup .stat:last-child {
+      border-bottom: none;
+    }
+
+    #simPopup .energyBar {
+      width: 100%;
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    #simPopup .energyFill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+      transition: width 0.3s;
+    }
+
+    #closePopup {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    #closePopup:hover {
+      opacity: 1;
+    }
+
+    #instructions {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      z-index: 50;
+      text-align: center;
+      opacity: 1;
+      transition: opacity 1s;
+    }
+
+    #instructions.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #zoomControls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .zoomBtn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .zoomBtn:active {
+      transform: scale(0.9);
+    }
+
+    #statsPanel {
+      position: fixed;
+      top: 50%;
+      right: -350px;
+      transform: translateY(-50%);
+      width: 340px;
+      max-height: 70vh;
+      background: rgba(0, 0, 0, 0.9);
+      backdrop-filter: blur(10px);
+      border-radius: 16px 0 0 16px;
+      padding: 20px;
+      z-index: 150;
+      overflow-y: auto;
+      transition: right 0.3s ease;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    #statsPanel.open {
+      right: 0;
+    }
+
+    #statsToggle {
+      position: fixed;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(78, 205, 196, 0.9);
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s;
+    }
+
+    #statsToggle:active {
+      transform: translateY(-50%) scale(0.9);
+    }
+
+    #statsPanel h2 {
+      color: #fff;
+      margin-bottom: 15px;
+      font-size: 20px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 10px;
+    }
+
+    .simStat {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid;
+    }
+
+    .simStat h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .simStat .simIcon {
+      font-size: 24px;
+    }
+
+    .simStat p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: #ddd;
+    }
+
+    .simStat .location {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px;
+      border-radius: 6px;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="topPanel">
+    <div id="clockRow">
+      <div>
+        <span id="clock">00:00</span>
+        <span id="dayIndicator">Giorno 1</span>
+      </div>
+      <div id="speedControls">
+        <button class="speedBtn active" data-speed="1">1x</button>
+        <button class="speedBtn" data-speed="2">2x</button>
+        <button class="speedBtn" data-speed="5">5x</button>
+      </div>
+    </div>
+    <div id="countersRow">
+      <div class="counter"><span class="icon">🛏️</span><span class="value" id="countSleep">0</span></div>
+      <div class="counter"><span class="icon">🍽️</span><span class="value" id="countEat">0</span></div>
+      <div class="counter"><span class="icon">💼</span><span class="value" id="countWork">0</span></div>
+      <div class="counter"><span class="icon">🛒</span><span class="value" id="countMall">0</span></div>
+      <div class="counter"><span class="icon">🎓</span><span class="value" id="countSchool">0</span></div>
+      <div class="counter"><span class="icon">🚶</span><span class="value" id="countWalk">0</span></div>
+      <div class="counter"><span class="icon">🐕</span><span class="value" id="countDog">0</span></div>
+      <div class="counter"><span class="icon">🍕</span><span class="value" id="countPizza">0</span></div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="simPopup">
+    <button id="closePopup">✕</button>
+    <h3><span class="simColor" id="popupColor"></span><span id="popupName">Nome</span></h3>
+    <div class="stat"><span>Stato:</span><span id="popupState">-</span></div>
+    <div class="stat"><span>Età:</span><span id="popupAge">-</span></div>
+    <div class="stat"><span>Occupazione:</span><span id="popupJob">-</span></div>
+    <div class="stat"><span>Energia:</span><span id="popupEnergy">-</span></div>
+    <div class="energyBar"><div class="energyFill" id="popupEnergyBar"></div></div>
+  </div>
+
+  <div id="instructions">
+    Trascina per muovere la mappa • Pizzica per zoom • Tocca un Sim per info
+  </div>
+
+  <div id="zoomControls">
+    <button class="zoomBtn" id="zoomIn">+</button>
+    <button class="zoomBtn" id="zoomOut">−</button>
+  </div>
+
+  <button id="statsToggle">📊</button>
+
+  <div id="statsPanel">
+    <h2>📊 Statistiche Sims</h2>
+    <div id="statsContent"></div>
+  </div>
+
+  <script>
+    // ==================== CONSTANTS ====================
+    const ACTIVITIES = {
+      SLEEP: { name: 'Dormire', icon: '🛏️', counterId: 'countSleep' },
+      EAT: { name: 'Mangiare', icon: '🍽️', counterId: 'countEat' },
+      WORK: { name: 'Lavoro', icon: '💼', counterId: 'countWork' },
+      MALL: { name: 'Centro Commerciale', icon: '🛒', counterId: 'countMall' },
+      SCHOOL: { name: 'Scuola', icon: '🎓', counterId: 'countSchool' },
+      WALK: { name: 'Passeggiata', icon: '🚶', counterId: 'countWalk' },
+      DOG: { name: 'Portare Cane', icon: '🐕', counterId: 'countDog' },
+      PIZZA: { name: 'Pizzeria', icon: '🍕', counterId: 'countPizza' }
+    };
+
+    const NAMES = [
+      'Marco', 'Giulia', 'Luca', 'Sofia', 'Alessandro', 'Francesca', 
+      'Andrea', 'Chiara', 'Matteo', 'Sara', 'Davide', 'Anna',
+      'Lorenzo', 'Valentina', 'Simone', 'Elisa', 'Federico', 'Martina',
+      'Giacomo', 'Laura', 'Riccardo', 'Elena', 'Nicola', 'Giorgia'
+    ];
+
+    const JOBS = ['Impiegato', 'Insegnante', 'Medico', 'Commerciante', 'Studente', 'Pensionato', 'Libero Professionista'];
+
+    const SIM_COLORS = [
+      '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181',
+      '#aa96da', '#fcbad3', '#a8d8ea', '#ffaaa5', '#dcedc1'
+    ];
+
+    // ==================== GAME STATE ====================
+    const gameState = {
+      // Time
+      gameTime: 6 * 60, // Minutes since midnight (start at 6:00 AM)
+      day: 1,
+      speed: 1,
+      lastRealTime: 0,
+
+      // Camera
+      camera: { x: 0, y: 0, zoom: 1.5, minZoom: 0.3, maxZoom: 3 },
+      
+      // Touch handling
+      touch: {
+        isDragging: false,
+        isPinching: false,
+        lastX: 0,
+        lastY: 0,
+        lastDist: 0
+      },
+
+      // City data
+      buildings: [],
+      roads: [],
+      sims: [],
+
+      // Counters
+      counters: {
+        SLEEP: 0, EAT: 0, WORK: 0, MALL: 0, SCHOOL: 0, WALK: 0, DOG: 0, PIZZA: 0
+      },
+
+      // Selected sim
+      selectedSim: null
+    };
+
+    // ==================== CANVAS SETUP ====================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ==================== CITY GENERATION ====================
+    const CITY_SIZE = 2000;
+    const BLOCK_SIZE = 150;
+    const ROAD_WIDTH = 30;
+
+    function generateCity() {
+      // Generate road grid
+      for (let x = -CITY_SIZE/2; x < CITY_SIZE/2; x += BLOCK_SIZE + ROAD_WIDTH) {
+        gameState.roads.push({
+          x: x,
+          y: -CITY_SIZE/2,
+          width: ROAD_WIDTH,
+          height: CITY_SIZE,
+          horizontal: false
+        });
+      }
+      for (let y = -CITY_SIZE/2; y < CITY_SIZE/2; y += BLOCK_SIZE + ROAD_WIDTH) {
+        gameState.roads.push({
+          x: -CITY_SIZE/2,
+          y: y,
+          width: CITY_SIZE,
+          height: ROAD_WIDTH,
+          horizontal: true
+        });
+      }
+
+      // Generate buildings (fewer but more detailed)
+      const buildingTypes = [
+        { type: 'house', color: '#4a90d9', activity: 'SLEEP', icon: '🏠', count: 8, hasRooms: true },
+        { type: 'office', color: '#7f8c8d', activity: 'WORK', icon: '🏢', count: 3, hasRooms: true },
+        { type: 'school', color: '#f1c40f', activity: 'SCHOOL', icon: '🏫', count: 2, hasRooms: true },
+        { type: 'mall', color: '#e74c3c', activity: 'MALL', icon: '🛒', count: 2, hasRooms: true },
+        { type: 'pizzeria', color: '#e67e22', activity: 'PIZZA', icon: '🍕', count: 3, hasRooms: true },
+        { type: 'park', color: '#27ae60', activity: 'WALK', icon: '🌳', count: 4, hasRooms: false },
+        { type: 'restaurant', color: '#9b59b6', activity: 'EAT', icon: '🍽️', count: 3, hasRooms: true }
+      ];
+
+      let buildingId = 0;
+      const gridCols = Math.floor(CITY_SIZE / (BLOCK_SIZE + ROAD_WIDTH));
+      const gridRows = Math.floor(CITY_SIZE / (BLOCK_SIZE + ROAD_WIDTH));
+      const usedCells = new Set();
+
+      buildingTypes.forEach(bt => {
+        for (let i = 0; i < bt.count; i++) {
+          let attempts = 0;
+          while (attempts < 50) {
+            const col = Math.floor(Math.random() * gridCols);
+            const row = Math.floor(Math.random() * gridRows);
+            const key = `${col},${row}`;
+            
+            if (!usedCells.has(key)) {
+              usedCells.add(key);
+              
+              const x = -CITY_SIZE/2 + col * (BLOCK_SIZE + ROAD_WIDTH) + ROAD_WIDTH + 10;
+              const y = -CITY_SIZE/2 + row * (BLOCK_SIZE + ROAD_WIDTH) + ROAD_WIDTH + 10;
+              const width = BLOCK_SIZE - 10;
+              const height = BLOCK_SIZE - 10;
+              
+              gameState.buildings.push({
+                id: buildingId++,
+                type: bt.type,
+                color: bt.color,
+                activity: bt.activity,
+                icon: bt.icon,
+                hasRooms: bt.hasRooms,
+                x, y, width, height,
+                centerX: x + width/2,
+                centerY: y + height/2
+              });
+              break;
+            }
+            attempts++;
+          }
+        }
+      });
+    }
+
+    // ==================== SIM CLASS ====================
+    class Sim {
+      constructor(id) {
+        this.id = id;
+        this.name = NAMES[Math.floor(Math.random() * NAMES.length)];
+        this.age = 18 + Math.floor(Math.random() * 50);
+        this.job = this.age < 22 ? 'Studente' : (this.age > 65 ? 'Pensionato' : JOBS[Math.floor(Math.random() * (JOBS.length - 2))]);
+        this.color = SIM_COLORS[id % SIM_COLORS.length];
+        this.energy = 80 + Math.random() * 20;
+        this.hasDog = Math.random() < 0.3;
+
+        // Assign home
+        const homes = gameState.buildings.filter(b => b.type === 'house');
+        if (homes.length === 0) {
+          console.error('No houses found! Cannot create Sim.');
+          this.home = { centerX: 0, centerY: 0 };
+        } else {
+          this.home = homes[Math.floor(Math.random() * homes.length)];
+        }
+        
+        // Start at home
+        this.x = this.home.centerX || 0;
+        this.y = this.home.centerY || 0;
+        
+        console.log(`Sim ${id} (${this.name}) initialized at position: (${this.x}, ${this.y})`);
+        
+        // State
+        this.state = null; // Start with no state so counters work correctly
+        this.targetBuilding = null;
+        this.isMoving = false;
+        this.inCar = false;
+        this.path = [];
+        this.pathIndex = 0;
+        
+        // Schedule
+        this.stateTimer = 0;
+        this.lastStateChange = 0;
+      }
+
+      getScheduleProbabilities(hour) {
+        const probs = {};
+        const isStudent = this.job === 'Studente';
+        const isRetired = this.job === 'Pensionato';
+        const isWeekend = gameState.day % 7 === 0 || gameState.day % 7 === 6;
+
+        // Night (23:00 - 6:00)
+        if (hour >= 23 || hour < 6) {
+          probs.SLEEP = 0.95;
+          probs.EAT = 0.03;
+          probs.WALK = 0.02;
+        }
+        // Early morning (6:00 - 8:00)
+        else if (hour >= 6 && hour < 8) {
+          probs.SLEEP = 0.3;
+          probs.EAT = 0.4;
+          probs.WALK = this.hasDog ? 0.2 : 0.05;
+          probs.DOG = this.hasDog ? 0.05 : 0;
+        }
+        // Morning work/school (8:00 - 12:00)
+        else if (hour >= 8 && hour < 12) {
+          if (isStudent && !isWeekend) {
+            probs.SCHOOL = 0.8;
+            probs.WALK = 0.1;
+          } else if (!isRetired && !isWeekend) {
+            probs.WORK = 0.75;
+            probs.MALL = 0.1;
+          } else {
+            probs.WALK = 0.3;
+            probs.MALL = 0.3;
+            probs.DOG = this.hasDog ? 0.2 : 0;
+          }
+          probs.EAT = 0.1;
+        }
+        // Lunch (12:00 - 14:00)
+        else if (hour >= 12 && hour < 14) {
+          probs.EAT = 0.5;
+          probs.PIZZA = 0.2;
+          probs.WORK = isStudent || isRetired || isWeekend ? 0 : 0.2;
+          probs.WALK = 0.1;
+        }
+        // Afternoon (14:00 - 18:00)
+        else if (hour >= 14 && hour < 18) {
+          if (isStudent && !isWeekend) {
+            probs.SCHOOL = 0.5;
+            probs.WALK = 0.2;
+          } else if (!isRetired && !isWeekend) {
+            probs.WORK = 0.6;
+          }
+          probs.MALL = 0.2;
+          probs.WALK = (probs.WALK || 0) + 0.1;
+          probs.DOG = this.hasDog ? 0.1 : 0;
+        }
+        // Evening (18:00 - 21:00)
+        else if (hour >= 18 && hour < 21) {
+          probs.EAT = 0.25;
+          probs.PIZZA = 0.2;
+          probs.WALK = 0.2;
+          probs.MALL = 0.15;
+          probs.DOG = this.hasDog ? 0.1 : 0;
+          probs.SLEEP = 0.1;
+        }
+        // Late evening (21:00 - 23:00)
+        else {
+          probs.SLEEP = 0.5;
+          probs.EAT = 0.15;
+          probs.PIZZA = 0.15;
+          probs.WALK = 0.1;
+          probs.DOG = this.hasDog ? 0.1 : 0;
+        }
+
+        // Energy modifier
+        if (this.energy < 30) {
+          probs.SLEEP = (probs.SLEEP || 0) + 0.4;
+        }
+
+        // Normalize probabilities
+        const total = Object.values(probs).reduce((a, b) => a + b, 0);
+        Object.keys(probs).forEach(k => probs[k] /= total);
+
+        return probs;
+      }
+
+      chooseNextActivity() {
+        const hour = Math.floor(gameState.gameTime / 60);
+        const probs = this.getScheduleProbabilities(hour);
+        
+        const rand = Math.random();
+        let cumulative = 0;
+        
+        for (const [activity, prob] of Object.entries(probs)) {
+          cumulative += prob;
+          if (rand < cumulative) {
+            return activity;
+          }
+        }
+        
+        return 'SLEEP';
+      }
+
+      findBuildingForActivity(activity) {
+        const activityToType = {
+          SLEEP: 'house',
+          EAT: 'restaurant',
+          WORK: 'office',
+          MALL: 'mall',
+          SCHOOL: 'school',
+          WALK: 'park',
+          DOG: 'park',
+          PIZZA: 'pizzeria'
+        };
+
+        if (activity === 'SLEEP') return this.home;
+
+        const type = activityToType[activity];
+        const buildings = gameState.buildings.filter(b => b.type === type);
+        
+        if (buildings.length === 0) return this.home;
+
+        // Choose nearest or random
+        if (Math.random() < 0.7) {
+          buildings.sort((a, b) => {
+            const distA = Math.hypot(a.centerX - this.x, a.centerY - this.y);
+            const distB = Math.hypot(b.centerX - this.x, b.centerY - this.y);
+            return distA - distB;
+          });
+          return buildings[0];
+        }
+        
+        return buildings[Math.floor(Math.random() * buildings.length)];
+      }
+
+      startActivity(activity) {
+        // Update counter - always decrement old state and increment new state
+        if (this.state && this.state !== activity && gameState.counters[this.state] !== undefined) {
+          gameState.counters[this.state] = Math.max(0, gameState.counters[this.state] - 1);
+        }
+        
+        // Always increment new activity counter
+        if (gameState.counters[activity] !== undefined) {
+          gameState.counters[activity]++;
+        }
+        
+        this.state = activity;
+        updateCounters();
+        
+        this.targetBuilding = this.findBuildingForActivity(activity);
+        this.isMoving = true;
+        
+        // Use car for longer distances
+        const dist = Math.hypot(this.targetBuilding.centerX - this.x, this.targetBuilding.centerY - this.y);
+        this.inCar = dist > 300 && activity !== 'WALK' && activity !== 'DOG';
+        
+        // Set activity duration (in game minutes)
+        const durations = {
+          SLEEP: 360 + Math.random() * 120,
+          EAT: 30 + Math.random() * 30,
+          WORK: 240 + Math.random() * 120,
+          MALL: 60 + Math.random() * 60,
+          SCHOOL: 300 + Math.random() * 60,
+          WALK: 30 + Math.random() * 30,
+          DOG: 20 + Math.random() * 20,
+          PIZZA: 45 + Math.random() * 30
+        };
+        this.stateTimer = durations[activity] || 60;
+        this.lastStateChange = gameState.gameTime;
+      }
+
+      update(deltaMinutes) {
+        // Check if should change activity
+        const elapsed = (gameState.gameTime - this.lastStateChange + 1440) % 1440;
+        if (elapsed >= this.stateTimer && !this.isMoving) {
+          const nextActivity = this.chooseNextActivity();
+          this.startActivity(nextActivity);
+        }
+
+        // Movement
+        if (this.isMoving && this.targetBuilding) {
+          const speed = (this.inCar ? 150 : 40) * (deltaMinutes / 60);
+          const dx = this.targetBuilding.centerX - this.x;
+          const dy = this.targetBuilding.centerY - this.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < speed) {
+            this.x = this.targetBuilding.centerX;
+            this.y = this.targetBuilding.centerY;
+            this.isMoving = false;
+            this.inCar = false;
+          } else {
+            this.x += (dx / dist) * speed;
+            this.y += (dy / dist) * speed;
+          }
+        }
+
+        // Energy management
+        if (this.state === 'SLEEP') {
+          this.energy = Math.min(100, this.energy + deltaMinutes * 0.3);
+        } else if (this.state === 'EAT' || this.state === 'PIZZA') {
+          this.energy = Math.min(100, this.energy + deltaMinutes * 0.2);
+        } else {
+          this.energy = Math.max(0, this.energy - deltaMinutes * 0.05);
+        }
+      }
+
+      draw(ctx) {
+        ctx.save();
+        
+        // Use emoji for simplicity and visibility
+        ctx.font = `${this.inCar ? '40' : '32'}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Shadow for better visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        if (this.inCar) {
+          // Car emoji
+          ctx.fillText('🚗', this.x, this.y);
+        } else if (this.hasDog && (this.state === 'DOG' || this.state === 'WALK')) {
+          // Person with dog
+          ctx.fillText('🚶', this.x - 8, this.y);
+          ctx.font = '20px Arial';
+          ctx.fillText('🐕', this.x + 12, this.y + 8);
+        } else {
+          // Person emoji
+          const personEmojis = ['🚶', '👨', '👩', '🧑', '👦'];
+          ctx.fillText(personEmojis[this.id % personEmojis.length], this.x, this.y);
+        }
+        
+        // Name tag (small, above sim)
+        ctx.shadowBlur = 2;
+        ctx.font = 'bold 10px Arial';
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeText(this.name, this.x, this.y - 25);
+        ctx.fillText(this.name, this.x, this.y - 25);
+
+        ctx.restore();
+      }
+
+      isClicked(worldX, worldY) {
+        const size = this.inCar ? 35 : 30;
+        return Math.hypot(worldX - this.x, worldY - this.y) < size;
+      }
+    }
+
+    // ==================== RENDERING ====================
+    function getDaylightColor() {
+      const hour = gameState.gameTime / 60;
+      
+      if (hour >= 6 && hour < 8) {
+        // Sunrise
+        const t = (hour - 6) / 2;
+        return lerpColor('#1a1a3a', '#87ceeb', t);
+      } else if (hour >= 8 && hour < 18) {
+        // Day
+        return '#87ceeb';
+      } else if (hour >= 18 && hour < 20) {
+        // Sunset
+        const t = (hour - 18) / 2;
+        return lerpColor('#87ceeb', '#ff7f50', t);
+      } else if (hour >= 20 && hour < 21) {
+        // Dusk
+        const t = hour - 20;
+        return lerpColor('#ff7f50', '#1a1a3a', t);
+      } else {
+        // Night
+        return '#1a1a3a';
+      }
+    }
+
+    function lerpColor(c1, c2, t) {
+      const r1 = parseInt(c1.slice(1, 3), 16);
+      const g1 = parseInt(c1.slice(3, 5), 16);
+      const b1 = parseInt(c1.slice(5, 7), 16);
+      const r2 = parseInt(c2.slice(1, 3), 16);
+      const g2 = parseInt(c2.slice(3, 5), 16);
+      const b2 = parseInt(c2.slice(5, 7), 16);
+      
+      const r = Math.round(r1 + (r2 - r1) * t);
+      const g = Math.round(g1 + (g2 - g1) * t);
+      const b = Math.round(b1 + (b2 - b1) * t);
+      
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function render() {
+      const { camera } = gameState;
+      
+      // Clear with sky color
+      ctx.fillStyle = getDaylightColor();
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      
+      // Apply camera transformation
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(camera.zoom, camera.zoom);
+      ctx.translate(-camera.x, -camera.y);
+
+      // Draw grass base
+      ctx.fillStyle = '#2d5a27';
+      ctx.fillRect(-CITY_SIZE/2, -CITY_SIZE/2, CITY_SIZE, CITY_SIZE);
+
+      // Draw roads
+      ctx.fillStyle = '#333';
+      gameState.roads.forEach(road => {
+        ctx.fillRect(road.x, road.y, road.width, road.height);
+        
+        // Road markings
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([20, 15]);
+        if (road.horizontal) {
+          ctx.beginPath();
+          ctx.moveTo(road.x, road.y + road.height/2);
+          ctx.lineTo(road.x + road.width, road.y + road.height/2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(road.x + road.width/2, road.y);
+          ctx.lineTo(road.x + road.width/2, road.y + road.height);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      });
+
+      // Night overlay for buildings
+      const hour = gameState.gameTime / 60;
+      const isNight = hour < 6 || hour >= 20;
+
+      // Draw buildings
+      gameState.buildings.forEach(b => {
+        // Building shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(b.x + 5, b.y + 5, b.width, b.height);
+        
+        // Building
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+        
+        // Building border
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+
+        // Draw rooms if building has them
+        if (b.hasRooms) {
+          const roomPadding = 10;
+          const wallThickness = 3;
+          
+          // Room walls
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = wallThickness;
+          
+          if (b.type === 'house') {
+            // Houses: 2x2 rooms
+            ctx.beginPath();
+            ctx.moveTo(b.x + b.width/2, b.y + roomPadding);
+            ctx.lineTo(b.x + b.width/2, b.y + b.height - roomPadding);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(b.x + roomPadding, b.y + b.height/2);
+            ctx.lineTo(b.x + b.width - roomPadding, b.y + b.height/2);
+            ctx.stroke();
+            
+            // Furniture icons
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText('🛏️', b.x + b.width * 0.25, b.y + b.height * 0.25);
+            ctx.fillText('🍽️', b.x + b.width * 0.75, b.y + b.height * 0.25);
+            ctx.fillText('🛋️', b.x + b.width * 0.25, b.y + b.height * 0.75);
+            ctx.fillText('🚿', b.x + b.width * 0.75, b.y + b.height * 0.75);
+          } else if (b.type === 'office') {
+            // Offices: cubicles
+            const cols = 3;
+            const rows = 2;
+            for (let i = 1; i < cols; i++) {
+              ctx.beginPath();
+              ctx.moveTo(b.x + (b.width / cols) * i, b.y + roomPadding);
+              ctx.lineTo(b.x + (b.width / cols) * i, b.y + b.height - roomPadding);
+              ctx.stroke();
+            }
+            for (let i = 1; i < rows; i++) {
+              ctx.beginPath();
+              ctx.moveTo(b.x + roomPadding, b.y + (b.height / rows) * i);
+              ctx.lineTo(b.x + b.width - roomPadding, b.y + (b.height / rows) * i);
+              ctx.stroke();
+            }
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText('💻', b.x + b.width * 0.33, b.y + b.height * 0.35);
+            ctx.fillText('💻', b.x + b.width * 0.66, b.y + b.height * 0.35);
+          } else if (b.type === 'school') {
+            // Schools: classrooms
+            ctx.beginPath();
+            ctx.moveTo(b.x + roomPadding, b.y + b.height/2);
+            ctx.lineTo(b.x + b.width - roomPadding, b.y + b.height/2);
+            ctx.stroke();
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText('📚', b.x + b.width * 0.3, b.y + b.height * 0.3);
+            ctx.fillText('📚', b.x + b.width * 0.7, b.y + b.height * 0.3);
+            ctx.fillText('🎨', b.x + b.width * 0.5, b.y + b.height * 0.7);
+          } else if (b.type === 'pizzeria' || b.type === 'restaurant') {
+            // Restaurants: tables
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText('🪑', b.x + b.width * 0.25, b.y + b.height * 0.3);
+            ctx.fillText('🪑', b.x + b.width * 0.75, b.y + b.height * 0.3);
+            ctx.fillText('🪑', b.x + b.width * 0.25, b.y + b.height * 0.7);
+            ctx.fillText('🪑', b.x + b.width * 0.75, b.y + b.height * 0.7);
+            ctx.fillText('🍳', b.x + b.width * 0.5, b.y + b.height * 0.5);
+          } else if (b.type === 'mall') {
+            // Mall: aisles
+            const aisles = 4;
+            for (let i = 1; i < aisles; i++) {
+              ctx.beginPath();
+              ctx.moveTo(b.x + roomPadding, b.y + (b.height / aisles) * i);
+              ctx.lineTo(b.x + b.width - roomPadding, b.y + (b.height / aisles) * i);
+              ctx.stroke();
+            }
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText('🛍️', b.x + b.width * 0.5, b.y + b.height * 0.5);
+          }
+        }
+
+        // Windows (lit at night)
+        if (isNight && !b.hasRooms) {
+          ctx.fillStyle = 'rgba(255, 255, 150, 0.8)';
+          const windowSize = 10;
+          const padding = 15;
+          for (let wx = b.x + padding; wx < b.x + b.width - padding; wx += 25) {
+            for (let wy = b.y + padding; wy < b.y + b.height - padding; wy += 25) {
+              if (Math.random() > 0.3) {
+                ctx.fillRect(wx, wy, windowSize, windowSize);
+              }
+            }
+          }
+        }
+
+        // Building icon on top
+        ctx.font = '32px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeText(b.icon, b.centerX, b.y + 30);
+        ctx.fillStyle = '#000';
+        ctx.fillText(b.icon, b.centerX, b.y + 30);
+      });
+
+      // Draw Sims (always on top)
+      gameState.sims.forEach(sim => {
+        sim.draw(ctx);
+      });
+
+      ctx.restore();
+
+      // Night overlay
+      if (isNight) {
+        const nightAlpha = hour < 6 ? 0.4 : Math.min(0.4, (hour - 20) * 0.1);
+        ctx.fillStyle = `rgba(0, 0, 30, ${nightAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    // ==================== UI UPDATES ====================
+    function updateClock() {
+      const hours = Math.floor(gameState.gameTime / 60) % 24;
+      const minutes = Math.floor(gameState.gameTime % 60);
+      document.getElementById('clock').textContent = 
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      document.getElementById('dayIndicator').textContent = `Giorno ${gameState.day}`;
+    }
+
+    function updateCounters() {
+      Object.keys(ACTIVITIES).forEach(key => {
+        const el = document.getElementById(ACTIVITIES[key].counterId);
+        if (el) el.textContent = gameState.counters[key];
+      });
+    }
+
+    function updateStatsPanel() {
+      const statsContent = document.getElementById('statsContent');
+      if (!statsContent) return;
+      
+      statsContent.innerHTML = '';
+      
+      gameState.sims.forEach(sim => {
+        const statDiv = document.createElement('div');
+        statDiv.className = 'simStat';
+        statDiv.style.borderLeftColor = sim.color;
+        
+        const emoji = sim.inCar ? '🚗' : (sim.hasDog && (sim.state === 'DOG' || sim.state === 'WALK') ? '🚶🐕' : '🚶');
+        const activity = ACTIVITIES[sim.state];
+        
+        statDiv.innerHTML = `
+          <h3><span class="simIcon">${emoji}</span> ${sim.name}</h3>
+          <p>💼 ${sim.job}, ${sim.age} anni</p>
+          <p>⚡ Energia: ${Math.round(sim.energy)}%</p>
+          <p>🎯 Stato: ${activity?.icon || ''} ${activity?.name || sim.state}</p>
+          <div class="location">📍 Posizione: (${Math.round(sim.x)}, ${Math.round(sim.y)})</div>
+        `;
+        
+        statsContent.appendChild(statDiv);
+      });
+    }
+
+    // ==================== TOUCH HANDLING ====================
+    function screenToWorld(screenX, screenY) {
+      const { camera } = gameState;
+      return {
+        x: (screenX - canvas.width/2) / camera.zoom + camera.x,
+        y: (screenY - canvas.height/2) / camera.zoom + camera.y
+      };
+    }
+
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      
+      if (e.touches.length === 1) {
+        gameState.touch.isDragging = true;
+        gameState.touch.lastX = e.touches[0].clientX;
+        gameState.touch.lastY = e.touches[0].clientY;
+        
+        // Check for sim click
+        const world = screenToWorld(e.touches[0].clientX, e.touches[0].clientY);
+        for (const sim of gameState.sims) {
+          if (sim.isClicked(world.x, world.y)) {
+            showSimPopup(sim, e.touches[0].clientX, e.touches[0].clientY);
+            gameState.touch.isDragging = false;
+            return;
+          }
+        }
+      } else if (e.touches.length === 2) {
+        gameState.touch.isPinching = true;
+        gameState.touch.isDragging = false;
+        gameState.touch.lastDist = getTouchDistance(e.touches);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      
+      if (gameState.touch.isDragging && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - gameState.touch.lastX;
+        const dy = e.touches[0].clientY - gameState.touch.lastY;
+        
+        gameState.camera.x -= dx / gameState.camera.zoom;
+        gameState.camera.y -= dy / gameState.camera.zoom;
+        
+        gameState.touch.lastX = e.touches[0].clientX;
+        gameState.touch.lastY = e.touches[0].clientY;
+      } else if (gameState.touch.isPinching && e.touches.length === 2) {
+        const dist = getTouchDistance(e.touches);
+        const scale = dist / gameState.touch.lastDist;
+        
+        gameState.camera.zoom = Math.max(
+          gameState.camera.minZoom,
+          Math.min(gameState.camera.maxZoom, gameState.camera.zoom * scale)
+        );
+        
+        gameState.touch.lastDist = dist;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) gameState.touch.isPinching = false;
+      if (e.touches.length < 1) gameState.touch.isDragging = false;
+    });
+
+    // Mouse support for desktop
+    canvas.addEventListener('mousedown', (e) => {
+      gameState.touch.isDragging = true;
+      gameState.touch.lastX = e.clientX;
+      gameState.touch.lastY = e.clientY;
+      
+      const world = screenToWorld(e.clientX, e.clientY);
+      for (const sim of gameState.sims) {
+        if (sim.isClicked(world.x, world.y)) {
+          showSimPopup(sim, e.clientX, e.clientY);
+          gameState.touch.isDragging = false;
+          return;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (gameState.touch.isDragging) {
+        const dx = e.clientX - gameState.touch.lastX;
+        const dy = e.clientY - gameState.touch.lastY;
+        
+        gameState.camera.x -= dx / gameState.camera.zoom;
+        gameState.camera.y -= dy / gameState.camera.zoom;
+        
+        gameState.touch.lastX = e.clientX;
+        gameState.touch.lastY = e.clientY;
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      gameState.touch.isDragging = false;
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      gameState.camera.zoom = Math.max(
+        gameState.camera.minZoom,
+        Math.min(gameState.camera.maxZoom, gameState.camera.zoom * zoomFactor)
+      );
+    }, { passive: false });
+
+    // Zoom buttons
+    document.getElementById('zoomIn').addEventListener('click', () => {
+      gameState.camera.zoom = Math.min(gameState.camera.maxZoom, gameState.camera.zoom * 1.3);
+    });
+    document.getElementById('zoomOut').addEventListener('click', () => {
+      gameState.camera.zoom = Math.max(gameState.camera.minZoom, gameState.camera.zoom * 0.7);
+    });
+
+    // Stats panel toggle
+    document.getElementById('statsToggle').addEventListener('click', () => {
+      const panel = document.getElementById('statsPanel');
+      const isOpen = panel.classList.contains('open');
+      
+      if (isOpen) {
+        panel.classList.remove('open');
+      } else {
+        panel.classList.add('open');
+        updateStatsPanel();
+      }
+    });
+
+    // ==================== SIM POPUP ====================
+    const popup = document.getElementById('simPopup');
+
+    function showSimPopup(sim, screenX, screenY) {
+      gameState.selectedSim = sim;
+      
+      document.getElementById('popupColor').style.backgroundColor = sim.color;
+      document.getElementById('popupName').textContent = sim.name;
+      document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
+      document.getElementById('popupAge').textContent = sim.age + ' anni';
+      document.getElementById('popupJob').textContent = sim.job + (sim.hasDog ? ' 🐕' : '');
+      document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
+      document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
+      
+      // Position popup
+      let left = screenX + 10;
+      let top = screenY + 10;
+      
+      if (left + 220 > window.innerWidth) left = screenX - 220;
+      if (top + 200 > window.innerHeight) top = screenY - 200;
+      
+      popup.style.left = Math.max(10, left) + 'px';
+      popup.style.top = Math.max(10, top) + 'px';
+      popup.classList.add('visible');
+    }
+
+    document.getElementById('closePopup').addEventListener('click', () => {
+      popup.classList.remove('visible');
+      gameState.selectedSim = null;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      const world = screenToWorld(e.clientX, e.clientY);
+      let clickedSim = false;
+      
+      for (const sim of gameState.sims) {
+        if (sim.isClicked(world.x, world.y)) {
+          clickedSim = true;
+          break;
+        }
+      }
+      
+      if (!clickedSim) {
+        popup.classList.remove('visible');
+        gameState.selectedSim = null;
+      }
+    });
+
+    // ==================== SPEED CONTROLS ====================
+    document.querySelectorAll('.speedBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speedBtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        gameState.speed = parseInt(btn.dataset.speed);
+      });
+    });
+
+    // ==================== GAME LOOP ====================
+    function gameLoop(timestamp) {
+      if (!gameState.lastRealTime) gameState.lastRealTime = timestamp;
+      
+      const realDelta = (timestamp - gameState.lastRealTime) / 1000; // seconds
+      gameState.lastRealTime = timestamp;
+
+      // 1 real second = 1 game minute
+      const gameMinutes = realDelta * 1 * gameState.speed;
+      
+      // Update game time
+      gameState.gameTime += gameMinutes;
+      if (gameState.gameTime >= 1440) {
+        gameState.gameTime -= 1440;
+        gameState.day++;
+      }
+
+      // Update sims
+      gameState.sims.forEach(sim => sim.update(gameMinutes));
+
+      // Update popup if a sim is selected
+      if (gameState.selectedSim) {
+        const sim = gameState.selectedSim;
+        document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
+        document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
+        document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
+      }
+
+      // Update UI
+      updateClock();
+      
+      // Update stats panel if open
+      const statsPanel = document.getElementById('statsPanel');
+      if (statsPanel && statsPanel.classList.contains('open')) {
+        updateStatsPanel();
+      }
+      
+      // Render
+      render();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ==================== INITIALIZATION ====================
+    function init() {
+      // Generate city
+      generateCity();
+
+      // Create sims
+      for (let i = 0; i < 5; i++) {
+        const sim = new Sim(i);
+        sim.startActivity('SLEEP');
+        gameState.sims.push(sim);
+        console.log(`Sim ${i} created: ${sim.name} at (${sim.x}, ${sim.y})`);
+      }
+      
+      console.log(`Total sims: ${gameState.sims.length}`);
+      console.log(`Initial counters:`, gameState.counters);
+
+      updateCounters();
+
+      // Hide instructions after 5 seconds
+      setTimeout(() => {
+        document.getElementById('instructions').classList.add('hidden');
+      }, 5000);
+
+      // Start game loop
+      requestAnimationFrame(gameLoop);
+    }
+
+    init();
+  </script>
+</body>
+</html>

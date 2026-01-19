@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Character Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #joystickContainer {
+      position: fixed;
+      bottom: 40px;
+      left: 40px;
+      width: 140px;
+      height: 140px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      border: 3px solid rgba(255, 255, 255, 0.2);
+    }
+
+    #joystickKnob {
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+      border-radius: 50%;
+      position: absolute;
+      cursor: grab;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform 0.05s ease-out;
+    }
+
+    #joystickKnob:active {
+      cursor: grabbing;
+    }
+
+    #loadingScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    #loadingScreen.hidden {
+      display: none;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-top: 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #instructions {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      #joystickContainer {
+        width: 120px;
+        height: 120px;
+        bottom: 30px;
+        left: 30px;
+      }
+
+      #joystickKnob {
+        width: 50px;
+        height: 50px;
+      }
+    }
+
+    .actionButton {
+      position: fixed;
+      bottom: 40px;
+      width: 70px;
+      height: 70px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 3px solid rgba(0, 0, 0, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      transition: all 0.1s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .actionButton:active {
+      transform: scale(0.9);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    #jumpButton {
+      right: 40px;
+    }
+
+    #interactButton {
+      right: 130px;
+      display: none;
+    }
+
+    #interactButton.visible {
+      display: flex;
+    }
+
+    #dialogBox {
+      position: fixed;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      display: none;
+      z-index: 150;
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      animation: fadeIn 0.3s ease;
+    }
+
+    #dialogBox.visible {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .actionButton {
+        width: 60px;
+        height: 60px;
+        bottom: 30px;
+        font-size: 24px;
+      }
+
+      #jumpButton {
+        right: 30px;
+      }
+
+      #interactButton {
+        right: 110px;
+      }
+
+      #dialogBox {
+        max-width: 80%;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingScreen">
+    <div>Caricamento...</div>
+    <div class="spinner"></div>
+  </div>
+
+  <div id="instructions">
+    Usa lo stick in basso a sinistra per muovere il personaggio
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="joystickContainer">
+    <div id="joystickKnob"></div>
+  </div>
+
+  <div id="jumpButton" class="actionButton">⬆️</div>
+  <div id="interactButton" class="actionButton">💬</div>
+  <div id="dialogBox"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // Game State
+    const gameState = {
+      joystick: { active: false, x: 0, y: 0 },
+      character: null,
+      mixer: null,
+      walkAnimation: null,
+      isMoving: false,
+      isJumping: false,
+      jumpVelocity: 0,
+      gravity: -25,
+      jumpForce: 10,
+      groundY: 0,
+      interactableObjects: [],
+      nearestObject: null
+    };
+
+    // Three.js Setup
+    const canvas = document.getElementById('gameCanvas');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
+
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 5, 10);
+    camera.lookAt(0, 1, 0);
+
+    const renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: true 
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 25, 10);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.left = -30;
+    directionalLight.shadow.camera.right = 30;
+    directionalLight.shadow.camera.top = 30;
+    directionalLight.shadow.camera.bottom = -30;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 100;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.bias = -0.0001;
+    scene.add(directionalLight);
+
+    // Ground Plane
+    const groundGeometry = new THREE.PlaneGeometry(100, 100, 10, 10);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x4a9b4a,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Grid Helper
+    const gridHelper = new THREE.GridHelper(100, 50, 0x000000, 0x555555);
+    gridHelper.material.opacity = 0.2;
+    gridHelper.material.transparent = true;
+    scene.add(gridHelper);
+
+    // Create Interactive Objects
+    function createInteractiveObject(type, position, color, message) {
+      let geometry;
+      switch(type) {
+        case 'box':
+          geometry = new THREE.BoxGeometry(2, 2, 2);
+          break;
+        case 'sphere':
+          geometry = new THREE.SphereGeometry(1, 32, 32);
+          break;
+        case 'cylinder':
+          geometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+          break;
+      }
+      
+      const material = new THREE.MeshStandardMaterial({ 
+        color: color,
+        roughness: 0.5,
+        metalness: 0.3
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.message = message;
+      mesh.userData.isInteractable = true;
+      scene.add(mesh);
+      gameState.interactableObjects.push(mesh);
+      return mesh;
+    }
+
+    // Add various interactive objects
+    createInteractiveObject('box', new THREE.Vector3(5, 1, 5), 0xff6b6b, '📦 Una scatola misteriosa... Chissà cosa contiene!');
+    createInteractiveObject('sphere', new THREE.Vector3(-5, 1, 8), 0x4ecdc4, '🔮 Una sfera magica che brilla di luce propria.');
+    createInteractiveObject('cylinder', new THREE.Vector3(8, 1, -5), 0xffe66d, '🎯 Un pilastro antico con strane incisioni.');
+    createInteractiveObject('box', new THREE.Vector3(-8, 1, -8), 0x95e1d3, '💎 Un cristallo che emana energia.');
+    createInteractiveObject('sphere', new THREE.Vector3(0, 1, -10), 0xf38181, '🌟 Una stella caduta dal cielo.');
+
+    // Load Character Model
+    const loader = new GLTFLoader();
+    loader.load(
+      '../assets/3d/avatar_1768519939535.glb',
+      (gltf) => {
+        gameState.character = gltf.scene;
+        gameState.character.position.set(0, 0, 0);
+        gameState.character.scale.set(1, 1, 1);
+        
+        // Enable shadows with better settings
+        gameState.character.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = false; // Character doesn't need to receive shadows
+            if (node.material) {
+              node.material.shadowSide = THREE.FrontSide;
+            }
+          }
+        });
+
+        scene.add(gameState.character);
+
+        // Setup animations if available
+        if (gltf.animations && gltf.animations.length > 0) {
+          gameState.mixer = new THREE.AnimationMixer(gameState.character);
+          
+          // Try to find walk animation
+          const walkAnim = gltf.animations.find(clip => 
+            clip.name.toLowerCase().includes('walk') || 
+            clip.name.toLowerCase().includes('run')
+          );
+          
+          if (walkAnim) {
+            gameState.walkAnimation = gameState.mixer.clipAction(walkAnim);
+            gameState.walkAnimation.loop = THREE.LoopRepeat;
+          } else if (gltf.animations[0]) {
+            // Use first animation as fallback
+            gameState.walkAnimation = gameState.mixer.clipAction(gltf.animations[0]);
+            gameState.walkAnimation.loop = THREE.LoopRepeat;
+          }
+        }
+
+        hideLoadingScreen();
+      },
+      (progress) => {
+        const percent = Math.round((progress.loaded / progress.total) * 100);
+        console.log(`Loading: ${percent}%`);
+      },
+      (error) => {
+        console.error('Error loading model:', error);
+        document.getElementById('loadingScreen').innerHTML = 
+          '<div>Errore nel caricamento del modello<br><small>Verifica che il file GLB sia presente</small></div>';
+      }
+    );
+
+    function hideLoadingScreen() {
+      document.getElementById('loadingScreen').classList.add('hidden');
+    }
+
+    // Joystick Controls
+    const joystickContainer = document.getElementById('joystickContainer');
+    const joystickKnob = document.getElementById('joystickKnob');
+    const maxDistance = 40;
+
+    let joystickCenter = { x: 0, y: 0 };
+
+    function updateJoystickCenter() {
+      const rect = joystickContainer.getBoundingClientRect();
+      joystickCenter.x = rect.left + rect.width / 2;
+      joystickCenter.y = rect.top + rect.height / 2;
+    }
+
+    updateJoystickCenter();
+    window.addEventListener('resize', updateJoystickCenter);
+
+    function handleJoystickStart(e) {
+      gameState.joystick.active = true;
+      handleJoystickMove(e);
+    }
+
+    function handleJoystickMove(e) {
+      if (!gameState.joystick.active) return;
+
+      const touch = e.touches ? e.touches[0] : e;
+      const dx = touch.clientX - joystickCenter.x;
+      const dy = touch.clientY - joystickCenter.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > maxDistance) {
+        const angle = Math.atan2(dy, dx);
+        gameState.joystick.x = Math.cos(angle) * maxDistance;
+        gameState.joystick.y = Math.sin(angle) * maxDistance;
+      } else {
+        gameState.joystick.x = dx;
+        gameState.joystick.y = dy;
+      }
+
+      joystickKnob.style.transform = 
+        `translate(${gameState.joystick.x}px, ${gameState.joystick.y}px)`;
+    }
+
+    function handleJoystickEnd() {
+      gameState.joystick.active = false;
+      gameState.joystick.x = 0;
+      gameState.joystick.y = 0;
+      joystickKnob.style.transform = 'translate(0, 0)';
+    }
+
+    // Touch events
+    joystickContainer.addEventListener('touchstart', handleJoystickStart, { passive: false });
+    document.addEventListener('touchmove', handleJoystickMove, { passive: false });
+    document.addEventListener('touchend', handleJoystickEnd);
+
+    // Mouse events (for desktop testing)
+    joystickContainer.addEventListener('mousedown', handleJoystickStart);
+    document.addEventListener('mousemove', handleJoystickMove);
+    document.addEventListener('mouseup', handleJoystickEnd);
+
+    // Prevent scrolling on touch
+    joystickContainer.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', (e) => {
+      if (gameState.joystick.active) e.preventDefault();
+    }, { passive: false });
+
+    // Jump Button
+    const jumpButton = document.getElementById('jumpButton');
+    function handleJump() {
+      if (gameState.character && !gameState.isJumping && 
+          Math.abs(gameState.character.position.y - gameState.groundY) < 0.1) {
+        gameState.isJumping = true;
+        gameState.jumpVelocity = gameState.jumpForce;
+      }
+    }
+    jumpButton.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      handleJump();
+    });
+    jumpButton.addEventListener('mousedown', handleJump);
+
+    // Interact Button
+    const interactButton = document.getElementById('interactButton');
+    const dialogBox = document.getElementById('dialogBox');
+    let dialogTimeout;
+
+    function showDialog(message) {
+      dialogBox.textContent = message;
+      dialogBox.classList.add('visible');
+      
+      clearTimeout(dialogTimeout);
+      dialogTimeout = setTimeout(() => {
+        dialogBox.classList.remove('visible');
+      }, 3000);
+    }
+
+    function handleInteract() {
+      if (gameState.nearestObject && gameState.character) {
+        const message = gameState.nearestObject.userData.message;
+        showDialog(message);
+      }
+    }
+
+    interactButton.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      handleInteract();
+    });
+    interactButton.addEventListener('mousedown', handleInteract);
+
+    // Check proximity to interactable objects
+    function updateInteractButton() {
+      if (!gameState.character) return;
+
+      let nearest = null;
+      let minDistance = 3; // Interaction range
+
+      gameState.interactableObjects.forEach(obj => {
+        const distance = gameState.character.position.distanceTo(obj.position);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = obj;
+        }
+      });
+
+      gameState.nearestObject = nearest;
+      
+      if (nearest) {
+        interactButton.classList.add('visible');
+      } else {
+        interactButton.classList.remove('visible');
+        dialogBox.classList.remove('visible');
+      }
+    }
+
+    // Game Loop
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      if (gameState.character && gameState.mixer) {
+        gameState.mixer.update(delta);
+      }
+
+      if (gameState.character) {
+        // Jump physics
+        if (gameState.isJumping || gameState.character.position.y > gameState.groundY) {
+          gameState.jumpVelocity += gameState.gravity * delta;
+          gameState.character.position.y += gameState.jumpVelocity * delta;
+          
+          if (gameState.character.position.y <= gameState.groundY) {
+            gameState.character.position.y = gameState.groundY;
+            gameState.jumpVelocity = 0;
+            gameState.isJumping = false;
+          }
+        }
+
+        const moveSpeed = 5 * delta;
+        const normalizedX = gameState.joystick.x / maxDistance;
+        const normalizedY = gameState.joystick.y / maxDistance;
+        const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+
+        if (magnitude > 0.1) {
+          // Calculate movement direction
+          const moveX = normalizedX * moveSpeed;
+          const moveZ = normalizedY * moveSpeed;
+
+          gameState.character.position.x += moveX;
+          gameState.character.position.z += moveZ;
+
+          // Rotate character to face movement direction
+          const angle = Math.atan2(normalizedX, normalizedY);
+          gameState.character.rotation.y = angle;
+
+          // Play walk animation (not during jump)
+          if (gameState.walkAnimation && !gameState.isMoving && !gameState.isJumping) {
+            gameState.walkAnimation.play();
+            gameState.isMoving = true;
+          }
+
+          // Camera follows character with offset
+          const cameraOffset = new THREE.Vector3(0, 5, 10);
+          const cameraTarget = new THREE.Vector3(
+            gameState.character.position.x,
+            gameState.character.position.y + 1,
+            gameState.character.position.z
+          );
+          
+          camera.position.lerp(
+            cameraTarget.clone().add(cameraOffset),
+            0.1
+          );
+          camera.lookAt(cameraTarget);
+        } else {
+          // Stop walk animation
+          if (gameState.walkAnimation && gameState.isMoving) {
+            gameState.walkAnimation.stop();
+            gameState.isMoving = false;
+          }
+        }
+
+        // Update camera even when not moving
+        if (magnitude <= 0.1) {
+          const cameraOffset = new THREE.Vector3(0, 5, 10);
+          const cameraTarget = new THREE.Vector3(
+            gameState.character.position.x,
+            gameState.character.position.y + 1,
+            gameState.character.position.z
+          );
+          
+          camera.position.lerp(
+            cameraTarget.clone().add(cameraOffset),
+            0.1
+          );
+          camera.lookAt(cameraTarget);
+        }
+
+        // Keep character on ground
+        const boundarySize = 48;
+        gameState.character.position.x = Math.max(-boundarySize, Math.min(boundarySize, gameState.character.position.x));
+        gameState.character.position.z = Math.max(-boundarySize, Math.min(boundarySize, gameState.character.position.z));
+        
+        // Check for nearby interactable objects
+        updateInteractButton();
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Hide instructions after 5 seconds
+    setTimeout(() => {
+      const instructions = document.getElementById('instructions');
+      if (instructions) {
+        instructions.style.opacity = '0';
+        instructions.style.transition = 'opacity 1s';
+        setTimeout(() => instructions.remove(), 1000);
+      }
+    }, 5000);
+  </script>
+</body>
+</html>
