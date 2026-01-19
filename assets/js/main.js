@@ -1,7 +1,7 @@
 // --- Theme toggle with seasonal themes ---
 // Note: themeToggle will be created dynamically, don't query it here
 
-// Definizione dei temi stagionali
+// Seasonal themes definition
 const seasonalThemes = [
     { id: 'default', name: 'Default', emoji: '🌙', data: null },
     { id: 'easter', name: 'Easter', emoji: '🐰', data: 'easter' },
@@ -100,9 +100,10 @@ if (document.readyState === 'loading') {
 const translations = {
     en: {
         common: { showMore: 'Show More', showLess: 'Show Less' },
-        nav: { about: 'About Me', skills: 'Skills', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
+        nav: { about: 'About Me', skills: 'Skills', languages: 'Languages', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
-        sections: { about: 'About Me', skills: 'Technical Skills', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
+        sections: { about: 'About Me', skills: 'Technical Skills', languages: 'Languages', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
+        languages: { italian: 'Italian', english: 'English', french: 'French', spanish: 'Spanish', native: 'Native Speaker', fluent: 'Level C1 (Advanced)', intermediate: 'Intermediate', basic: 'Basic' },
         games: { 
             plane: { title: 'Sky Ace', lead: 'Side-scrolling aerial combat.', level: 'Action' },
             kart: { title: 'Neon Kart', lead: 'High speed racing. Drift and use Nitro!', level: 'Arcade Racing' },
@@ -118,9 +119,10 @@ const translations = {
     },
     es: {
         common: { showMore: 'Ver más', showLess: 'Ver menos' },
-        nav: { about: 'Sobre mí', skills: 'Habilidades', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', dailyQuote: 'Frase Diaria', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
+        nav: { about: 'Sobre mí', skills: 'Habilidades', languages: 'Idiomas', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', dailyQuote: 'Frase Diaria', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
         hero: { title: 'Luca Gandolfi — Ingeniero Full‑Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
-        sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
+        sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', languages: 'Idiomas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
+        languages: { italian: 'Italiano', english: 'Inglés', french: 'Francés', spanish: 'Español', native: 'Nativo', fluent: 'Nivel C1 (Avanzado)', intermediate: 'Intermedio', basic: 'Básico' },
         about: { p1: '¡Hola! Soy Luca, un desarrollador full-stack apasionado por crear soluciones digitales innovadoras. Con años de experiencia en desarrollo web, sistemas embebidos y IA. Me especializo en construir aplicaciones modernas y escalables que marcan la diferencia.', p2: 'Mi trayectoria en tecnología comenzó con la curiosidad y se ha convertido en una carrera impulsada por el aprendizaje continuo y la resolución de problemas. Creo en escribir código limpio, adoptar nuevas tecnologías y crear experiencias centradas en el usuario.' },
         contact: { email: 'Correo', phone: 'Teléfono', location: 'Ubicación', specialization: 'Especialización' },
         cv: { download: 'Descargar CV' },
@@ -131,9 +133,10 @@ const translations = {
     },
     zh: {
         common: { showMore: '显示更多', showLess: '收起' },
-        nav: { about: '关于我', skills: '技能', experience: '经验', achievements: '成就', projects: '项目', books: '图书', dailyQuote: '每日名言', blog: '博客', testimonials: '推荐', contact: '联系', cv: '下载简历' },
+        nav: { about: '关于我', skills: '技能', languages: '语言', experience: '经验', achievements: '成就', projects: '项目', books: '图书', dailyQuote: '每日名言', blog: '博客', testimonials: '推荐', contact: '联系', cv: '下载简历' },
         hero: { title: '卢卡·甘多尔菲 — 全栈工程师', subtitle: '开发者 • 嵌入式系统 • 人工智能 • Web', contactBtn: '联系我', cvBtn: '下载简历' },
-        sections: { about: '关于我', skills: '技术技能', experience: '工作经历', achievements: '成就与认证', contact: '个人信息', cv: '简历', social: '社交 & 联系', projects: '我的项目', testimonials: '推荐', dailyQuote: '每日励志名言' },
+        sections: { about: '关于我', skills: '技术技能', languages: '语言', experience: '工作经历', achievements: '成就与认证', contact: '个人信息', cv: '简历', social: '社交 & 联系', projects: '我的项目', testimonials: '推荐', dailyQuote: '每日励志名言' },
+        languages: { italian: '意大利语', english: '英语', french: '法语', spanish: '西班牙语', native: '母语', fluent: 'C1级（高级）', intermediate: '中级', basic: '初级' },
         about: { p1: '你好！我是卢卡，一名热衷于创造创新数字解决方案的全栈开发者。在网络开发、嵌入式系统和人工智能领域有多年经验。我专注于构建现代且可扩展的应用程序。', p2: '我的技术之旅始于好奇心，并发展为以持续学习与解决问题为动力的职业。我相信编写整洁的代码、拥抱新技术并创造以用户为中心的体验。' },
         contact: { email: '邮箱', phone: '电话', location: '位置', specialization: '专长' },
         cv: { download: '下载简历' },
@@ -144,9 +147,10 @@ const translations = {
     },
     ru: {
         common: { showMore: 'Показать больше', showLess: 'Свернуть' },
-        nav: { about: 'Обо мне', skills: 'Навыки', experience: 'Опыт', achievements: 'Достижения', projects: 'Проекты', books: 'Книги', dailyQuote: 'Цитата дня', blog: 'Блог', testimonials: 'Отзывы', contact: 'Контакт', cv: 'Скачать CV' },
+        nav: { about: 'Обо мне', skills: 'Навыки', languages: 'Языки', experience: 'Опыт', achievements: 'Достижения', projects: 'Проекты', books: 'Книги', dailyQuote: 'Цитата дня', blog: 'Блог', testimonials: 'Отзывы', contact: 'Контакт', cv: 'Скачать CV' },
         hero: { title: 'Лука Гандольфи — Full‑Stack инженер', subtitle: 'Разработчик • Встроенные системы • ИИ • Веб', contactBtn: 'Связаться', cvBtn: 'Скачать CV' },
-        sections: { about: 'Обо мне', skills: 'Технические навыки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы', dailyQuote: 'Цитата дня' },
+        sections: { about: 'Обо мне', skills: 'Технические навыки', languages: 'Языки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы', dailyQuote: 'Цитата дня' },
+        languages: { italian: 'Итальянский', english: 'Английский', french: 'Французский', spanish: 'Испанский', native: 'Родной язык', fluent: 'Уровень C1 (Продвинутый)', intermediate: 'Средний', basic: 'Базовый' },
         about: { p1: 'Привет! Я Лука, увлеченный full-stack разработчик, создающий инновационные цифровые решения. Многолетний опыт в веб-разработке, встроенных системах и ИИ. Я специализируюсь на создании современных масштабируемых приложений.', p2: 'Моё путешествие в IT началось с любопытства и превратилось в карьеру, основанную на постоянном обучении и решении задач. Я верю в чистый код, освоение новых технологий и создание удобного для пользователей опыта.' },
         contact: { email: 'Эл. почта', phone: 'Телефон', location: 'Местоположение', specialization: 'Специализация' },
         cv: { download: 'Скачать CV' },
@@ -157,9 +161,10 @@ const translations = {
     },
     de: {
         common: { showMore: 'Mehr anzeigen', showLess: 'Weniger anzeigen' },
-        nav: { about: 'Über mich', skills: 'Fähigkeiten', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', dailyQuote: 'Zitat des Tages', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
+        nav: { about: 'Über mich', skills: 'Fähigkeiten', languages: 'Sprachen', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', dailyQuote: 'Zitat des Tages', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
         hero: { title: 'Luca Gandolfi — Full‑Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
-        sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
+        sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', languages: 'Sprachen', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
+        languages: { italian: 'Italienisch', english: 'Englisch', french: 'Französisch', spanish: 'Spanisch', native: 'Muttersprache', fluent: 'Niveau C1 (Fortgeschritten)', intermediate: 'Mittelstufe', basic: 'Grundkenntnisse' },
         about: { p1: 'Hallo! Ich bin Luca, ein leidenschaftlicher Full‑Stack‑Entwickler, der gerne innovative digitale Lösungen erstellt. Mit mehrjähriger Erfahrung in Webentwicklung, Embedded Systems und KI. Ich spezialisiere mich auf moderne, skalierbare Anwendungen.', p2: 'Meine Reise in der Technik begann mit Neugier und entwickelte sich zu einer Karriere, die von kontinuierlichem Lernen und Problemlösung angetrieben wird. Ich glaube an sauberen Code, neue Technologien und benutzerzentrierte Erlebnisse.' },
         contact: { email: 'E‑Mail', phone: 'Telefon', location: 'Standort', specialization: 'Spezialisierung' },
         cv: { download: 'CV herunterladen' },
@@ -170,9 +175,10 @@ const translations = {
     },
     it: {
         common: { showMore: 'Mostra altro', showLess: 'Mostra meno' },
-        nav: { about: 'Chi sono', skills: 'Competenze', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
+        nav: { about: 'Chi sono', skills: 'Competenze', languages: 'Lingue', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
         hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
-        sections: { about: 'Chi sono', skills: 'Competenze tecniche', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
+        sections: { about: 'Chi sono', skills: 'Competenze tecniche', languages: 'Lingue', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
+        languages: { italian: 'Italiano', english: 'Inglese', french: 'Francese', spanish: 'Spagnolo', native: 'Madrelingua', fluent: 'Livello C1 (Avanzato)', intermediate: 'Intermedio', basic: 'Base' },
         games: { 
             plane: { title: 'Sky Ace', lead: 'Combattimento aereo a scorrimento laterale.', level: 'Azione' },
             kart: { title: 'Neon Kart', lead: 'Corse ad alta velocità. Drifta e usa il Nitro!', level: 'Arcade Racing' },
@@ -188,9 +194,10 @@ const translations = {
     },
     fr: {
         common: { showMore: 'Voir plus', showLess: 'Voir moins' },
-        nav: { about: 'À propos', skills: 'Compétences', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', dailyQuote: 'Citation du Jour', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
+        nav: { about: 'À propos', skills: 'Compétences', languages: 'Langues', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', dailyQuote: 'Citation du Jour', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
         hero: { title: 'Luca Gandolfi — Ingénieur Full‑Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez‑moi', cvBtn: 'Télécharger le CV' },
-        sections: { about: 'À propos', skills: 'Compétences techniques', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
+        sections: { about: 'À propos', skills: 'Compétences techniques', languages: 'Langues', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
+        languages: { italian: 'Italien', english: 'Anglais', french: 'Français', spanish: 'Espagnol', native: 'Langue maternelle', fluent: 'Niveau C1 (Avancé)', intermediate: 'Intermédiaire', basic: 'Basique' },
         about: { p1: "Bonjour ! Je suis Luca, un développeur full-stack passionné par la création de solutions numériques innovantes. Avec plusieurs années d'expérience en développement web, systèmes embarqués et IA. Je me spécialise dans la création d'applications modernes et évolutives qui font la différence.", p2: "Mon parcours dans la tech a commencé par la curiosité et est devenu une carrière guidée par l'apprentissage continu et la résolution de problèmes. Je crois en l'écriture d'un code propre, l'adoption de nouvelles technologies et la création d'expériences centrées sur l'utilisateur." },
         contact: { email: 'Email', phone: 'Téléphone', location: 'Localisation', specialization: 'Spécialisation' },
         cv: { download: 'Télécharger le CV' },
@@ -201,9 +208,10 @@ const translations = {
     },
     ja: {
         common: { showMore: 'もっと見る', showLess: '表示を減らす' },
-        nav: { about: '私について', skills: 'スキル', experience: '経験', achievements: '実績', projects: 'プロジェクト', books: '書籍', dailyQuote: '今日の名言', blog: 'ブログ', testimonials: '推薦', contact: '連絡先', cv: '履歴書をダウンロード' },
+        nav: { about: '私について', skills: 'スキル', languages: '言語', experience: '経験', achievements: '実績', projects: 'プロジェクト', books: '書籍', dailyQuote: '今日の名言', blog: 'ブログ', testimonials: '推薦', contact: '連絡先', cv: '履歴書をダウンロード' },
         hero: { title: 'ルカ・ガンドルフィ — フルスタックエンジニア', subtitle: '開発者 • 組み込みシステム • AI • Web', contactBtn: 'お問い合わせ', cvBtn: '履歴書をダウンロード' },
-        sections: { about: '私について', skills: '技術スキル', experience: '職務経歴', achievements: '実績と認定', contact: '個人情報', cv: '履歴書', social: 'ソーシャル & 連絡先', projects: '私のプロジェクト', testimonials: '推薦', dailyQuote: '今日の名言' },
+        sections: { about: '私について', skills: '技術スキル', languages: '言語', experience: '職務経歴', achievements: '実績と認定', contact: '個人情報', cv: '履歴書', social: 'ソーシャル & 連絡先', projects: '私のプロジェクト', testimonials: '推薦', dailyQuote: '今日の名言' },
+        languages: { italian: 'イタリア語', english: '英語', french: 'フランス語', spanish: 'スペイン語', native: '母国語', fluent: 'C1レベル（上級）', intermediate: '中級', basic: '初級' },
         about: { p1: 'こんにちは！私はルカ、革新的なデジタルソリューションの作成を愛するフルスタック開発者です。ウェブ開発、組み込みシステム、AIでの豊富な経験があります。モダンでスケーラブルなアプリケーション構築を専門としています。', p2: '技術への道は好奇心から始まり、継続的な学習と問題解決によって駆動されるキャリアに発展しました。私はクリーンなコード、新しい技術の採用、ユーザー中心の体験を信じています。' },
         contact: { email: 'メール', phone: '電話', location: '所在地', specialization: '専門分野' },
         cv: { download: '履歴書をダウンロード' },
