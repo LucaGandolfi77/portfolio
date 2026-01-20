@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Shop Scraper & CSV Exporter</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .header-icon {
+            font-size: 3rem;
+            color: #0d6efd;
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+        }
+        #resultsSection {
+            display: none;
+            margin-top: 30px;
+        }
+        .preview-img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Spinner -->
+    <div class="loading-overlay" id="loader">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="mt-3 text-muted">Analyzing structure and extracting data...</h4>
+    </div>
+
+    <div class="container">
+        <div class="main-container">
+            <div class="text-center">
+                <i class="fas fa-robot header-icon"></i>
+                <h1 class="mb-3">Universal Shop Scraper</h1>
+                <p class="text-muted mb-4 lead">Enter a URL to scrape product data and export it to CSV using client-side heuristic analysis.</p>
+            </div>
+
+            <!-- Input Section -->
+            <div class="card p-4 mb-4 border-0 bg-light">
+                <label for="urlInput" class="form-label fw-bold">Target Shop URL</label>
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-white"><i class="fas fa-link"></i></span>
+                    <input type="url" class="form-control" id="urlInput" placeholder="https://example-shop.com/collections/all" required>
+                    <button class="btn btn-primary px-4" type="button" id="btnScrape">
+                        <i class="fas fa-search me-2"></i> Scrape Now
+                    </button>
+                </div>
+                <div class="form-text mt-2">
+                    <i class="fas fa-info-circle"></i> Uses a CORS proxy to fetch data. Works best on static HTML sites (Shopify, WooCommerce, standard HTML). JS-rendered content (React/Vue) might require a specialized backend.
+                </div>
+            </div>
+
+            <!-- Alert Box -->
+            <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="animate__animated animate__fadeIn">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h3 class="m-0">Results Found: <span id="countBadge" class="badge bg-success rounded-pill">0</span></h3>
+                    </div>
+                    <button class="btn btn-success btn-lg shadow-sm" id="btnDownload">
+                        <i class="fas fa-file-csv me-2"></i> Download CSV
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered align-middle bg-white shadow-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="60">Image</th>
+                                <th>Product Name</th>
+                                <th>Price</th>
+                                <th>Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Rows inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnScrape = document.getElementById('btnScrape');
+            const btnDownload = document.getElementById('btnDownload');
+            const urlInput = document.getElementById('urlInput');
+            const loader = document.getElementById('loader');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const alertBox = document.getElementById('alertBox');
+            const countBadge = document.getElementById('countBadge');
+
+            let scrapedData = [];
+
+            btnScrape.addEventListener('click', () => {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    showAlert('Please enter a valid URL', 'warning');
+                    return;
+                }
+                startScraping(url);
+            });
+
+            btnDownload.addEventListener('click', downloadCSV);
+
+            function showAlert(msg, type = 'danger') {
+                alertBox.className = `alert alert-${type}`;
+                alertBox.textContent = msg;
+                alertBox.classList.remove('d-none');
+            }
+
+            function hideAlert() {
+                alertBox.classList.add('d-none');
+            }
+
+            async function startScraping(targetUrl) {
+                hideAlert();
+                resultsSection.style.display = 'none';
+                loader.style.display = 'flex';
+                scrapedData = []; // clear previous
+
+                try {
+                    // Use AllOrigins as a CORS proxy
+                    // Note: In a production environment, you should use your own backend proxy.
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                    
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    
+                    const data = await response.json();
+                    
+                    if (!data.contents) {
+                        throw new Error('No content retrieved from URL. The site might be blocking proxies.');
+                    }
+
+                    // Parse the HTML content
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.contents, 'text/html');
+
+                    // --- INTELLIGENT HEURISTIC SCRAPING STRATEGY ---
+                    
+                    // Strategy 1: Look for Schema.org Product Microdata (Most Accurate for E-commerce)
+                    let items = Array.from(doc.querySelectorAll('[itemtype*="schema.org/Product"]'));
+                    
+                    // Strategy 2: If no Schema.org, look for common class names
+                    if (items.length === 0) {
+                        const commonSelectors = [
+                            '.product', '.product-item', '.product-card', '.grid-item', 
+                            'li.item', '.s-item', '.card', 'article'
+                        ];
+                        for (let sel of commonSelectors) {
+                            const found = doc.querySelectorAll(sel);
+                            // Heuristic filter implementation: A product card usually has an image AND a price
+                            const potentialProducts = Array.from(found).filter(el => {
+                                return el.querySelector('img') && (el.innerText.includes('$') || el.innerText.includes('€') || el.innerText.includes('£'));
+                            });
+                            
+                            if (potentialProducts.length > 2) {
+                                items = potentialProducts;
+                                break; // Stop at first valid selector match
+                            }
+                        }
+                    }
+
+                    if (items.length === 0) {
+                        // Fallback: Try to find all blocks that look like cards
+                        showAlert('Could not automatically identify product structure. The site might rely heavily on JavaScript rendering.', 'warning');
+                        loader.style.display = 'none';
+                        return;
+                    }
+
+                    // Process found items
+                    items.forEach(item => {
+                        const product = extractProductData(item, targetUrl);
+                        if (product.name) { // only add if at least name is found
+                            scrapedData.push(product);
+                        }
+                    });
+
+                    if (scrapedData.length > 0) {
+                        displayResults();
+                    } else {
+                        showAlert('Found potential structure, but failed to extract specific data fields.', 'warning');
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    showAlert(`Error: ${error.message}. Ensure the URL is correct and public.`);
+                } finally {
+                    loader.style.display = 'none';
+                }
+            }
+
+            function extractProductData(el, baseUrl) {
+                // Helper to clean text
+                const clean = txt => txt ? txt.replace(/\s+/g, ' ').trim() : '';
+                
+                // Helper to resolve relative URLs
+                const resolveUrl = (rel) => {
+                    try {
+                        return new URL(rel, baseUrl).href;
+                    } catch {
+                        return rel;
+                    }
+                };
+
+                // 1. Extract Name/Title
+                // Look for H1-H6, or specific classes
+                let nameEl = el.querySelector('[itemprop="name"]') || 
+                             el.querySelector('h1, h2, h3, h4, .title, .product-title, .product_title, .woocommerce-loop-product__title');
+                let name = nameEl ? clean(nameEl.innerText) : '';
+                
+                // Fallback for name: longest text node?
+                if (!name) {
+                    // Start looking for links, often the title is a link
+                    const linkEl = el.querySelector('a');
+                    if (linkEl && linkEl.innerText.length > 5) name = clean(linkEl.innerText);
+                }
+
+                // 2. Extract Price
+                let priceEl = el.querySelector('[itemprop="price"]') || 
+                              el.querySelector('.price, .amount, .money, .current-price, .sales-price');
+                let price = priceEl ? clean(priceEl.innerText) : '';
+
+                // Heuristic regex search for price if class selector fails
+                if (!price) {
+                    const priceMatch = el.innerText.match(/[$€£]\s*[0-9,.]+/);
+                    if (priceMatch) price = priceMatch[0];
+                }
+
+                // 3. Extract Image
+                let imgEl = el.querySelector('[itemprop="image"]') || el.querySelector('img');
+                let image = imgEl ? resolveUrl(imgEl.getAttribute('src') || imgEl.getAttribute('data-src')) : '';
+
+                // 4. Extract Link
+                let linkEl = el.querySelector('[itemprop="url"]') || el.querySelector('a');
+                let link = linkEl ? resolveUrl(linkEl.getAttribute('href')) : baseUrl;
+
+                return { name, price, image, link };
+            }
+
+            function displayResults() {
+                resultsTableBody.innerHTML = '';
+                countBadge.textContent = scrapedData.length;
+
+                scrapedData.forEach(item => {
+                    const row = `
+                        <tr>
+                            <td>
+                                ${item.image ? `<img src="${item.image}" class="preview-img" alt="img">` : '<i class="fas fa-image text-muted"></i>'}
+                            </td>
+                            <td class="fw-bold">${item.name}</td>
+                            <td class="text-success">${item.price}</td>
+                            <td><a href="${item.link}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt"></i></a></td>
+                        </tr>
+                    `;
+                    resultsTableBody.insertAdjacentHTML('beforeend', row);
+                });
+
+                resultsSection.style.display = 'block';
+            }
+
+            function downloadCSV() {
+                if (scrapedData.length === 0) return;
+
+                const headers = ['Name', 'Price', 'Image URL', 'Product URL'];
+                const csvRows = [];
+                
+                // Add header
+                csvRows.push(headers.join(','));
+
+                // Add data
+                scrapedData.forEach(item => {
+                    const row = [
+                        `"${item.name.replace(/"/g, '""')}"`, // Escape double quotes
+                        `"${item.price}"`,
+                        `"${item.image}"`,
+                        `"${item.link}"`
+                    ];
+                    csvRows.push(row.join(','));
+                });
+
+                const csvString = csvRows.join('\n');
+                const blob = new Blob([csvString], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.setAttribute('hidden', '');
+                a.setAttribute('href', url);
+                a.setAttribute('download', 'scraped_products.csv');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+    </script>
+</body>
+</html>
