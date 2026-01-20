@@ -83,11 +83,13 @@ if (!document.getElementById('site-top-bar')) {
     });
     langSelect.addEventListener('change', () => setLang(langSelect.value));
     async function loadTranslations(lang) {
-      // Try parent folder first (useful for pages inside /games/), then try two levels up,
+      // Try current folder, then parent folder (useful for pages inside /games/), then try two levels up,
       // then fall back to site root. Return true on success.
       const candidates = [
+        `./i18n/${lang}.json`,
         `../i18n/${lang}.json`,
         `../../i18n/${lang}.json`,
+        `/portfolio/i18n/${lang}.json`,
         `/i18n/${lang}.json`
       ];
 
