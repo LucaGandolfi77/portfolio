@@ -860,10 +860,11 @@
                 const cannonPos = new THREE.Vector3();
                 playerShip.cannon.getWorldPosition(cannonPos);
                 
-                const direction = new THREE.Vector3(0, 0, -1);
-                direction.applyQuaternion(playerShip.quaternion);
+                // Fire in the direction the camera is looking (where the crosshair points)
+                const direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
 
-                const velocity = gameState.isZoomed ? 60 : 50;
+                const velocity = gameState.isZoomed ? 70 : 50;
                 const projectile = createProjectile(cannonPos, direction, velocity);
                 
                 // Track the first projectile
@@ -886,6 +887,31 @@
             fireShot(0);
         }
 
+        // ==================== CANNON CONTROL ====================
+        function updateCannon() {
+            // Get camera direction (where the player is looking)
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            
+            // Calculate angle in ship's local space
+            const shipForward = new THREE.Vector3(0, 0, -1);
+            shipForward.applyQuaternion(playerShip.quaternion);
+            
+            // Project directions to horizontal plane
+            const cameraDir2D = new THREE.Vector2(cameraDirection.x, cameraDirection.z).normalize();
+            const shipDir2D = new THREE.Vector2(shipForward.x, shipForward.z).normalize();
+            
+            // Calculate angle difference
+            let angle = Math.atan2(cameraDir2D.y, cameraDir2D.x) - Math.atan2(shipDir2D.y, shipDir2D.x);
+            
+            // Rotate cannon to face camera direction
+            playerShip.cannon.rotation.y = angle;
+            
+            // Adjust vertical angle based on camera pitch
+            const verticalAngle = Math.asin(-cameraDirection.y);
+            playerShip.cannon.rotation.x = verticalAngle;
+        }
+        
         // ==================== CAMERA CONTROL ====================
         function updateCamera() {
             // Track projectile if button held and projectile exists
@@ -914,11 +940,14 @@
                 
             } else {
                 // Normal camera following player ship with touch control
-                const cameraDistance = gameState.isZoomed ? 15 : 25;
-                const cameraHeight = gameState.isZoomed ? 8 : 12;
+                const cameraDistance = gameState.isZoomed ? 12 : 25;
+                const cameraHeight = gameState.isZoomed ? 5 : 12;
+                
+                // When zoomed, position camera in front; when not zoomed, behind
+                const cameraZ = gameState.isZoomed ? -cameraDistance : cameraDistance;
 
                 const targetPosition = new THREE.Vector3();
-                const offset = new THREE.Vector3(0, cameraHeight, cameraDistance);
+                const offset = new THREE.Vector3(0, cameraHeight, cameraZ);
                 
                 // Apply player ship rotation
                 offset.applyQuaternion(playerShip.quaternion);
@@ -1630,6 +1659,7 @@
                 updateProjectiles(deltaTime);
                 updateEnemyProjectiles(deltaTime);
                 updateCamera();
+                updateCannon();
                 drawMinimap();
             }
 
