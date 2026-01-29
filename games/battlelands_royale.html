@@ -600,8 +600,13 @@
 
       // Three.js setup
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x87ceeb);
-      scene.fog = new THREE.Fog(0x87ceeb, 80, 200);
+      scene.background = new THREE.Color(isUltraUltra ? 0x6ec6ff : 0x87ceeb);
+      // Reduce fog in Ultra Ultra mode for clearer visuals
+      if (isUltraUltra) {
+        scene.fog = new THREE.Fog(0x6ec6ff, 150, 350); // Much less fog
+      } else {
+        scene.fog = new THREE.Fog(0x87ceeb, 80, 200);
+      }
 
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
       // Adjust camera based on orientation
@@ -636,8 +641,9 @@
       }
       if (isUltraUltra) {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.2;
+        renderer.toneMappingExposure = 1.0; // Reduced from 1.2 to fix white haze
         renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.physicallyCorrectLights = true;
       }
       container.appendChild(renderer.domElement);
       console.log(`Device: ${isLowEnd ? 'LOW-END' : 'NORMAL'} | Mobile: ${isMobile} | PixelRatio: ${renderer.getPixelRatio()} | Resolution: ${selectedResolution}`);
@@ -822,18 +828,190 @@
       beach.position.y = 1.01;
       scene.add(beach);
 
-      // Buildings
+      // Buildings - Houses with walls and doors
       const buildings = [];
+      const houseRoofs = []; // Track roofs for visibility toggling
+      
       function createBuilding(x, z, w, d, h) {
         const group = new THREE.Group();
+        const wallThickness = 0.3;
+        const doorWidth = 2.0;
+        const doorHeight = 2.5;
         
-        const wallGeo = new THREE.BoxGeometry(w, h, d);
-        const walls = new THREE.Mesh(wallGeo, buildingMaterial);
-        walls.position.y = h / 2;
-        walls.castShadow = true;
-        walls.receiveShadow = true;
-        group.add(walls);
+        // Determine door position (random side: 0=front, 1=back, 2=left, 3=right)
+        const doorSide = Math.floor(Math.random() * 4);
+        
+        // Wall material with different inside/outside
+        const wallInnerMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5dc, roughness: 0.8 }); // Beige inside
+        
+        // Create 4 walls with door opening
+        // Front wall (negative Z)
+        if (doorSide === 0) {
+          // Wall with door opening - split into two parts
+          const leftWidth = (w - doorWidth) / 2;
+          const rightWidth = (w - doorWidth) / 2;
+          
+          // Left part
+          const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(leftWidth, h, wallThickness),
+            buildingMaterial
+          );
+          leftWall.position.set(-w/2 + leftWidth/2, h/2, -d/2);
+          leftWall.castShadow = true;
+          leftWall.receiveShadow = true;
+          group.add(leftWall);
+          
+          // Right part
+          const rightWall = new THREE.Mesh(
+            new THREE.BoxGeometry(rightWidth, h, wallThickness),
+            buildingMaterial
+          );
+          rightWall.position.set(w/2 - rightWidth/2, h/2, -d/2);
+          rightWall.castShadow = true;
+          rightWall.receiveShadow = true;
+          group.add(rightWall);
+          
+          // Top part above door
+          const topWall = new THREE.Mesh(
+            new THREE.BoxGeometry(doorWidth, h - doorHeight, wallThickness),
+            buildingMaterial
+          );
+          topWall.position.set(0, h - (h - doorHeight)/2, -d/2);
+          topWall.castShadow = true;
+          group.add(topWall);
+        } else {
+          // Full front wall
+          const frontWall = new THREE.Mesh(
+            new THREE.BoxGeometry(w, h, wallThickness),
+            buildingMaterial
+          );
+          frontWall.position.set(0, h/2, -d/2);
+          frontWall.castShadow = true;
+          frontWall.receiveShadow = true;
+          group.add(frontWall);
+        }
+        
+        // Back wall (positive Z)
+        if (doorSide === 1) {
+          const leftWidth = (w - doorWidth) / 2;
+          const rightWidth = (w - doorWidth) / 2;
+          
+          const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(leftWidth, h, wallThickness),
+            buildingMaterial
+          );
+          leftWall.position.set(-w/2 + leftWidth/2, h/2, d/2);
+          leftWall.castShadow = true;
+          group.add(leftWall);
+          
+          const rightWall = new THREE.Mesh(
+            new THREE.BoxGeometry(rightWidth, h, wallThickness),
+            buildingMaterial
+          );
+          rightWall.position.set(w/2 - rightWidth/2, h/2, d/2);
+          rightWall.castShadow = true;
+          group.add(rightWall);
+          
+          const topWall = new THREE.Mesh(
+            new THREE.BoxGeometry(doorWidth, h - doorHeight, wallThickness),
+            buildingMaterial
+          );
+          topWall.position.set(0, h - (h - doorHeight)/2, d/2);
+          group.add(topWall);
+        } else {
+          const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(w, h, wallThickness),
+            buildingMaterial
+          );
+          backWall.position.set(0, h/2, d/2);
+          backWall.castShadow = true;
+          group.add(backWall);
+        }
+        
+        // Left wall (negative X)
+        if (doorSide === 2) {
+          const frontDepth = (d - doorWidth) / 2;
+          const backDepth = (d - doorWidth) / 2;
+          
+          const frontWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, frontDepth),
+            buildingMaterial
+          );
+          frontWall.position.set(-w/2, h/2, -d/2 + frontDepth/2);
+          frontWall.castShadow = true;
+          group.add(frontWall);
+          
+          const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, backDepth),
+            buildingMaterial
+          );
+          backWall.position.set(-w/2, h/2, d/2 - backDepth/2);
+          backWall.castShadow = true;
+          group.add(backWall);
+          
+          const topWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h - doorHeight, doorWidth),
+            buildingMaterial
+          );
+          topWall.position.set(-w/2, h - (h - doorHeight)/2, 0);
+          group.add(topWall);
+        } else {
+          const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, d),
+            buildingMaterial
+          );
+          leftWall.position.set(-w/2, h/2, 0);
+          leftWall.castShadow = true;
+          group.add(leftWall);
+        }
+        
+        // Right wall (positive X)
+        if (doorSide === 3) {
+          const frontDepth = (d - doorWidth) / 2;
+          const backDepth = (d - doorWidth) / 2;
+          
+          const frontWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, frontDepth),
+            buildingMaterial
+          );
+          frontWall.position.set(w/2, h/2, -d/2 + frontDepth/2);
+          frontWall.castShadow = true;
+          group.add(frontWall);
+          
+          const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, backDepth),
+            buildingMaterial
+          );
+          backWall.position.set(w/2, h/2, d/2 - backDepth/2);
+          backWall.castShadow = true;
+          group.add(backWall);
+          
+          const topWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h - doorHeight, doorWidth),
+            buildingMaterial
+          );
+          topWall.position.set(w/2, h - (h - doorHeight)/2, 0);
+          group.add(topWall);
+        } else {
+          const rightWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, h, d),
+            buildingMaterial
+          );
+          rightWall.position.set(w/2, h/2, 0);
+          rightWall.castShadow = true;
+          group.add(rightWall);
+        }
+        
+        // Floor inside house
+        const floorGeo = new THREE.PlaneGeometry(w - 0.2, d - 0.2);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 }); // Wood floor
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0.05;
+        floor.receiveShadow = true;
+        group.add(floor);
 
+        // Roof
         const roofGeo = new THREE.ConeGeometry(Math.max(w, d) * 0.7, 3, 4);
         const roof = new THREE.Mesh(roofGeo, roofMaterial);
         roof.position.y = h + 1.5;
@@ -843,85 +1021,214 @@
 
         group.position.set(x, 1, z);
         scene.add(group);
-        buildings.push({ x, z, w: w + 2, d: d + 2, h });
+        
+        // Store building data with door info and walls reference
+        const buildingData = { 
+          x, z, w, d, h, 
+          doorSide, 
+          doorWidth,
+          group,
+          roof,
+          walls: [] // Wall collision segments
+        };
+        
+        // Calculate wall collision segments (excluding door area)
+        const wt = wallThickness;
+        if (doorSide === 0) {
+          // Front has door - left segment, right segment
+          buildingData.walls.push({ x1: x - w/2, z1: z - d/2 - wt/2, x2: x - doorWidth/2, z2: z - d/2 + wt/2 });
+          buildingData.walls.push({ x1: x + doorWidth/2, z1: z - d/2 - wt/2, x2: x + w/2, z2: z - d/2 + wt/2 });
+        } else {
+          buildingData.walls.push({ x1: x - w/2, z1: z - d/2 - wt/2, x2: x + w/2, z2: z - d/2 + wt/2 });
+        }
+        
+        if (doorSide === 1) {
+          buildingData.walls.push({ x1: x - w/2, z1: z + d/2 - wt/2, x2: x - doorWidth/2, z2: z + d/2 + wt/2 });
+          buildingData.walls.push({ x1: x + doorWidth/2, z1: z + d/2 - wt/2, x2: x + w/2, z2: z + d/2 + wt/2 });
+        } else {
+          buildingData.walls.push({ x1: x - w/2, z1: z + d/2 - wt/2, x2: x + w/2, z2: z + d/2 + wt/2 });
+        }
+        
+        if (doorSide === 2) {
+          buildingData.walls.push({ x1: x - w/2 - wt/2, z1: z - d/2, x2: x - w/2 + wt/2, z2: z - doorWidth/2 });
+          buildingData.walls.push({ x1: x - w/2 - wt/2, z1: z + doorWidth/2, x2: x - w/2 + wt/2, z2: z + d/2 });
+        } else {
+          buildingData.walls.push({ x1: x - w/2 - wt/2, z1: z - d/2, x2: x - w/2 + wt/2, z2: z + d/2 });
+        }
+        
+        if (doorSide === 3) {
+          buildingData.walls.push({ x1: x + w/2 - wt/2, z1: z - d/2, x2: x + w/2 + wt/2, z2: z - doorWidth/2 });
+          buildingData.walls.push({ x1: x + w/2 - wt/2, z1: z + doorWidth/2, x2: x + w/2 + wt/2, z2: z + d/2 });
+        } else {
+          buildingData.walls.push({ x1: x + w/2 - wt/2, z1: z - d/2, x2: x + w/2 + wt/2, z2: z + d/2 });
+        }
+        
+        buildings.push(buildingData);
+        houseRoofs.push({ roof, x, z, w, d });
         return group;
       }
+      
+      // Check if player is inside a building
+      function isInsideBuilding(px, pz) {
+        for (const b of buildings) {
+          if (px > b.x - b.w/2 + 0.5 && px < b.x + b.w/2 - 0.5 &&
+              pz > b.z - b.d/2 + 0.5 && pz < b.z + b.d/2 - 0.5) {
+            return b;
+          }
+        }
+        return null;
+      }
+      
+      // Check wall collision for player/entity
+      function checkWallCollision(x, z, radius) {
+        for (const b of buildings) {
+          for (const wall of b.walls) {
+            // Expand wall by radius for collision
+            const minX = Math.min(wall.x1, wall.x2) - radius;
+            const maxX = Math.max(wall.x1, wall.x2) + radius;
+            const minZ = Math.min(wall.z1, wall.z2) - radius;
+            const maxZ = Math.max(wall.z1, wall.z2) + radius;
+            
+            if (x > minX && x < maxX && z > minZ && z < maxZ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      
+      // Check bullet collision with walls
+      function checkBulletWallCollision(x, z) {
+        for (const b of buildings) {
+          for (const wall of b.walls) {
+            const minX = Math.min(wall.x1, wall.x2);
+            const maxX = Math.max(wall.x1, wall.x2);
+            const minZ = Math.min(wall.z1, wall.z2);
+            const maxZ = Math.max(wall.z1, wall.z2);
+            
+            if (x > minX && x < maxX && z > minZ && z < maxZ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
 
-      // Create various buildings - MAPPA ENORME con molti più edifici!
-      // Centro città (area centrale densa)
-      createBuilding(-20, -15, 8, 6, 5);
-      createBuilding(15, 10, 10, 8, 6);
-      createBuilding(-10, 20, 6, 6, 4);
-      createBuilding(25, -20, 7, 7, 5);
-      createBuilding(0, -25, 12, 8, 7);
-      createBuilding(-25, 5, 5, 5, 4);
-      createBuilding(30, 15, 6, 8, 5);
-      createBuilding(5, 5, 7, 7, 6);
-      createBuilding(-15, -5, 6, 5, 5);
-      createBuilding(20, -10, 8, 6, 4);
+      // Create various buildings - MAPPA ISPIRATA A BATTLELANDS ROYALE
+      // Materiali colorati per edifici
+      const orangeBuildingMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
+      const blueBuildingMat = new THREE.MeshLambertMaterial({ color: 0x29b6f6 });
+      const yellowBuildingMat = new THREE.MeshLambertMaterial({ color: 0xffc107 });
+      const grayBuildingMat = new THREE.MeshLambertMaterial({ color: 0x757575 });
+      const darkBuildingMat = new THREE.MeshLambertMaterial({ color: 0x424242 });
       
-      // Quartiere nord
-      createBuilding(-40, -35, 9, 7, 6);
-      createBuilding(-55, -45, 7, 6, 5);
-      createBuilding(-30, -50, 8, 8, 7);
-      createBuilding(-60, -30, 6, 5, 4);
-      createBuilding(-45, -60, 10, 7, 6);
-      createBuilding(-70, -50, 5, 5, 5);
+      // Funzione per creare strade
+      const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x546e7a });
+      const roads = [];
       
-      // Quartiere est
-      createBuilding(45, 30, 8, 8, 5);
-      createBuilding(55, 15, 9, 6, 6);
-      createBuilding(65, 25, 7, 7, 5);
-      createBuilding(50, 45, 6, 8, 4);
-      createBuilding(70, 5, 8, 5, 6);
-      createBuilding(60, 50, 10, 6, 7);
-      createBuilding(75, 35, 5, 5, 5);
+      function createRoad(x1, z1, x2, z2, width = 5) {
+        const length = Math.hypot(x2 - x1, z2 - z1);
+        const angle = Math.atan2(z2 - z1, x2 - x1);
+        const roadGeo = new THREE.PlaneGeometry(length, width);
+        const road = new THREE.Mesh(roadGeo, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.rotation.z = -angle;
+        road.position.set((x1 + x2) / 2, 1.01, (z1 + z2) / 2);
+        scene.add(road);
+        roads.push({ x1, z1, x2, z2, width });
+      }
       
-      // Quartiere sud
-      createBuilding(-35, 40, 7, 6, 5);
-      createBuilding(-50, 55, 8, 7, 6);
-      createBuilding(-25, 50, 6, 6, 5);
-      createBuilding(-60, 45, 9, 5, 7);
-      createBuilding(-40, 65, 7, 8, 4);
-      createBuilding(-70, 60, 5, 6, 5);
+      // === STRADE PRINCIPALI ===
+      // Strade orizzontali
+      createRoad(-95, -60, 95, -60, 6);
+      createRoad(-95, -20, 95, -20, 6);
+      createRoad(-95, 20, 95, 20, 6);
+      createRoad(-95, 60, 95, 60, 6);
       
-      // Quartiere ovest
-      createBuilding(50, -25, 10, 6, 7);
-      createBuilding(60, -40, 8, 7, 5);
-      createBuilding(40, -50, 7, 5, 6);
-      createBuilding(70, -30, 6, 6, 5);
-      createBuilding(55, -60, 9, 8, 6);
-      createBuilding(75, -50, 5, 5, 4);
+      // Strade verticali
+      createRoad(-60, -95, -60, 95, 6);
+      createRoad(-20, -95, -20, 95, 6);
+      createRoad(20, -95, 20, 95, 6);
+      createRoad(60, -95, 60, 95, 6);
       
-      // Zona intermedia
-      createBuilding(-50, 10, 6, 9, 4);
-      createBuilding(35, -45, 8, 5, 6);
-      createBuilding(-15, -50, 7, 7, 5);
-      createBuilding(40, 50, 6, 6, 4);
-      createBuilding(-55, -20, 5, 5, 4);
-      createBuilding(55, 5, 6, 4, 5);
-      createBuilding(0, 55, 8, 6, 6);
-      createBuilding(20, -55, 7, 5, 5);
+      // === QUARTIERE NORD-OVEST (area residenziale arancione) ===
+      createBuilding(-80, -80, 8, 6, 4);
+      createBuilding(-70, -75, 6, 5, 3);
+      createBuilding(-85, -70, 5, 5, 3);
+      createBuilding(-75, -45, 7, 6, 4);
+      createBuilding(-85, -40, 6, 5, 3);
+      createBuilding(-70, -35, 5, 5, 3);
+      createBuilding(-45, -80, 8, 7, 4);
+      createBuilding(-35, -75, 6, 5, 3);
+      createBuilding(-50, -45, 7, 6, 4);
+      createBuilding(-40, -40, 5, 5, 3);
       
-      // Edifici esterni (periferia)
-      createBuilding(-80, -20, 6, 5, 5);
-      createBuilding(80, 10, 5, 6, 4);
-      createBuilding(-10, 80, 7, 6, 5);
-      createBuilding(15, -80, 6, 5, 6);
-      createBuilding(-75, 30, 5, 5, 4);
-      createBuilding(70, -70, 8, 7, 5);
-      createBuilding(-65, 70, 6, 6, 4);
-      createBuilding(85, 60, 5, 5, 5);
-      createBuilding(0, -75, 7, 8, 6);
-      createBuilding(-85, 0, 6, 5, 5);
+      // === QUARTIERE NORD-EST (area industriale grigia) ===
+      createBuilding(40, -80, 10, 8, 5);
+      createBuilding(55, -75, 8, 6, 4);
+      createBuilding(70, -85, 6, 6, 3);
+      createBuilding(85, -75, 7, 5, 4);
+      createBuilding(45, -45, 9, 7, 5);
+      createBuilding(60, -40, 6, 6, 3);
+      createBuilding(75, -50, 8, 5, 4);
+      createBuilding(85, -35, 5, 5, 3);
       
-      // Piccoli edifici sparsi
-      createBuilding(30, 70, 4, 4, 3);
-      createBuilding(-50, -70, 5, 4, 4);
-      createBuilding(65, -15, 4, 5, 3);
-      createBuilding(-30, 25, 5, 5, 3);
-      createBuilding(10, -40, 4, 4, 4);
-      createBuilding(-70, -10, 5, 4, 3);
+      // === CENTRO CITTÀ (zona commerciale mista) ===
+      // Piazza centrale
+      createBuilding(-10, -10, 12, 10, 7);
+      createBuilding(10, -8, 8, 8, 6);
+      createBuilding(-8, 10, 10, 8, 6);
+      createBuilding(8, 12, 6, 6, 5);
+      
+      // Edifici attorno al centro
+      createBuilding(-35, -10, 8, 6, 5);
+      createBuilding(-30, 5, 6, 5, 4);
+      createBuilding(35, -8, 7, 7, 5);
+      createBuilding(30, 8, 6, 5, 4);
+      createBuilding(-8, -35, 8, 6, 5);
+      createBuilding(8, -30, 6, 6, 4);
+      createBuilding(-10, 35, 7, 6, 5);
+      createBuilding(5, 40, 5, 5, 4);
+      
+      // === QUARTIERE SUD-OVEST (area residenziale blu) ===
+      createBuilding(-80, 40, 7, 6, 4);
+      createBuilding(-70, 45, 5, 5, 3);
+      createBuilding(-85, 50, 6, 6, 4);
+      createBuilding(-75, 70, 8, 6, 4);
+      createBuilding(-85, 80, 6, 5, 3);
+      createBuilding(-65, 75, 5, 5, 3);
+      createBuilding(-45, 45, 7, 7, 4);
+      createBuilding(-35, 50, 6, 5, 3);
+      createBuilding(-50, 75, 8, 6, 4);
+      createBuilding(-40, 85, 6, 6, 3);
+      
+      // === QUARTIERE SUD-EST (area mista gialla/arancione) ===
+      createBuilding(40, 40, 9, 7, 5);
+      createBuilding(55, 45, 6, 6, 4);
+      createBuilding(70, 50, 7, 5, 4);
+      createBuilding(85, 40, 5, 5, 3);
+      createBuilding(45, 70, 8, 7, 5);
+      createBuilding(60, 75, 6, 6, 4);
+      createBuilding(75, 80, 7, 5, 4);
+      createBuilding(85, 85, 6, 6, 3);
+      createBuilding(50, 85, 5, 5, 3);
+      
+      // === EDIFICI LUNGO LE STRADE ===
+      // Strada verticale sinistra
+      createBuilding(-50, -10, 5, 4, 3);
+      createBuilding(-50, 10, 5, 4, 3);
+      
+      // Strada verticale destra
+      createBuilding(50, -10, 5, 4, 3);
+      createBuilding(50, 10, 5, 4, 3);
+      
+      // Strada orizzontale superiore
+      createBuilding(-10, -50, 4, 5, 3);
+      createBuilding(10, -50, 4, 5, 3);
+      
+      // Strada orizzontale inferiore
+      createBuilding(-10, 50, 4, 5, 3);
+      createBuilding(10, 50, 4, 5, 3);
 
       // Rocce decorative
       const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x757575 });
@@ -964,13 +1271,69 @@
       }
 
       const trees = [];
-      const treeCount = isLowEnd ? 35 : 80;  // Molti più alberi per mappa enorme
-      for (let i = 0; i < treeCount; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 15 + Math.random() * 80;  // Distanza maggiore per mappa più grande
-        const x = Math.cos(angle) * dist;
-        const z = Math.sin(angle) * dist;
-        trees.push(createTree(x, z));
+      const treeCount = isLowEnd ? 60 : 150;  // Molti più alberi per foreste ai bordi
+      
+      // Funzione per verificare se un punto è su una strada
+      function isOnRoad(x, z) {
+        // Strade orizzontali
+        if (Math.abs(z + 60) < 4 || Math.abs(z + 20) < 4 || Math.abs(z - 20) < 4 || Math.abs(z - 60) < 4) {
+          return true;
+        }
+        // Strade verticali
+        if (Math.abs(x + 60) < 4 || Math.abs(x + 20) < 4 || Math.abs(x - 20) < 4 || Math.abs(x - 60) < 4) {
+          return true;
+        }
+        return false;
+      }
+      
+      // Foresta bordo NORD
+      for (let i = 0; i < (isLowEnd ? 15 : 35); i++) {
+        const x = -90 + Math.random() * 180;
+        const z = -85 - Math.random() * 10;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Foresta bordo SUD
+      for (let i = 0; i < (isLowEnd ? 15 : 35); i++) {
+        const x = -90 + Math.random() * 180;
+        const z = 85 + Math.random() * 10;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Foresta bordo OVEST
+      for (let i = 0; i < (isLowEnd ? 12 : 30); i++) {
+        const x = -85 - Math.random() * 10;
+        const z = -80 + Math.random() * 160;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Foresta bordo EST
+      for (let i = 0; i < (isLowEnd ? 12 : 30); i++) {
+        const x = 85 + Math.random() * 10;
+        const z = -80 + Math.random() * 160;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Alberi sparsi negli angoli (zone verdi come nell'immagine)
+      // Angolo NE (zona con alberi)
+      for (let i = 0; i < (isLowEnd ? 5 : 12); i++) {
+        const x = 70 + Math.random() * 20;
+        const z = -70 - Math.random() * 20;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Angolo SE (zona con alberi)
+      for (let i = 0; i < (isLowEnd ? 5 : 12); i++) {
+        const x = 70 + Math.random() * 20;
+        const z = 70 + Math.random() * 20;
+        if (!isOnRoad(x, z)) trees.push(createTree(x, z));
+      }
+      
+      // Alberi sparsi nel centro (pochi)
+      for (let i = 0; i < (isLowEnd ? 8 : 20); i++) {
+        const x = -50 + Math.random() * 100;
+        const z = -50 + Math.random() * 100;
+        if (!isOnRoad(x, z) && Math.random() > 0.3) trees.push(createTree(x, z));
       }
 
       // Bushes (optimized with shared geometry) - PIÙ CESPUGLI!
@@ -984,11 +1347,31 @@
         scene.add(bush);
       }
 
-      const bushCount = isLowEnd ? 40 : 100;  // Molti più cespugli
-      for (let i = 0; i < bushCount; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 10 + Math.random() * 85;  // Distanza maggiore per mappa più grande
-        createBush(Math.cos(angle) * dist, Math.sin(angle) * dist);
+      const bushCount = isLowEnd ? 50 : 120;  // Molti più cespugli ai bordi
+      // Cespugli principalmente ai bordi della mappa
+      for (let i = 0; i < bushCount * 0.6; i++) {
+        const side = Math.floor(Math.random() * 4);
+        let x, z;
+        if (side === 0) { // Nord
+          x = -90 + Math.random() * 180;
+          z = -75 - Math.random() * 20;
+        } else if (side === 1) { // Sud
+          x = -90 + Math.random() * 180;
+          z = 75 + Math.random() * 20;
+        } else if (side === 2) { // Ovest
+          x = -75 - Math.random() * 20;
+          z = -80 + Math.random() * 160;
+        } else { // Est
+          x = 75 + Math.random() * 20;
+          z = -80 + Math.random() * 160;
+        }
+        if (!isOnRoad(x, z)) createBush(x, z);
+      }
+      // Cespugli sparsi nel resto della mappa
+      for (let i = 0; i < bushCount * 0.4; i++) {
+        const x = -70 + Math.random() * 140;
+        const z = -70 + Math.random() * 140;
+        if (!isOnRoad(x, z)) createBush(x, z);
       }
 
       // ===== ZONE (Fire Circle) =====
@@ -1754,17 +2137,70 @@
       // ===== UTILITY =====
       const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-      function checkCollision(x, z, radius) {
-        // Buildings
+      // Returns collision info with push direction for smooth sliding
+      function checkCollisionWithPush(x, z, radius) {
+        let pushX = 0, pushZ = 0;
+        let collided = false;
+        
+        // Building walls
         for (const b of buildings) {
-          if (x > b.x - b.w/2 - radius && x < b.x + b.w/2 + radius &&
-              z > b.z - b.d/2 - radius && z < b.z + b.d/2 + radius) {
-            return true;
+          for (const wall of b.walls) {
+            const minX = Math.min(wall.x1, wall.x2) - radius;
+            const maxX = Math.max(wall.x1, wall.x2) + radius;
+            const minZ = Math.min(wall.z1, wall.z2) - radius;
+            const maxZ = Math.max(wall.z1, wall.z2) + radius;
+            
+            if (x > minX && x < maxX && z > minZ && z < maxZ) {
+              collided = true;
+              // Calculate push direction
+              const wallCenterX = (wall.x1 + wall.x2) / 2;
+              const wallCenterZ = (wall.z1 + wall.z2) / 2;
+              const wallWidth = Math.abs(wall.x2 - wall.x1);
+              const wallDepth = Math.abs(wall.z2 - wall.z1);
+              
+              // Push perpendicular to wall
+              if (wallWidth > wallDepth) {
+                // Horizontal wall - push in Z
+                pushZ += (z > wallCenterZ) ? (maxZ - z + 0.1) : (minZ - z - 0.1);
+              } else {
+                // Vertical wall - push in X
+                pushX += (x > wallCenterX) ? (maxX - x + 0.1) : (minX - x - 0.1);
+              }
+            }
           }
         }
         // Trees
         for (const t of trees) {
+          const dist = Math.hypot(x - t.x, z - t.z);
+          const minDist = t.radius + radius;
+          if (dist < minDist) {
+            collided = true;
+            const pushDist = minDist - dist + 0.1;
+            const angle = Math.atan2(z - t.z, x - t.x);
+            pushX += Math.cos(angle) * pushDist;
+            pushZ += Math.sin(angle) * pushDist;
+          }
+        }
+        return { collided, pushX, pushZ };
+      }
+
+      function checkCollision(x, z, radius) {
+        // Building walls
+        if (checkWallCollision(x, z, radius)) return true;
+        // Trees
+        for (const t of trees) {
           if (Math.hypot(x - t.x, z - t.z) < t.radius + radius) return true;
+        }
+        return false;
+      }
+      
+      // Check if a point collides with obstacles (for bullets)
+      function checkBulletCollision(x, z) {
+        // Building walls
+        if (checkBulletWallCollision(x, z)) return true;
+        // Trees (thinner hit for bullets)
+        for (const t of trees) {
+          if (Math.hypot(x - t.x, z - t.z) < t.radius * 0.5) return true;
         }
         return false;
       }
@@ -1789,17 +2225,39 @@
         // Update footprints (fade and remove old ones)
         updateFootprints();
 
-        // Player movement
+        // Player movement with smooth sliding
         const inputLen = Math.hypot(moveInput.x, moveInput.y);
         if (inputLen > 0.1) {
           // INVERTED Y axis for movement stick (removed negative sign)
           const moveAngle = Math.atan2(moveInput.x, moveInput.y);
-          const newX = player.x + Math.sin(moveAngle) * player.speed;
-          const newZ = player.z + Math.cos(moveAngle) * player.speed;
+          let newX = player.x + Math.sin(moveAngle) * player.speed;
+          let newZ = player.z + Math.cos(moveAngle) * player.speed;
 
           // Check boundaries (island)
           const distFromCenter = Math.hypot(newX, newZ);
-          if (distFromCenter < WORLD_SIZE / 2 - 2 && !checkCollision(newX, newZ, 0.5)) {
+          if (distFromCenter < WORLD_SIZE / 2 - 2) {
+            const collision = checkCollisionWithPush(newX, newZ, 0.6);
+            if (collision.collided) {
+              // Apply push to slide along obstacles
+              newX += collision.pushX;
+              newZ += collision.pushZ;
+              // Verify new position is valid
+              if (checkCollision(newX, newZ, 0.5)) {
+                // Still colliding, try moving only on one axis
+                const axisX = player.x + Math.sin(moveAngle) * player.speed;
+                const axisZ = player.z + Math.cos(moveAngle) * player.speed;
+                if (!checkCollision(axisX, player.z, 0.5)) {
+                  newX = axisX;
+                  newZ = player.z;
+                } else if (!checkCollision(player.x, axisZ, 0.5)) {
+                  newX = player.x;
+                  newZ = axisZ;
+                } else {
+                  newX = player.x;
+                  newZ = player.z;
+                }
+              }
+            }
             player.x = newX;
             player.z = newZ;
             
@@ -1848,6 +2306,32 @@
         // Update player mesh
         player.mesh.position.set(player.x, 1, player.z);
         player.mesh.rotation.y = player.angle;
+        
+        // Check if player is inside a building and toggle roof visibility
+        const insideBuilding = isInsideBuilding(player.x, player.z);
+        for (const b of buildings) {
+          if (b.roof) {
+            const playerInside = (insideBuilding === b);
+            // Hide roof if player is inside this building
+            b.roof.visible = !playerInside;
+            // Track previous state to avoid unnecessary updates
+            if (b.playerWasInside !== playerInside) {
+              b.playerWasInside = playerInside;
+              // Make walls semi-transparent when inside for better visibility
+              b.group.children.forEach(child => {
+                if (child !== b.roof && child.material && child !== b.group.children.find(c => c.geometry && c.geometry.type === 'PlaneGeometry')) {
+                  if (playerInside) {
+                    child.material = child.material.clone();
+                    child.material.transparent = true;
+                    child.material.opacity = 0.4;
+                  } else {
+                    child.material = buildingMaterial;
+                  }
+                }
+              });
+            }
+          }
+        }
 
         // Zone damage
         const playerDistFromZone = Math.hypot(player.x - zone.currentX, player.z - zone.currentZ);
@@ -2076,6 +2560,14 @@
           b.mesh.position.set(b.x, 1.5, b.z);
 
           let removed = false;
+          
+          // Check collision with walls and obstacles
+          if (checkBulletCollision(b.x, b.z)) {
+            scene.remove(b.mesh);
+            bullets.splice(i, 1);
+            removed = true;
+            continue;
+          }
 
           // Check collisions with enemies (from player bullets)
           if (!b.isEnemy) {
@@ -2171,6 +2663,35 @@
         minimapCtx.beginPath();
         minimapCtx.arc(50, 50, 40, 0, Math.PI * 2);
         minimapCtx.fill();
+        
+        // Draw roads on minimap
+        const mapScale = 40 / (WORLD_SIZE / 2);
+        minimapCtx.strokeStyle = '#546e7a';
+        minimapCtx.lineWidth = 1.5;
+        // Horizontal roads
+        [-60, -20, 20, 60].forEach(z => {
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(50 - 38, 50 + z * mapScale);
+          minimapCtx.lineTo(50 + 38, 50 + z * mapScale);
+          minimapCtx.stroke();
+        });
+        // Vertical roads
+        [-60, -20, 20, 60].forEach(x => {
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(50 + x * mapScale, 50 - 38);
+          minimapCtx.lineTo(50 + x * mapScale, 50 + 38);
+          minimapCtx.stroke();
+        });
+        
+        // Draw buildings on minimap
+        minimapCtx.fillStyle = '#9e9e9e';
+        for (const b of buildings) {
+          const bx = 50 + b.x * mapScale;
+          const bz = 50 + b.z * mapScale;
+          const bw = Math.max(2, b.w * mapScale * 0.5);
+          const bd = Math.max(2, b.d * mapScale * 0.5);
+          minimapCtx.fillRect(bx - bw/2, bz - bd/2, bw, bd);
+        }
         
         // Draw zone
         minimapCtx.strokeStyle = '#ff4400';
