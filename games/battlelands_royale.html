@@ -96,21 +96,23 @@
         display: flex; gap: 6px; pointer-events: none;
       }
       .weapon-box {
-        width: 50px; height: 50px; border-radius: 8px;
+        width: 65px; height: 65px; border-radius: 10px;
         background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.2);
         display: flex; align-items: center; justify-content: center;
-        font-size: 20px;
+        font-size: 28px;
       }
       .weapon-box.active { border-color: #ffcc00; background: rgba(255,200,0,0.2); }
       .weapon-info {
-        position: fixed; bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        position: fixed; bottom: calc(90px + env(safe-area-inset-bottom, 0px));
         left: 50%; transform: translateX(-50%);
         background: rgba(0,0,0,0.6); padding: 6px 14px;
         border-radius: 12px; color: #fff; font-size: 11px;
         pointer-events: none; text-align: center;
         backdrop-filter: blur(8px);
+        display: flex; align-items: center; gap: 8px;
+        white-space: nowrap;
       }
-      .weapon-info .name { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+      .weapon-info .name { font-weight: 700; font-size: 13px; }
       .weapon-info .stats { opacity: 0.8; }
       .rarity-common { color: #b0b0b0; }
       .rarity-rare { color: #4fc3f7; }
@@ -459,9 +461,12 @@
       // ===== REGISTER SERVICE WORKER FOR PWA =====
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./battlelands_sw.js')
+          // Force update service worker
+          navigator.serviceWorker.register('./battlelands_sw.js', { updateViaCache: 'none' })
             .then((registration) => {
               console.log('ServiceWorker registered:', registration.scope);
+              // Check for updates
+              registration.update();
             })
             .catch((err) => {
               console.log('ServiceWorker registration failed:', err);
@@ -598,6 +603,11 @@
       minimapCanvas.width = 100;
       minimapCanvas.height = 100;
 
+      // Mobile optimization: detect low-end devices (MUST be before scene setup)
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const isLowEnd = isMobile && (navigator.hardwareConcurrency <= 4 || window.innerWidth < 500);
+      const isUltraUltra = selectedResolution >= 3;
+
       // Three.js setup
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(isUltraUltra ? 0x6ec6ff : 0x87ceeb);
@@ -619,11 +629,6 @@
         camera.position.set(0, 45, 32);
       }
       camera.lookAt(0, 0, 0);
-
-      // Mobile optimization: detect low-end devices
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      const isLowEnd = isMobile && (navigator.hardwareConcurrency <= 4 || window.innerWidth < 500);
-      const isUltraUltra = selectedResolution >= 3;
       
       const renderer = new THREE.WebGLRenderer({ 
         antialias: selectedResolution >= 1,
@@ -1642,12 +1647,12 @@
         const w = WEAPONS[player.weaponKey];
         weaponEl.textContent = w.emoji;
         const rarityClass = 'rarity-' + w.rarity;
+        const ammoText = player.ammo === Infinity ? '∞' : player.ammo;
         weaponInfoEl.innerHTML = `
-          <div class="name ${rarityClass}">${w.name}</div>
-          <div class="stats">Ammo: ${player.ammo === Infinity ? '∞' : player.ammo}</div>
+          <span class="name ${rarityClass}">${w.name}</span>
+          <span class="stats">| ${ammoText} colpi</span>
         `;
         // Update weapon chip in status bar
-        const ammoText = player.ammo === Infinity ? '∞' : player.ammo;
         weaponChipEl.textContent = `${w.emoji} ${w.name} | ${ammoText}`;
       }
       updateWeaponUI();

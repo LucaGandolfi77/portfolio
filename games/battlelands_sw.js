@@ -1,5 +1,5 @@
 // Service Worker for Battlelands Royale PWA
-const CACHE_NAME = 'battlelands-v1';
+const CACHE_NAME = 'battlelands-v2';
 const urlsToCache = [
   './',
   './battlelands_royale.html',
