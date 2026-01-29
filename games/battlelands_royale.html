@@ -5,6 +5,10 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="battlelands_manifest.json" />
+    <link rel="apple-touch-icon" href="../assets/images/games/battlelands_icon_192.png" />
+    <meta name="apple-mobile-web-app-title" content="Battlelands" />
+    <meta name="theme-color" content="#ffd700" />
     <title>Battlelands Royale 3D</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
@@ -53,6 +57,7 @@
       .chip.hp { background: linear-gradient(135deg, rgba(220,50,50,0.7), rgba(180,30,30,0.7)); }
       .chip.shield { background: linear-gradient(135deg, rgba(50,150,220,0.7), rgba(30,100,180,0.7)); }
       .chip.zone { background: linear-gradient(135deg, rgba(255,100,0,0.7), rgba(200,50,0,0.7)); }
+      .chip.weapon { background: linear-gradient(135deg, rgba(100,100,100,0.7), rgba(60,60,60,0.7)); }
       .pickup-indicator {
         position: fixed; left: 50%; top: 60%;
         transform: translate(-50%, -50%);
@@ -115,6 +120,15 @@
         :root { --ui-size: 100px; }
         .hud { padding: 12px; }
         .minimap { width: 70px; height: 70px; }
+      }
+      
+      /* Landscape mode adjustments */
+      @media (orientation: landscape) {
+        .minimap { 
+          width: 60px; height: 60px;
+          top: calc(env(safe-area-inset-top, 10px) + 10px);
+          right: 10px;
+        }
       }
       
       /* Game Over / Victory Screens */
@@ -378,6 +392,7 @@
           <button class="resolution-btn selected" data-res="1">Media</button>
           <button class="resolution-btn" data-res="1.5">Alta</button>
           <button class="resolution-btn" data-res="2">Ultra</button>
+          <button class="resolution-btn" data-res="3">✨ Ultra Ultra</button>
         </div>
       </div>
       
@@ -387,10 +402,11 @@
     <div id="game"></div>
     
     <div class="status-bar">
+      <div class="chip weapon" id="weaponChip">👊 Fists | ∞</div>
       <div class="chip hp" id="hp">❤️ 100</div>
       <div class="chip shield" id="shield">🛡️ 0</div>
       <div class="chip zone" id="zone">🔥 90s</div>
-      <div class="chip" id="alive">👥 13</div>
+      <div class="chip" id="alive">👥 19</div>
     </div>
     
     <div class="minimap"><canvas id="minimap"></canvas></div>
@@ -440,6 +456,19 @@
 
     <script>
     (function() {
+      // ===== REGISTER SERVICE WORKER FOR PWA =====
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./battlelands_sw.js')
+            .then((registration) => {
+              console.log('ServiceWorker registered:', registration.scope);
+            })
+            .catch((err) => {
+              console.log('ServiceWorker registration failed:', err);
+            });
+        });
+      }
+      
       // Check if Three.js loaded
       if (typeof THREE === 'undefined') {
         console.error('ERROR: Three.js not loaded!');
@@ -556,6 +585,7 @@
       const shieldEl = document.getElementById('shield');
       const zoneEl = document.getElementById('zone');
       const aliveEl = document.getElementById('alive');
+      const weaponChipEl = document.getElementById('weaponChip');
       const pickupIndicator = document.getElementById('pickupIndicator');
       const pickupProgress = document.getElementById('pickupProgress');
       const pickupLabel = document.getElementById('pickupLabel');
@@ -574,26 +604,40 @@
       scene.fog = new THREE.Fog(0x87ceeb, 80, 200);
 
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
-      // ZOOM OUT: Increased Y from 35->45, Z from 25->32
-      camera.position.set(0, 45, 32);
+      // Adjust camera based on orientation
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape) {
+        // Landscape: zoom in closer
+        camera.position.set(0, 35, 22);
+      } else {
+        // Portrait: zoom out for better view
+        camera.position.set(0, 45, 32);
+      }
       camera.lookAt(0, 0, 0);
 
       // Mobile optimization: detect low-end devices
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const isLowEnd = isMobile && (navigator.hardwareConcurrency <= 4 || window.innerWidth < 500);
+      const isUltraUltra = selectedResolution >= 3;
       
       const renderer = new THREE.WebGLRenderer({ 
-        antialias: !isLowEnd && selectedResolution >= 1, // Disable antialiasing on low-end or low res
-        powerPreference: 'high-performance',
-        stencil: false,
-        depth: true
+        antialias: selectedResolution >= 1,
+        powerPreference: isUltraUltra ? 'high-performance' : 'default',
+        stencil: isUltraUltra,
+        depth: true,
+        logarithmicDepthBuffer: isUltraUltra // Better depth precision
       });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      // Use selected resolution (pixel ratio)
-      renderer.setPixelRatio(isLowEnd ? Math.min(selectedResolution, 1) : Math.min(selectedResolution, 2));
-      renderer.shadowMap.enabled = !isLowEnd && selectedResolution >= 1; // Disable shadows on low-end or low res
-      if (!isLowEnd && selectedResolution >= 1) {
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Use selected resolution (pixel ratio) - Ultra Ultra goes up to 3x
+      renderer.setPixelRatio(Math.min(selectedResolution, isUltraUltra ? 3 : 2));
+      renderer.shadowMap.enabled = selectedResolution >= 1;
+      if (selectedResolution >= 1) {
+        renderer.shadowMap.type = isUltraUltra ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+      }
+      if (isUltraUltra) {
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        renderer.outputEncoding = THREE.sRGBEncoding;
       }
       container.appendChild(renderer.domElement);
       console.log(`Device: ${isLowEnd ? 'LOW-END' : 'NORMAL'} | Mobile: ${isMobile} | PixelRatio: ${renderer.getPixelRatio()} | Resolution: ${selectedResolution}`);
@@ -617,8 +661,8 @@
       scene.add(sunLight);
 
       // ===== WORLD CONFIG =====
-      const WORLD_SIZE = 150;  // Mappa più grande!
-      const WATER_SIZE = 200;
+      const WORLD_SIZE = 200;  // Mappa ancora più grande!
+      const WATER_SIZE = 250;
 
       // ===== MATERIALS =====
       const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x7cb342 });
@@ -629,6 +673,24 @@
       const treeTrunkMaterial = new THREE.MeshLambertMaterial({ color: 0x5d4037 });
       const treeLeavesMaterial = new THREE.MeshLambertMaterial({ color: 0x388e3c });
       const bushMaterial = new THREE.MeshLambertMaterial({ color: 0x2e7d32 });
+      
+      // ===== BIOME MATERIALS =====
+      // Snow biome
+      const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xf5f5f5 });
+      const snowTreeMaterial = new THREE.MeshLambertMaterial({ color: 0xe8f5e9 });
+      const iceMaterial = new THREE.MeshLambertMaterial({ color: 0xb3e5fc, transparent: true, opacity: 0.85 });
+      // Desert biome
+      const sandMaterial = new THREE.MeshLambertMaterial({ color: 0xffe0b2 });
+      const desertRockMaterial = new THREE.MeshLambertMaterial({ color: 0xd7ccc8 });
+      const cactusMaterial = new THREE.MeshLambertMaterial({ color: 0x8bc34a });
+      // Lava biome
+      const lavaMaterial = new THREE.MeshBasicMaterial({ color: 0xff5722 });
+      const volcanicRockMaterial = new THREE.MeshLambertMaterial({ color: 0x37474f });
+      const ashMaterial = new THREE.MeshLambertMaterial({ color: 0x424242 });
+      
+      // ===== SHARED GEOMETRIES (defined early for biomes) =====
+      const sharedTrunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3, 6);
+      const sharedLeavesGeo = new THREE.SphereGeometry(2.5, 6, 4);
 
       // ===== CREATE WORLD =====
       // Water
@@ -638,12 +700,120 @@
       water.position.y = -0.5;
       scene.add(water);
 
-      // Island (grass)
+      // Main Island (grass - center)
       const islandGeo = new THREE.CylinderGeometry(WORLD_SIZE / 2, WORLD_SIZE / 2 + 5, 2, 32);
       const island = new THREE.Mesh(islandGeo, grassMaterial);
       island.position.y = 0;
       island.receiveShadow = true;
       scene.add(island);
+      
+      // ===== BIOMES =====
+      // Snow Biome (Nord-Est) - quadrante
+      const snowBiomeGeo = new THREE.CircleGeometry(35, 24);
+      const snowBiome = new THREE.Mesh(snowBiomeGeo, snowMaterial);
+      snowBiome.rotation.x = -Math.PI / 2;
+      snowBiome.position.set(50, 1.02, -50);
+      scene.add(snowBiome);
+      
+      // Desert Biome (Sud-Est) - quadrante
+      const desertBiomeGeo = new THREE.CircleGeometry(38, 24);
+      const desertBiome = new THREE.Mesh(desertBiomeGeo, sandMaterial);
+      desertBiome.rotation.x = -Math.PI / 2;
+      desertBiome.position.set(55, 1.02, 50);
+      scene.add(desertBiome);
+      
+      // Lava Biome (Sud-Ovest) - quadrante
+      const lavaBiomeGeo = new THREE.CircleGeometry(32, 24);
+      const lavaBiome = new THREE.Mesh(lavaBiomeGeo, ashMaterial);
+      lavaBiome.rotation.x = -Math.PI / 2;
+      lavaBiome.position.set(-55, 1.02, 55);
+      scene.add(lavaBiome);
+      
+      // Lava pools in lava biome
+      for (let i = 0; i < 5; i++) {
+        const poolGeo = new THREE.CircleGeometry(3 + Math.random() * 4, 16);
+        const lavaPool = new THREE.Mesh(poolGeo, lavaMaterial);
+        lavaPool.rotation.x = -Math.PI / 2;
+        lavaPool.position.set(
+          -55 + (Math.random() - 0.5) * 40,
+          1.03,
+          55 + (Math.random() - 0.5) * 40
+        );
+        scene.add(lavaPool);
+      }
+      
+      // Ice patches in snow biome
+      for (let i = 0; i < 4; i++) {
+        const iceGeo = new THREE.CircleGeometry(4 + Math.random() * 3, 12);
+        const icePatch = new THREE.Mesh(iceGeo, iceMaterial);
+        icePatch.rotation.x = -Math.PI / 2;
+        icePatch.position.set(
+          50 + (Math.random() - 0.5) * 45,
+          1.03,
+          -50 + (Math.random() - 0.5) * 45
+        );
+        scene.add(icePatch);
+      }
+      
+      // Snow trees (white/blue trees in snow biome)
+      for (let i = 0; i < (isLowEnd ? 8 : 15); i++) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(sharedTrunkGeo, treeTrunkMaterial);
+        trunk.position.y = 1.5;
+        group.add(trunk);
+        const snowLeaves = new THREE.Mesh(sharedLeavesGeo, snowTreeMaterial);
+        snowLeaves.position.y = 4.5;
+        group.add(snowLeaves);
+        group.position.set(
+          50 + (Math.random() - 0.5) * 50,
+          1,
+          -50 + (Math.random() - 0.5) * 50
+        );
+        scene.add(group);
+      }
+      
+      // Cacti in desert biome
+      const cactusGeo = new THREE.CylinderGeometry(0.3, 0.4, 3, 6);
+      const cactusArmGeo = new THREE.CylinderGeometry(0.2, 0.25, 1.5, 6);
+      for (let i = 0; i < (isLowEnd ? 10 : 20); i++) {
+        const cactus = new THREE.Group();
+        const body = new THREE.Mesh(cactusGeo, cactusMaterial);
+        body.position.y = 1.5;
+        cactus.add(body);
+        // Arms
+        if (Math.random() > 0.4) {
+          const arm1 = new THREE.Mesh(cactusArmGeo, cactusMaterial);
+          arm1.rotation.z = Math.PI / 2;
+          arm1.position.set(0.5, 2, 0);
+          cactus.add(arm1);
+        }
+        if (Math.random() > 0.5) {
+          const arm2 = new THREE.Mesh(cactusArmGeo, cactusMaterial);
+          arm2.rotation.z = -Math.PI / 2;
+          arm2.position.set(-0.5, 1.8, 0);
+          cactus.add(arm2);
+        }
+        cactus.position.set(
+          55 + (Math.random() - 0.5) * 55,
+          1,
+          50 + (Math.random() - 0.5) * 55
+        );
+        scene.add(cactus);
+      }
+      
+      // Volcanic rocks in lava biome
+      const volcanicRockGeo = new THREE.DodecahedronGeometry(2, 0);
+      for (let i = 0; i < (isLowEnd ? 8 : 18); i++) {
+        const rock = new THREE.Mesh(volcanicRockGeo, volcanicRockMaterial);
+        rock.position.set(
+          -55 + (Math.random() - 0.5) * 50,
+          1.5 + Math.random(),
+          55 + (Math.random() - 0.5) * 50
+        );
+        rock.scale.setScalar(0.5 + Math.random() * 0.8);
+        rock.rotation.set(Math.random(), Math.random(), Math.random());
+        scene.add(rock);
+      }
 
       // Beach ring
       const beachGeo = new THREE.RingGeometry(WORLD_SIZE / 2 - 3, WORLD_SIZE / 2 + 2, 32);
@@ -677,8 +847,8 @@
         return group;
       }
 
-      // Create various buildings - MAPPA PIÙ GRANDE con più edifici!
-      // Centro città
+      // Create various buildings - MAPPA ENORME con molti più edifici!
+      // Centro città (area centrale densa)
       createBuilding(-20, -15, 8, 6, 5);
       createBuilding(15, 10, 10, 8, 6);
       createBuilding(-10, 20, 6, 6, 4);
@@ -686,20 +856,72 @@
       createBuilding(0, -25, 12, 8, 7);
       createBuilding(-25, 5, 5, 5, 4);
       createBuilding(30, 15, 6, 8, 5);
-      // Nuovi edifici per mappa più grande
+      createBuilding(5, 5, 7, 7, 6);
+      createBuilding(-15, -5, 6, 5, 5);
+      createBuilding(20, -10, 8, 6, 4);
+      
+      // Quartiere nord
       createBuilding(-40, -35, 9, 7, 6);
+      createBuilding(-55, -45, 7, 6, 5);
+      createBuilding(-30, -50, 8, 8, 7);
+      createBuilding(-60, -30, 6, 5, 4);
+      createBuilding(-45, -60, 10, 7, 6);
+      createBuilding(-70, -50, 5, 5, 5);
+      
+      // Quartiere est
       createBuilding(45, 30, 8, 8, 5);
+      createBuilding(55, 15, 9, 6, 6);
+      createBuilding(65, 25, 7, 7, 5);
+      createBuilding(50, 45, 6, 8, 4);
+      createBuilding(70, 5, 8, 5, 6);
+      createBuilding(60, 50, 10, 6, 7);
+      createBuilding(75, 35, 5, 5, 5);
+      
+      // Quartiere sud
       createBuilding(-35, 40, 7, 6, 5);
+      createBuilding(-50, 55, 8, 7, 6);
+      createBuilding(-25, 50, 6, 6, 5);
+      createBuilding(-60, 45, 9, 5, 7);
+      createBuilding(-40, 65, 7, 8, 4);
+      createBuilding(-70, 60, 5, 6, 5);
+      
+      // Quartiere ovest
       createBuilding(50, -25, 10, 6, 7);
+      createBuilding(60, -40, 8, 7, 5);
+      createBuilding(40, -50, 7, 5, 6);
+      createBuilding(70, -30, 6, 6, 5);
+      createBuilding(55, -60, 9, 8, 6);
+      createBuilding(75, -50, 5, 5, 4);
+      
+      // Zona intermedia
       createBuilding(-50, 10, 6, 9, 4);
       createBuilding(35, -45, 8, 5, 6);
       createBuilding(-15, -50, 7, 7, 5);
       createBuilding(40, 50, 6, 6, 4);
-      // Edifici ai bordi
       createBuilding(-55, -20, 5, 5, 4);
       createBuilding(55, 5, 6, 4, 5);
       createBuilding(0, 55, 8, 6, 6);
       createBuilding(20, -55, 7, 5, 5);
+      
+      // Edifici esterni (periferia)
+      createBuilding(-80, -20, 6, 5, 5);
+      createBuilding(80, 10, 5, 6, 4);
+      createBuilding(-10, 80, 7, 6, 5);
+      createBuilding(15, -80, 6, 5, 6);
+      createBuilding(-75, 30, 5, 5, 4);
+      createBuilding(70, -70, 8, 7, 5);
+      createBuilding(-65, 70, 6, 6, 4);
+      createBuilding(85, 60, 5, 5, 5);
+      createBuilding(0, -75, 7, 8, 6);
+      createBuilding(-85, 0, 6, 5, 5);
+      
+      // Piccoli edifici sparsi
+      createBuilding(30, 70, 4, 4, 3);
+      createBuilding(-50, -70, 5, 4, 4);
+      createBuilding(65, -15, 4, 5, 3);
+      createBuilding(-30, 25, 5, 5, 3);
+      createBuilding(10, -40, 4, 4, 4);
+      createBuilding(-70, -10, 5, 4, 3);
 
       // Rocce decorative
       const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x757575 });
@@ -715,7 +937,7 @@
       }
       
       // Aggiungi rocce sparse
-      const rockCount = isLowEnd ? 8 : 20;
+      const rockCount = isLowEnd ? 15 : 40;
       for (let i = 0; i < rockCount; i++) {
         const angle = Math.random() * Math.PI * 2;
         const dist = 15 + Math.random() * 55;
@@ -723,9 +945,6 @@
       }
 
       // Trees (optimized geometry) - PIÙ ALBERI!
-      const sharedTrunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3, 6);
-      const sharedLeavesGeo = new THREE.SphereGeometry(2.5, 6, 4);
-      
       function createTree(x, z) {
         const group = new THREE.Group();
         
@@ -745,10 +964,10 @@
       }
 
       const trees = [];
-      const treeCount = isLowEnd ? 20 : 50;  // Più alberi per mappa grande
+      const treeCount = isLowEnd ? 35 : 80;  // Molti più alberi per mappa enorme
       for (let i = 0; i < treeCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = 10 + Math.random() * 60;  // Distanza maggiore
+        const dist = 15 + Math.random() * 80;  // Distanza maggiore per mappa più grande
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
         trees.push(createTree(x, z));
@@ -765,10 +984,10 @@
         scene.add(bush);
       }
 
-      const bushCount = isLowEnd ? 25 : 60;  // Più cespugli
+      const bushCount = isLowEnd ? 40 : 100;  // Molti più cespugli
       for (let i = 0; i < bushCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = 8 + Math.random() * 65;  // Distanza maggiore
+        const dist = 10 + Math.random() * 85;  // Distanza maggiore per mappa più grande
         createBush(Math.cos(angle) * dist, Math.sin(angle) * dist);
       }
 
@@ -1044,6 +1263,9 @@
           <div class="name ${rarityClass}">${w.name}</div>
           <div class="stats">Ammo: ${player.ammo === Infinity ? '∞' : player.ammo}</div>
         `;
+        // Update weapon chip in status bar
+        const ammoText = player.ammo === Infinity ? '∞' : player.ammo;
+        weaponChipEl.textContent = `${w.emoji} ${w.name} | ${ammoText}`;
       }
       updateWeaponUI();
 
@@ -1261,7 +1483,7 @@
         enemies.push(enemy);
       }
 
-      for (let i = 0; i < 12; i++) spawnEnemy();  // Più nemici per mappa grande
+      for (let i = 0; i < 18; i++) spawnEnemy();  // Molti più nemici per mappa enorme
 
       // ===== BULLETS (bigger, optimized) =====
       const bullets = [];
@@ -1441,8 +1663,8 @@
         pickups.push(pickupData);
       }
 
-      // Spawn initial pickups - Più pickup per mappa grande
-      for (let i = 0; i < 35; i++) {
+      // Spawn initial pickups - Molti più pickup per mappa enorme
+      for (let i = 0; i < 50; i++) {
         const angle = Math.random() * Math.PI * 2;
         const dist = 5 + Math.random() * 60;  // Distanza maggiore
         const x = Math.cos(angle) * dist;
@@ -2117,6 +2339,15 @@
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Adjust camera position based on new orientation
+        const isLandscape = window.innerWidth > window.innerHeight;
+        if (isLandscape) {
+          camera.position.set(0, 35, 22);
+        } else {
+          camera.position.set(0, 45, 32);
+        }
+        camera.lookAt(0, 0, 0);
       });
 
       animate(performance.now());
