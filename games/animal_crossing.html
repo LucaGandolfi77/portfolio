@@ -1,0 +1,2553 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Crossing Clone - Town Builder 3D</title>
+  <style>
+    /* ===== RESET E BASE ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #87ceeb;
+    }
+    
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    /* ===== UI OVERLAY ===== */
+    #ui-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+    
+    /* Inventario risorse */
+    #resources-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 248, 220, 0.95);
+      border: 4px solid #8b4513;
+      border-radius: 15px;
+      padding: 15px 25px;
+      display: flex;
+      gap: 25px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      pointer-events: auto;
+    }
+    
+    .resource {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #5d4037;
+    }
+    
+    .resource-icon {
+      font-size: 28px;
+    }
+    
+    .resource-count {
+      background: #fff;
+      padding: 5px 12px;
+      border-radius: 10px;
+      border: 2px solid #a1887f;
+      min-width: 40px;
+      text-align: center;
+    }
+    
+    /* Pulsante Crafting */
+    #crafting-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(145deg, #4caf50, #388e3c);
+      color: white;
+      border: 3px solid #2e7d32;
+      border-radius: 15px;
+      padding: 12px 25px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    #crafting-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    }
+    
+    /* Prompt interazione */
+    #interaction-prompt {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 15px 30px;
+      border-radius: 25px;
+      font-size: 18px;
+      font-weight: bold;
+      display: none;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.05); }
+    }
+    
+    .key-hint {
+      background: #4caf50;
+      padding: 3px 10px;
+      border-radius: 5px;
+      margin: 0 5px;
+    }
+    
+    /* Controlli info */
+    #controls-info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.8;
+      pointer-events: auto;
+    }
+    
+    #controls-info kbd {
+      background: #555;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid #777;
+    }
+    
+    /* Modalità posizionamento */
+    #placement-mode {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(76, 175, 80, 0.95);
+      color: white;
+      padding: 15px 30px;
+      border-radius: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      display: none;
+      text-align: center;
+    }
+    
+    /* ===== MENU CRAFTING ===== */
+    #crafting-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      pointer-events: auto;
+    }
+    
+    #crafting-modal.active {
+      display: flex;
+    }
+    
+    #crafting-content {
+      background: linear-gradient(145deg, #fff8dc, #f5deb3);
+      border: 5px solid #8b4513;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    
+    #crafting-content h2 {
+      text-align: center;
+      color: #5d4037;
+      margin-bottom: 25px;
+      font-size: 28px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .craft-item {
+      background: white;
+      border: 3px solid #a1887f;
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .craft-info h3 {
+      color: #5d4037;
+      margin-bottom: 8px;
+      font-size: 20px;
+    }
+    
+    .craft-requirements {
+      display: flex;
+      gap: 15px;
+      color: #795548;
+    }
+    
+    .craft-req {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .craft-req.has {
+      color: #4caf50;
+    }
+    
+    .craft-req.missing {
+      color: #f44336;
+    }
+    
+    .craft-btn {
+      background: linear-gradient(145deg, #4caf50, #388e3c);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 25px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .craft-btn:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    
+    .craft-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    #close-crafting {
+      display: block;
+      margin: 20px auto 0;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    #close-crafting:hover {
+      background: #d32f2f;
+    }
+    
+    /* Messaggio raccolta */
+    #collect-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: bold;
+      color: #4caf50;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    
+    #collect-message.show {
+      opacity: 1;
+      animation: collectAnim 1s forwards;
+    }
+    
+    @keyframes collectAnim {
+      0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+      30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -70%) scale(1); opacity: 0; }
+    }
+    
+    /* Giorno/Notte indicator */
+    #time-indicator {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 16px;
+      pointer-events: auto;
+    }
+    
+    /* ===== POKEDEX MODAL ===== */
+    #pokedex-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 300;
+      pointer-events: auto;
+    }
+    
+    #pokedex-modal.active {
+      display: flex;
+    }
+    
+    #pokedex-content {
+      background: linear-gradient(145deg, #ff6b6b, #c92a2a);
+      border: 6px solid #8b0000;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 450px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    }
+    
+    #pokedex-content h2 {
+      text-align: center;
+      color: white;
+      margin-bottom: 25px;
+      font-size: 28px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+    }
+    
+    .pokemon-entry {
+      background: rgba(255, 255, 255, 0.95);
+      border: 3px solid #333;
+      border-radius: 12px;
+      padding: 15px 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .pokemon-entry.unknown {
+      background: rgba(100, 100, 100, 0.7);
+      color: #666;
+    }
+    
+    .pokemon-emoji {
+      font-size: 40px;
+      min-width: 50px;
+      text-align: center;
+    }
+    
+    .pokemon-info {
+      flex: 1;
+    }
+    
+    .pokemon-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .pokemon-type {
+      font-size: 14px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: 5px;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .type-grass { background: #78c850; }
+    .type-water { background: #6890f0; }
+    .type-fire { background: #f08030; }
+    .type-electric { background: #f8d030; color: #333; }
+    
+    .pokemon-status {
+      font-size: 24px;
+    }
+    
+    .pokemon-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+    }
+    
+    .pokedex-action-btn {
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    
+    .pokedex-action-btn:hover {
+      background: #388e3c;
+    }
+    
+    .pokedex-status-text {
+      font-size: 12px;
+      color: #333;
+      font-style: italic;
+    }
+    
+    #close-pokedex {
+      display: block;
+      margin: 20px auto 0;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    #close-pokedex:hover {
+      background: #555;
+    }
+    
+    /* Creature indicator */
+    .creature-nearby {
+      background: rgba(255, 215, 0, 0.9) !important;
+      animation: creaturePulse 1s infinite;
+    }
+    
+    @keyframes creaturePulse {
+      0%, 100% { box-shadow: 0 0 10px gold; }
+      50% { box-shadow: 0 0 25px gold; }
+    }
+    
+    /* Pokedex counter */
+    #pokedex-counter {
+      position: absolute;
+      top: 80px;
+      right: 20px;
+      background: linear-gradient(145deg, #ff6b6b, #c92a2a);
+      color: white;
+      border: 3px solid #8b0000;
+      border-radius: 15px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    
+    #pokedex-counter:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <!-- Canvas Three.js -->
+  <canvas id="gameCanvas"></canvas>
+  
+  <!-- UI Overlay -->
+  <div id="ui-overlay">
+    <!-- Pannello Risorse -->
+    <div id="resources-panel">
+      <div class="resource">
+        <span class="resource-icon">🪵</span>
+        <span>Legno:</span>
+        <span class="resource-count" id="wood-count">0</span>
+      </div>
+      <div class="resource">
+        <span class="resource-icon">🪨</span>
+        <span>Pietra:</span>
+        <span class="resource-count" id="stone-count">0</span>
+      </div>
+      <div class="resource">
+        <span class="resource-icon">🏖️</span>
+        <span>Sabbia:</span>
+        <span class="resource-count" id="sand-count">0</span>
+      </div>
+    </div>
+    
+    <!-- Indicatore tempo -->
+    <div id="time-indicator">☀️ Giorno</div>
+    
+    <!-- Pulsante Crafting -->
+    <button id="crafting-btn">🔨 Crafting (C)</button>
+    
+    <!-- Pokedex Counter -->
+    <div id="pokedex-counter">📱 Pokédex: <span id="caught-count">0</span>/4 (P)</div>
+    
+    <!-- Prompt Interazione -->
+    <div id="interaction-prompt">
+      Premi <span class="key-hint">E</span> per raccogliere
+    </div>
+    
+    <!-- Modalità Posizionamento -->
+    <div id="placement-mode">
+      🏗️ Modalità Posizionamento<br>
+      <small>Clicca per posizionare • Premi ESC per annullare</small>
+    </div>
+    
+    <!-- Messaggio Raccolta -->
+    <div id="collect-message"></div>
+    
+    <!-- Controlli Info -->
+    <div id="controls-info">
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Muovi<br>
+      <kbd>E</kbd> Raccogli/Cattura<br>
+      <kbd>C</kbd> Crafting<br>
+      <kbd>P</kbd> Pokédex<br>
+      <kbd>Mouse</kbd> Ruota camera
+    </div>
+  </div>
+  
+  <!-- Menu Crafting Modal -->
+  <div id="crafting-modal">
+    <div id="crafting-content">
+      <h2>🔨 Menu Crafting</h2>
+      
+      <div class="craft-item" data-item="bench">
+        <div class="craft-info">
+          <h3>🪑 Panchina</h3>
+          <div class="craft-requirements">
+            <span class="craft-req" id="bench-wood">🪵 5 Legno</span>
+            <span class="craft-req" id="bench-stone">🪨 3 Pietra</span>
+          </div>
+        </div>
+        <button class="craft-btn" id="craft-bench-btn">Crafta</button>
+      </div>
+      
+      <div class="craft-item" data-item="fence">
+        <div class="craft-info">
+          <h3>🚧 Staccionata</h3>
+          <div class="craft-requirements">
+            <span class="craft-req" id="fence-wood">🪵 3 Legno</span>
+          </div>
+        </div>
+        <button class="craft-btn" id="craft-fence-btn">Crafta</button>
+      </div>
+      
+      <div class="craft-item" data-item="well">
+        <div class="craft-info">
+          <h3>🪣 Pozzo</h3>
+          <div class="craft-requirements">
+            <span class="craft-req" id="well-stone">🪨 8 Pietra</span>
+            <span class="craft-req" id="well-wood">🪵 4 Legno</span>
+          </div>
+        </div>
+        <button class="craft-btn" id="craft-well-btn">Crafta</button>
+      </div>
+      
+      <div class="craft-item" data-item="streetlamp">
+        <div class="craft-info">
+          <h3>💡 Lampione</h3>
+          <div class="craft-requirements">
+            <span class="craft-req" id="streetlamp-wood">🪵 2 Legno</span>
+            <span class="craft-req" id="streetlamp-stone">🪨 2 Pietra</span>
+          </div>
+        </div>
+        <button class="craft-btn" id="craft-streetlamp-btn">Crafta</button>
+      </div>
+      
+      <div class="craft-item" data-item="fountain">
+        <div class="craft-info">
+          <h3>⛲ Fontana</h3>
+          <div class="craft-requirements">
+            <span class="craft-req" id="fountain-stone">🪨 10 Pietra</span>
+            <span class="craft-req" id="fountain-wood">🪵 2 Legno</span>
+          </div>
+        </div>
+        <button class="craft-btn" id="craft-fountain-btn">Crafta</button>
+      </div>
+      
+      <button id="close-crafting">Chiudi</button>
+    </div>
+  </div>
+  
+  <!-- Pokedex Modal -->
+  <div id="pokedex-modal">
+    <div id="pokedex-content">
+      <h2>📱 Pokédex</h2>
+      <div id="pokedex-list">
+        <!-- Populated by JavaScript -->
+      </div>
+      <button id="close-pokedex">Chiudi</button>
+    </div>
+  </div>
+  
+  <!-- Three.js via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+  
+  <script>
+    // ============================================
+    // ===== SETUP THREE.JS E VARIABILI GLOBALI =====
+    // ============================================
+    
+    const canvas = document.getElementById('gameCanvas');
+    
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: true 
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    
+    // Scena
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // Cielo azzurro
+    scene.fog = new THREE.Fog(0x87ceeb, 50, 150);
+    
+    // Camera
+    const camera = new THREE.PerspectiveCamera(
+      60, 
+      window.innerWidth / window.innerHeight, 
+      0.1, 
+      1000
+    );
+    
+    // ===== RISORSE E STATO DEL GIOCO =====
+    const gameState = {
+      wood: 50,
+      stone: 30,
+      sand: 30,
+      isPlacementMode: false,
+      itemToPlace: null,
+      craftingOpen: false,
+      pokedexOpen: false,
+      nearbyCollectible: null,
+      nearbyCreature: null,
+      dayTime: 0, // 0-1 ciclo giorno/notte
+    };
+    
+    // ===== POKEMON DATA =====
+    const POKEMON = {
+      bulbasaur: { name: 'Bulbasaur', emoji: '🌿', type: 'grass', biome: 'tallGrass', caught: false },
+      squirtle: { name: 'Squirtle', emoji: '🐢', type: 'water', biome: 'water', caught: false },
+      charmander: { name: 'Charmander', emoji: '🔥', type: 'fire', biome: 'mountain', caught: false },
+      pikachu: { name: 'Pikachu', emoji: '⚡', type: 'electric', biome: 'random', caught: false, rare: true },
+      snorlax: { name: 'Snorlax', emoji: '💤', type: 'normal', biome: 'random', caught: false, rare: true },
+      caterpie: { name: 'Caterpie', emoji: '🐛', type: 'bug', biome: 'tallGrass', caught: false },
+      poliwag: { name: 'Poliwag', emoji: '🌀', type: 'water', biome: 'water', caught: false },
+      zubat: { name: 'Zubat', emoji: '🦇', type: 'poison', biome: 'random', caught: false, rare: true },
+    };
+    
+    const creatures = []; // Active creatures in world
+    
+    // Ricette crafting
+    const RECIPES = {
+      bench: { wood: 5, stone: 3, name: 'Panchina' },
+      fence: { wood: 3, stone: 0, name: 'Staccionata' },
+      well: { wood: 4, stone: 8, name: 'Pozzo' },
+      streetlamp: { wood: 2, stone: 2, name: 'Lampione' },
+      fountain: { wood: 2, stone: 10, name: 'Fontana' },
+    };
+    
+    // Array per oggetti nel mondo
+    const collectibles = [];
+    const placedObjects = [];
+    
+    // ============================================
+    // ===== ILLUMINAZIONE =====
+    // ============================================
+    
+    // Luce ambientale
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    
+    // Luce direzionale (sole)
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+    sunLight.position.set(50, 100, 50);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 200;
+    sunLight.shadow.camera.left = -100;
+    sunLight.shadow.camera.right = 100;
+    sunLight.shadow.camera.top = 100;
+    sunLight.shadow.camera.bottom = -100;
+    scene.add(sunLight);
+    
+    // Luce emisferica per effetto cielo
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x556b2f, 0.4);
+    scene.add(hemiLight);
+    
+    // ============================================
+    // ===== CREAZIONE TERRENO CON BIOMI =====
+    // ============================================
+    
+    const WORLD_SIZE = 150;
+    const biomeZones = []; // Store biome info for creature spawning
+    const hills = []; // Store hill info for height calculation
+    
+    // Base ground (grass)
+    const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE * 2, WORLD_SIZE * 2);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x7cba5f });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    ground.userData.biome = 'grass';
+    scene.add(ground);
+    
+    // Roads (System of paths)
+    const roadGroup = new THREE.Group();
+    const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x95a5a6 });
+    
+    // Main Ring Road
+    const roadRing = new THREE.Mesh(
+      new THREE.RingGeometry(55, 63, 64),
+      roadMaterial
+    );
+    roadRing.rotation.x = -Math.PI / 2;
+    roadRing.position.y = 0.06;
+    roadGroup.add(roadRing);
+    
+    // Cross Roads
+    const roadCross1 = new THREE.Mesh(new THREE.PlaneGeometry(10, WORLD_SIZE * 1.8), roadMaterial);
+    roadCross1.rotation.x = -Math.PI / 2;
+    roadCross1.position.y = 0.06;
+    roadGroup.add(roadCross1);
+    
+    const roadCross2 = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 1.8, 10), roadMaterial);
+    roadCross2.rotation.x = -Math.PI / 2;
+    roadCross2.position.y = 0.06;
+    roadGroup.add(roadCross2);
+    
+    scene.add(roadGroup);
+    
+    // Biome: Water (center-left lake)
+    const waterGeometry = new THREE.CircleGeometry(30, 32);
+    const waterMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x4da6ff, 
+      transparent: true, 
+      opacity: 0.85 
+    });
+    const waterZone = new THREE.Mesh(waterGeometry, waterMaterial);
+    waterZone.rotation.x = -Math.PI / 2;
+    waterZone.position.set(-50, 0.05, 40);
+    waterZone.userData.biome = 'water';
+    scene.add(waterZone);
+    biomeZones.push({ type: 'water', x: -50, z: 40, radius: 30 });
+    
+    // Water ripple effect meshes
+    const ripples = [];
+    for (let i = 0; i < 8; i++) {
+      const rippleGeo = new THREE.RingGeometry(2, 2.5, 16);
+      const rippleMat = new THREE.MeshBasicMaterial({ 
+        color: 0xffffff, transparent: true, opacity: 0.3, side: THREE.DoubleSide 
+      });
+      const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+      ripple.rotation.x = -Math.PI / 2;
+      ripple.position.set(-50 + (Math.random() - 0.5) * 45, 0.1, 40 + (Math.random() - 0.5) * 45);
+      ripple.userData.phase = Math.random() * Math.PI * 2;
+      scene.add(ripple);
+      ripples.push(ripple);
+    }
+    
+    // Biome: Beach (around water)
+    const beachGeometry = new THREE.RingGeometry(30, 45, 32);
+    const beachMaterial = new THREE.MeshLambertMaterial({ color: 0xf4d03f });
+    const beachZone = new THREE.Mesh(beachGeometry, beachMaterial);
+    beachZone.rotation.x = -Math.PI / 2;
+    beachZone.position.set(-50, 0.02, 40);
+    beachZone.userData.biome = 'beach';
+    scene.add(beachZone);
+    biomeZones.push({ type: 'beach', x: -50, z: 40, innerRadius: 30, outerRadius: 45 });
+    
+    // Biome: Mountain (Walkable Hills)
+    // Create height map based hills
+    const mountainGroup = new THREE.Group();
+    const mountainMaterial = new THREE.MeshLambertMaterial({ color: 0x7cba5f }); // Grass color but elevated
+    const rockFaceMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    
+    function createHill(x, z, radius, height) {
+      hills.push({ x, z, r: radius, h: height });
+      
+      // Visual representation
+      const segments = 32;
+      const geo = new THREE.CylinderGeometry(radius * 0.4, radius, height, segments);
+      const mesh = new THREE.Mesh(geo, mountainMaterial);
+      mesh.position.set(x, height / 2, z);
+      mesh.castShadow = true;
+      mountainGroup.add(mesh);
+      
+      // Add some rocks on top/side
+      for(let i=0; i<5; i++) {
+         const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + Math.random()), rockFaceMaterial);
+         const angle = Math.random() * Math.PI * 2;
+         const dist = Math.random() * radius * 0.8;
+         const ry = (height * (1 - dist/radius)) + Math.random();
+         rock.position.set(x + Math.cos(angle)*dist, ry, z + Math.sin(angle)*dist);
+         mountainGroup.add(rock);
+      }
+    }
+    
+    // Add hills
+    createHill(60, -60, 25, 8);
+    createHill(80, -40, 20, 6);
+    createHill(90, -80, 25, 10);
+    
+    scene.add(mountainGroup);
+    biomeZones.push({ type: 'mountain', x: 70, z: -60, radius: 40 }); // General area
+    
+    // Get Ground Height Function
+    function getGroundHeight(x, z) {
+      let y = 0;
+      // Check hills
+      for (const hill of hills) {
+        const dx = x - hill.x;
+        const dz = z - hill.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < hill.r) {
+          // Simple cone helper: y = h * (1 - dist/r)
+          // We want flat top maybe? 
+          // Let's stick to the cylinder visual:
+          // The visual is a Cylinder with top radius 0.4*r.
+          // slope is from r to 0.4r. 
+          // If dist < 0.4r, height is max. 
+          if (dist < hill.r * 0.4) {
+             y = Math.max(y, hill.h); // On top
+          } else {
+             // On slope
+             const slopeProgress = (dist - hill.r * 0.4) / (hill.r * 0.6);
+             y = Math.max(y, hill.h * (1 - slopeProgress));
+          }
+        }
+      }
+      return y;
+    }
+    
+    // Biome: Tall Grass (multiple patches)
+    const tallGrassPatches = [
+      { x: 50, z: 50, radius: 20 },
+      { x: -70, z: -60, radius: 18 },
+      { x: 20, z: -80, radius: 15 },
+    ];
+    
+    tallGrassPatches.forEach(patch => {
+      // Dark green base
+      const tallGrassBase = new THREE.Mesh(
+        new THREE.CircleGeometry(patch.radius, 16),
+        new THREE.MeshLambertMaterial({ color: 0x2d5a27 })
+      );
+      tallGrassBase.rotation.x = -Math.PI / 2;
+      tallGrassBase.position.set(patch.x, 0.04, patch.z);
+      tallGrassBase.userData.biome = 'tallGrass';
+      scene.add(tallGrassBase);
+      biomeZones.push({ type: 'tallGrass', ...patch });
+      
+      // Grass blades
+      const bladeGeo = new THREE.ConeGeometry(0.1, 0.8, 4);
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0x3d7a35 });
+      for (let i = 0; i < 80; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * patch.radius * 0.9;
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(
+          patch.x + Math.cos(angle) * dist,
+          0.4,
+          patch.z + Math.sin(angle) * dist
+        );
+        blade.rotation.x = (Math.random() - 0.5) * 0.3;
+        blade.rotation.z = (Math.random() - 0.5) * 0.3;
+        scene.add(blade);
+      }
+    });
+    
+    // Ocean border
+    const oceanGeometry = new THREE.PlaneGeometry(WORLD_SIZE * 4, WORLD_SIZE * 4);
+    const oceanMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x1a5276, 
+      transparent: true, 
+      opacity: 0.9 
+    });
+    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.y = -0.5;
+    scene.add(ocean);
+    
+    // Helper function to get biome at position
+    function getBiomeAt(x, z) {
+      for (const zone of biomeZones) {
+        const dx = x - zone.x;
+        const dz = z - zone.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        
+        if (zone.innerRadius !== undefined) {
+          if (dist >= zone.innerRadius && dist <= zone.outerRadius) return zone.type;
+        } else if (dist <= zone.radius) {
+          return zone.type;
+        }
+      }
+      return 'grass';
+    }
+    
+    // ============================================
+    // ===== CREAZIONE OGGETTI RACCOGLIBILI =====
+    // ============================================
+    
+    // Geometrie condivise per ottimizzazione
+    const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 2, 8);
+    const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+    const leavesGeometry = new THREE.SphereGeometry(1.5, 8, 6);
+    const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22 });
+    
+    const rockGeometry = new THREE.IcosahedronGeometry(0.8, 0);
+    const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    
+    function createTree(x, z) {
+      const group = new THREE.Group();
+      
+      // Tronco
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = 1;
+      trunk.castShadow = true;
+      group.add(trunk);
+      
+      // Foglie
+      const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+      leaves.position.y = 3;
+      leaves.castShadow = true;
+      group.add(leaves);
+      
+      group.position.set(x, 0, z);
+      group.userData = { 
+        type: 'tree', 
+        resource: 'wood', 
+        amount: 2,
+        collected: false 
+      };
+      
+      scene.add(group);
+      collectibles.push(group);
+      
+      return group;
+    }
+    
+    function createRock(x, z) {
+      const scale = 0.5 + Math.random() * 0.8;
+      const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+      rock.position.set(x, scale * 0.4, z);
+      rock.scale.set(scale, scale * 0.7, scale);
+      rock.rotation.y = Math.random() * Math.PI * 2;
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      rock.userData = { 
+        type: 'rock', 
+        resource: 'stone', 
+        amount: 2,
+        collected: false 
+      };
+      
+      scene.add(rock);
+      collectibles.push(rock);
+      
+      return rock;
+    }
+    
+    // Funzione per generare posizione casuale non sovrapposta
+    function getRandomPosition(minDist = 5) {
+      let x, z, valid;
+      let attempts = 0;
+      
+      do {
+        x = (Math.random() - 0.5) * (WORLD_SIZE * 1.6);
+        z = (Math.random() - 0.5) * (WORLD_SIZE * 1.6);
+        valid = true;
+        
+        // Controlla distanza da altri oggetti
+        for (const obj of collectibles) {
+          const dx = obj.position.x - x;
+          const dz = obj.position.z - z;
+          if (Math.sqrt(dx * dx + dz * dz) < minDist) {
+            valid = false;
+            break;
+          }
+        }
+        
+        // Non troppo vicino al centro (spawn player)
+        if (Math.abs(x) < 8 && Math.abs(z) < 8) valid = false;
+        
+        attempts++;
+      } while (!valid && attempts < 50);
+      
+      return { x, z };
+    }
+    
+    // Genera alberi
+    for (let i = 0; i < 40; i++) {
+      const pos = getRandomPosition(6);
+      createTree(pos.x, pos.z);
+    }
+    
+    // Genera rocce
+    for (let i = 0; i < 25; i++) {
+      const pos = getRandomPosition(4);
+      createRock(pos.x, pos.z);
+    }
+    
+    // Genera depositi di sabbia sulla spiaggia
+    const sandDepositGeo = new THREE.DodecahedronGeometry(0.5, 0);
+    const sandDepositMat = new THREE.MeshLambertMaterial({ color: 0xe5c07b });
+    
+    for (let i = 0; i < 15; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 25 + Math.random() * 10; // Within beach ring
+      const x = -30 + Math.cos(angle) * dist;
+      const z = 20 + Math.sin(angle) * dist;
+      
+      const sandPile = new THREE.Mesh(sandDepositGeo, sandDepositMat);
+      sandPile.position.set(x, 0.3, z);
+      sandPile.scale.set(1 + Math.random() * 0.5, 0.5, 1 + Math.random() * 0.5);
+      sandPile.rotation.y = Math.random() * Math.PI;
+      sandPile.castShadow = true;
+      sandPile.userData = { type: 'sand', resource: 'sand', amount: 2, collected: false };
+      scene.add(sandPile);
+      collectibles.push(sandPile);
+    }
+    
+    // Aggiungi qualche fiore decorativo
+    const flowerColors = [0xff69b4, 0xffff00, 0xff4500, 0xda70d6, 0x00bfff, 0xffffff];
+    
+    function createFlower(x, z, color) {
+       const group = new THREE.Group();
+       
+       // Stem
+       const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.02, 0.4, 5),
+          new THREE.MeshLambertMaterial({ color: 0x27ae60 })
+       );
+       stem.position.y = 0.2;
+       group.add(stem);
+       
+       // Center
+       const center = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 6, 6),
+          new THREE.MeshLambertMaterial({ color: 0xffff00 })
+       );
+       center.position.y = 0.4;
+       group.add(center);
+       
+       // Petals
+       const petalGeo = new THREE.SphereGeometry(0.1, 6, 4);
+       const petalMat = new THREE.MeshLambertMaterial({ color: color });
+       
+       for(let i=0; i<5; i++) {
+          const petal = new THREE.Mesh(petalGeo, petalMat);
+          const angle = (i / 5) * Math.PI * 2;
+          petal.position.set(Math.cos(angle)*0.1, 0.4, Math.sin(angle)*0.1);
+          petal.scale.set(1, 0.5, 1);
+          petal.rotation.x = -Math.PI/4;
+          group.add(petal);
+       }
+       
+       group.position.set(x, 0, z);
+       // Check height
+       group.position.y = Math.max(0.04, getGroundHeight(x, z));
+       
+       scene.add(group);
+    }
+    
+    for (let i = 0; i < 100; i++) {
+      const x = (Math.random() - 0.5) * WORLD_SIZE * 1.8;
+      const z = (Math.random() - 0.5) * WORLD_SIZE * 1.8;
+      const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+      
+      createFlower(x, z, color);
+    }
+    
+    // ============================================
+    // ===== CREATURE SYSTEM =====
+    // ============================================
+    
+    function createCreature(pokemonKey) {
+      const pokemon = POKEMON[pokemonKey];
+      const group = new THREE.Group();
+      
+      // Body (colored sphere/cube)
+      let bodyGeo, bodyColor;
+      switch (pokemonKey) {
+        case 'bulbasaur':
+          bodyGeo = new THREE.SphereGeometry(0.5, 8, 6);
+          bodyColor = 0x68a678;
+          break;
+        case 'squirtle':
+          bodyGeo = new THREE.SphereGeometry(0.5, 8, 6);
+          bodyColor = 0x5dade2;
+          break;
+        case 'charmander':
+          bodyGeo = new THREE.SphereGeometry(0.5, 8, 6);
+          bodyColor = 0xe67e22;
+          break;
+        case 'pikachu':
+          bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.5);
+          bodyColor = 0xf1c40f;
+          break;
+        case 'snorlax':
+          bodyGeo = new THREE.SphereGeometry(1.2, 12, 10);
+          bodyColor = 0x2c3e50; // Dark blue/green
+          break;
+        case 'caterpie':
+          bodyGeo = new THREE.CylinderGeometry(0.2, 0.25, 0.8, 8);
+          bodyColor = 0x7dcea0;
+          break;
+        case 'poliwag':
+          bodyGeo = new THREE.SphereGeometry(0.4, 10, 8);
+          bodyColor = 0x5499c7;
+          break;
+        case 'zubat':
+          bodyGeo = new THREE.DodecahedronGeometry(0.3);
+          bodyColor = 0x8e44ad;
+          break;
+      }
+      
+      const body = new THREE.Mesh(bodyGeo, new THREE.MeshLambertMaterial({ color: bodyColor }));
+      body.position.y = 0.5;
+      if (pokemonKey === 'snorlax') body.position.y = 1.0;
+      if (pokemonKey === 'caterpie') { body.rotation.z = Math.PI / 2; body.position.y = 0.3; }
+      if (pokemonKey === 'zubat') body.position.y = 1.5; // Flying
+      body.castShadow = true;
+      group.add(body);
+      
+      // Eyes
+      const eyeGeo = new THREE.SphereGeometry(0.08, 6, 4);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+      
+      if (pokemonKey === 'snorlax') {
+        // Sleepy eyes (lines)
+        const closedEyeGeo = new THREE.BoxGeometry(0.3, 0.05, 0.05);
+        const lEye = new THREE.Mesh(closedEyeGeo, eyeMat);
+        lEye.position.set(-0.4, 1.5, 0.9);
+        lEye.rotation.z = 0.1;
+        group.add(lEye);
+        
+        const rEye = new THREE.Mesh(closedEyeGeo, eyeMat);
+        rEye.position.set(0.4, 1.5, 0.9);
+        rEye.rotation.z = -0.1;
+        group.add(rEye);
+        
+        // Belly
+        const belly = new THREE.Mesh(
+           new THREE.SphereGeometry(1.0, 10, 8),
+           new THREE.MeshLambertMaterial({ color: 0xf5e6ca })
+        );
+        belly.position.set(0, 0.8, 0.3);
+        belly.scale.set(0.9, 0.9, 0.5);
+        group.add(belly);
+      } else {
+        leftEye.position.set(-0.15, 0.6, 0.4);
+        group.add(leftEye);
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.15, 0.6, 0.4);
+        group.add(rightEye);
+      }
+      
+      // Type-specific features
+      if (pokemonKey === 'bulbasaur') {
+        const bulb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 6, 4),
+          new THREE.MeshLambertMaterial({ color: 0x27ae60 })
+        );
+        bulb.position.set(0, 1, -0.1);
+        group.add(bulb);
+      } else if (pokemonKey === 'charmander') {
+        const flame = new THREE.Mesh(
+          new THREE.ConeGeometry(0.15, 0.4, 6),
+          new THREE.MeshBasicMaterial({ color: 0xff6600 })
+        );
+        flame.position.set(0, 0.3, -0.5);
+        flame.rotation.x = Math.PI / 4;
+        group.add(flame);
+      } else if (pokemonKey === 'pikachu') {
+        // Ears
+        const earGeo = new THREE.ConeGeometry(0.1, 0.4, 4);
+        const earMat = new THREE.MeshLambertMaterial({ color: 0xf1c40f });
+        const leftEar = new THREE.Mesh(earGeo, earMat);
+        leftEar.position.set(-0.2, 1.1, 0);
+        group.add(leftEar);
+        const rightEar = new THREE.Mesh(earGeo, earMat);
+        rightEar.position.set(0.2, 1.1, 0);
+        group.add(rightEar);
+        // Red cheeks
+        const cheekGeo = new THREE.SphereGeometry(0.1, 6, 4);
+        const cheekMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+        const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
+        leftCheek.position.set(-0.35, 0.5, 0.3);
+        group.add(leftCheek);
+        const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
+        rightCheek.position.set(0.35, 0.5, 0.3);
+        group.add(rightCheek);
+      } else if (pokemonKey === 'squirtle') {
+        // Shell
+        const shell = new THREE.Mesh(
+          new THREE.SphereGeometry(0.4, 8, 6),
+          new THREE.MeshLambertMaterial({ color: 0x935116 })
+        );
+        shell.position.set(0, 0.5, -0.3);
+        shell.scale.set(1, 0.8, 0.6);
+        group.add(shell);
+      } else if (pokemonKey === 'poliwag') {
+        // Swirl
+        const swirlGeo = new THREE.CircleGeometry(0.25, 16);
+        const swirlMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const swirl = new THREE.Mesh(swirlGeo, swirlMat);
+        swirl.position.set(0, 0, 0.35); // Front of body
+        group.add(swirl);
+        // Inner swirl (blue spiral simplified as circle)
+        const inSwirl = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), new THREE.MeshBasicMaterial({ color: 0x2980b9 }));
+        inSwirl.position.z = 0.01;
+        swirl.add(inSwirl);
+      } else if (pokemonKey === 'zubat') {
+        // Wings
+        const wingGeo = new THREE.BufferGeometry();
+        const vertices = new Float32Array([
+           0, 0, 0,
+           0.8, 0.3, 0.2,
+           0.5, -0.2, 0,
+           
+           0, 0, 0,
+           -0.8, 0.3, 0.2,
+           -0.5, -0.2, 0
+        ]);
+        wingGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        const wingMat = new THREE.MeshBasicMaterial({ color: 0x7d3c98, side: THREE.DoubleSide });
+        const wings = new THREE.Mesh(wingGeo, wingMat);
+        group.add(wings);
+      } else if (pokemonKey === 'caterpie') {
+        // Antenna
+        const antGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3);
+        const antMat = new THREE.MeshLambertMaterial({ color: 0xe74c3c });
+        const ant = new THREE.Mesh(antGeo, antMat);
+        ant.position.set(0.2, 0.2, 0); // Head is right side of cylinder
+        ant.rotation.z = -0.5;
+        group.add(ant);
+      }
+      
+      group.userData = { pokemonKey, pokemon, captured: false };
+      return group;
+    }
+    
+    function spawnCreature(pokemonKey, xPos = null, zPos = null) {
+      // If xPos/zPos provided, force spawn there (for "Call" feature)
+      // Otherwise check if already caught or random spawn logic
+      if (!xPos && POKEMON[pokemonKey].caught && !POKEMON[pokemonKey].isCalled) return; 
+      
+      const pokemon = POKEMON[pokemonKey];
+      let x, z, validPos = false;
+      
+      if (xPos !== null && zPos !== null) {
+        x = xPos;
+        z = zPos;
+        validPos = true;
+      } else {
+          let attempts = 0;
+          while (!validPos && attempts < 50) {
+            if (pokemon.biome === 'random') {
+              x = (Math.random() - 0.5) * WORLD_SIZE * 1.5;
+              z = (Math.random() - 0.5) * WORLD_SIZE * 1.5;
+              validPos = true;
+            } else {
+              // Find a zone matching the biome
+              const matchingZones = biomeZones.filter(zone => zone.type === pokemon.biome);
+              if (matchingZones.length > 0) {
+                const zone = matchingZones[Math.floor(Math.random() * matchingZones.length)];
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * (zone.radius || zone.outerRadius) * 0.7;
+                x = zone.x + Math.cos(angle) * dist;
+                z = zone.z + Math.sin(angle) * dist;
+                validPos = true;
+              }
+            }
+            attempts++;
+          }
+      }
+      
+      if (!validPos) return;
+      
+      const creature = createCreature(pokemonKey);
+      const y = getGroundHeight(x, z);
+      creature.position.set(x, y, z);
+      creature.userData.spawnTime = performance.now();
+      
+      // Random movement props
+      creature.userData.moveTimer = 0;
+      creature.userData.moveDir = new THREE.Vector3();
+      creature.userData.isMoving = false;
+      
+      scene.add(creature);
+      creatures.push(creature);
+    }
+    
+    // Initial creature spawning
+    function initCreatures() {
+      const commons = ['bulbasaur', 'squirtle', 'charmander', 'caterpie', 'poliwag'];
+      commons.forEach(key => {
+        if (!POKEMON[key].caught) spawnCreature(key);
+      });
+      
+      // Rare/Scenario spawns
+      if (Math.random() < 0.5 && !POKEMON['pikachu'].caught) spawnCreature('pikachu');
+      if (Math.random() < 0.3 && !POKEMON['snorlax'].caught) spawnCreature('snorlax');
+      if (Math.random() < 0.3 && !POKEMON['zubat'].caught) spawnCreature('zubat');
+    }
+    
+    // Respawn creatures periodically
+    let lastCreatureSpawn = 0;
+    function updateCreatures() {
+      const now = performance.now();
+      
+      // Respawn logic
+      if (now - lastCreatureSpawn > 30000) {
+        lastCreatureSpawn = now;
+        Object.keys(POKEMON).forEach(key => {
+          if (!POKEMON[key].caught && !creatures.find(c => c.userData.pokemonKey === key)) {
+            if (POKEMON[key].rare) {
+              if (Math.random() < 0.3) spawnCreature(key);
+            } else {
+              spawnCreature(key);
+            }
+          }
+        });
+      }
+      
+      // AI & Animation
+      const delta = 0.016; // Approx
+      creatures.forEach(creature => {
+        if (!creature.userData.captured) {
+           
+           // Random Movement AI
+           creature.userData.moveTimer -= delta * 1000;
+           if (creature.userData.moveTimer <= 0) {
+              if (creature.userData.isMoving) {
+                 // Stop
+                 creature.userData.isMoving = false;
+                 creature.userData.moveTimer = 2000 + Math.random() * 3000;
+              } else {
+                 // Start moving
+                 creature.userData.isMoving = true;
+                 creature.userData.moveTimer = 1000 + Math.random() * 2000;
+                 const angle = Math.random() * Math.PI * 2;
+                 creature.userData.moveDir.set(Math.sin(angle), 0, Math.cos(angle));
+                 creature.rotation.y = angle;
+              }
+           }
+           
+           if (creature.userData.isMoving) {
+              const speed = 0.05;
+              const newX = creature.position.x + creature.userData.moveDir.x * speed;
+              const newZ = creature.position.z + creature.userData.moveDir.z * speed;
+              
+              const h = getGroundHeight(newX, newZ);
+              creature.position.x = newX;
+              creature.position.z = newZ;
+              // Ensure height is at least road level if on road
+              creature.position.y = Math.max(0.1, h) + (0.1 + Math.sin(now * 0.003 + creature.id) * 0.1); 
+           } else {
+              // Just bobbing
+              const h = getGroundHeight(creature.position.x, creature.position.z);
+              creature.position.y = Math.max(0.1, h) + (0.1 + Math.sin(now * 0.003 + creature.id) * 0.1);
+           }
+           
+           // Pikachu + Lamp Check
+           if (creature.userData.pokemonKey === 'pikachu') {
+               checkPikachuLampInteraction(creature);
+           }
+           
+           // Squirtle + Fountain Check
+           if (creature.userData.pokemonKey === 'squirtle') {
+               checkSquirtleFountainInteraction(creature);
+           }
+        }
+      });
+    }
+
+    function checkPikachuLampInteraction(pikachu) {
+       // Only at night/dusk
+       if (gameState.dayTime > 0.25 && gameState.dayTime < 0.75) return; // Day time
+       
+       for (const obj of placedObjects) {
+          if (obj.userData.type === 'streetlamp' && !obj.userData.isOn) {
+             const dx = obj.position.x - pikachu.position.x;
+             const dz = obj.position.z - pikachu.position.z;
+             if (dx*dx + dz*dz < 25) { // Distance < 5
+                 // Trigger lightning
+                 obj.userData.isOn = true;
+                 if (obj.userData.light) obj.userData.light.intensity = 1.0;
+                 if (obj.userData.bulb) obj.userData.bulb.material.emissive.setHex(0xffff00);
+                 
+                 // Animation hint
+                 createLightning(pikachu.position, obj.position);
+             }
+          }
+       }
+    }
+    
+    function checkSquirtleFountainInteraction(squirtle) {
+       for (const obj of placedObjects) {
+          if (obj.userData.type === 'fountain' && obj.userData.water) {
+             const dx = obj.position.x - squirtle.position.x;
+             const dz = obj.position.z - squirtle.position.z;
+             const distSq = dx*dx + dz*dz;
+             
+             // Within 10 units (100 sq)
+             if (distSq < 100) { 
+                if (!obj.userData.isFlowing) {
+                   obj.userData.isFlowing = true;
+                   obj.userData.waterScale = 0.01;
+                   if (obj.userData.jet) obj.userData.jet.visible = true;
+                }
+                
+                // Animate water growing
+                if (obj.userData.waterScale < 1) {
+                   obj.userData.waterScale = Math.min(1, obj.userData.waterScale + 0.02);
+                   const s = obj.userData.waterScale;
+                   obj.userData.water.scale.set(s, 1, s);
+                }
+                
+             } else if (distSq > 144 && obj.userData.isFlowing) { // > 12 units
+                // Animate water shrinking
+                obj.userData.waterScale = Math.max(0.01, obj.userData.waterScale - 0.015);
+                const s = obj.userData.waterScale;
+                obj.userData.water.scale.set(s, 1, s);
+                
+                if (obj.userData.waterScale <= 0.01) {
+                   obj.userData.isFlowing = false;
+                   if (obj.userData.jet) obj.userData.jet.visible = false;
+                }
+             }
+          }
+       }
+    }
+    
+    function createLightning(start, end) {
+       // Create visible lightning bolt using cylinders
+       const group = new THREE.Group();
+       const lightMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+       
+       // Main bolt - multiple segments
+       const startY = start.y + 1;
+       const endY = end.y + 4.5; // Lamppost bulb height
+       const midX = (start.x + end.x) / 2 + (Math.random() - 0.5) * 2;
+       const midZ = (start.z + end.z) / 2 + (Math.random() - 0.5) * 2;
+       
+       // Segment 1
+       const bolt1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 2, 6), lightMat);
+       bolt1.position.set(start.x, startY + 1, start.z);
+       bolt1.lookAt(midX, startY + 2, midZ);
+       bolt1.rotateX(Math.PI / 2);
+       group.add(bolt1);
+       
+       // Segment 2
+       const bolt2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 2.5, 6), lightMat);
+       bolt2.position.set(midX, (startY + endY) / 2, midZ);
+       bolt2.lookAt(end.x, endY, end.z);
+       bolt2.rotateX(Math.PI / 2);
+       group.add(bolt2);
+       
+       // Glow sphere at impact
+       const glow = new THREE.Mesh(
+          new THREE.SphereGeometry(0.5, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.8 })
+       );
+       glow.position.set(end.x, endY, end.z);
+       group.add(glow);
+       
+       scene.add(group);
+       
+       // Flash effect
+       let flashCount = 0;
+       const flashInterval = setInterval(() => {
+          group.visible = !group.visible;
+          flashCount++;
+          if (flashCount > 6) {
+             clearInterval(flashInterval);
+             scene.remove(group);
+          }
+       }, 80);
+    }
+    
+    initCreatures();
+    
+    // ============================================
+    // ===== CREAZIONE GIOCATORE =====
+    // ============================================
+    
+    const player = {
+      mesh: null,
+      x: 0,
+      z: 0,
+      y: 0,
+      angle: 0,
+      speed: 0.15,
+      targetAngle: 0,
+    };
+    
+    function createPlayer() {
+      const group = new THREE.Group();
+      
+      // Corpo (capsula)
+      const bodyGeo = new THREE.CapsuleGeometry(0.4, 0.8, 4, 8);
+      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3498db });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 1;
+      body.castShadow = true;
+      group.add(body);
+      
+      // Testa
+      const headGeo = new THREE.SphereGeometry(0.35, 8, 6);
+      const headMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 1.8;
+      head.castShadow = true;
+      group.add(head);
+      
+      // Occhi
+      const eyeGeo = new THREE.SphereGeometry(0.06, 6, 4);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+      leftEye.position.set(-0.12, 1.85, 0.28);
+      group.add(leftEye);
+      
+      const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rightEye.position.set(0.12, 1.85, 0.28);
+      group.add(rightEye);
+      
+      // Cappello
+      const hatGeo = new THREE.CylinderGeometry(0.25, 0.4, 0.25, 8);
+      const hatMat = new THREE.MeshLambertMaterial({ color: 0xe74c3c });
+      const hat = new THREE.Mesh(hatGeo, hatMat);
+      hat.position.y = 2.15;
+      group.add(hat);
+      
+      return group;
+    }
+    
+    player.mesh = createPlayer();
+    scene.add(player.mesh);
+    
+    // ============================================
+    // ===== CAMERA CONTROLLER =====
+    // ============================================
+    
+    const cameraSettings = {
+      distance: 12,
+      height: 8,
+      targetHeight: 1.5,
+      rotationX: 0,
+      rotationY: 0,
+      smoothness: 0.08,
+    };
+    
+    let cameraTargetX = 0;
+    let cameraTargetZ = 0;
+    
+    function updateCamera() {
+      // Target position (player)
+      const targetX = player.x;
+      const targetZ = player.z;
+      
+      // Smooth follow
+      cameraTargetX += (targetX - cameraTargetX) * cameraSettings.smoothness;
+      cameraTargetZ += (targetZ - cameraTargetZ) * cameraSettings.smoothness;
+      
+      // Calculate camera position based on rotation
+      const camX = cameraTargetX + Math.sin(cameraSettings.rotationY) * cameraSettings.distance;
+      const camZ = cameraTargetZ + Math.cos(cameraSettings.rotationY) * cameraSettings.distance;
+      const camY = player.y + cameraSettings.height;
+      
+      camera.position.set(camX, camY, camZ);
+      camera.lookAt(cameraTargetX, player.y + cameraSettings.targetHeight, cameraTargetZ);
+    }
+    
+    // ============================================
+    // ===== INPUT HANDLING =====
+    // ============================================
+    
+    const keys = {};
+    let mouseDown = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    
+    document.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key === 'Shift') keys['shift'] = true;
+      
+      // Raccolta risorse o cattura creature
+      if (e.key.toLowerCase() === 'e') {
+        if (gameState.nearbyCreature) {
+          captureCreature(gameState.nearbyCreature);
+        } else if (gameState.nearbyCollectible) {
+          collectResource(gameState.nearbyCollectible);
+        }
+      }
+      
+      // Pokedex toggle
+      if (e.key.toLowerCase() === 'p' && !gameState.isPlacementMode) {
+        togglePokedex();
+      }
+      
+      // Crafting menu
+      if (e.key.toLowerCase() === 'c' && !gameState.isPlacementMode && !gameState.pokedexOpen) {
+        toggleCraftingMenu();
+      }
+      
+      // Annulla posizionamento
+      if (e.key === 'Escape') {
+        if (gameState.pokedexOpen) {
+          closePokedex();
+        } else if (gameState.isPlacementMode) {
+          cancelPlacement();
+        } else if (gameState.craftingOpen) {
+          closeCraftingMenu();
+        }
+      }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+      if (e.key === 'Shift') keys['shift'] = false;
+    });
+    
+    // Mouse per rotazione camera
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && gameState.isPlacementMode) {
+        placeObject();
+      } else if (e.button === 2 || e.button === 0) {
+        mouseDown = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      }
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+      mouseDown = false;
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (mouseDown && !gameState.isPlacementMode) {
+        const deltaX = e.clientX - lastMouseX;
+        cameraSettings.rotationY -= deltaX * 0.005;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      }
+      
+      if (gameState.isPlacementMode) {
+        updateGhostPosition(e);
+      }
+    });
+    
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    // ============================================
+    // ===== MOVIMENTO GIOCATORE =====
+    // ============================================
+    
+    function updatePlayer() {
+      let dx = 0;
+      let dz = 0;
+      
+      // Direzione basata sulla rotazione camera
+      const forward = new THREE.Vector3(
+        -Math.sin(cameraSettings.rotationY),
+        0,
+        -Math.cos(cameraSettings.rotationY)
+      );
+      const right = new THREE.Vector3(
+        Math.cos(cameraSettings.rotationY),
+        0,
+        -Math.sin(cameraSettings.rotationY)
+      );
+      
+      if (keys['w'] || keys['arrowup']) {
+        dx += forward.x;
+        dz += forward.z;
+      }
+      if (keys['s'] || keys['arrowdown']) {
+        dx -= forward.x;
+        dz -= forward.z;
+      }
+      if (keys['a'] || keys['arrowleft']) {
+        dx -= right.x;
+        dz -= right.z;
+      }
+      if (keys['d'] || keys['arrowright']) {
+        dx += right.x;
+        dz += right.z;
+      }
+      
+      // Normalizza e applica velocità
+      if (dx !== 0 || dz !== 0) {
+        const len = Math.sqrt(dx * dx + dz * dz);
+        dx /= len;
+        dz /= len;
+        
+        const currentSpeed = keys['shift'] ? player.speed * 1.8 : player.speed;
+        
+        const newX = player.x + dx * currentSpeed;
+        const newZ = player.z + dz * currentSpeed;
+        
+        // Limiti mondo
+        const limit = WORLD_SIZE - 2;
+        player.x = Math.max(-limit, Math.min(limit, newX));
+        player.z = Math.max(-limit, Math.min(limit, newZ));
+        
+        // Ruota player verso direzione movimento
+        player.targetAngle = Math.atan2(dx, dz);
+      }
+      
+      // Update Y based on terrain height
+      player.y = getGroundHeight(player.x, player.z);
+      
+      // Smooth rotation
+      let angleDiff = player.targetAngle - player.angle;
+      if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      player.angle += angleDiff * 0.15;
+      
+      // Aggiorna mesh
+      player.mesh.position.set(player.x, player.y, player.z);
+      player.mesh.rotation.y = player.angle;
+    }
+    
+    // ============================================
+    // ===== SISTEMA DI INTERAZIONE =====
+    // ============================================
+    
+    const interactionPrompt = document.getElementById('interaction-prompt');
+    const INTERACTION_DISTANCE = 3;
+    
+    function checkNearbyCollectibles() {
+      let nearestDist = Infinity;
+      let nearest = null;
+      
+      for (const obj of collectibles) {
+        if (obj.userData.collected) continue;
+        
+        const dx = obj.position.x - player.x;
+        const dz = obj.position.z - player.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        
+        if (dist < INTERACTION_DISTANCE && dist < nearestDist) {
+          nearestDist = dist;
+          nearest = obj;
+        }
+      }
+      
+      // Check for nearby creatures too
+      let nearestCreature = null;
+      let nearestCreatureDist = Infinity;
+      
+      for (const creature of creatures) {
+        if (creature.userData.captured) continue;
+        
+        const dx = creature.position.x - player.x;
+        const dz = creature.position.z - player.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        
+        if (dist < INTERACTION_DISTANCE && dist < nearestCreatureDist) {
+          nearestCreatureDist = dist;
+          nearestCreature = creature;
+        }
+      }
+      
+      gameState.nearbyCollectible = nearest;
+      gameState.nearbyCreature = nearestCreature;
+      
+      // Priority: creature > collectible for prompt
+      if (nearestCreature && !gameState.isPlacementMode && !gameState.craftingOpen && !gameState.pokedexOpen) {
+        const pokemon = nearestCreature.userData.pokemon;
+        interactionPrompt.innerHTML = `<span class="creature-nearby">${pokemon.emoji} ${pokemon.name} selvatico!</span><br>Premi <span class="key-hint">E</span> per catturare`;
+        interactionPrompt.style.display = 'block';
+      } else if (nearest && !gameState.isPlacementMode && !gameState.craftingOpen && !gameState.pokedexOpen) {
+        let resourceName;
+        if (nearest.userData.type === 'tree') resourceName = 'Legno';
+        else if (nearest.userData.type === 'rock') resourceName = 'Pietra';
+        else if (nearest.userData.type === 'sand') resourceName = 'Sabbia';
+        else resourceName = 'Risorsa';
+        interactionPrompt.innerHTML = `Premi <span class="key-hint">E</span> per raccogliere ${resourceName}`;
+        interactionPrompt.style.display = 'block';
+      } else {
+        interactionPrompt.style.display = 'none';
+      }
+    }
+    
+    function collectResource(obj) {
+      if (!obj || obj.userData.collected) return;
+      
+      const { resource, amount } = obj.userData;
+      
+      // Aggiungi risorsa
+      gameState[resource] += amount;
+      obj.userData.collected = true;
+      
+      // Animazione e rimozione
+      animateCollection(obj);
+      
+      // Mostra messaggio
+      let icon;
+      if (resource === 'wood') icon = '🪵';
+      else if (resource === 'stone') icon = '🪨';
+      else if (resource === 'sand') icon = '🏖️';
+      else icon = '📦';
+      showCollectMessage(icon, amount);
+      
+      // Aggiorna UI
+      updateResourceUI();
+      
+      gameState.nearbyCollectible = null;
+    }
+    
+    function animateCollection(obj) {
+      const startY = obj.position.y;
+      const startScale = obj.scale.clone();
+      let progress = 0;
+      
+      function animate() {
+        progress += 0.05;
+        
+        obj.position.y = startY + progress * 2;
+        const scale = 1 - progress;
+        obj.scale.set(
+          startScale.x * scale,
+          startScale.y * scale,
+          startScale.z * scale
+        );
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          scene.remove(obj);
+        }
+      }
+      
+      animate();
+    }
+    
+    function showCollectMessage(icon, amount) {
+      const msg = document.getElementById('collect-message');
+      msg.textContent = `+${amount} ${icon}`;
+      msg.classList.remove('show');
+      void msg.offsetWidth; // Force reflow
+      msg.classList.add('show');
+      
+      setTimeout(() => {
+        msg.classList.remove('show');
+      }, 1000);
+    }
+    
+    // ============================================
+    // ===== SISTEMA UI =====
+    // ============================================
+    
+    function updateResourceUI() {
+      document.getElementById('wood-count').textContent = gameState.wood;
+      document.getElementById('stone-count').textContent = gameState.stone;
+      document.getElementById('sand-count').textContent = gameState.sand;
+      
+      // Update Pokedex counter
+      const caught = Object.values(POKEMON).filter(p => p.caught).length;
+      const total = Object.keys(POKEMON).length;
+      document.getElementById('pokedex-counter').textContent = `📱 Pokédex: ${caught}/${total} (P)`;
+      
+      updateCraftingButtons();
+    }
+    
+    function updateCraftingButtons() {
+      // Panchina
+      const canCraftBench = gameState.wood >= 5 && gameState.stone >= 3;
+      document.getElementById('craft-bench-btn').disabled = !canCraftBench;
+      document.getElementById('bench-wood').className = 
+        'craft-req ' + (gameState.wood >= 5 ? 'has' : 'missing');
+      document.getElementById('bench-stone').className = 
+        'craft-req ' + (gameState.stone >= 3 ? 'has' : 'missing');
+      
+      // Staccionata
+      const canCraftFence = gameState.wood >= 3;
+      document.getElementById('craft-fence-btn').disabled = !canCraftFence;
+      document.getElementById('fence-wood').className = 
+        'craft-req ' + (gameState.wood >= 3 ? 'has' : 'missing');
+      
+      // Pozzo
+      const canCraftWell = gameState.wood >= 4 && gameState.stone >= 8;
+      document.getElementById('craft-well-btn').disabled = !canCraftWell;
+      document.getElementById('well-wood').className = 
+        'craft-req ' + (gameState.wood >= 4 ? 'has' : 'missing');
+      document.getElementById('well-stone').className = 
+        'craft-req ' + (gameState.stone >= 8 ? 'has' : 'missing');
+        
+      // Lampione
+      const canCraftStreetlamp = gameState.wood >= 2 && gameState.stone >= 2;
+      document.getElementById('craft-streetlamp-btn').disabled = !canCraftStreetlamp;
+      document.getElementById('streetlamp-wood').className = 
+        'craft-req ' + (gameState.wood >= 2 ? 'has' : 'missing');
+      document.getElementById('streetlamp-stone').className = 
+        'craft-req ' + (gameState.stone >= 2 ? 'has' : 'missing');
+        
+      // Fontana
+      const canCraftFountain = gameState.wood >= 2 && gameState.stone >= 10;
+      document.getElementById('craft-fountain-btn').disabled = !canCraftFountain;
+      document.getElementById('fountain-wood').className = 
+        'craft-req ' + (gameState.wood >= 2 ? 'has' : 'missing');
+      document.getElementById('fountain-stone').className = 
+        'craft-req ' + (gameState.stone >= 10 ? 'has' : 'missing');
+    }
+    
+    // ============================================
+    // ===== SISTEMA POKEDEX & CATTURA =====
+    // ============================================
+    
+    const pokedexModal = document.getElementById('pokedex-modal');
+    const closePokedexBtn = document.getElementById('close-pokedex');
+    
+    function togglePokedex() {
+      if (gameState.pokedexOpen) {
+        closePokedex();
+      } else {
+        openPokedex();
+      }
+    }
+    
+    function openPokedex() {
+      gameState.pokedexOpen = true;
+      updatePokedexUI();
+      pokedexModal.classList.add('active');
+    }
+    
+    function closePokedex() {
+      gameState.pokedexOpen = false;
+      pokedexModal.classList.remove('active');
+    }
+    
+    function updatePokedexUI() {
+      const list = document.getElementById('pokedex-list');
+      list.innerHTML = '';
+      
+      Object.entries(POKEMON).forEach(([key, pokemon]) => {
+        const entry = document.createElement('div');
+        entry.className = 'pokemon-entry';
+        
+        if (pokemon.caught) {
+          entry.classList.add('caught');
+          
+          const isSpawned = creatures.find(c => c.userData.pokemonKey === key);
+          let actionHtml = '';
+          
+          if (!isSpawned) {
+             actionHtml = `<button class="pokedex-action-btn" onclick="window.callPokemon('${key}')">Chiama 📢</button>`;
+          } else {
+             actionHtml = `<span class="pokedex-status-text">In giro 🌲</span>`;
+          }
+          
+          entry.innerHTML = `
+            <div class="pokemon-icon">${pokemon.emoji}</div>
+            <div class="pokemon-info">
+              <span class="pokemon-name">${pokemon.name}</span>
+              <span class="pokemon-type type-${pokemon.type}">${pokemon.type.toUpperCase()}</span>
+            </div>
+            <div class="pokemon-actions">
+               <span class="pokemon-status">✓</span>
+               ${actionHtml}
+            </div>
+          `;
+        } else {
+          entry.innerHTML = `
+            <div class="pokemon-icon">❓</div>
+            <div class="pokemon-info">
+              <span class="pokemon-name">???</span>
+              <span class="pokemon-type">???</span>
+            </div>
+            <span class="pokemon-status">Non scoperto</span>
+          `;
+        }
+        
+        list.appendChild(entry);
+      });
+    }
+    
+    // Global function for the button
+    window.callPokemon = function(key) {
+       if (!POKEMON[key].caught) return;
+       
+       // Spawn near player
+       const spawnDist = 4;
+       // Spawn in front of player (based on rotation)
+       const x = player.x + Math.sin(player.angle) * spawnDist; 
+       const z = player.z + Math.cos(player.angle) * spawnDist;
+       
+       POKEMON[key].isCalled = true;
+       
+       // Create creature directly with proper position
+       const creature = createCreature(key);
+       const h = getGroundHeight(x, z);
+       creature.position.set(x, Math.max(h + 0.5, 0.5), z); // Start higher
+       creature.userData.spawnTime = performance.now();
+       creature.userData.moveTimer = 0;
+       creature.userData.moveDir = new THREE.Vector3();
+       creature.userData.isMoving = false;
+       creature.visible = true;
+       
+       scene.add(creature);
+       creatures.push(creature);
+       
+       // Update UI
+       updatePokedexUI();
+       closePokedex();
+       
+       // Show message
+       const msg = document.getElementById('collect-message');
+       msg.innerHTML = `${POKEMON[key].emoji} ${POKEMON[key].name} chiamato!`;
+       msg.classList.remove('show');
+       void msg.offsetWidth;
+       msg.classList.add('show');
+       setTimeout(() => msg.classList.remove('show'), 2000);
+    };
+    
+    function captureCreature(creature) {
+      if (!creature || creature.userData.captured) return;
+      
+      const pokemonKey = creature.userData.pokemonKey;
+      const pokemon = POKEMON[pokemonKey];
+      
+      // Mark as captured
+      creature.userData.captured = true;
+      pokemon.caught = true;
+      
+      // Animate capture
+      const startScale = creature.scale.clone();
+      const startY = creature.position.y;
+      let progress = 0;
+      
+      function animateCapture() {
+        progress += 0.03;
+        
+        // Spin and shrink
+        creature.rotation.y += 0.3;
+        creature.position.y = startY + Math.sin(progress * Math.PI) * 2;
+        const scale = 1 - progress;
+        creature.scale.set(scale, scale, scale);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateCapture);
+        } else {
+          scene.remove(creature);
+          const idx = creatures.indexOf(creature);
+          if (idx > -1) creatures.splice(idx, 1);
+        }
+      }
+      
+      animateCapture();
+      
+      // Show capture message
+      showCollectMessage(pokemon.emoji, pokemon.name);
+      
+      // Update UI
+      updateResourceUI();
+      
+      gameState.nearbyCreature = null;
+    }
+    
+    // Bind pokedex button and close
+    document.getElementById('pokedex-counter').addEventListener('click', togglePokedex);
+    closePokedexBtn.addEventListener('click', closePokedex);
+    
+    // ============================================
+    // ===== SISTEMA CRAFTING =====
+    // ============================================
+    
+    const craftingModal = document.getElementById('crafting-modal');
+    const craftingBtn = document.getElementById('crafting-btn');
+    const closeCraftingBtn = document.getElementById('close-crafting');
+    
+    function toggleCraftingMenu() {
+      if (gameState.craftingOpen) {
+        closeCraftingMenu();
+      } else {
+        openCraftingMenu();
+      }
+    }
+    
+    function openCraftingMenu() {
+      gameState.craftingOpen = true;
+      craftingModal.classList.add('active');
+      updateCraftingButtons();
+    }
+    
+    function closeCraftingMenu() {
+      gameState.craftingOpen = false;
+      craftingModal.classList.remove('active');
+    }
+    
+    craftingBtn.addEventListener('click', toggleCraftingMenu);
+    closeCraftingBtn.addEventListener('click', closeCraftingMenu);
+    
+    // Crafta panchina
+    document.getElementById('craft-bench-btn').addEventListener('click', () => {
+      if (gameState.wood >= 5 && gameState.stone >= 3) {
+        gameState.wood -= 5;
+        gameState.stone -= 3;
+        updateResourceUI();
+        closeCraftingMenu();
+        startPlacementMode('bench');
+      }
+    });
+    
+    // Crafta staccionata
+    document.getElementById('craft-fence-btn').addEventListener('click', () => {
+      if (gameState.wood >= 3) {
+        gameState.wood -= 3;
+        updateResourceUI();
+        closeCraftingMenu();
+        startPlacementMode('fence');
+      }
+    });
+    
+    // Crafta pozzo
+    document.getElementById('craft-well-btn').addEventListener('click', () => {
+      if (gameState.wood >= 4 && gameState.stone >= 8) {
+        gameState.wood -= 4;
+        gameState.stone -= 8;
+        updateResourceUI();
+        closeCraftingMenu();
+        startPlacementMode('well');
+      }
+    });
+
+    // Crafta lampione
+    document.getElementById('craft-streetlamp-btn').addEventListener('click', () => {
+      if (gameState.wood >= 2 && gameState.stone >= 2) {
+        gameState.wood -= 2;
+        gameState.stone -= 2;
+        updateResourceUI();
+        closeCraftingMenu();
+        startPlacementMode('streetlamp');
+      }
+    });
+    
+    // Crafta fontana
+    document.getElementById('craft-fountain-btn').addEventListener('click', () => {
+      if (gameState.wood >= 2 && gameState.stone >= 10) {
+        gameState.wood -= 2;
+        gameState.stone -= 10;
+        updateResourceUI();
+        closeCraftingMenu();
+        startPlacementMode('fountain');
+      }
+    });
+    
+    // ============================================
+    // ===== SISTEMA POSIZIONAMENTO =====
+    // ============================================
+    
+    let ghostObject = null;
+    const placementUI = document.getElementById('placement-mode');
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    
+    function createPlaceableObject(type, isGhost = false) {
+      const group = new THREE.Group();
+      
+      if (type === 'bench') {
+        // Seduta
+        const seatGeo = new THREE.BoxGeometry(2, 0.15, 0.6);
+        const seatMat = new THREE.MeshLambertMaterial({ 
+          color: 0x8b4513,
+          transparent: isGhost,
+          opacity: isGhost ? 0.5 : 1
+        });
+        const seat = new THREE.Mesh(seatGeo, seatMat);
+        seat.position.y = 0.6;
+        seat.castShadow = !isGhost;
+        group.add(seat);
+        
+        // Schienale
+        const backGeo = new THREE.BoxGeometry(2, 0.6, 0.1);
+        const back = new THREE.Mesh(backGeo, seatMat);
+        back.position.set(0, 1, -0.25);
+        back.castShadow = !isGhost;
+        group.add(back);
+        
+        // Gambe
+        const legGeo = new THREE.BoxGeometry(0.1, 0.6, 0.5);
+        const leg1 = new THREE.Mesh(legGeo, seatMat);
+        leg1.position.set(-0.8, 0.3, 0);
+        group.add(leg1);
+        const leg2 = new THREE.Mesh(legGeo, seatMat);
+        leg2.position.set(0.8, 0.3, 0);
+        group.add(leg2);
+        
+      } else if (type === 'fence') {
+        // Staccionata
+        const postGeo = new THREE.BoxGeometry(0.15, 1.2, 0.15);
+        const plankGeo = new THREE.BoxGeometry(1.8, 0.15, 0.08);
+        const fenceMat = new THREE.MeshLambertMaterial({ 
+          color: 0xdeb887,
+          transparent: isGhost,
+          opacity: isGhost ? 0.5 : 1
+        });
+        
+        // Pali
+        const post1 = new THREE.Mesh(postGeo, fenceMat);
+        post1.position.set(-0.8, 0.6, 0);
+        post1.castShadow = !isGhost;
+        group.add(post1);
+        
+        const post2 = new THREE.Mesh(postGeo, fenceMat);
+        post2.position.set(0.8, 0.6, 0);
+        post2.castShadow = !isGhost;
+        group.add(post2);
+        
+        // Tavole orizzontali
+        const plank1 = new THREE.Mesh(plankGeo, fenceMat);
+        plank1.position.set(0, 0.4, 0);
+        group.add(plank1);
+        
+        const plank2 = new THREE.Mesh(plankGeo, fenceMat);
+        plank2.position.set(0, 0.9, 0);
+        group.add(plank2);
+        
+      } else if (type === 'well') {
+        // Pozzo existing code...
+        // Base circolare
+        const baseGeo = new THREE.CylinderGeometry(0.9, 1, 0.8, 12);
+        const stoneMat = new THREE.MeshLambertMaterial({ 
+          color: 0x808080,
+          transparent: isGhost,
+          opacity: isGhost ? 0.5 : 1
+        });
+        const base = new THREE.Mesh(baseGeo, stoneMat);
+        base.position.y = 0.4;
+        base.castShadow = !isGhost;
+        group.add(base);
+        
+        // Acqua interna
+        if (!isGhost) {
+          const waterGeo = new THREE.CircleGeometry(0.7, 12);
+          const waterMat = new THREE.MeshLambertMaterial({ color: 0x4da6ff });
+          const wellWater = new THREE.Mesh(waterGeo, waterMat);
+          wellWater.rotation.x = -Math.PI / 2;
+          wellWater.position.y = 0.75;
+          group.add(wellWater);
+        }
+        
+        // Pali supporto tetto
+        const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6);
+        const woodMat = new THREE.MeshLambertMaterial({ 
+          color: 0x8b4513,
+          transparent: isGhost,
+          opacity: isGhost ? 0.5 : 1
+        });
+        
+        const postA = new THREE.Mesh(postGeo, woodMat);
+        postA.position.set(-0.6, 1.55, 0);
+        group.add(postA);
+        
+        const postB = new THREE.Mesh(postGeo, woodMat);
+        postB.position.set(0.6, 1.55, 0);
+        group.add(postB);
+        
+        // Tetto
+        const roofGeo = new THREE.ConeGeometry(1, 0.6, 6);
+        const roofMat = new THREE.MeshLambertMaterial({ 
+          color: 0xa0522d,
+          transparent: isGhost,
+          opacity: isGhost ? 0.5 : 1
+        });
+        const roof = new THREE.Mesh(roofGeo, roofMat);
+        roof.position.y = 2.5;
+        roof.castShadow = !isGhost;
+        group.add(roof);
+
+      } else if (type === 'streetlamp') {
+         // Pole
+         const poleGeo = new THREE.CylinderGeometry(0.1, 0.15, 4, 8);
+         const poleMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+         const pole = new THREE.Mesh(poleGeo, poleMat);
+         pole.position.y = 2;
+         pole.castShadow = !isGhost;
+         group.add(pole);
+         
+         // Lamp head
+         const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+         const headMat = new THREE.MeshLambertMaterial({ color: 0x34495e });
+         const head = new THREE.Mesh(headGeo, headMat);
+         head.position.y = 4.2;
+         group.add(head);
+         
+         // Bulb / Light
+         const bulbGeo = new THREE.SphereGeometry(0.2, 8, 8);
+         const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffcc }); 
+         const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+         bulb.position.y = 4;
+         group.add(bulb);
+         
+         if (!isGhost) {
+            const light = new THREE.PointLight(0xffffcc, 0, 15);
+            light.position.y = 3.5;
+            group.add(light);
+            group.userData.light = light;
+            bulb.material.emissive = new THREE.Color(0x000000); // Off by default
+            group.userData.bulb = bulb;
+            group.userData.isOn = false;
+         }
+      } else if (type === 'fountain') {
+         const basinGeo = new THREE.CylinderGeometry(2, 1.5, 0.8, 12);
+         const stoneMat = new THREE.MeshLambertMaterial({ color: 0xfdfefe });
+         const basin = new THREE.Mesh(basinGeo, stoneMat);
+         basin.position.y = 0.4;
+         basin.castShadow = !isGhost;
+         group.add(basin);
+         
+         const pillarGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 8);
+         const pillar = new THREE.Mesh(pillarGeo, stoneMat);
+         pillar.position.y = 1.15;
+         pillar.castShadow = !isGhost;
+         group.add(pillar);
+         
+         const topGeo = new THREE.CylinderGeometry(0.8, 0.1, 0.4, 8);
+         const topPiece = new THREE.Mesh(topGeo, stoneMat);
+         topPiece.position.y = 2.0;
+         topPiece.castShadow = !isGhost;
+         group.add(topPiece);
+         
+         if (!isGhost) {
+            // Water pool - starts empty (scale 0)
+            const waterGeo = new THREE.CylinderGeometry(1.7, 1.7, 0.15, 16);
+            const waterMat = new THREE.MeshLambertMaterial({ color: 0x4da6ff, transparent: true, opacity: 0.85 });
+            const water = new THREE.Mesh(waterGeo, waterMat);
+            water.position.y = 0.5;
+            water.scale.set(0.01, 1, 0.01); // Start nearly invisible
+            water.visible = true;
+            group.add(water);
+            group.userData.water = water;
+            group.userData.waterScale = 0.01;
+            
+            // Water jet
+            const jetGeo = new THREE.CylinderGeometry(0.08, 0.02, 1.0, 8);
+            const jetMat = new THREE.MeshBasicMaterial({ color: 0x85C1E9, transparent: true, opacity: 0.7 });
+            const jet = new THREE.Mesh(jetGeo, jetMat);
+            jet.position.y = 2.5;
+            jet.visible = false;
+            group.add(jet);
+            group.userData.jet = jet;
+            
+            group.userData.isFlowing = false;
+         }
+      }
+      
+      group.userData.type = type;
+      return group;
+    }
+    
+    function startPlacementMode(itemType) {
+      gameState.isPlacementMode = true;
+      gameState.itemToPlace = itemType;
+      
+      // Crea oggetto fantasma
+      ghostObject = createPlaceableObject(itemType, true);
+      scene.add(ghostObject);
+      
+      placementUI.style.display = 'block';
+    }
+    
+    function updateGhostPosition(e) {
+      if (!ghostObject) return;
+      
+      // Converti posizione mouse in coordinate normalizzate
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      
+      // Raycast sul terreno
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(ground);
+      
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        ghostObject.position.set(point.x, 0, point.z);
+        
+        // Ruota verso il player
+        const angle = Math.atan2(
+          player.x - point.x,
+          player.z - point.z
+        );
+        ghostObject.rotation.y = angle;
+      }
+    }
+    
+    function placeObject() {
+      if (!ghostObject || !gameState.itemToPlace) return;
+      
+      // Crea oggetto reale alla posizione del fantasma
+      const realObject = createPlaceableObject(gameState.itemToPlace, false);
+      realObject.position.copy(ghostObject.position);
+      realObject.rotation.copy(ghostObject.rotation);
+      scene.add(realObject);
+      placedObjects.push(realObject);
+      
+      // Pulisci
+      scene.remove(ghostObject);
+      ghostObject = null;
+      
+      gameState.isPlacementMode = false;
+      gameState.itemToPlace = null;
+      placementUI.style.display = 'none';
+    }
+    
+    function cancelPlacement() {
+      if (ghostObject) {
+        scene.remove(ghostObject);
+        ghostObject = null;
+      }
+      
+      // Restituisci risorse
+      if (gameState.itemToPlace === 'bench') {
+        gameState.wood += 5;
+        gameState.stone += 3;
+      } else if (gameState.itemToPlace === 'fence') {
+        gameState.wood += 3;
+      } else if (gameState.itemToPlace === 'well') {
+        gameState.wood += 4;
+        gameState.stone += 8;
+      } else if (gameState.itemToPlace === 'streetlamp') {
+        gameState.wood += 2;
+        gameState.stone += 2;
+      } else if (gameState.itemToPlace === 'fountain') {
+        gameState.wood += 2;
+        gameState.stone += 10;
+      }
+      
+      updateResourceUI();
+      
+      gameState.isPlacementMode = false;
+      gameState.itemToPlace = null;
+      placementUI.style.display = 'none';
+    }
+    
+    // ============================================
+    // ===== CICLO GIORNO/NOTTE (OPZIONALE) =====
+    // ============================================
+    
+    const timeIndicator = document.getElementById('time-indicator');
+    
+    function updateDayNightCycle(delta) {
+      gameState.dayTime += delta * 0.00002;
+      if (gameState.dayTime > 1) gameState.dayTime = 0;
+      
+      // Calcola intensità luce
+      const dayProgress = Math.sin(gameState.dayTime * Math.PI * 2);
+      const lightIntensity = 0.3 + Math.max(0, dayProgress) * 0.7;
+      
+      sunLight.intensity = lightIntensity;
+      ambientLight.intensity = 0.2 + lightIntensity * 0.3;
+      
+      // Colore cielo
+      const isNight = dayProgress < 0;
+      if (isNight) {
+        scene.background = new THREE.Color(0x1a1a3e);
+        scene.fog.color = new THREE.Color(0x1a1a3e);
+        timeIndicator.innerHTML = '🌙 Notte';
+      } else {
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog.color = new THREE.Color(0x87ceeb);
+        timeIndicator.innerHTML = '☀️ Giorno';
+      }
+    }
+    
+    // ============================================
+    // ===== RIDIMENSIONAMENTO FINESTRA =====
+    // ============================================
+    
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    // ============================================
+    // ===== GAME LOOP PRINCIPALE =====
+    // ============================================
+    
+    let lastTime = performance.now();
+    
+    function gameLoop() {
+      requestAnimationFrame(gameLoop);
+      
+      const now = performance.now();
+      const delta = now - lastTime;
+      lastTime = now;
+      
+      // Aggiorna giocatore (solo se non in menu)
+      if (!gameState.craftingOpen && !gameState.pokedexOpen) {
+        updatePlayer();
+      }
+      
+      // Aggiorna camera
+      updateCamera();
+      
+      // Controlla oggetti vicini
+      checkNearbyCollectibles();
+      
+      // Aggiorna creature
+      updateCreatures();
+      
+      // Animate water ripples
+      ripples.forEach(ripple => {
+        ripple.position.y = -0.3 + Math.sin(now * 0.002 + ripple.userData.offset) * 0.1;
+        ripple.rotation.z = now * 0.0005 + ripple.userData.offset;
+      });
+      
+      // Ciclo giorno/notte
+      updateDayNightCycle(delta);
+      
+      // Render
+      renderer.render(scene, camera);
+    }
+    
+    // Avvia il gioco
+    updateResourceUI();
+    gameLoop();
+    
+    console.log('🏝️ Animal Crossing Clone caricato!');
+    console.log('Usa WASD per muoverti, E per raccogliere/catturare, C per il crafting, P per il Pokédex.');
+  </script>
+</body>
+</html>
