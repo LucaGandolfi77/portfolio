@@ -26,13 +26,25 @@ const $display = document.getElementById('time-display');
 const $btnStart   = document.getElementById('btn-start');
 const $btnCollect = document.getElementById('btn-collect');
 const $timerPill  = document.getElementById('timer-pill');
+const $timerText  = document.getElementById('timer-text');
+const $btnEnd     = document.getElementById('btn-end');
 const $meadowArea = document.getElementById('meadow');
 const $confetti   = document.getElementById('confetti-canvas');
 const $bouquet    = document.getElementById('bouquet-container');
 const $rewardMsg  = document.getElementById('reward-message');
 
+const FLOWER_EMOJI = { daisy: '🌼', rose: '🌹', sunflower: '🌻', tulip: '🌷', cherry: '🌸', rosette: '🏵️', hyacinth: '🪻', hibiscus: '🌺', mushroom: '🍄', custom: '✏️' };
+
+/* ---- Custom text modal refs ---- */
+const $customModal   = document.getElementById('custom-modal');
+const $customInput   = document.getElementById('custom-text-input');
+const $btnCustomOk   = document.getElementById('btn-custom-ok');
+const $btnCustomCancel = document.getElementById('btn-custom-cancel');
+const $pickedPill  = document.getElementById('picked-pill');
+
 /* ---- State ---- */
 let timer = null;
+let pickedCount = 0;
 
 /* ============================================================
    DaisyTimer — the main timer engine
@@ -136,7 +148,7 @@ class DaisyTimer {
     this.remaining = Math.max(0, this.remaining - 1);
     const m = String(Math.floor(this.remaining / 60)).padStart(2, '0');
     const s = String(this.remaining % 60).padStart(2, '0');
-    $timerPill.textContent = `${m}:${s}`;
+    $timerText.textContent = `${m}:${s}`;
 
     /* Pulse effect in last 30 s */
     if (this.remaining <= 30) {
@@ -187,7 +199,10 @@ class DaisyTimer {
       Confetti.start($confetti);
 
       /* 5. Message */
-      $rewardMsg.textContent = `🌼 Well done! You stayed away for ${this.minutes} minute${this.minutes > 1 ? 's' : ''}!`;
+      const emoji = FLOWER_EMOJI[DaisyFactory.getFlowerType()] || '🌼';
+      const pickedText = pickedCount > 0 ? ` You picked ${pickedCount} flower${pickedCount > 1 ? 's' : ''}!` : '';
+      $rewardMsg.textContent = `${emoji} Well done! You stayed away for ${this.minutes} minute${this.minutes > 1 ? 's' : ''}!${pickedText}`;
+      $pickedPill.classList.remove('visible');
 
     }, 700);
   }
@@ -220,16 +235,65 @@ function _updateDisplay() {
   $display.innerHTML = `${v}<span>minute${v > 1 ? 's' : ''}</span>`;
 }
 
+/* Flower type selection */
+document.querySelectorAll('.flower-option').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.flower-option').forEach(b => {
+      b.classList.remove('selected');
+      b.setAttribute('aria-pressed', 'false');
+    });
+    btn.classList.add('selected');
+    btn.setAttribute('aria-pressed', 'true');
+    DaisyFactory.setFlowerType(btn.dataset.flower);
+
+    /* Open modal when Custom is selected */
+    if (btn.dataset.flower === 'custom') {
+      $customModal.classList.add('open');
+      $customModal.setAttribute('aria-hidden', 'false');
+      $customInput.value = DaisyFactory.getCustomText();
+      $customInput.focus();
+    }
+  });
+});
+
+/* Custom modal — OK */
+$btnCustomOk.addEventListener('click', () => {
+  const text = $customInput.value.trim();
+  DaisyFactory.setCustomText(text || '✨');
+  $customModal.classList.remove('open');
+  $customModal.setAttribute('aria-hidden', 'true');
+});
+
+/* Custom modal — Cancel */
+$btnCustomCancel.addEventListener('click', () => {
+  $customModal.classList.remove('open');
+  $customModal.setAttribute('aria-hidden', 'true');
+  /* Revert to previous flower if no custom text set */
+  if (!DaisyFactory.getCustomText()) {
+    const prev = document.querySelector('.flower-option[data-flower="daisy"]');
+    prev.click();
+  }
+});
+
+/* Custom modal — Enter key submits */
+$customInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $btnCustomOk.click();
+});
+
 /* Start button */
 $btnStart.addEventListener('click', () => {
   const minutes = Number($slider.value);
   _switchScreen($meadow);
   $meadow.classList.add('filling');
   $timerPill.classList.remove('pulse');
-  $timerPill.textContent = `${String(minutes).padStart(2, '0')}:00`;
+  $timerPill.classList.remove('expanded');
+  $timerText.textContent = `${String(minutes).padStart(2, '0')}:00`;
 
-  /* Clear old daisies */
+  /* Clear old daisies & picked counter */
   $meadowArea.innerHTML = '';
+  pickedCount = 0;
+  $pickedPill.textContent = '💐 0';
+  $pickedPill.classList.remove('visible');
 
   timer = new DaisyTimer(minutes);
 
@@ -237,11 +301,61 @@ $btnStart.addEventListener('click', () => {
   setTimeout(() => timer.start(), 400);
 });
 
+/* Timer pill tap-to-expand */
+$timerPill.addEventListener('click', (e) => {
+  if (e.target === $btnEnd) return;
+  $timerPill.classList.toggle('expanded');
+});
+
+/* End timer early */
+$btnEnd.addEventListener('click', () => {
+  if (!timer) return;
+  timer.stop();
+  $timerPill.classList.remove('expanded');
+  $timerPill.classList.remove('pulse');
+  $meadow.classList.remove('filling');
+  $meadowArea.innerHTML = '';
+  pickedCount = 0;
+  $pickedPill.classList.remove('visible');
+  DaisyFactory.clearMeadow();
+  _switchScreen($setup);
+});
+
+/* Pick up a flower by tapping it */
+$meadowArea.addEventListener('click', (e) => {
+  const flower = e.target.closest('.daisy');
+  if (!flower || flower.classList.contains('picked')) return;
+
+  flower.classList.add('picked');
+  pickedCount++;
+  $pickedPill.textContent = `💐 ${pickedCount}`;
+  $pickedPill.classList.add('visible');
+
+  /* Pluck animation: scale up, float upward, fade out */
+  if (typeof gsap !== 'undefined') {
+    gsap.to(flower, {
+      y: -80,
+      scale: 1.3,
+      opacity: 0,
+      rotation: (Math.random() - 0.5) * 30,
+      duration: 0.55,
+      ease: 'power2.out',
+      onComplete() { flower.remove(); }
+    });
+  } else {
+    flower.style.transition = 'transform .5s ease, opacity .5s ease';
+    flower.style.transform = 'translateY(-80px) scale(1.3)';
+    flower.style.opacity = '0';
+    setTimeout(() => flower.remove(), 500);
+  }
+});
+
 /* Collect bouquet → reset */
 $btnCollect.addEventListener('click', () => {
   Confetti.stop();
   $meadow.classList.remove('filling');
   $meadowArea.innerHTML = '';
+  pickedCount = 0;
   DaisyFactory.clearMeadow();
   _switchScreen($setup);
 });
