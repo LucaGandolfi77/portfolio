@@ -48,17 +48,55 @@ class OllamaBookWriterGUI:
         self.ui_queue = queue.Queue()
         self.worker_running = False
 
-        self.model_var = tk.StringVar(value="qwen3.5")
+        self.model_var = tk.StringVar(value="qwen3.5:9b")
         self.output_dir_var = tk.StringVar(value=str(Path.cwd() / "generated_books"))
         self.books_file_var = tk.StringVar(value=str(Path.cwd() / "books.json"))
         self.status_var = tk.StringVar(value="Ready.")
         self.chapter_target_var = tk.StringVar(value="20")
         self.words_var = tk.StringVar(value="2500")
 
+        # Optional: store a Google API key (user-provided) and keep an in-memory log history
+        self.google_api_key_var = tk.StringVar(value="")
+        self.log_history = []
+        self.google_key_source_var = tk.StringVar(value="No key loaded")
+        self.api_key_loaded_from_file = False
+        # ChatGPT / OpenAI API key and source label
+        self.chatgpt_api_key_var = tk.StringVar(value="")
+        self.chatgpt_key_source_var = tk.StringVar(value="No key loaded")
+        self.chatgpt_api_loaded_from_file = False
+
         self.idea_vars = []
         self.idea_radio_var = tk.IntVar(value=-1)
 
         self._build_ui()
+        # attempt to load API key from api-key.txt next to this script
+        try:
+            self.load_api_key_file()
+        except Exception:
+            pass
+        # attempt to load OpenAI key from chatgpt-api-key.txt
+        try:
+            self.load_chatgpt_key_file()
+        except Exception:
+            pass
+        # ensure label reflects current key source
+        try:
+            self.update_key_source_label()
+        except Exception:
+            pass
+        try:
+            self.update_chatgpt_key_source_label()
+        except Exception:
+            pass
+        # watch for manual edits to the API key field
+        try:
+            self.google_api_key_var.trace_add("write", self.on_api_key_change)
+        except Exception:
+            pass
+        try:
+            self.chatgpt_api_key_var.trace_add("write", self.on_chatgpt_key_change)
+        except Exception:
+            pass
         self.root.after(100, self.process_ui_queue)
 
     def _build_ui(self):
@@ -66,12 +104,24 @@ class OllamaBookWriterGUI:
         top.pack(fill="x")
 
         ttk.Label(top, text="Model:").grid(row=0, column=0, sticky="w")
-        ttk.Entry(top, textvariable=self.model_var, width=20).grid(row=0, column=1, padx=5)
+        ttk.Combobox(top, textvariable=self.model_var, values=("qwen3.5:9b", "gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo", "google-vertex-ai", "custom"), width=20).grid(row=0, column=1, padx=5)
 
         ttk.Label(top, text="Books file:").grid(row=0, column=2, sticky="w", padx=(10, 0))
         ttk.Entry(top, textvariable=self.books_file_var, width=45).grid(row=0, column=3, padx=5)
         ttk.Button(top, text="Browse", command=self.browse_books_file).grid(row=0, column=4, padx=5)
         ttk.Button(top, text="Load Books", command=self.load_books).grid(row=0, column=5, padx=5)
+
+        # Google API key input (optional)
+        ttk.Label(top, text="Google API Key:").grid(row=0, column=9, sticky="w", padx=(10, 0))
+        ttk.Entry(top, textvariable=self.google_api_key_var, width=30, show="*").grid(row=0, column=10, padx=5)
+        ttk.Button(top, text="Test Key", command=self.test_api_key).grid(row=0, column=11, padx=5)
+        ttk.Label(top, textvariable=self.google_key_source_var).grid(row=0, column=12, sticky="w", padx=(8,0))
+
+        # OpenAI / ChatGPT key (optional) and source label
+        ttk.Label(top, text="OpenAI Key:").grid(row=1, column=9, sticky="w", padx=(10, 0))
+        ttk.Entry(top, textvariable=self.chatgpt_api_key_var, width=30, show="*").grid(row=1, column=10, padx=5)
+        ttk.Label(top, textvariable=self.chatgpt_key_source_var).grid(row=1, column=11, sticky="w", padx=(8,0))
+        ttk.Button(top, text="Test OpenAI Key", command=self.test_openai_key).grid(row=1, column=12, padx=5)
 
         ttk.Label(top, text="Output dir:").grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(top, textvariable=self.output_dir_var, width=45).grid(row=1, column=1, columnspan=3, sticky="we", padx=5, pady=(8, 0))
@@ -105,6 +155,7 @@ class OllamaBookWriterGUI:
         ttk.Button(btns, text="Write Selected Chapter", command=self.write_selected_chapter).pack(fill="x", pady=2)
         ttk.Button(btns, text="Auto Finish to Chapter 20", command=self.auto_finish_book).pack(fill="x", pady=2)
         ttk.Button(btns, text="Open Output Folder", command=self.open_output_folder).pack(fill="x", pady=2)
+        ttk.Button(btns, text="Show Logs", command=self.show_logs).pack(fill="x", pady=2)
 
         ttk.Label(center, text="Book Context").pack(anchor="w")
         self.context_text = tk.Text(center, wrap="word", height=18)
@@ -151,10 +202,248 @@ class OllamaBookWriterGUI:
         path.mkdir(parents=True, exist_ok=True)
         messagebox.showinfo("Output folder", f"Files are saved in:\n{path}")
 
+    def load_api_key_file(self):
+        # Look for api-key.txt next to this script
+        try:
+            base = Path(__file__).parent
+            # prefer api-key.txt but also accept google-api-key.txt
+            key_file = base / "api-key.txt"
+            if not key_file.exists():
+                key_file = base / "google-api-key.txt"
+
+            if key_file.exists():
+                key = key_file.read_text(encoding="utf-8").strip()
+                if key:
+                    self.google_api_key_var.set(key)
+                    self.api_key_loaded_from_file = True
+                    self.google_key_source_var.set(f"Loaded from {key_file.name}")
+                    self.log(f"Loaded Google API key from {key_file}")
+                    return True
+        except Exception as e:
+            self.log(f"Failed to read api-key.txt: {e}")
+        return False
+
+    def update_key_source_label(self):
+        if self.api_key_loaded_from_file:
+            self.google_key_source_var.set("Loaded from api-key.txt")
+        else:
+            if self.google_api_key_var.get().strip():
+                self.google_key_source_var.set("Entered manually")
+            else:
+                self.google_key_source_var.set("No key loaded")
+
+    def on_api_key_change(self, *args):
+        # if user edits the key, consider it manual
+        self.api_key_loaded_from_file = False
+        self.update_key_source_label()
+
+    def load_chatgpt_key_file(self):
+        # Look for chatgpt-api-key.txt next to this script
+        try:
+            base = Path(__file__).parent
+            key_file = base / "chatgpt-api-key.txt"
+            if key_file.exists():
+                key = key_file.read_text(encoding="utf-8").strip()
+                if key:
+                    self.chatgpt_api_key_var.set(key)
+                    self.chatgpt_api_loaded_from_file = True
+                    self.chatgpt_key_source_var.set(f"Loaded from {key_file.name}")
+                    self.log(f"Loaded ChatGPT/OpenAI API key from {key_file}")
+                    return True
+        except Exception as e:
+            self.log(f"Failed to read chatgpt-api-key.txt: {e}")
+        return False
+
+    def update_chatgpt_key_source_label(self):
+        if self.chatgpt_api_loaded_from_file:
+            self.chatgpt_key_source_var.set("Loaded from chatgpt-api-key.txt")
+        else:
+            if self.chatgpt_api_key_var.get().strip():
+                self.chatgpt_key_source_var.set("Entered manually")
+            else:
+                self.chatgpt_key_source_var.set("No key loaded")
+
+    def on_chatgpt_key_change(self, *args):
+        # if user edits the OpenAI key, consider it manual
+        self.chatgpt_api_loaded_from_file = False
+        self.update_chatgpt_key_source_label()
+
     def log(self, msg):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_text.insert("end", f"[{timestamp}] {msg}\n")
+        entry = f"[{timestamp}] {msg}"
+        # store in-memory history
+        try:
+            self.log_history.append(entry)
+        except Exception:
+            self.log_history = [entry]
+        self.log_text.insert("end", entry + "\n")
         self.log_text.see("end")
+
+    def show_logs(self):
+        win = tk.Toplevel(self.root)
+        win.title("Program Logs")
+
+        txt = tk.Text(win, wrap="word", width=120, height=30)
+        txt.pack(fill="both", expand=True, padx=6, pady=6)
+        txt.insert("1.0", "\n".join(self.log_history))
+        txt.config(state="disabled")
+
+        btn_frame = ttk.Frame(win, padding=6)
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame, text="Save Logs", command=lambda: self.save_logs()).pack(side="left", padx=(0, 6))
+        ttk.Button(btn_frame, text="Close", command=win.destroy).pack(side="left")
+
+    def save_logs(self):
+        content = "\n".join(self.log_history)
+        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if path:
+            Path(path).write_text(content, encoding="utf-8")
+            messagebox.showinfo("Saved", f"Logs saved to:\n{path}")
+
+    def test_api_key(self):
+        if self.worker_running:
+            return
+        thread = threading.Thread(target=self._test_api_key_worker, daemon=True)
+        thread.start()
+
+    def _test_api_key_worker(self):
+        api_key = self.google_api_key_var.get().strip()
+        if not api_key:
+            # fallback: try to read api-key.txt next to the script
+            try:
+                base = Path(__file__).parent
+                key_file = base / "api-key.txt"
+                if not key_file.exists():
+                    key_file = base / "google-api-key.txt"
+                if key_file.exists():
+                    api_key = key_file.read_text(encoding="utf-8").strip()
+                    if api_key:
+                        self.google_api_key_var.set(api_key)
+                        self.ui_queue.put(("log", f"Loaded Google API key from {key_file} for test"))
+            except Exception as e:
+                self.ui_queue.put(("log", f"Failed to read api-key.txt: {e}"))
+
+        if not api_key:
+            self.ui_queue.put(("log", "No Google API key set for test."))
+            self.ui_queue.put(("status", "No API key for test."))
+            return
+
+        url = f"https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key={api_key}"
+        body = {"prompt": {"text": "Test request: respond with the single word OK."}, "temperature": 0.0, "candidate_count": 1}
+
+        try:
+            r = requests.post(url, json=body, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.RequestException as e:
+            resp = getattr(e, 'response', None)
+            resp_text = None
+            if resp is not None:
+                try:
+                    resp_text = resp.text
+                except Exception:
+                    resp_text = '<unreadable response body>'
+            msg = f"Google API key test failed: {e}"
+            if resp_text:
+                msg += f" -- response: {resp_text}"
+            self.ui_queue.put(("log", msg))
+            self.ui_queue.put(("status", "API key test failed."))
+            return
+
+        # parse response
+        text = None
+        if isinstance(data, dict):
+            if "candidates" in data and data["candidates"]:
+                text = data["candidates"][0].get("content", "")
+            elif "output" in data and isinstance(data["output"], list):
+                text = "\n".join(item.get("content", "") for item in data["output"]) or None
+            elif "content" in data:
+                text = data.get("content")
+
+        if text and text.strip():
+            sample = text.strip()[:200]
+            self.ui_queue.put(("log", f"Google API key test succeeded — sample: {sample}"))
+            self.ui_queue.put(("status", "API key valid."))
+            self.root.after(0, lambda: messagebox.showinfo("API Key Test", "API key appears valid (see logs for sample)."))
+        else:
+            self.ui_queue.put(("log", f"Google API key test returned empty response: {data}"))
+            self.ui_queue.put(("status", "API key test returned no content."))
+
+    def test_openai_key(self):
+        if self.worker_running:
+            return
+        thread = threading.Thread(target=self._test_openai_key_worker, daemon=True)
+        thread.start()
+
+    def _test_openai_key_worker(self):
+        key = self.chatgpt_api_key_var.get().strip()
+        if not key:
+            # fallback: try to read chatgpt-api-key.txt next to the script
+            try:
+                base = Path(__file__).parent
+                key_file = base / "chatgpt-api-key.txt"
+                if key_file.exists():
+                    key = key_file.read_text(encoding="utf-8").strip()
+                    if key:
+                        self.chatgpt_api_key_var.set(key)
+                        self.ui_queue.put(("log", f"Loaded ChatGPT API key from {key_file} for test"))
+            except Exception as e:
+                self.ui_queue.put(("log", f"Failed to read chatgpt-api-key.txt: {e}"))
+
+        if not key:
+            self.ui_queue.put(("log", "No OpenAI API key set for test."))
+            self.ui_queue.put(("status", "No OpenAI API key for test."))
+            return
+
+        model = self.model_var.get() if self.model_var.get() and "gpt" in self.model_var.get().lower() else "gpt-3.5-turbo"
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        body = {
+            "model": model,
+            "messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Respond with the single word OK."}],
+            "temperature": 0.0,
+            "max_tokens": 10
+        }
+
+        try:
+            r = requests.post(url, headers=headers, json=body, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.RequestException as e:
+            resp = getattr(e, 'response', None)
+            resp_text = None
+            if resp is not None:
+                try:
+                    resp_text = resp.text
+                except Exception:
+                    resp_text = '<unreadable response body>'
+            msg = f"OpenAI API key test failed: {e}"
+            if resp_text:
+                msg += f" -- response: {resp_text}"
+            self.ui_queue.put(("log", msg))
+            self.ui_queue.put(("status", "OpenAI API key test failed."))
+            return
+
+        # parse response
+        text = None
+        if isinstance(data, dict):
+            choices = data.get("choices") or []
+            if choices:
+                first = choices[0]
+                msg = first.get("message", {}).get("content") if isinstance(first.get("message"), dict) else None
+                if msg:
+                    text = msg
+                else:
+                    text = first.get("text")
+
+        if text and text.strip():
+            sample = text.strip()[:200]
+            self.ui_queue.put(("log", f"OpenAI API key test succeeded — sample: {sample}"))
+            self.ui_queue.put(("status", "OpenAI API key valid."))
+            self.root.after(0, lambda: messagebox.showinfo("OpenAI API Key Test", "OpenAI API key appears valid (see logs for sample)."))
+        else:
+            self.ui_queue.put(("log", f"OpenAI API key test returned empty response: {data}"))
+            self.ui_queue.put(("status", "OpenAI API key test returned no content."))
 
     def set_status(self, text):
         self.status_var.set(text)
@@ -324,6 +613,14 @@ Keep this book distinct from any other book.
         return messages
 
     def ollama_chat(self, model, messages, temperature=0.9):
+        # Route to Google Generative API if model indicates Google
+        if model and "google" in model.lower():
+            return self.google_chat(model, messages, temperature=temperature)
+
+        # Route to OpenAI/ChatGPT if model name looks like a GPT/OpenAI model
+        if model and ("gpt" in model.lower() or "openai" in model.lower()):
+            return self.openai_chat(model, messages, temperature=temperature)
+
         payload = {
             "model": model,
             "messages": messages,
@@ -336,6 +633,130 @@ Keep this book distinct from any other book.
         r.raise_for_status()
         data = r.json()
         return data["message"]["content"]
+
+    def google_chat(self, model, messages, temperature=0.9):
+        api_key = self.google_api_key_var.get().strip()
+        if not api_key:
+            # fallback: try to read api-key.txt next to the script
+            try:
+                base = Path(__file__).parent
+                key_file = base / "api-key.txt"
+                if key_file.exists():
+                    api_key = key_file.read_text(encoding="utf-8").strip()
+                    if api_key:
+                        self.google_api_key_var.set(api_key)
+                        self.log(f"Loaded Google API key from {key_file}")
+            except Exception:
+                pass
+        if not api_key:
+            raise ValueError("Google API key not set. Enter it in the Google API Key field or place it in api-key.txt.")
+
+        # Flatten messages to a single prompt string
+        parts = []
+        for m in messages:
+            role = m.get("role", "")
+            content = m.get("content", "")
+            if role:
+                parts.append(f"{role.upper()}: {content}")
+            else:
+                parts.append(content)
+        prompt_text = "\n\n".join(parts)
+
+        url = f"https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key={api_key}"
+        body = {
+            "prompt": {"text": prompt_text},
+            "temperature": float(temperature),
+            "candidate_count": 1
+        }
+
+        try:
+            r = requests.post(url, json=body, timeout=3600)
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.RequestException as e:
+            resp = getattr(e, 'response', None)
+            resp_text = None
+            if resp is not None:
+                try:
+                    resp_text = resp.text
+                except Exception:
+                    resp_text = '<unreadable response body>'
+            msg = f"Google API request failed: {e}"
+            if resp_text:
+                msg += f" -- response: {resp_text}"
+            self.log(msg)
+            raise ValueError(msg)
+
+        # Parse common response shapes
+        if isinstance(data, dict):
+            if "candidates" in data and data["candidates"]:
+                return data["candidates"][0].get("content", "")
+            if "output" in data and isinstance(data["output"], list):
+                return "\n".join(item.get("content", "") for item in data["output"])
+            # fallback: try top-level 'content'
+            if "content" in data:
+                return data["content"]
+
+        raise ValueError("Unexpected response from Google Generative API")
+
+    def openai_chat(self, model, messages, temperature=0.9):
+        key = self.chatgpt_api_key_var.get().strip()
+        if not key:
+            try:
+                base = Path(__file__).parent
+                key_file = base / "chatgpt-api-key.txt"
+                if key_file.exists():
+                    key = key_file.read_text(encoding="utf-8").strip()
+                    if key:
+                        self.chatgpt_api_key_var.set(key)
+                        self.log(f"Loaded ChatGPT/OpenAI API key from {key_file}")
+            except Exception:
+                pass
+        if not key:
+            raise ValueError("OpenAI API key not set. Enter it in the OpenAI Key field or place it in chatgpt-api-key.txt.")
+
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        body = {
+            "model": model,
+            "messages": messages,
+            "temperature": float(temperature),
+            "max_tokens": 2000
+        }
+
+        try:
+            r = requests.post(url, headers=headers, json=body, timeout=3600)
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.RequestException as e:
+            resp = getattr(e, 'response', None)
+            resp_text = None
+            if resp is not None:
+                try:
+                    resp_text = resp.text
+                except Exception:
+                    resp_text = '<unreadable response body>'
+            msg = f"OpenAI API request failed: {e}"
+            if resp_text:
+                msg += f" -- response: {resp_text}"
+            self.log(msg)
+            raise ValueError(msg)
+
+        # parse typical OpenAI response
+        if isinstance(data, dict):
+            choices = data.get("choices") or []
+            if choices:
+                first = choices[0]
+                # Chat-style
+                msg = first.get("message", {}).get("content") if isinstance(first.get("message"), dict) else None
+                if msg:
+                    return msg
+                # fallback: text
+                text = first.get("text")
+                if text:
+                    return text
+
+        raise ValueError("Unexpected response from OpenAI API")
 
     def generate_ideas(self):
         if self.worker_running:
