@@ -527,7 +527,7 @@ class OllamaBookWriterGUI:
         body = {
             "model": model,
             "messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Respond with the single word OK."}],
-            "temperature": 0.0
+            #No temperature for openai "temperature": 0.0
         }
         try:
             if model and "gpt-5" in str(model).lower():
@@ -1006,7 +1006,7 @@ Keep this book distinct from any other book.
 
         # Route to OpenAI/ChatGPT if model name looks like a GPT/OpenAI model
         if model and ("gpt" in model.lower() or "openai" in model.lower()):
-            return self.openai_chat(model, messages, temperature=temperature)
+            return self.openai_chat(model, messages)
 
         payload = {
             "model": model,
@@ -1086,7 +1086,7 @@ Keep this book distinct from any other book.
 
         raise ValueError("Unexpected response from Google Generative API")
 
-    def openai_chat(self, model, messages, temperature=0.9):
+    def openai_chat(self, model, messages):
         key = self.chatgpt_api_key_var.get().strip()
         if not key:
             try:
@@ -1100,156 +1100,97 @@ Keep this book distinct from any other book.
             except Exception:
                 pass
         if not key:
-            raise ValueError("OpenAI API key not set. Enter it in the OpenAI Key field or place it in chatgpt-api-key.txt.")
+            raise ValueError("OpenAI API key not set.")
 
-        url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+        # ── GPT-5 family: Responses API ──────────────────────────────────────
+        if model and "gpt-5" in str(model).lower():
+            input_messages = [
+                {"role": m.get("role", "user"), "content": m.get("content", "")}
+                for m in messages
+            ]
+            body = {
+                "model": model,
+                "input": input_messages,
+                #no temperature: "temperature": float(temperature),
+                #"max_output_tokens": default,
+            }
+            try:
+                r = requests.post(
+                    "https://api.openai.com/v1/responses",
+                    headers=headers,
+                    json=body,
+                    timeout=3600,
+                )
+                if not r.ok:
+                    self.log(f"OpenAI Responses API HTTP {r.status_code}: {r.text[:500]}")
+                    r.raise_for_status()
+                data = r.json()
+            except requests.exceptions.RequestException as e:
+                resp = getattr(e, "response", None)
+                resp_text = resp.text if resp is not None else None
+                msg = f"OpenAI Responses API request failed: {e}"
+                if resp_text:
+                    msg += f" -- {resp_text[:400]}"
+                self.log(msg)
+                raise ValueError(msg)
+
+            if isinstance(data, dict) and data.get("error"):
+                err = data["error"]
+                if isinstance(err, dict):
+                    em = (err.get("message") or err.get("code") or
+                          err.get("type") or err.get("detail") or json.dumps(err))
+                else:
+                    em = str(err)
+                self.log(f"OpenAI Responses API error body: {json.dumps(data)[:600]}")
+                raise ValueError(f"OpenAI Responses API error: {em}")
+
+            try:
+                text = next(
+                    item["content"][0]["text"]
+                    for item in data["output"]
+                    if item.get("type") == "message"
+                )
+                return text
+            except (StopIteration, KeyError, IndexError, TypeError) as e:
+                self.log(f"Unexpected Responses API response: {json.dumps(data, ensure_ascii=False)[:800]}")
+                raise ValueError(f"Unexpected/empty response from OpenAI Responses API: {e}")
+
+        # ── GPT-4 and older: Chat Completions API ────────────────────────────
+        url = "https://api.openai.com/v1/chat/completions"
         body = {
             "model": model,
             "messages": messages,
-            "temperature": float(temperature)
+            #No temperature for gpt4 or older "temperature": float(temperature),
         }
         try:
-            if model and "gpt-5" in str(model).lower():
-                body["max_completion_tokens"] = 4096
-            else:
-                body["max_tokens"] = 4096
-        except Exception:
-            body["max_tokens"] = 4096
-
-        try:
             r = requests.post(url, headers=headers, json=body, timeout=3600)
-            r.raise_for_status()
+            if not r.ok:
+                self.log(f"OpenAI Chat API HTTP {r.status_code}: {r.text[:500]}")
+                r.raise_for_status()
             data = r.json()
         except requests.exceptions.RequestException as e:
-            resp = getattr(e, 'response', None)
-            resp_text = None
-            if resp is not None:
-                try:
-                    resp_text = resp.text
-                except Exception:
-                    resp_text = '<unreadable response body>'
-            msg = f"OpenAI API request failed: {e}"
+            resp = getattr(e, "response", None)
+            resp_text = resp.text if resp is not None else None
+            msg = f"OpenAI Chat API request failed: {e}"
             if resp_text:
-                msg += f" -- response: {resp_text}"
+                msg += f" -- {resp_text[:400]}"
             self.log(msg)
             raise ValueError(msg)
 
-        # Helper: recursively search for first non-empty string in nested JSON
-        def _is_valid_text(s: str) -> bool:
-            s = s.strip()
-            if not s:
-                return False
-            # ignore likely IDs (e.g., chatcmpl-..., hex-like) that contain no whitespace
-            if not re.search(r"\s", s) and re.match(r'^[A-Za-z0-9_-]{8,}$', s):
-                return False
-            # accept if reasonably long or contains punctuation/whitespace
-            if len(s) >= 40 or re.search(r"\s", s) or re.search(r"[.?!,:;]", s):
-                return True
-            # accept medium-length strings that contain spaces (multiple words)
-            if len(s) >= 20 and re.search(r"\s", s):
-                return True
-            return False
+        if isinstance(data, dict) and data.get("error"):
+            err = data["error"]
+            em = err.get("message") if isinstance(err, dict) else str(err)
+            raise ValueError(f"OpenAI API error: {em}")
 
-        def _find_text(obj):
-            if isinstance(obj, str):
-                s = obj.strip()
-                return s if _is_valid_text(s) else None
-            if isinstance(obj, dict):
-                # check common keys first
-                for k in ("message", "content", "text", "output_text", "response", "result"):
-                    if k in obj:
-                        res = _find_text(obj[k])
-                        if res:
-                            return res
-                # otherwise search values
-                for v in obj.values():
-                    res = _find_text(v)
-                    if res:
-                        return res
-            if isinstance(obj, list):
-                for item in obj:
-                    res = _find_text(item)
-                    if res:
-                        return res
-            return None
-
-        # parse typical OpenAI response (chat completions)
-        if isinstance(data, dict):
-            # explicit error
-            if 'error' in data:
-                err = data.get('error')
-                em = err.get('message') if isinstance(err, dict) else str(err)
-                self.log(f"OpenAI API returned error: {em}")
-                raise ValueError(f"OpenAI API error: {em}")
-
-            choices = data.get("choices") or []
-            if choices:
-                first = choices[0]
-                # Chat-style message content
-                if isinstance(first.get("message"), dict):
-                    msg = first["message"].get("content")
-                    if msg:
-                        return msg
-                # fallback: 'text' field
-                text = first.get("text")
-                if text:
-                    return text
-                # streaming-style delta
-                delta = first.get("delta") or {}
-                if isinstance(delta, dict):
-                    for k in ("content", "text"):
-                        if k in delta and isinstance(delta[k], str) and delta[k].strip():
-                            return delta[k].strip()
-
-            # other common shapes
-            if "output" in data and isinstance(data["output"], list):
-                return "\n".join(item.get("content", "") for item in data["output"])
-
-            for key in ("result", "response", "output_text", "content"):
-                if key in data:
-                    val = data[key]
-                    if isinstance(val, str) and val.strip():
-                        if _is_valid_text(val):
-                            return val
-                    if isinstance(val, dict):
-                        found = _find_text(val)
-                        if found:
-                            return found
-
-            # If the model is a gpt-5 variant, try the newer Responses API as a fallback
-            if model and "gpt-5" in str(model).lower():
-                try:
-                    self.log("OpenAI chat/completions returned no content; trying Responses API fallback.")
-                    prompt_text = "\n\n".join([f"{m.get('role','user').upper()}: {m.get('content','')}" for m in messages])
-                    resp2 = requests.post(
-                        "https://api.openai.com/v1/responses",
-                        headers=headers,
-                        json={"model": model, "input": prompt_text, "temperature": float(temperature), "max_output_tokens": 4096},
-                        timeout=3600,
-                    )
-                    resp2.raise_for_status()
-                    data2 = resp2.json()
-                    found2 = _find_text(data2)
-                    if found2:
-                        self.log("OpenAI Responses API fallback succeeded.")
-                        return found2
-                except Exception as e2:
-                    self.log(f"Responses API fallback failed: {e2}")
-
-        # last-ditch: search entire JSON for any text
-        found = _find_text(data)
-        if found:
-            self.log("OpenAI response used fallback extraction.")
-            return found
-
-        # log snippet for debugging
         try:
-            raw_snippet = json.dumps(data, ensure_ascii=False)[:1000]
-        except Exception:
-            raw_snippet = str(data)[:1000]
-        self.log(f"Unexpected response from OpenAI API: {raw_snippet}")
-        raise ValueError("Unexpected response from OpenAI API")
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError):
+            pass
+
+        self.log(f"Unexpected Chat API response: {json.dumps(data, ensure_ascii=False)[:800]}")
+        raise ValueError("Unexpected response from OpenAI Chat API")
 
     def generate_ideas(self):
         if self.worker_running:
@@ -1365,6 +1306,9 @@ Requirements:
             s = s.replace("\u201c", '"').replace("\u201d", '"')
             # remove trailing commas before closing brackets/braces
             s = re.sub(r",\s*(\]|\})", r"\1", s)
+            # fix doubled quotes at JSON string boundaries: model ends idea text with "
+            # producing ."", or ""] which is invalid JSON
+            s = re.sub(r'""\s*([,\]\}])', r'"\1', s)
             return s
 
         # try direct parse as JSON

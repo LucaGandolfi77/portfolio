@@ -443,16 +443,51 @@ Rules:
 
   function extractIdeasJson(raw) {
     raw = raw.trim();
+    // remove common code fences and language hints
+    const fence = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fence && fence[1]) raw = fence[1].trim();
+
+    // try direct parse
     try {
       const d = JSON.parse(raw);
       if (d.ideas && d.ideas.length === 5) return d.ideas;
     } catch (_) {}
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start !== -1 && end > start) {
-      const d = JSON.parse(raw.substring(start, end + 1));
-      if (d.ideas && d.ideas.length === 5) return d.ideas;
+
+    // attempt to find the first balanced JSON object in the text
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '{') {
+        let depth = 1;
+        for (let j = i + 1; j < raw.length; j++) {
+          if (raw[j] === '{') depth++;
+          else if (raw[j] === '}') depth--;
+          if (depth === 0) {
+            const candidate = raw.substring(i, j + 1);
+            try {
+              const d = JSON.parse(candidate);
+              if (d.ideas && d.ideas.length === 5) return d.ideas;
+            } catch (_) {}
+            break;
+          }
+        }
+      }
     }
+
+    // try to find an array of strings and wrap it
+    const arrMatch = raw.match(/\[\s*(?:".*?"(?:\s*,\s*".*?")+)\s*\]/s);
+    if (arrMatch) {
+      try {
+        const d = JSON.parse('{"ideas":' + arrMatch[0] + '}');
+        if (d.ideas && d.ideas.length === 5) return d.ideas;
+      } catch (_) {}
+    }
+
+    // last-ditch: try normalize single quotes to double quotes (best-effort)
+    try {
+      const normalized = raw.replace(/(\')/g, "'").replace(/(^|\W)'(\w)/g, '$1"$2').replace(/(\w)'(\W|$)/g, '$1"$2').replace(/"\s*,\s*"/g, '","');
+      const d = JSON.parse(normalized);
+      if (d.ideas && d.ideas.length === 5) return d.ideas;
+    } catch (_) {}
+
     throw new Error("Could not parse ideas JSON from model output.");
   }
 
