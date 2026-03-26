@@ -156,7 +156,7 @@ class OllamaBookWriterGUI:
         top.pack(fill="x")
 
         ttk.Label(top, text="Model:").grid(row=0, column=0, sticky="w")
-        ttk.Combobox(top, textvariable=self.model_var, values=("qwen3.5:9b", "gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo", "google-vertex-ai", "custom"), width=20).grid(row=0, column=1, padx=5)
+        ttk.Combobox(top, textvariable=self.model_var, values=("qwen3.5:9b", "gpt-4o", "gpt-4o-mini", "gpt-5-mini", "gpt-5-nano", "gpt-4", "gpt-3.5-turbo", "google-vertex-ai", "custom"), width=20).grid(row=0, column=1, padx=5)
 
         ttk.Label(top, text="Books file:").grid(row=0, column=2, sticky="w", padx=(10, 0))
         ttk.Entry(top, textvariable=self.books_file_var, width=45).grid(row=0, column=3, padx=5)

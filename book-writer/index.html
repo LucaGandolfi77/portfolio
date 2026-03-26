@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Book Writer — AI-Powered Novel Generator</title>
+  <meta name="description" content="AI-powered book writing assistant. Generate ideas and write full novel chapters using Ollama, OpenAI, or Google Generative AI."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="app-header">
+  <a href="../index.html" class="back-link">← Portfolio</a>
+  <h1>📖 Book <span>Writer</span></h1>
+  <div class="header-right">
+    <button class="btn btn-secondary btn-sm" id="btnLang" title="Switch language">🌐 EN</button>
+    <button class="btn btn-secondary btn-sm" id="btnThemeLogs" title="Show logs">📋 Logs</button>
+  </div>
+</header>
+
+<!-- ═══ TOOLBAR ═══ -->
+<div class="toolbar" id="toolbar">
+  <label>Model</label>
+  <select id="selModel">
+    <option value="ollama">Ollama (local)</option>
+    <option value="gpt-4o">GPT-4o</option>
+    <option value="gpt-4o-mini">GPT-4o-mini</option>
+    <option value="gpt-5-mini">GPT-5-mini</option>
+    <option value="gpt-5-nano">GPT-5-nano</option>
+    <option value="gpt-3.5-turbo">GPT-3.5-turbo</option>
+    <option value="google">Google AI</option>
+  </select>
+
+  <div class="sep"></div>
+  <label>Chapters</label>
+  <input type="number" id="inpChapters" value="20" min="1" max="100" style="width:60px"/>
+
+  <div class="sep"></div>
+  <label>Words/ch</label>
+  <input type="number" id="inpWords" value="2500" min="500" max="10000" step="500" style="width:80px"/>
+
+  <div class="sep"></div>
+  <label>Ollama URL</label>
+  <input type="text" id="inpOllamaUrl" value="http://localhost:11434/api/chat" style="width:220px"/>
+
+  <div class="sep"></div>
+  <label>OpenAI Key</label>
+  <input type="password" id="inpOpenaiKey" placeholder="sk-..." style="width:150px"/>
+
+  <div class="sep"></div>
+  <label>Google Key</label>
+  <input type="password" id="inpGoogleKey" placeholder="AI..." style="width:150px"/>
+</div>
+
+<!-- ═══ MAIN 3-PANEL LAYOUT ═══ -->
+<div class="main-layout">
+
+  <!-- LEFT: Book list -->
+  <div class="panel panel-books">
+    <div class="panel-header">
+      <span id="lbl-books">Books</span>
+      <button class="btn btn-sm btn-ghost" id="btnAddBook" title="Add book">＋</button>
+    </div>
+    <div class="panel-body" id="bookListBody">
+      <ul class="book-list" id="bookList"></ul>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" id="btnGenerate" disabled>💡 <span data-t="generate">Generate 5 Ideas</span></button>
+      <button class="btn btn-success" id="btnWrite" disabled>✍️ <span data-t="write">Write Selected Chapter</span></button>
+      <button class="btn btn-secondary" id="btnOptions">⚙️ <span data-t="options">Writing Options</span></button>
+      <button class="btn btn-secondary" id="btnAuto" disabled>🚀 <span data-t="auto">Auto Finish</span></button>
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+        📂 <span data-t="loadJson">Load books.json</span>
+        <input type="file" accept=".json" id="fileInput" style="display:none"/>
+      </label>
+      <button class="btn btn-ghost btn-sm" id="btnExport">💾 <span data-t="export">Export Book (.txt)</span></button>
+    </div>
+  </div>
+
+  <!-- CENTER: Context + Ideas -->
+  <div class="panel panel-center">
+    <div class="panel-header"><span data-t="context">Book Context</span></div>
+    <div class="panel-body">
+      <div class="context-box" id="contextBox">Select or add a book to begin.</div>
+
+      <div class="prompt-extras">
+        <label style="font-size:.78rem;color:var(--muted)" data-t="promptExtras">Prompt Extras (optional)</label>
+        <textarea id="promptExtras" rows="2" placeholder="Additional instructions for the AI..."></textarea>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="panel-header" style="padding:0 0 8px;background:none;border:none"><span data-t="ideas">Generated Ideas</span></div>
+        <div class="ideas-grid" id="ideasGrid">
+          <div style="color:var(--muted);font-size:.82rem;padding:12px" data-t="ideasPlaceholder">Ideas will appear here after generation.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Log / Preview -->
+  <div class="panel panel-log">
+    <div class="panel-header"><span data-t="log">Log / Preview</span></div>
+    <div class="panel-body" style="display:flex;flex-direction:column">
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STATUS BAR ═══ -->
+<div class="status-bar">
+  <div class="dot" id="statusDot"></div>
+  <span id="statusText">Ready.</span>
+</div>
+
+<!-- ═══ WRITING OPTIONS MODAL ═══ -->
+<div class="modal-overlay" id="optionsModal">
+  <div class="modal">
+    <h3 data-t="optionsTitle">Writing Options</h3>
+    <label class="opt"><input type="checkbox" id="optDialogue" checked/> <span data-t="optDialogue">Include dialogue</span></label>
+    <label class="opt"><input type="checkbox" id="optSensory" checked/> <span data-t="optSensory">Sensory detail</span></label>
+    <label class="opt"><input type="checkbox" id="optMetaphor"/> <span data-t="optMetaphor">Allow metaphor</span></label>
+    <label class="opt"><input type="checkbox" id="optMonologue"/> <span data-t="optMonologue">Interior monologue</span></label>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="optCancel" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" id="optSave">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD / EDIT BOOK MODAL ═══ -->
+<div class="modal-overlay" id="bookModal">
+  <div class="modal" style="max-width:520px">
+    <h3 id="bookModalTitle" data-t="addBook">Add Book</h3>
+    <div class="book-form">
+      <div class="field"><label>Title *</label><input type="text" id="bmTitle" required/></div>
+      <div class="field"><label>Description *</label><textarea id="bmDesc" rows="3"></textarea></div>
+      <div class="field"><label>Genre</label><input type="text" id="bmGenre"/></div>
+      <div class="field"><label>Audience</label><input type="text" id="bmAudience"/></div>
+      <div class="field"><label>Tone</label><input type="text" id="bmTone"/></div>
+      <div class="field"><label>Language</label>
+        <select id="bmLang"><option value="English">English</option><option value="Italian">Italian</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="bmDelete" style="margin-right:auto;display:none" data-t="delete">Delete</button>
+      <button class="btn btn-secondary" id="bmCancel" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" id="bmSave" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LOGS MODAL ═══ -->
+<div class="modal-overlay" id="logsModal">
+  <div class="modal" style="max-width:700px;max-height:80vh">
+    <h3>Logs</h3>
+    <div class="log-box" id="fullLogsBox" style="max-height:55vh"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="logsCopy">📋 Copy</button>
+      <button class="btn btn-secondary" id="logsClose" data-t="close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
