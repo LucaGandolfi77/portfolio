@@ -465,9 +465,15 @@ class OllamaBookWriterGUI:
         body = {
             "model": model,
             "messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Respond with the single word OK."}],
-            "temperature": 0.0,
-            "max_tokens": 10
+            "temperature": 0.0
         }
+        try:
+            if model and "gpt-5" in str(model).lower():
+                body["max_completion_tokens"] = 10
+            else:
+                body["max_tokens"] = 10
+        except Exception:
+            body["max_tokens"] = 10
 
         try:
             r = requests.post(url, headers=headers, json=body, timeout=30)
@@ -1035,9 +1041,15 @@ Keep this book distinct from any other book.
         body = {
             "model": model,
             "messages": messages,
-            "temperature": float(temperature),
-            "max_tokens": 2000
+            "temperature": float(temperature)
         }
+        try:
+            if model and "gpt-5" in str(model).lower():
+                body["max_completion_tokens"] = 2000
+            else:
+                body["max_tokens"] = 2000
+        except Exception:
+            body["max_tokens"] = 2000
 
         try:
             r = requests.post(url, headers=headers, json=body, timeout=3600)

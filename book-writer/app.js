@@ -301,11 +301,21 @@
   async function openaiChat(model, messages, temperature) {
     const key = inpOpenaiKey.value.trim();
     if (!key) throw new Error("OpenAI API key not set.");
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, temperature, max_tokens: 4096 }),
-    });
+      const bodyObj = { model, messages, temperature };
+      try {
+        if (model && model.toLowerCase().includes("gpt-5")) {
+          bodyObj.max_completion_tokens = 4096;
+        } else {
+          bodyObj.max_tokens = 4096;
+        }
+      } catch (e) {
+        bodyObj.max_tokens = 4096;
+      }
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(bodyObj),
+      });
     if (!resp.ok) throw new Error(`OpenAI error ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     return data.choices?.[0]?.message?.content || "";
