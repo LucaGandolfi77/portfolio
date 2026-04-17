@@ -1,372 +1,593 @@
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title data-i18n="tiny_ai.page.title">Tiny Local AI Demo</title>
+  <title data-i18n="tiny_ai.page.title">Tiny AI Chat</title>
   <style>
     :root {
-      --bg-color: #121212;
-      --panel-bg: #1e1e1e;
-      --text-color: #e0e0e0;
-      --accent-color: #0d6efd;
-      --border-color: #333;
-      --input-bg: #2d2d2d;
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --border: #30363d;
+      --input-bg: #0d1117;
+      --user-bg: #1f6feb;
+      --ai-bg: #1c2128;
+      --danger: #da3633;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      margin: 0;
-      background-color: var(--bg-color);
-      color: var(--text-color);
     }
-    header {
-      padding: 16px;
-      background: var(--panel-bg);
-      border-bottom: 1px solid var(--border-color);
+
+    .app-header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
     }
-    nav a {
-      color: var(--accent-color);
-      text-decoration: none;
-      font-weight: 600;
-      display: inline-flex;
+    .app-header .logo { font-size: 1.2rem; font-weight: 700; }
+    .app-header .logo span { color: var(--accent); }
+
+    .settings-bar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
     }
-    main {
+    .settings-bar label { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .settings-bar select, .settings-bar input {
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .settings-bar select:focus, .settings-bar input:focus {
+      outline: 1px solid var(--accent);
+      border-color: var(--accent);
+    }
+    .settings-bar .sep { width: 1px; height: 24px; background: var(--border); }
+    .btn-sm {
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-sm:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .btn-sm.danger { border-color: var(--danger); color: var(--danger); }
+    .btn-sm.danger:hover { background: rgba(218,54,51,0.15); }
+    #apiKeyInput { width: 220px; font-family: monospace; font-size: 0.78rem; }
+    .key-toggle { cursor: pointer; font-size: 0.85rem; color: var(--muted); user-select: none; }
+
+    .chat-container {
       flex: 1;
+      overflow-y: auto;
       padding: 20px;
       display: flex;
-      gap: 20px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-      box-sizing: border-box;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
     }
-    .panel {
-      flex: 1;
-      min-width: 300px;
-      background: var(--panel-bg);
-      padding: 24px;
+    .chat-container::-webkit-scrollbar { width: 6px; }
+    .chat-container::-webkit-scrollbar-track { background: transparent; }
+    .chat-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .msg {
+      max-width: 75%;
+      padding: 12px 16px;
       border-radius: 12px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    h2 { margin-top: 0; font-size: 1.25rem; color: #fff; margin-bottom: 16px; }
-    textarea {
-      width: 100%;
-      height: 150px;
-      padding: 12px;
-      font-size: 1rem;
-      background: var(--input-bg);
-      color: #fff;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      box-sizing: border-box;
-      resize: vertical;
-      font-family: inherit;
-    }
-    textarea:focus, input:focus, select:focus {
-      outline: 2px solid var(--accent-color);
-      border-color: transparent;
-    }
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    label { font-size: 0.9rem; color: #aaa; white-space: nowrap; }
-    select, input {
-      padding: 10px;
-      border-radius: 6px;
-      background: var(--input-bg);
-      color: #fff;
-      border: 1px solid var(--border-color);
+      line-height: 1.55;
       font-size: 0.95rem;
+      position: relative;
+      word-wrap: break-word;
+      white-space: pre-wrap;
     }
-    button {
-      padding: 10px 20px;
-      font-size: 1rem;
-      border-radius: 6px;
-      background: var(--accent-color);
+    .msg.user {
+      align-self: flex-end;
+      background: var(--user-bg);
+      border-bottom-right-radius: 4px;
+      color: #fff;
+    }
+    .msg.ai {
+      align-self: flex-start;
+      background: var(--ai-bg);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+    .msg.system {
+      align-self: center;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 6px 12px;
+    }
+    .msg .meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .msg .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .msg:hover .copy-btn { opacity: 1; }
+    .msg .copy-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+    .msg .copy-btn.copied { color: var(--accent); }
+
+    .typing-indicator { color: var(--muted); font-style: italic; }
+    .typing-indicator::after {
+      content: '';
+      animation: dots 1.4s infinite;
+    }
+    @keyframes dots {
+      0%,20% { content: '.'; }
+      40% { content: '..'; }
+      60%,100% { content: '...'; }
+    }
+
+    .input-bar {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+    .input-bar textarea {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      resize: none;
+      font-family: inherit;
+      min-height: 42px;
+      max-height: 150px;
+      line-height: 1.4;
+    }
+    .input-bar textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+    .send-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--accent);
       color: #fff;
       border: none;
       cursor: pointer;
-      font-weight: 600;
-      transition: background 0.2s;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
     }
-    button:hover { background: #0b5ed7; }
-    button#clearCache { background: #dc3545; margin-left: auto; }
-    button#clearCache:hover { background: #bb2d3b; }
-    
-    #output {
-      white-space: pre-wrap;
-      background: #111;
-      padding: 16px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      min-height: 300px;
-      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-      line-height: 1.6;
-      color: #eee;
+    .send-btn:hover { background: var(--accent-hover); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .welcome {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      gap: 12px;
+      text-align: center;
+      padding: 40px;
     }
-    .hint {
-      color: #888;
-      font-size: 0.85rem;
-      margin-top: 16px;
-      line-height: 1.5;
-    }
-    code { background: #333; padding: 2px 6px; border-radius: 4px; color: #ff7b72; }
-    
-    @media (max-width: 768px) {
-      main { flex-direction: column; padding: 16px; gap: 16px; }
-      .panel { width: 100%; min-width: 0; padding: 16px; }
-      .controls { flex-direction: column; align-items: stretch; gap: 10px; }
-      .controls > * { width: 100%; }
-      .controls label { margin-bottom: -5px; }
-      button#clearCache { margin-left: 0; margin-top: 10px; }
-      select#model { max-width: none !important; }
+    .welcome h2 { color: var(--text); font-size: 1.4rem; }
+    .welcome p { max-width: 420px; line-height: 1.5; font-size: 0.9rem; }
+
+    @media (max-width: 640px) {
+      .settings-bar { padding: 8px 12px; gap: 6px; }
+      .msg { max-width: 90%; font-size: 0.9rem; }
+      .input-bar { padding: 10px 12px; }
+      #apiKeyInput { width: 140px; }
+      .chat-container { padding: 12px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <nav>
-      <span style="font-weight:700">Tiny Local AI Demo</span>
-    <nav>
-      <span style="font-weight:700" data-i18n="tiny_ai.header.title">Tiny Local AI Demo</span>
-    </nav>
-      <h2 data-i18n="tiny_ai.page.title">Prompt</h2>
-      <textarea id="prompt" data-i18n="tiny_ai.prompt.placeholder" placeholder="Write a short prompt (e.g. 'Write a friendly 2-line haiku about coffee')."></textarea>
-      <div class="controls">
-        <label for="backend" data-i18n="tiny_ai.controls.backend">Backend</label>
-        <select id="backend">
-          <option value="server" data-i18n="tiny_ai.controls.backend.server">Flask Server (/generate)</option>
-          <option value="webllm" data-i18n="tiny_ai.controls.backend.webllm">WebLLM (WebSocket ws://127.0.0.1:11434)</option>
-          <option value="webgpu" data-i18n="tiny_ai.controls.backend.webgpu">In-Browser WebLLM (WebGPU)</option>
-        </select>
-        <select id="model" style="display:none;max-width:200px">
-          <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (Default)</option>
-          <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 2.5 0.5B (Tiny)</option>
-          <option value="TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC">TinyLlama 1.1B</option>
-          <option value="SmolLM2-135M-Instruct-q4f16_1-MLC">SmolLM2 135M (Smallest - 135M)</option>
-          <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (Very Tiny)</option>        </select>
-        <label for="maxlen" data-i18n="tiny_ai.controls.max_tokens">Max tokens</label>
-        <input id="maxlen" type="number" value="128" style="width:80px">
-        <button id="gen" data-i18n="tiny_ai.controls.generate">Generate</button>
-        <button id="clearCache" title="Free up space if you get QuotaExceededError" data-i18n="tiny_ai.controls.clear_cache">Clear Cache</button>
-      </div>
-      <div class="hint" data-i18n="tiny_ai.hint">This page expects a local server to run a small model. See the included <code>server.py</code> and <code>README.md</code> for setup instructions.</div>
+
+  <div class="app-header">
+    <div class="logo">&#x1F916; <span>Tiny AI</span> Chat</div>
+  </div>
+
+  <div class="settings-bar">
+    <label for="backend">Backend</label>
+    <select id="backend">
+      <option value="openrouter">OpenRouter (Cloud)</option>
+      <option value="webgpu">In-Browser (WebGPU)</option>
+      <option value="server">Local Flask Server</option>
+      <option value="webllm">WebLLM WebSocket</option>
+    </select>
+
+    <div class="sep"></div>
+
+    <label for="model">Model</label>
+    <select id="model"></select>
+
+    <div class="sep"></div>
+
+    <label for="maxlen">Tokens</label>
+    <input id="maxlen" type="number" value="256" style="width:70px" min="1" max="4096">
+
+    <div class="sep" id="keySep"></div>
+    <label id="keyLabel" for="apiKeyInput">API Key</label>
+    <input id="apiKeyInput" type="password" placeholder="sk-or-v1-..." autocomplete="off">
+    <span class="key-toggle" id="keyToggle" title="Show/hide key">&#x1F441;</span>
+
+    <div style="margin-left:auto; display:flex; gap:6px;">
+      <button class="btn-sm" id="clearChat">Clear chat</button>
+      <button class="btn-sm danger" id="clearCache">Clear model cache</button>
     </div>
-    <div class="panel">
-      <h2 data-i18n="tiny_ai.page.title">Output</h2>
-      <div id="output" data-i18n="tiny_ai.output.placeholder">Results will appear here.</div>
+  </div>
+
+  <div class="chat-container" id="chatArea">
+    <div class="welcome" id="welcome">
+      <h2>Tiny AI Chat</h2>
+      <p>Choose a backend and model above, then start chatting. OpenRouter free-tier models require a free API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:var(--accent)">openrouter.ai/keys</a>.</p>
     </div>
-  </main>
+  </div>
+
+  <div class="input-bar">
+    <textarea id="prompt" rows="1" placeholder="Type a message..." autofocus></textarea>
+    <button class="send-btn" id="sendBtn" title="Send (Enter)">&#x27A4;</button>
+  </div>
 
   <script>
-    async function generate(){
-      const prompt = document.getElementById('prompt').value.trim();
-      const maxlen = parseInt(document.getElementById('maxlen').value) || 128;
-      const out = document.getElementById('output');
-      if(!prompt){ out.textContent = 'Please enter a prompt.'; return; }
+  (() => {
+    const MODELS = {
+      openrouter: [
+        { id: 'google/gemma-3-1b-it:free',           label: 'Gemma 3 1B' },
+        { id: 'google/gemma-3-4b-it:free',           label: 'Gemma 3 4B' },
+        { id: 'google/gemma-3-12b-it:free',          label: 'Gemma 3 12B' },
+        { id: 'google/gemma-3-27b-it:free',          label: 'Gemma 3 27B' },
+        { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1 8B' },
+        { id: 'meta-llama/llama-4-scout:free',       label: 'Llama 4 Scout' },
+        { id: 'meta-llama/llama-4-maverick:free',    label: 'Llama 4 Maverick' },
+        { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1 24B' },
+        { id: 'qwen/qwen3-8b:free',                  label: 'Qwen 3 8B' },
+        { id: 'qwen/qwen3-14b:free',                 label: 'Qwen 3 14B' },
+        { id: 'qwen/qwen3-30b-a3b:free',             label: 'Qwen 3 30B-A3B' },
+        { id: 'qwen/qwen3-32b:free',                 label: 'Qwen 3 32B' },
+        { id: 'deepseek/deepseek-r1-0528:free',      label: 'DeepSeek R1' },
+        { id: 'microsoft/mai-ds-r1:free',             label: 'Microsoft MAI DS R1' },
+        { id: 'moonshotai/kimi-vl-a3b-thinking:free', label: 'Kimi VL A3B Thinking' },
+        { id: 'nvidia/llama-3.1-nemotron-70b-instruct:free', label: 'Nemotron 70B' },
+      ],
+      webgpu: [
+        { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',        label: 'Llama 3.2 1B' },
+        { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',        label: 'Llama 3.2 3B' },
+        { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',       label: 'Qwen 2.5 0.5B' },
+        { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',       label: 'Qwen 2.5 1.5B' },
+        { id: 'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC',    label: 'TinyLlama 1.1B' },
+        { id: 'SmolLM2-135M-Instruct-q4f16_1-MLC',        label: 'SmolLM2 135M (Tiny)' },
+        { id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',        label: 'SmolLM2 360M' },
+        { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',        label: 'Phi 3.5 Mini 3.8B' },
+        { id: 'gemma-2-2b-it-q4f16_1-MLC',                label: 'Gemma 2 2B' },
+        { id: 'Qwen3.5-0.6B-Instruct-q4f16_1-MLC',       label: 'Qwen 3.5 0.6B' },
+        { id: 'Qwen3.5-1.7B-Instruct-q4f16_1-MLC',       label: 'Qwen 3.5 1.7B' },
+        { id: 'Qwen3.5-4B-Instruct-q4f16_1-MLC',         label: 'Qwen 3.5 4B' },
+      ],
+      server: [
+        { id: 'default', label: 'Server Default' },
+      ],
+      webllm: [
+        { id: 'default', label: 'WebLLM Default' },
+      ],
+    };
 
-      const backend = document.getElementById('backend').value;
-      const modelId = document.getElementById('model').value;
-      
-      if (backend === 'webgpu') {
-        out.textContent = 'Initializing WebLLM (WebGPU)...';
-      } else {
-        out.textContent = backend === 'webllm' ? 'Connecting to WebLLM (ws://127.0.0.1:11434)...' : 'Contacting local model server...';
-      }
+    const $ = id => document.getElementById(id);
+    const backendSel = $('backend');
+    const modelSel   = $('model');
+    const maxlenIn   = $('maxlen');
+    const apiKeyIn   = $('apiKeyInput');
+    const keyToggle  = $('keyToggle');
+    const chatArea   = $('chatArea');
+    const welcome    = $('welcome');
+    const promptIn   = $('prompt');
+    const sendBtn    = $('sendBtn');
 
-      try{
-        if(backend === 'webgpu'){
-          const text = await runWebGPU(prompt, maxlen, (msg) => out.textContent = msg, modelId);
-          out.textContent = text || 'No output';
-        } else if(backend === 'webllm'){
-          const text = await webllmGenerate(prompt, maxlen);
-          out.textContent = text || 'No output';
-        } else {
-          const res = await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({prompt,max_length: maxlen})});
-          if(!res.ok){ const text = await res.text(); out.textContent = 'Server error: '+text; return; }
-          const data = await res.json();
-          out.textContent = data.generated || data.error || 'No output';
-        }
-      }catch(e){ 
-        console.error(e);
-        if (e.name === 'QuotaExceededError' || e.message.includes('QuotaExceededError')) {
-            out.textContent = 'Error: Browser storage quota exceeded. Please click "Clear Cache" to free up space, then try again.\n\n' + e.message;
-        } else {
-            out.textContent = 'Error: ' + e.message + '\n\nCheck console for details.'; 
-        }
-      }
-    }
-    document.getElementById('gen').addEventListener('click', generate);
-    
-    document.getElementById('clearCache').addEventListener('click', async () => {
-      if(!confirm('This will delete all downloaded models from your browser cache to free up space. Are you sure?')) return;
-      const out = document.getElementById('output');
-      out.textContent = 'Clearing cache...';
-      try {
-        // Clear Cache API
-        const keys = await caches.keys();
-        let count = 0;
-        for(const key of keys) {
-           // WebLLM uses specific cache names, but we can be safe and clear ones that look like model caches
-           if(key.startsWith('webllm/') || key.includes('mlc')) {
-             await caches.delete(key);
-             count++;
-           }
-        }
-        
-        // Also try to clear IndexedDB if used by WebLLM
-        try {
-            const dbs = await window.indexedDB.databases();
-            for (const db of dbs) {
-                if (db.name && (db.name.includes('webllm') || db.name.includes('mlc'))) {
-                    window.indexedDB.deleteDatabase(db.name);
-                    count++;
-                }
-            }
-        } catch(e) { console.warn("Could not list/delete IndexedDB:", e); }
+    const LS_KEY = 'tinyai_key';
+    const LS_BACKEND = 'tinyai_backend';
+    apiKeyIn.value = localStorage.getItem(LS_KEY) || '';
+    if (localStorage.getItem(LS_BACKEND)) backendSel.value = localStorage.getItem(LS_BACKEND);
+    apiKeyIn.addEventListener('input', () => localStorage.setItem(LS_KEY, apiKeyIn.value));
 
-        out.textContent = `Cache cleared (${count} items removed). You can now reload the page and try downloading a model again.`;
-        webllmEngine = null; 
-        currentModelId = null;
-      } catch(e) {
-        out.textContent = 'Error clearing cache: ' + e;
-      }
+    keyToggle.addEventListener('click', () => {
+      apiKeyIn.type = apiKeyIn.type === 'password' ? 'text' : 'password';
     });
 
-    // Allow Ctrl+Enter to generate
-    document.getElementById('prompt').addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.key === 'Enter') generate(); });
-
-    // Toggle model selector visibility
-    const backendSelect = document.getElementById('backend');
-    const modelSelect = document.getElementById('model');
-    function updateModelVisibility() {
-        modelSelect.style.display = backendSelect.value === 'webgpu' ? 'block' : 'none';
+    function populateModels() {
+      const backend = backendSel.value;
+      modelSel.innerHTML = '';
+      (MODELS[backend] || []).forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id;
+        o.textContent = m.label;
+        modelSel.appendChild(o);
+      });
+      const showKey = backend === 'openrouter';
+      $('keySep').style.display = showKey ? '' : 'none';
+      $('keyLabel').style.display = showKey ? '' : 'none';
+      apiKeyIn.style.display = showKey ? '' : 'none';
+      keyToggle.style.display = showKey ? '' : 'none';
+      localStorage.setItem(LS_BACKEND, backend);
     }
-    backendSelect.addEventListener('change', updateModelVisibility);
-    updateModelVisibility();
+    backendSel.addEventListener('change', populateModels);
+    populateModels();
 
+    let chatHistory = [];
+
+    function addMessage(role, text, meta) {
+      const w = $('welcome');
+      if (w) w.remove();
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      if (meta && role === 'ai') {
+        const metaEl = document.createElement('div');
+        metaEl.className = 'meta';
+        metaEl.textContent = meta;
+        div.appendChild(metaEl);
+      }
+      const contentEl = document.createElement('span');
+      contentEl.className = 'content';
+      contentEl.textContent = text;
+      div.appendChild(contentEl);
+
+      if (role === 'ai') {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = 'Copy';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1500);
+          });
+        });
+        div.appendChild(copyBtn);
+      }
+      chatArea.appendChild(div);
+      chatArea.scrollTop = chatArea.scrollHeight;
+      return div;
+    }
+
+    function addTypingIndicator() {
+      const w = $('welcome');
+      if (w) w.remove();
+      const div = document.createElement('div');
+      div.className = 'msg ai typing-indicator';
+      div.id = 'typing';
+      div.textContent = 'Thinking';
+      chatArea.appendChild(div);
+      chatArea.scrollTop = chatArea.scrollHeight;
+      return div;
+    }
+
+    function removeTyping() {
+      const el = $('typing');
+      if (el) el.remove();
+    }
+
+    // OpenRouter
+    async function openrouterGenerate(messages, modelId, maxTokens) {
+      const key = apiKeyIn.value.trim();
+      if (!key) throw new Error('Please enter your OpenRouter API key (get one free at openrouter.ai/keys)');
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + key,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': location.href,
+          'X-Title': 'Tiny AI Chat',
+        },
+        body: JSON.stringify({ model: modelId, messages, max_tokens: maxTokens }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || 'OpenRouter error ' + res.status);
+      }
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || 'No response';
+    }
+
+    // WebGPU
     let webllmEngine = null;
     let currentModelId = null;
 
-    async function runWebGPU(prompt, maxTokens, onProgress, modelId) {
-        // Dynamic import from CDN
-        const { CreateMLCEngine, prebuiltAppConfig } = await import('https://esm.run/@mlc-ai/web-llm');
-        
-        const selectedModel = modelId || "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
-        
-        // Custom config for models not in prebuilt list
-        const appConfig = {
-            model_list: [
-                ...prebuiltAppConfig.model_list,
-                {
-                    "model": "https://huggingface.co/mlc-ai/SmolLM2-135M-Instruct-q4f16_1-MLC",
-                    "model_id": "SmolLM2-135M-Instruct-q4f16_1-MLC",
-                    "model_lib": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-135M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-                    "vram_required_MB": 128,
-                    "low_resource_required": true,
-                    "overrides": { "context_window_size": 4096 }
-                },
-                {
-                    "model": "https://huggingface.co/mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC",
-                    "model_id": "SmolLM2-360M-Instruct-q4f16_1-MLC",
-                    "model_lib": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-360M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-                    "vram_required_MB": 256,
-                    "low_resource_required": true,
-                    "overrides": { "context_window_size": 4096 }
-                }
-            ]
-        };
-
-        if (!webllmEngine) {
-            onProgress("Loading WebLLM engine and model " + selectedModel + " (this may take a while)...");
-            webllmEngine = await CreateMLCEngine(
-                selectedModel,
-                { 
-                    appConfig: appConfig,
-                    initProgressCallback: (report) => onProgress(report.text) 
-                }
-            );
-            currentModelId = selectedModel;
-        } else if (currentModelId !== selectedModel) {
-            onProgress("Switching to model " + selectedModel + "...");
-            await webllmEngine.reload(selectedModel, { 
-                appConfig: appConfig,
-                initProgressCallback: (report) => onProgress(report.text) 
-            });
-            currentModelId = selectedModel;
+    async function runWebGPU(messages, maxTokens, onProgress, modelId) {
+      const { CreateMLCEngine, prebuiltAppConfig } = await import('https://esm.run/@mlc-ai/web-llm');
+      const selectedModel = modelId || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+      const appConfig = {
+        model_list: [
+          ...prebuiltAppConfig.model_list,
+          {
+            model: 'https://huggingface.co/mlc-ai/SmolLM2-135M-Instruct-q4f16_1-MLC',
+            model_id: 'SmolLM2-135M-Instruct-q4f16_1-MLC',
+            model_lib: 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-135M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+            vram_required_MB: 128, low_resource_required: true,
+            overrides: { context_window_size: 4096 },
+          },
+          {
+            model: 'https://huggingface.co/mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC',
+            model_id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+            model_lib: 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/SmolLM2-360M-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+            vram_required_MB: 256, low_resource_required: true,
+            overrides: { context_window_size: 4096 },
+          },
+        ],
+      };
+      if (!webllmEngine || currentModelId !== selectedModel) {
+        onProgress(webllmEngine ? 'Switching model...' : 'Loading model ' + selectedModel + '...');
+        if (webllmEngine) {
+          await webllmEngine.reload(selectedModel, { appConfig, initProgressCallback: r => onProgress(r.text) });
+        } else {
+          webllmEngine = await CreateMLCEngine(selectedModel, { appConfig, initProgressCallback: r => onProgress(r.text) });
         }
-
-        onProgress("Generating...");
-        const messages = [
-            { role: "user", content: prompt }
-        ];
-
-        const reply = await webllmEngine.chat.completions.create({
-            messages,
-            max_tokens: maxTokens,
-        });
-        
-        return reply.choices[0].message.content;
+        currentModelId = selectedModel;
+      }
+      onProgress('Generating...');
+      const reply = await webllmEngine.chat.completions.create({ messages, max_tokens: maxTokens });
+      return reply.choices[0].message.content;
     }
 
-    // WebLLM WebSocket client (best-effort). Many WebLLM setups expose a WebSocket at ws://127.0.0.1:11434
-    function webllmGenerate(prompt, maxTokens){
+    // WebLLM WebSocket
+    function webllmWSGenerate(prompt, maxTokens) {
       return new Promise((resolve, reject) => {
-        try{
-          const url = 'ws://127.0.0.1:11434/';
-          const ws = new WebSocket(url);
-          const timeout = setTimeout(()=>{ try{ ws.close(); }catch{}; reject('WebLLM connection timeout'); }, 20000);
-
-          ws.onopen = () => {
-            // Generic request format. Different WebLLM versions may expect different JSON; adjust if needed.
-            const msg = {
-              type: 'generate',
-              input: prompt,
-              parameters: { max_new_tokens: maxTokens }
-            };
-            ws.send(JSON.stringify(msg));
-          };
-
-          ws.onmessage = (evt) => {
-            try{
-              const data = JSON.parse(evt.data);
-              // Try common response fields
-              if(data.result || data.text || data.output){
-                clearTimeout(timeout);
-                try{ ws.close(); }catch{};
-                resolve(data.result || data.text || data.output);
-              } else if(data.type === 'generation_chunk' && data.text){
-                // chunked streaming -- resolve final on 'finished' flag
-                if(data.finished){ clearTimeout(timeout); try{ ws.close(); }catch{}; resolve(data.text); }
-              } else {
-                // fallback: return the raw message
-                clearTimeout(timeout);
-                try{ ws.close(); }catch{};
-                resolve(JSON.stringify(data));
-              }
-            }catch(err){ clearTimeout(timeout); try{ ws.close(); }catch{}; resolve(evt.data); }
-          };
-
-          ws.onerror = (err) => { clearTimeout(timeout); try{ ws.close(); }catch{}; reject('WebSocket error'); };
-          ws.onclose = ()=>{};
-        }catch(e){ reject(e); }
+        const ws = new WebSocket('ws://127.0.0.1:11434/');
+        const timeout = setTimeout(() => { try { ws.close(); } catch {} reject(new Error('WebLLM connection timeout')); }, 20000);
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'generate', input: prompt, parameters: { max_new_tokens: maxTokens } }));
+        ws.onmessage = evt => {
+          try {
+            const data = JSON.parse(evt.data);
+            const text = data.result || data.text || data.output;
+            if (text) { clearTimeout(timeout); try { ws.close(); } catch {} resolve(text); }
+            else if (data.type === 'generation_chunk' && data.text && data.finished) { clearTimeout(timeout); try { ws.close(); } catch {} resolve(data.text); }
+            else { clearTimeout(timeout); try { ws.close(); } catch {} resolve(JSON.stringify(data)); }
+          } catch { clearTimeout(timeout); try { ws.close(); } catch {} resolve(evt.data); }
+        };
+        ws.onerror = () => { clearTimeout(timeout); try { ws.close(); } catch {} reject(new Error('WebSocket error')); };
       });
     }
+
+    // Flask server
+    async function serverGenerate(prompt, maxTokens) {
+      const res = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, max_length: maxTokens }),
+      });
+      if (!res.ok) throw new Error('Server error: ' + await res.text());
+      const data = await res.json();
+      return data.generated || data.error || 'No output';
+    }
+
+    // Main send
+    let busy = false;
+    async function send() {
+      const text = promptIn.value.trim();
+      if (!text || busy) return;
+      busy = true;
+      sendBtn.disabled = true;
+      promptIn.value = '';
+      autoResize();
+
+      addMessage('user', text);
+      chatHistory.push({ role: 'user', content: text });
+
+      const backend = backendSel.value;
+      const modelId = modelSel.value;
+      const maxTokens = parseInt(maxlenIn.value) || 256;
+      const modelLabel = modelSel.options[modelSel.selectedIndex]?.text || modelId;
+      const typingEl = addTypingIndicator();
+
+      try {
+        let reply;
+        if (backend === 'openrouter') {
+          reply = await openrouterGenerate(chatHistory, modelId, maxTokens);
+        } else if (backend === 'webgpu') {
+          reply = await runWebGPU(chatHistory, maxTokens, msg => { typingEl.textContent = msg; }, modelId);
+        } else if (backend === 'webllm') {
+          reply = await webllmWSGenerate(text, maxTokens);
+        } else {
+          reply = await serverGenerate(text, maxTokens);
+        }
+        removeTyping();
+        addMessage('ai', reply, modelLabel);
+        chatHistory.push({ role: 'assistant', content: reply });
+      } catch (e) {
+        console.error(e);
+        removeTyping();
+        if (e.name === 'QuotaExceededError' || (e.message && e.message.includes('QuotaExceededError'))) {
+          addMessage('system', 'Storage quota exceeded. Click "Clear model cache" to free space.');
+        } else {
+          addMessage('system', 'Error: ' + e.message);
+        }
+      } finally {
+        busy = false;
+        sendBtn.disabled = false;
+        promptIn.focus();
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    promptIn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    function autoResize() {
+      promptIn.style.height = 'auto';
+      promptIn.style.height = Math.min(promptIn.scrollHeight, 150) + 'px';
+    }
+    promptIn.addEventListener('input', autoResize);
+
+    $('clearChat').addEventListener('click', () => {
+      chatHistory = [];
+      chatArea.innerHTML = '';
+    });
+
+    $('clearCache').addEventListener('click', async () => {
+      if (!confirm('Delete all downloaded WebGPU models from browser cache?')) return;
+      try {
+        let count = 0;
+        const keys = await caches.keys();
+        for (const key of keys) {
+          if (key.startsWith('webllm/') || key.includes('mlc')) { await caches.delete(key); count++; }
+        }
+        try {
+          const dbs = await window.indexedDB.databases();
+          for (const db of dbs) {
+            if (db.name && (db.name.includes('webllm') || db.name.includes('mlc'))) { window.indexedDB.deleteDatabase(db.name); count++; }
+          }
+        } catch {}
+        webllmEngine = null;
+        currentModelId = null;
+        addMessage('system', 'Cache cleared (' + count + ' items removed).');
+      } catch (e) {
+        addMessage('system', 'Error clearing cache: ' + e.message);
+      }
+    });
+  })();
   </script>
 </body>
 <script src="top_buttons.js"></script>
