@@ -1,28 +1,32 @@
 // Service Worker per supporto offline
 const CACHE_NAME = 'portfolio-v2';
+const scopedStaticPaths = [
+    './',
+    'index.html',
+    'pages/main/timeline.html',
+    'pages/main/books.html',
+    'pages/main/technology.html',
+    'pages/content/music.html',
+    'pages/content/movies.html',
+    'pages/main/piano.html',
+    'pages/content/poem.html',
+    'pages/content/photobook.html',
+    'pages/content/memes.html',
+    'pages/main/life_comic.html',
+    'pages/main/blog.html',
+    'pages/main/shop.html',
+    'projects/quiz.html',
+    'assets/css/main.css',
+    'assets/js/main.js',
+    'assets/icon-192.png',
+    'assets/icon-512.png',
+    'manifest.json',
+    'robots.txt',
+    'sitemap.xml',
+];
+
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/timeline.html',
-    '/books.html',
-    '/technology.html',
-    '/music.html',
-    '/movies.html',
-    '/piano.html',
-    '/poem.html',
-    '/photobook.html',
-    '/memes.html',
-    '/life_comic.html',
-    '/blog.html',
-    '/shop.html',
-    '/projects/quiz.html',
-    '/assets/css/main.css',
-    '/assets/js/main.js',
-    '/assets/icon-192.png',
-    '/assets/icon-512.png',
-    '/manifest.json',
-    '/robots.txt',
-    '/sitemap.xml',
+    ...scopedStaticPaths.map(path => new URL(path, self.registration.scope).toString()),
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
@@ -107,8 +111,8 @@ self.addEventListener('fetch', event => {
                 .catch(() => {
                     return caches.match(request)
                         .then(cachedResponse => {
-                            if (cachedResponse) return cachedResponse;
-                             return caches.match('/index.html')
+                                if (cachedResponse) return cachedResponse;
+                                 return caches.match(new URL('index.html', self.registration.scope).toString())
                                      .then(response => response || createOfflineResponse());
                         });
                 })

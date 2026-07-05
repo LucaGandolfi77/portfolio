@@ -27,7 +27,7 @@ Your sheet music is organized in the following folders:
    - **Contemporary**: `/assets/sheet-music/contemporary/`
    - **Original**: `/assets/sheet-music/original/`
 
-2. Update the piano.html file to include your new files in the sidebar lists
+2. Update the pages/main/piano.html file to include your new files in the sidebar lists
 
 ## 🎵 Recommended File Naming Convention
 

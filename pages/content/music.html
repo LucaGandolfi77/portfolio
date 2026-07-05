@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title data-i18n="music.page.title">Music — Luca Gandolfi</title>
+    <meta name="description" content="Music playlists, compositions, and audio inspirations from Luca Gandolfi.">
+    <link rel="canonical" href="https://lucagandolfi.dev/pages/content/music.html">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Music — Luca Gandolfi">
+    <meta property="og:description" content="Listen to playlists and discover Luca Gandolfi's music inspirations.">
+    <meta property="og:url" content="https://lucagandolfi.dev/pages/content/music.html">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#0a1628 0%,#1a2940 100%);color:white}
+        .wrap{max-width:1000px;margin:36px auto;padding:28px}
+        a.back{color:#00d4ff;text-decoration:none;font-weight:600}
+        .music-grid{display:flex;flex-direction:column;gap:18px;margin-top:18px}
+        .playlists-list{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);max-height:560px;overflow:auto;scrollbar-gutter:stable}
+        .playlists-list input{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(0,0,0,0.12);color:inherit;margin-bottom:8px;box-sizing:border-box}
+        .playlist-item{padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:8px}
+        .playlist-item:hover{background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.03)}
+        .playlist-item.active{background:linear-gradient(90deg,rgba(0,212,255,0.06),rgba(0,212,255,0.02));border-color:rgba(0,212,255,0.18)}
+        .spotify-wrap{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column}
+        .spotify-iframe{width:100%;height:380px;border:0;border-radius:8px;background:#000;flex-shrink:0}
+        @media(max-width:880px){.spotify-iframe{height:320px}}
+        @media(max-width:768px){.spotify-iframe{height:280px}.wrap{padding:20px;margin:24px auto}.music-grid{gap:12px}}
+        @media(max-width:480px){.spotify-iframe{height:240px}.wrap{padding:16px;margin:20px auto}.music-grid{gap:8px}}
+    </style>
+</head>
+<body>
+
+    <div class="wrap">
+        <a class="back" href="../../index.html">← <span data-i18n="page.back">Back to portfolio</span></a>
+        <h1 data-i18n="music.page.heading">Music</h1>
+        <p data-i18n="music.page.lead">Compositions, playlists and inspirations.</p>
+
+
+                <h2 data-i18n="music.playlists.heading">Playlists</h2>
+                <p data-i18n="music.playlists.lead">Select a playlist to play in the embedded Spotify player.</p>
+
+                <div class="music-grid">
+                    <div class="spotify-wrap">
+                        <div id="playlistTitle" style="font-weight:700;margin-bottom:8px">Select a playlist</div>
+                        <iframe id="spotifyPlayer" class="spotify-iframe" src="" allow="encrypted-media; autoplay" title="Spotify player"></iframe>
+                    </div>
+                    <div class="playlists-list">
+                        <label style="font-weight:700;display:block;margin-bottom:8px"><span data-i18n="music.playlists.customPlaylist">Paste Spotify Link</span></label>
+                        <input id="spotifyLinkInput" type="text" placeholder="https://open.spotify.com/playlist/..." aria-label="Paste Spotify playlist link" data-i18n-placeholder="music.playlists.spotifyLinkPlaceholder" style="margin-bottom:8px" />
+                        <button id="loadSpotifyLink" class="small" style="width:100%;margin-bottom:12px;padding:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,212,255,0.08);color:#00d4ff;border-radius:6px;cursor:pointer;font-weight:600;transition:all 0.3s" data-i18n="music.playlists.loadPlaylist">Load Playlist</button>
+                        <input id="playlistSearch" type="search" placeholder="Search playlists..." aria-label="Search playlists" data-i18n-placeholder="music.playlists.search" />
+                        <div id="playlistsContainer"><!-- items go here --></div>
+                    </div>
+                </div>
+
+    </div>
+
+    <script>
+        // Placeholder handling (since top_buttons doesn't handle data-i18n-placeholder)
+        function updatePlaceholders() {
+            const t = window.translations || {};
+            function getNested(o,p){return p.split('.').reduce((a,k)=> (a && a[k]!==undefined)? a[k]: undefined, o);}
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{ 
+                const k=el.getAttribute('data-i18n-placeholder'); 
+                const v=getNested(t,k); 
+                if(v!==undefined) el.placeholder = v; 
+            });
+        }
+
+        // Wait for top_buttons to initialize
+        const checkInterval = setInterval(() => {
+            const sel = document.getElementById('siteLangSelect');
+            if (sel && window.translations) {
+                clearInterval(checkInterval);
+                updatePlaceholders();
+                sel.addEventListener('change', () => setTimeout(updatePlaceholders, 100)); // wait for fetch
+            }
+        }, 100);
+
+        document.addEventListener('DOMContentLoaded', async ()=>{
+            // load Spotify playlists from JSON
+            let PLAYLISTS = [];
+            try{
+              const resp = await fetch('../../assets/spotify.json');
+              if(resp.ok){ PLAYLISTS = await resp.json(); }
+            }catch(e){ console.warn('Could not load ../../assets/spotify.json', e); }
+
+            function createPlaylistItem(p){ const el = document.createElement('div'); el.className='playlist-item'; el.tabIndex=0; el.dataset.id=p.id; el.textContent = p.title; return el; }
+            function renderPlaylists(filter=''){ const container = document.getElementById('playlistsContainer'); if(!container) return; container.innerHTML=''; const q=(filter||'').toLowerCase().trim(); const list = PLAYLISTS.filter(pp=> pp.title.toLowerCase().includes(q)); if(list.length===0){ container.innerHTML = '<div style="color:#9fbcd8">No playlists</div>'; return; } list.forEach(p=>{ const item = createPlaylistItem(p); item.addEventListener('click', ()=> selectPlaylist(p, item, true)); item.addEventListener('keydown', e=>{ if(e.key==='Enter') selectPlaylist(p, item, true); }); container.appendChild(item); }); }
+            function selectPlaylist(p, el, autoplay){ document.querySelectorAll('.playlist-item').forEach(x=>x.classList.remove('active')); if(el) el.classList.add('active'); const player = document.getElementById('spotifyPlayer'); const title = document.getElementById('playlistTitle'); if(title) title.textContent = p.title; if(player) player.src = `https://open.spotify.com/embed/playlist/${p.id}?utm_source=generator&autoplay=${autoplay?1:0}`; }
+
+            // initialize playlist UI
+            renderPlaylists();
+            if(PLAYLISTS.length){ const first = document.querySelector('.playlist-item'); if(first) selectPlaylist(PLAYLISTS[0], first, false); }
+            const search = document.getElementById('playlistSearch'); if(search){ search.addEventListener('input', e=> renderPlaylists(e.target.value)); }
+
+            // Handle Spotify link input
+            const spotifyLinkInput = document.getElementById('spotifyLinkInput');
+            const loadSpotifyLink = document.getElementById('loadSpotifyLink');
+            
+            function extractSpotifyPlaylistId(url){
+                // Extract ID from URLs like:
+                // https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYKl2d
+                // spotify:playlist:37i9dQZF1DXcBWIGoYKl2d
+                // https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYKl2d?si=...
+                const match = url.match(/(?:spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]+)/);
+                return match ? match[1] : null;
+            }
+            
+            if(loadSpotifyLink && spotifyLinkInput){
+                loadSpotifyLink.addEventListener('click', ()=>{
+                    const url = (spotifyLinkInput.value || '').trim();
+                    if(!url){
+                        alert('Please paste a Spotify playlist link');
+                        return;
+                    }
+                    const playlistId = extractSpotifyPlaylistId(url);
+                    if(!playlistId){
+                        alert('Invalid Spotify link. Please use a valid playlist link.');
+                        return;
+                    }
+                    selectPlaylist({title: 'Custom Playlist', id: playlistId}, null, true);
+                    spotifyLinkInput.value = '';
+                });
+                
+                spotifyLinkInput.addEventListener('keypress', (e)=>{
+                    if(e.key === 'Enter'){
+                        loadSpotifyLink.click();
+                    }
+                });
+            }
+        });
+    </script>
+    <script src="../../top_buttons.js"></script>
+</body>
+</html>

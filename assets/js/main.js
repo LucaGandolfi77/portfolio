@@ -657,7 +657,7 @@ function createBubbles() {
         'Pianoforte': 'Pianoforte: learned pieces and practice. Music shapes my rhythm.',
         'Musica': 'Music is central: composing, listening, and inspiration.',
         'Poesie': 'Poesie: I write and read poems to capture moments.',
-        'Fisica Quantistica': 'Fascinated by quantum physics? <br><a href="quantum_lab.html" class="btn btn-sm btn-primary" style="margin-top:8px;display:inline-block;text-decoration:none;font-size:0.8rem;">⚛️ Enter Quantum Lab</a>',
+        'Fisica Quantistica': 'Fascinated by quantum physics? <br><a href="pages/main/quantum_lab.html" class="btn btn-sm btn-primary" style="margin-top:8px;display:inline-block;text-decoration:none;font-size:0.8rem;">⚛️ Enter Quantum Lab</a>',
         'Tecnologia': 'Technology: building practical solutions with elegant code.',
         'Storia': 'Storia: history shapes perspective and context.'
     };
@@ -812,11 +812,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') {
                 const val = quickSearch.value.trim().toLowerCase();
                 if (val === 'easter') {
-                    window.location.href = 'easter_egg.html';
+                    window.location.href = 'pages/experiments/easter_egg.html';
                 } else if (val === 'viper') {
-                    window.location.href = 'aviator_viper.html';
+                    window.location.href = 'pages/experiments/aviator_viper.html';
                 } else if (val === '8') {
-                    window.location.href = '8.html';
+                    window.location.href = 'pages/experiments/8.html';
                 } else if (val === 'spark') {
                     const sparkControl = document.getElementById('sparkControl');
                     if (sparkControl) {
@@ -888,7 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
             preview.innerHTML = '';
             imgs.slice(0,6).forEach((item, idx) => {
                 const wrapper = document.createElement('a');
-                wrapper.href = `memes.html?i=${idx}`;
+                wrapper.href = `pages/content/memes.html?i=${idx}`;
                 wrapper.style.display = 'block';
                 wrapper.style.borderRadius = '8px';
                 wrapper.style.overflow = 'hidden';

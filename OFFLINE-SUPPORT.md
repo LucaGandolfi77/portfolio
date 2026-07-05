@@ -41,7 +41,7 @@ Utente offline?
 
 ### Cache Critica (Al primo carico)
 - `index.html`
-- `timeline.html`
+- `pages/main/timeline.html`
 - `main.css`
 - `main.js`
 - `manifest.json`

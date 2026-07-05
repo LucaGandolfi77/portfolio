@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8 - Chaos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a1628;
+            color: #00d4ff;
+            font-family: 'Inter', sans-serif;
+        }
+        #chaosCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        .overlay-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+        .btn-back {
+            background: rgba(10, 22, 40, 0.8);
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+        .btn-back:hover {
+            background: #00d4ff;
+            color: #0a1628;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="chaosCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('chaosCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+        const maxParticles = 200; // Max number of 8s
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Eight {
+            constructor(x, y) {
+                this.reset(true, x, y);
+            }
+
+            reset(randomY = false, startX, startY) {
+                this.x = startX !== undefined ? startX : Math.random() * width;
+                this.y = startY !== undefined ? startY : (randomY ? Math.random() * height : -100);
+                this.size = Math.random() * 50 + 20; // Base size
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+                this.scale = 1;
+                this.scaleSpeed = Math.random() * 0.05 + 0.01;
+                this.scaleDir = 1;
+                
+                // Colors & Iridescence (Cangianti)
+                this.hue = Math.random() * 360;
+                this.hueSpeed = 0.5 + Math.random(); 
+                
+                this.font = Math.random() > 0.5 ? 'Arial' : 'Times New Roman';
+                this.bold = Math.random() > 0.5 ? 'bold' : '';
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rotationSpeed;
+                
+                // Change color over time
+                this.hue += this.hueSpeed;
+
+                // Bounce off walls
+                if (this.x < -50 || this.x > width + 50) this.vx *= -1;
+                if (this.y < -50 || this.y > height + 50) this.vy *= -1;
+
+                // Pulse scale
+                this.scale += this.scaleSpeed * this.scaleDir;
+                if (this.scale > 1.5 || this.scale < 0.5) {
+                    this.scaleDir *= -1;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.scale(this.scale, this.scale);
+                
+                ctx.font = `${this.bold} ${this.size}px ${this.font}`;
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 60%)`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('8', 0, 0);
+                
+                ctx.restore();
+            }
+        }
+
+        function addParticles(x, y, count = 1) {
+            for(let i=0; i<count; i++) {
+                particles.push(new Eight(x, y));
+                if (particles.length > maxParticles) {
+                    particles.shift(); // Remove oldest
+                }
+            }
+        }
+
+        function init() {
+            particles = [];
+            // Start with some particles
+            for (let i = 0; i < 50; i++) {
+                particles.push(new Eight());
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(10, 22, 40, 0.2)'; // Trail effect
+            ctx.fillRect(0, 0, width, height);
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+
+        // Interaction
+        let isDragging = false;
+
+        canvas.addEventListener('mousedown', () => isDragging = true);
+        canvas.addEventListener('mouseup', () => isDragging = false);
+        canvas.addEventListener('mouseleave', () => isDragging = false);
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                addParticles(e.clientX, e.clientY, 1);
+            }
+        });
+
+        canvas.addEventListener('touchstart', () => isDragging = true);
+        canvas.addEventListener('touchend', () => isDragging = false);
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            addParticles(touch.clientX, touch.clientY, 1);
+        }, { passive: false });
+
+        canvas.addEventListener('click', (e) => {
+            addParticles(e.clientX, e.clientY, 5);
+        });
+
+    </script>
+    <script src="../../top_buttons.js"></script>
+</body>
+</html>

@@ -28,9 +28,9 @@
 
 ### 4. **Page-Specific Meta Tags** ✓
 - ✅ index.html - Home page SEO completa
-- ✅ piano.html - Meta tags musicali
-- ✅ shop.html - E-commerce meta tags
-- ✅ blog.html - Blog post meta tags
+- ✅ pages/main/piano.html - Meta tags musicali
+- ✅ pages/main/shop.html - E-commerce meta tags
+- ✅ pages/main/blog.html - Blog post meta tags
 
 ---
 

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Wrapper</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <style>
+        body { margin: 0; background: #1e1e1e; color: #fff; font-family: 'Courier New', monospace; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        #terminal { flex: 1; background: #000; padding: 10px; overflow-y: auto; border-radius: 5px; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }
+        .input-line { display: flex; margin-top: 10px; }
+        .prompt { color: #0f0; margin-right: 10px; }
+        #cmdInput { flex: 1; background: transparent; border: none; color: #fff; font-family: inherit; font-size: inherit; outline: none; }
+        .output { color: #ccc; margin-bottom: 5px; }
+        .error { color: #f55; margin-bottom: 5px; }
+        .loading { color: #aaa; font-style: italic; }
+        h1 { margin-top: 0; margin-bottom: 10px; font-size: 1.5rem; }
+        p { margin-top: 0; color: #aaa; margin-bottom: 20px; font-size: 0.9rem; }
+        .nav-back { display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none; }
+        .nav-back:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <a href="../../index.html" class="nav-back">← Back to Portfolio</a>
+    <h1>Python Wrapper & CLI</h1>
+    <p>Run Python code and install lightweight packages (micropip) directly in your browser. <br>Use <code>import micropip</code> then <code>await micropip.install('package')</code> to install libraries.</p>
+    <div id="terminal">
+        <div class="loading">Loading Python Environment... Please wait.</div>
+    </div>
+    <div class="input-line">
+        <span class="prompt">>>></span>
+        <input type="text" id="cmdInput" disabled autocomplete="off" spellcheck="false" placeholder="Initializing...">
+    </div>
+
+    <script>
+        let pyodide = null;
+        const terminal = document.getElementById('terminal');
+        const cmdInput = document.getElementById('cmdInput');
+        const loadingMsg = document.querySelector('.loading');
+
+        function addToTerminal(text, type = 'output') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = text;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        async function initPyodide() {
+            try {
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage("micropip");
+                loadingMsg.textContent = "Python 3.11 Ready! (micropip available)";
+                addToTerminal("Welcome to Pyodide! WebAssembly Python environment.", 'output');
+                addToTerminal("Type 'help()' for help, or install packages with:", 'output');
+                addToTerminal("import micropip", 'output');
+                addToTerminal("await micropip.install('package_name')", 'output');
+                addToTerminal("---------------------------------------------------", 'output');
+                cmdInput.disabled = false;
+                cmdInput.placeholder = "Type python code here...";
+                cmdInput.focus();
+            } catch (err) {
+                loadingMsg.textContent = "Failed to load Python environment.";
+                addToTerminal(err.message, 'error');
+            }
+        }
+
+        async function runPython(code) {
+            try {
+                // Determine if we should print result (like REPL)
+                let result = await pyodide.runPythonAsync(code);
+                if (result !== undefined) {
+                    addToTerminal(result.toString());
+                }
+            } catch (err) {
+                addToTerminal(err.message, 'error');
+            }
+        }
+
+        cmdInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const command = cmdInput.value;
+                if (!command) return;
+                
+                // Echo command
+                const echo = document.createElement('div');
+                echo.textContent = '>>> ' + command;
+                echo.style.color = '#fff';
+                echo.style.marginTop = '5px';
+                terminal.appendChild(echo);
+                
+                cmdInput.value = '';
+                
+                await runPython(command);
+            }
+        });
+
+        initPyodide();
+        
+        // Expose python wrapper to window for easier external js calls if needed
+        window.runPythonCommand = async (cmd) => {
+            await runPython(cmd);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Cadet Pinball - Portfolio</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #0a0a14;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            width: 100%;
+            padding: 1rem 2rem;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .game-container {
+            margin-top: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: calc(100vh - 60px);
+            position: relative;
+        }
+
+        canvas {
+            background: radial-gradient(circle at 50% 30%, #1a1a2e, #000);
+            border: 4px solid #333;
+            border-radius: 10px 10px 40px 40px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            max-height: 90vh;
+            max-width: 100%;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00d4ff;
+            pointer-events: none;
+            width: 100%;
+            max-width: 500px;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .score-box {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 15px;
+            border: 1px solid #00d4ff;
+            border-radius: 5px;
+            color: #00d4ff;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            color: #aaa;
+            font-size: 0.8rem;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .mobile-controls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            z-index: 10;
+            touch-action: none;
+        }
+
+        .touch-zone {
+            flex: 1;
+            /* background: rgba(255, 0, 0, 0.1); Debug */ 
+        }
+
+        .plunger-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid rgba(255, 0, 0, 0.6);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            pointer-events: auto;
+            z-index: 20;
+            user-select: none;
+        }
+        
+        .plunger-btn:active {
+            background: rgba(255, 0, 0, 0.6);
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border: 2px solid #00d4ff;
+            text-align: center;
+            border-radius: 10px;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 0 50px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #00d4ff, #0099ff);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-top: 20px;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: bold;
+            border-radius: 50px;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+        }
+
+        h1 {
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00d4ff;
+        }
+
+        @media (min-width: 800px) {
+            .mobile-controls { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="../../index.html" class="nav-brand">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="backToHome">Back to Home</span>
+        </a>
+    </nav>
+
+    <div class="game-container">
+        <canvas id="pinballCanvas"></canvas>
+        
+        <div class="ui-layer">
+            <div class="score-box">SCORE: <span id="score">0</span></div>
+            <div class="score-box">BALLS: <span id="balls">3</span></div>
+        </div>
+
+        <div id="startScreen">
+            <h1>SPACE CADET</h1>
+            <p>Mission: Launch the ball and score points!</p>
+            <button class="btn" id="startBtn">START MISSION</button>
+        </div>
+
+        <div id="gameOverScreen" style="display: none;">
+            <h1>GAME OVER</h1>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button class="btn" id="restartBtn">PLAY AGAIN</button>
+        </div>
+
+        <div class="controls-hint">
+            PC: Left/Right Arrows for Flippers, Space/Enter to Launch<br>
+            Mobile: Tap Left/Right side for Flippers, Button to Launch
+        </div>
+
+        <div class="mobile-controls">
+            <div class="touch-zone" id="leftZone"></div>
+            <div class="touch-zone" id="rightZone"></div>
+            <div class="plunger-btn" id="plungerBtn"><i class="fas fa-rocket"></i></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Vector Math ---
+        class Vector {
+            constructor(x, y) { this.x = x; this.y = y; }
+            add(v) { return new Vector(this.x + v.x, this.y + v.y); }
+            sub(v) { return new Vector(this.x - v.x, this.y - v.y); }
+            mult(s) { return new Vector(this.x * s, this.y * s); }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            norm() { let m = this.mag(); return m === 0 ? new Vector(0, 0) : new Vector(this.x / m, this.y / m); }
+            dot(v) { return this.x * v.x + this.y * v.y; }
+            perp() { return new Vector(-this.y, this.x); }
+            dist(v) { return Math.sqrt((this.x - v.x)**2 + (this.y - v.y)**2); }
+        }
+
+        // --- Game Constants ---
+        const GRAVITY = 0.25;
+        const FRICTION = 0.99;
+        const RESTITUTION = 0.6; // Bounciness
+        const FLIPPER_SPEED = 0.25;
+        const MAX_FLIPPER_ANGLE = Math.PI / 4;
+        
+        // --- Game State ---
+        let canvas, ctx;
+        let width, height;
+        let score = 0;
+        let balls = 3;
+        let gameLoopId;
+        let isGameOver = false;
+        let isPaused = true;
+
+        // --- Physics Objects ---
+        let ball = {
+            pos: new Vector(0, 0),
+            vel: new Vector(0, 0),
+            radius: 10,
+            active: false
+        };
+
+        let flippers = {
+            left: {
+                pivot: new Vector(0, 0),
+                length: 80,
+                angle: Math.PI / 6,
+                restAngle: Math.PI / 6,
+                activeAngle: -Math.PI / 6,
+                currentAngle: Math.PI / 6,
+                angularVel: 0,
+                side: 'left'
+            },
+            right: {
+                pivot: new Vector(0, 0),
+                length: 80,
+                angle: Math.PI - Math.PI / 6,
+                restAngle: Math.PI - Math.PI / 6,
+                activeAngle: Math.PI + Math.PI / 6,
+                currentAngle: Math.PI - Math.PI / 6,
+                angularVel: 0,
+                side: 'right'
+            }
+        };
+
+        let obstacles = []; // Bumpers, walls
+        let particles = [];
+
+        // --- Input ---
+        let keys = { left: false, right: false, plunger: false };
+
+        // --- Initialization ---
+        window.onload = function() {
+            canvas = document.getElementById('pinballCanvas');
+            ctx = canvas.getContext('2d');
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Controls
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            
+            // Mobile Controls
+            setupTouchControls();
+
+            document.getElementById('startBtn').addEventListener('click', startGame);
+            document.getElementById('restartBtn').addEventListener('click', startGame);
+        };
+
+        function resizeCanvas() {
+            const container = document.querySelector('.game-container');
+            // Aspect ratio roughly 3:4
+            let h = container.clientHeight;
+            let w = h * 0.6;
+            if (w > container.clientWidth) {
+                w = container.clientWidth;
+                h = w / 0.6;
+            }
+            
+            canvas.width = w;
+            canvas.height = h;
+            width = w;
+            height = h;
+
+            initLevel();
+        }
+
+        function setupTouchControls() {
+            const leftZone = document.getElementById('leftZone');
+            const rightZone = document.getElementById('rightZone');
+            const plungerBtn = document.getElementById('plungerBtn');
+
+            const handleTouch = (key, pressed) => (e) => {
+                e.preventDefault();
+                keys[key] = pressed;
+                if (key === 'plunger' && pressed && !ball.active && !isGameOver) {
+                    launchBall();
+                }
+            };
+
+            leftZone.addEventListener('touchstart', handleTouch('left', true));
+            leftZone.addEventListener('touchend', handleTouch('left', false));
+            
+            rightZone.addEventListener('touchstart', handleTouch('right', true));
+            rightZone.addEventListener('touchend', handleTouch('right', false));
+            
+            plungerBtn.addEventListener('touchstart', handleTouch('plunger', true));
+            plungerBtn.addEventListener('touchend', handleTouch('plunger', false));
+            plungerBtn.addEventListener('mousedown', handleTouch('plunger', true));
+            plungerBtn.addEventListener('mouseup', handleTouch('plunger', false));
+        }
+
+        function initLevel() {
+            // Flippers position
+            const flipperY = height * 0.85;
+            const flipperGap = width * 0.18;
+            
+            flippers.left.pivot = new Vector(width / 2 - flipperGap, flipperY);
+            flippers.left.length = width * 0.13;
+            
+            flippers.right.pivot = new Vector(width / 2 + flipperGap, flipperY);
+            flippers.right.length = width * 0.13;
+
+            // Obstacles
+            obstacles = [];
+            
+            const laneX = width * 0.9;
+            const curveRadius = width / 2;
+            
+            // 1. Top Curve (Semi-circle)
+            const steps = 20;
+            for(let i=0; i<steps; i++) {
+                let a1 = Math.PI + (Math.PI * i / steps);
+                let a2 = Math.PI + (Math.PI * (i+1) / steps);
+                let cx = width/2;
+                let cy = width/2;
+                obstacles.push({
+                    type: 'line',
+                    p1: new Vector(cx + Math.cos(a1)*curveRadius, cy + Math.sin(a1)*curveRadius),
+                    p2: new Vector(cx + Math.cos(a2)*curveRadius, cy + Math.sin(a2)*curveRadius)
+                });
+            }
+
+            // 2. Left Wall
+            obstacles.push({ type: 'line', p1: new Vector(0, width/2), p2: new Vector(0, height * 0.75) });
+            obstacles.push({ type: 'line', p1: new Vector(0, height * 0.75), p2: flippers.left.pivot });
+            
+            // 3. Right Wall (Lane Divider)
+            // Starts lower to let ball exit lane
+            obstacles.push({ type: 'line', p1: new Vector(laneX, width * 0.35), p2: new Vector(laneX, height) });
+            
+            // 4. Right Guide (Inside playfield)
+            obstacles.push({ type: 'line', p1: new Vector(laneX, height * 0.75), p2: flippers.right.pivot });
+
+            // 5. Outer Right Wall
+            obstacles.push({ type: 'line', p1: new Vector(width, width/2), p2: new Vector(width, height) });
+
+            // Bumpers
+            obstacles.push({ type: 'circle', pos: new Vector(width * 0.3, height * 0.35), radius: width * 0.07, score: 100, color: '#ff0055' });
+            obstacles.push({ type: 'circle', pos: new Vector(width * 0.6, height * 0.35), radius: width * 0.07, score: 100, color: '#ff0055' });
+            obstacles.push({ type: 'circle', pos: new Vector(width * 0.45, height * 0.25), radius: width * 0.07, score: 200, color: '#00ff55' });
+            
+            // Slingshots
+            obstacles.push({ type: 'circle', pos: new Vector(width * 0.2, height * 0.65), radius: width * 0.04, score: 50, color: '#ffff00' });
+            obstacles.push({ type: 'circle', pos: new Vector(width * 0.7, height * 0.65), radius: width * 0.04, score: 50, color: '#ffff00' });
+
+            resetBall();
+        }
+
+        function resetBall() {
+            ball.pos = new Vector(width * 0.95, height * 0.8);
+            ball.vel = new Vector(0, 0);
+            ball.active = false;
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            score = 0;
+            balls = 3;
+            updateUI();
+            
+            initLevel();
+            isGameOver = false;
+            isPaused = false;
+            
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            gameLoop();
+        }
+
+        function handleKeyDown(e) {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyZ') keys.left = true;
+            if (e.code === 'ArrowRight' || e.code === 'KeyM') keys.right = true;
+            if (e.code === 'Space' || e.code === 'Enter') {
+                keys.plunger = true;
+                if (!ball.active && !isGameOver) launchBall();
+            }
+        }
+
+        function handleKeyUp(e) {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyZ') keys.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyM') keys.right = false;
+            if (e.code === 'Space' || e.code === 'Enter') keys.plunger = false;
+        }
+
+        function launchBall() {
+            ball.active = true;
+            ball.vel = new Vector(0, -height * 0.035); // Launch force
+        }
+
+        function update() {
+            if (isPaused || isGameOver) return;
+
+            // --- Update Flippers ---
+            updateFlipper(flippers.left, keys.left);
+            updateFlipper(flippers.right, keys.right);
+
+            // --- Update Ball ---
+            if (ball.active) {
+                // Gravity
+                ball.vel.y += GRAVITY;
+                ball.vel = ball.vel.mult(FRICTION);
+                ball.pos = ball.pos.add(ball.vel);
+
+                // Collisions
+                checkCollisions();
+
+                // Check Death
+                if (ball.pos.y > height + 50) {
+                    balls--;
+                    updateUI();
+                    if (balls <= 0) {
+                        gameOver();
+                    } else {
+                        resetBall();
+                    }
+                }
+            }
+
+            // --- Update Particles ---
+            particles.forEach(p => {
+                p.pos = p.pos.add(p.vel);
+                p.life--;
+            });
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function updateFlipper(flipper, isPressed) {
+            const target = isPressed ? flipper.activeAngle : flipper.restAngle;
+            const diff = target - flipper.currentAngle;
+            flipper.currentAngle += diff * FLIPPER_SPEED;
+        }
+
+        function checkCollisions() {
+            // 1. Obstacles (Lines and Circles)
+            obstacles.forEach(obs => {
+                if (obs.type === 'circle') {
+                    if (ball.pos.dist(obs.pos) < ball.radius + obs.radius) {
+                        // Bounce
+                        let normal = ball.pos.sub(obs.pos).norm();
+                        ball.vel = ball.vel.sub(normal.mult(2 * ball.vel.dot(normal))).mult(RESTITUTION * 1.5); // Extra bounce from bumpers
+                        ball.pos = obs.pos.add(normal.mult(ball.radius + obs.radius + 1));
+                        
+                        addScore(obs.score);
+                        createExplosion(obs.pos.x, obs.pos.y, obs.color);
+                    }
+                } else if (obs.type === 'line') {
+                    checkLineCollision(obs.p1, obs.p2);
+                }
+            });
+
+            // 2. Flippers
+            checkFlipperCollision(flippers.left);
+            checkFlipperCollision(flippers.right);
+        }
+
+        function checkLineCollision(p1, p2) {
+            let line = p2.sub(p1);
+            let len = line.mag();
+            let lineNorm = line.norm();
+            
+            let toBall = ball.pos.sub(p1);
+            let proj = toBall.dot(lineNorm);
+            
+            if (proj > 0 && proj < len) {
+                let closest = p1.add(lineNorm.mult(proj));
+                let dist = ball.pos.dist(closest);
+                
+                if (dist < ball.radius) {
+                    // Collision
+                    let normal = ball.pos.sub(closest).norm();
+                    ball.vel = ball.vel.sub(normal.mult(2 * ball.vel.dot(normal))).mult(RESTITUTION);
+                    ball.pos = closest.add(normal.mult(ball.radius + 1));
+                }
+            }
+        }
+
+        function checkFlipperCollision(flipper) {
+            let tip = new Vector(
+                flipper.pivot.x + Math.cos(flipper.currentAngle) * flipper.length,
+                flipper.pivot.y + Math.sin(flipper.currentAngle) * flipper.length
+            );
+            
+            // Treat flipper as a line segment
+            let p1 = flipper.pivot;
+            let p2 = tip;
+            
+            let line = p2.sub(p1);
+            let len = line.mag();
+            let lineNorm = line.norm();
+            
+            let toBall = ball.pos.sub(p1);
+            let proj = toBall.dot(lineNorm);
+            
+            if (proj > 0 && proj < len) {
+                let closest = p1.add(lineNorm.mult(proj));
+                let dist = ball.pos.dist(closest);
+                
+                if (dist < ball.radius + 5) { // Slightly thicker collision for flippers
+                    // Collision
+                    let normal = ball.pos.sub(closest).norm();
+                    
+                    // Add flipper velocity to ball
+                    // Simple approximation: if flipper is moving up and ball hits it, add boost
+                    let isMovingUp = false;
+                    if (flipper.side === 'left' && flipper.currentAngle < flipper.restAngle) isMovingUp = true; // Moving towards active (negative angle)
+                    // Wait, angles: rest is PI/6 (30deg), active is -PI/6 (-30deg). So decreasing angle is moving up.
+                    // Actually, let's just check angular velocity if we tracked it, or diff from target.
+                    
+                    // Simplified boost
+                    let boost = 0;
+                    if (keys[flipper.side]) boost = 5;
+
+                    ball.vel = ball.vel.sub(normal.mult(2 * ball.vel.dot(normal))).mult(RESTITUTION);
+                    ball.vel = ball.vel.add(normal.mult(boost)); // Flipper kick
+                    
+                    ball.pos = closest.add(normal.mult(ball.radius + 6));
+                }
+            }
+        }
+
+        function addScore(points) {
+            score += points;
+            updateUI();
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    pos: new Vector(x, y),
+                    vel: new Vector((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5),
+                    life: 20,
+                    color: color
+                });
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('balls').textContent = balls;
+        }
+
+        function draw() {
+            // Clear
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Obstacles
+            obstacles.forEach(obs => {
+                if (obs.type === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(obs.pos.x, obs.pos.y, obs.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = obs.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // Glow
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = obs.color;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                } else if (obs.type === 'line') {
+                    ctx.beginPath();
+                    ctx.moveTo(obs.p1.x, obs.p1.y);
+                    ctx.lineTo(obs.p2.x, obs.p2.y);
+                    ctx.strokeStyle = '#00d4ff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+
+            // Draw Flippers
+            drawFlipper(flippers.left);
+            drawFlipper(flippers.right);
+
+            // Draw Ball
+            if (ball.active || !isGameOver) { // Draw ball even if waiting to launch
+                ctx.beginPath();
+                ctx.arc(ball.pos.x, ball.pos.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                // Shine
+                ctx.beginPath();
+                ctx.arc(ball.pos.x - 3, ball.pos.y - 3, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.fill();
+            }
+
+            // Draw Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life / 20;
+                ctx.fillRect(p.pos.x, p.pos.y, 4, 4);
+                ctx.globalAlpha = 1;
+            });
+        }
+
+        function drawFlipper(flipper) {
+            let tip = new Vector(
+                flipper.pivot.x + Math.cos(flipper.currentAngle) * flipper.length,
+                flipper.pivot.y + Math.sin(flipper.currentAngle) * flipper.length
+            );
+            
+            ctx.beginPath();
+            ctx.moveTo(flipper.pivot.x, flipper.pivot.y);
+            ctx.lineTo(tip.x, tip.y);
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 10;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>

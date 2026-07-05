@@ -78,7 +78,7 @@
 **What was fixed:** Complete rewrite with:
 - 27 pages including all major content pages
 - Consistent domain: `lucagandolfi77.github.io/portfolio/`
-- Added privacy-policy.html and cookie-policy.html
+- Added pages/main/privacy-policy.html and pages/main/cookie-policy.html
 - Updated all `lastmod` to 2026-03-31
 - Old file backed up as `sitemap.xml.bak`
 
@@ -163,14 +163,14 @@
 2. **Preference modal** — Overlay modal with toggle switches per category (Necessary, Functional, Analytics, Marketing)
 3. **Consent management JS** (`assets/js/cookies.js`) — Stores consent in localStorage as JSON with version and timestamp; 6-month expiry; dynamic script loading after consent
 4. **Cookie banner CSS** (`assets/css/cookies.css`) — Responsive styles with dark/light mode support, accessible toggle switches
-5. **Privacy Policy page** (`privacy-policy.html`) — Full GDPR Art. 13 compliant policy
-6. **Cookie Policy page** (`cookie-policy.html`) — Full cookie/technology audit table, browser management instructions
+5. **Privacy Policy page** (`pages/main/privacy-policy.html`) — Full GDPR Art. 13 compliant policy
+6. **Cookie Policy page** (`pages/main/cookie-policy.html`) — Full cookie/technology audit table, browser management instructions
 7. **Footer links** — Persistent links to Privacy Policy, Cookie Policy, and "Manage Cookie Preferences"
 
 ### What Requires Manual Action
 
 - [ ] **Replace `YOUR_RECAPTCHA_SITE_KEY`** in `<meta name="recaptcha-site-key">` with your actual reCAPTCHA v3 site key
-- [ ] **Review privacy-policy.html** — Verify all data processing activities are accurate
+- [ ] **Review pages/main/privacy-policy.html** — Verify all data processing activities are accurate
 - [ ] **If you add Google Analytics**, uncomment the GA loader in `cookies.js` and replace `GA_MEASUREMENT_ID`
 - [ ] **If deploying to a custom domain** (e.g., `lucagandolfi.dev`), update all canonical URLs, sitemap URLs, and robots.txt
 
@@ -239,6 +239,6 @@
 |---|---|
 | `assets/js/cookies.js` | Cookie consent management system |
 | `assets/css/cookies.css` | Cookie banner and modal styles |
-| `privacy-policy.html` | GDPR-compliant privacy policy |
-| `cookie-policy.html` | Cookie audit table and management instructions |
+| `pages/main/privacy-policy.html` | GDPR-compliant privacy policy |
+| `pages/main/cookie-policy.html` | Cookie audit table and management instructions |
 | `audit-report.md` | This report |

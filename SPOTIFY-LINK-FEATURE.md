@@ -1,7 +1,7 @@
-# Spotify Playlist Feature — Music.html
+# Spotify Playlist Feature — pages/content/music.html
 
 ## Overview
-L'aggiornamento di `music.html` aggiunge la possibilità di incollare direttamente un link di playlist di Spotify per ascoltarla nell'embedded Spotify player.
+L'aggiornamento di `pages/content/music.html` aggiunge la possibilità di incollare direttamente un link di playlist di Spotify per ascoltarla nell'embedded Spotify player.
 
 ## How It Works
 
@@ -71,14 +71,14 @@ music.playlists.loadPlaylist
 - ⚠️ עברית (he) - Pre-existing JSON errors
 
 ## CSS Styling
-Il bottone "Load Playlist" utilizza lo stesso design coerente di music.html:
+Il bottone "Load Playlist" utilizza lo stesso design coerente di pages/content/music.html:
 - Colore primario: `#a78bfa` (viola-azzurro)
 - Hover effect: Scale + shadow
 - Responsive: Si adatta a tutti i device
 
 ## Usage Example
 ```
-1. Vai a music.html
+1. Vai a pages/content/music.html
 2. Copia il link di una playlist dal tuo profilo Spotify
 3. Incolla nel campo "Paste Spotify Link"
 4. Premi Invio o clicca "Load Playlist"

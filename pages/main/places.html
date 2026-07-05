@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Luca Gandolfi - Places. Scopri i luoghi significativi della mia vita.">
+    <meta name="keywords" content="places, mappa, luoghi, vita, Luca Gandolfi">
+    <meta name="author" content="Luca Gandolfi">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lucagandolfi.dev/../../pages/main/places.html">
+    <meta property="og:title" content="Places - Luca Gandolfi">
+    <meta property="og:description" content="Scopri i luoghi più significativi della mia vita">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="../../assets/favicon.ico">
+    
+    <!-- Fonts & Stylesheets -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <title>Places - Luca Gandolfi | Mappa Interattiva</title>
+    
+    <style>
+        .places-page-header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .places-page-header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #00d4ff, #0099ff, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .places-page-header p {
+            font-size: 1.1rem;
+            color: #a0c0e0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0, 212, 255, 0.2);
+            margin-bottom: 40px;
+            border: 2px solid rgba(0, 212, 255, 0.2);
+        }
+
+        #placesMap {
+            width: 100%;
+            height: 100%;
+            background: #1a2940;
+        }
+
+        .places-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .place-card {
+            background: rgba(26, 41, 64, 0.4);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all var(--transition);
+            cursor: pointer;
+        }
+
+        .place-card:hover {
+            background: rgba(26, 41, 64, 0.7);
+            border-color: rgba(0, 212, 255, 0.5);
+            box-shadow: 0 12px 40px rgba(0, 212, 255, 0.15);
+            transform: translateY(-8px);
+        }
+
+        .place-card.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.6);
+            box-shadow: 0 12px 40px rgba(0, 212, 255, 0.3);
+        }
+
+        .place-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+
+        .place-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #00d4ff;
+            margin-bottom: 8px;
+        }
+
+        .place-location {
+            font-size: 0.9rem;
+            color: #64c8ff;
+            margin-bottom: 12px;
+        }
+
+        .place-description {
+            font-size: 0.95rem;
+            color: #a0c0e0;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .place-significance {
+            font-size: 0.85rem;
+            background: rgba(0, 212, 255, 0.1);
+            border-left: 3px solid #00d4ff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            color: #64c8ff;
+            font-style: italic;
+        }
+
+        .leaflet-popup-content {
+            font-family: 'Inter', sans-serif;
+            color: #0a1628;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(248, 252, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(248, 252, 255, 0.95);
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 40px;
+            padding: 12px 24px;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition);
+        }
+
+        .back-button:hover {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: rgba(0, 212, 255, 0.6);
+            transform: translateX(-5px);
+        }
+
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 80px 20px;
+            min-height: 100vh;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0c0e0;
+            border-top: 1px solid rgba(0, 212, 255, 0.1);
+            margin-top: 80px;
+        }
+
+        .lang-top-left {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1003;
+        }
+
+        .lang-top-left select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(26, 41, 64, 0.9);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .lang-top-left select:hover {
+            border-color: rgba(0, 212, 255, 0.6);
+            background: rgba(26, 41, 64, 0.95);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1002;
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        [data-theme="light"] .places-page-header h1 {
+            background: linear-gradient(90deg, #0052a3, #003d7a, #0052a3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        [data-theme="light"] .place-card {
+            background: rgba(248, 252, 255, 0.5);
+            border-color: rgba(0, 82, 163, 0.2);
+        }
+
+        [data-theme="light"] .place-card:hover {
+            background: rgba(248, 252, 255, 0.8);
+            border-color: rgba(0, 82, 163, 0.5);
+        }
+
+        [data-theme="light"] .place-name {
+            color: #0052a3;
+        }
+
+        [data-theme="light"] .place-location {
+            color: #0066cc;
+        }
+
+        [data-theme="light"] .place-description {
+            color: #4a7a9f;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .places-page-header h1 {
+                font-size: 2rem;
+            }
+
+            .map-container {
+                height: 400px;
+            }
+
+            .places-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Selector -->
+    <div class="lang-top-left">
+        <label for="langSelect" class="visually-hidden">Select language</label>
+        <select id="langSelect" aria-label="Select language" title="Change language">
+            <option value="en">🇬🇧 EN</option>
+            <option value="it">🇮🇹 IT</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="zh">🇨🇳 中</option>
+            <option value="ru">🇷🇺 RU</option>
+            <option value="de">🇩🇪 DE</option>
+            <option value="ja">🇯🇵 日本</option>
+            <option value="sv">🇸🇪 SV</option>
+            <option value="ar">🇸🇦 AR</option>
+            <option value="he">🇮🇱 HE</option>
+        </select>
+    </div>
+
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme" title="Hold to select theme">🌙</button>
+
+    <!-- Animated particles -->
+    <div class="particles" id="particles"></div>
+
+    <div class="page-container">
+        <!-- Back Button -->
+        <a href="../../index.html#interests" class="back-button">
+            <span>←</span>
+            <span>Back to Portfolio</span>
+        </a>
+
+        <!-- Page Header -->
+        <div class="places-page-header">
+            <h1>🌍 Places in My Life</h1>
+            <p>Discover the most significant places that have shaped my journey and experiences.</p>
+        </div>
+
+        <!-- Map -->
+        <div class="map-container">
+            <div id="placesMap"></div>
+        </div>
+
+        <!-- Places List -->
+        <div class="places-grid" id="placesGrid">
+            <!-- Places will be added dynamically -->
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p data-i18n="footer.text">© 2026 Luca Gandolfi. Built with passion and technology.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Theme System (same as main.js) ---
+        const seasonalThemes = [
+            { id: 'default', name: 'Default', emoji: '🌙', data: null },
+            { id: 'easter', name: 'Easter', emoji: '🐰', data: 'easter' },
+            { id: 'summer', name: 'Summer', emoji: '☀️', data: 'summer' },
+            { id: 'autumn', name: 'Autumn', emoji: '🍂', data: 'autumn' },
+            { id: 'christmas', name: 'Christmas', emoji: '🎄', data: 'christmas' },
+            { id: 'halloween', name: 'Halloween', emoji: '👻', data: 'halloween' },
+            { id: 'cyberpunk', name: 'Cyberpunk', emoji: '⚡', data: 'cyberpunk' }
+        ];
+
+        function applySeasonalTheme(themeId) {
+            const theme = seasonalThemes.find(t => t.id === themeId);
+            if (!theme) return;
+            
+            document.documentElement.removeAttribute('data-seasonal-theme');
+            if (theme.data) {
+                document.documentElement.setAttribute('data-seasonal-theme', theme.data);
+            }
+            
+            localStorage.setItem('seasonal-theme', themeId);
+            closeThemeMenu();
+            updateThemeButton();
+        }
+
+        function updateThemeButton() {
+            const currentSeasonalTheme = localStorage.getItem('seasonal-theme') || 'default';
+            const theme = seasonalThemes.find(t => t.id === currentSeasonalTheme);
+            if (theme) {
+                document.getElementById('themeToggle').textContent = theme.emoji;
+            }
+        }
+
+        function createThemeMenu() {
+            const container = document.createElement('div');
+            container.className = 'theme-menu-container';
+            
+            const button = document.getElementById('themeToggle');
+            button.className = 'theme-toggle-button';
+            
+            const menu = document.createElement('div');
+            menu.className = 'theme-dropdown';
+            
+            seasonalThemes.forEach(theme => {
+                const option = document.createElement('div');
+                option.className = 'theme-option';
+                option.innerHTML = `
+                    <span class="theme-option-emoji">${theme.emoji}</span>
+                    <span class="theme-option-name">${theme.name}</span>
+                    <span class="theme-option-check">✓</span>
+                `;
+                
+                option.addEventListener('click', () => {
+                    applySeasonalTheme(theme.id);
+                });
+                
+                menu.appendChild(option);
+            });
+            
+            button.parentElement.appendChild(menu);
+            return { button, menu };
+        }
+
+        let themeMenu = null;
+        let holdTimer = null;
+        let isTouching = false;
+
+        function initThemeMenu() {
+            if (!themeMenu) {
+                themeMenu = createThemeMenu();
+                const button = themeMenu.button;
+                const menu = themeMenu.menu;
+                
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    holdTimer = setTimeout(() => openThemeMenu(), 500);
+                });
+                
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    if (holdTimer) clearTimeout(holdTimer);
+                });
+                
+                button.addEventListener('mouseleave', (e) => {
+                    e.preventDefault();
+                    if (holdTimer) clearTimeout(holdTimer);
+                });
+                
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    isTouching = true;
+                    holdTimer = setTimeout(() => {
+                        if (isTouching) {
+                            openThemeMenu();
+                            if (navigator.vibrate) {
+                                navigator.vibrate(50);
+                            }
+                        }
+                    }, 500);
+                }, { passive: false });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    if (holdTimer) clearTimeout(holdTimer);
+                }, { passive: false });
+                
+                button.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    isTouching = false;
+                    if (holdTimer) clearTimeout(holdTimer);
+                }, { passive: false });
+                
+                document.addEventListener('click', (e) => {
+                    if (!button.contains(e.target) && !menu.contains(e.target)) {
+                        closeThemeMenu();
+                    }
+                });
+            }
+            
+            updateThemeButton();
+        }
+
+        function openThemeMenu() {
+            if (!themeMenu) initThemeMenu();
+            themeMenu.menu.classList.add('active');
+            themeMenu.button.classList.add('active');
+        }
+
+        function closeThemeMenu() {
+            if (themeMenu) {
+                themeMenu.menu.classList.remove('active');
+                themeMenu.button.classList.remove('active');
+            }
+        }
+
+        const savedSeasonalTheme = localStorage.getItem('seasonal-theme');
+        if (savedSeasonalTheme) {
+            applySeasonalTheme(savedSeasonalTheme);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initThemeMenu);
+        } else {
+            initThemeMenu();
+        }
+
+        // --- Places Data and Map ---
+        const places = [
+            {
+                id: 'birthplace',
+                emoji: '👶',
+                name: 'Fidenza, Parma',
+                coords: [44.8733, 10.2639],
+                description: 'My birthplace - where everything started on February 12, 2003.',
+                significance: 'The beginning of my journey'
+            },
+            {
+                id: 'university',
+                emoji: '🎓',
+                name: 'University of Parma',
+                coords: [44.8049, 10.3296],
+                description: 'Where I studied Computer Engineering and discovered my passion for technology.',
+                significance: 'Formative years in tech'
+            },
+            {
+                id: 'work',
+                emoji: '💼',
+                name: 'Alten Italia - Milan',
+                coords: [45.4642, 9.1900],
+                description: 'My professional journey as a Full-Stack Developer and Software Engineer.',
+                significance: 'Career development'
+            },
+            {
+                id: 'tech',
+                emoji: '💻',
+                name: 'Tech Hub - Remote',
+                coords: [44.8385, 10.3306],
+                description: 'Working on innovative projects across the globe.',
+                significance: 'Digital transformation'
+            },
+            {
+                id: 'creative',
+                emoji: '🎨',
+                name: 'Creative Space',
+                coords: [44.6521, 10.2458],
+                description: 'Where I explore music, art, and creative projects.',
+                significance: 'Creative exploration'
+            },
+            {
+                id: 'home',
+                emoji: '🏠',
+                name: 'Home - Milan & Fidenza',
+                coords: [44.8733, 10.2639],
+                description: 'Base of operations and personal growth.',
+                significance: 'Where memories are made'
+            }
+        ];
+
+        let map = null;
+        let markers = {};
+
+        function initMap() {
+            map = L.map('placesMap').setView([44.83, 10.29], 8);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+                tileSize: 256
+            }).addTo(map);
+
+            places.forEach(place => {
+                const marker = L.marker(place.coords).addTo(map);
+                marker.bindPopup(`
+                    <div>
+                        <div style="font-size: 1.5em; margin-bottom: 8px;">${place.emoji}</div>
+                        <strong style="color: #0052a3;">${place.name}</strong>
+                        <p style="margin: 8px 0; color: #666;">${place.description}</p>
+                        <em style="color: #0066cc;">${place.significance}</em>
+                    </div>
+                `);
+                
+                markers[place.id] = marker;
+            });
+        }
+
+        function renderPlaces() {
+            const grid = document.getElementById('placesGrid');
+            grid.innerHTML = '';
+            
+            places.forEach(place => {
+                const card = document.createElement('div');
+                card.className = 'place-card';
+                card.innerHTML = `
+                    <div class="place-emoji">${place.emoji}</div>
+                    <div class="place-name">${place.name}</div>
+                    <div class="place-location">📍 Coordinates: ${place.coords[0].toFixed(2)}, ${place.coords[1].toFixed(2)}</div>
+                    <div class="place-description">${place.description}</div>
+                    <div class="place-significance">${place.significance}</div>
+                `;
+                
+                card.addEventListener('click', () => {
+                    if (markers[place.id]) {
+                        map.setView(place.coords, 12);
+                        markers[place.id].openPopup();
+                    }
+                });
+                
+                grid.appendChild(card);
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initMap();
+                renderPlaces();
+            });
+        } else {
+            initMap();
+            renderPlaces();
+        }
+
+        // --- Particle animation ---
+        function createParticles() {
+            const particles = document.getElementById('particles');
+            if (!particles) return;
+
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.style.position = 'fixed';
+                particle.style.width = Math.random() * 4 + 1 + 'px';
+                particle.style.height = particle.style.width;
+                particle.style.background = Math.random() > 0.5 ? '#00d4ff' : '#0099ff';
+                particle.style.borderRadius = '50%';
+                particle.style.opacity = Math.random() * 0.5 + 0.3;
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.pointerEvents = 'none';
+                particle.style.animation = `float ${Math.random() * 20 + 10}s infinite`;
+                particles.appendChild(particle);
+            }
+        }
+
+        createParticles();
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translateY(0px) translateX(0px); }
+                50% { transform: translateY(-100px) translateX(50px); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
