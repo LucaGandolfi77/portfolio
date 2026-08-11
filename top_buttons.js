@@ -33,14 +33,27 @@ if (!document.getElementById('site-top-bar')) {
     if (document.getElementById('exitTop')) {
       const old2 = document.getElementById('exitTop'); if (old2.parentNode) old2.parentNode.removeChild(old2);
     }
+    // Compute the path back to site index.html based on current page depth.
+    // Resolves to './index.html', '../index.html', '../../index.html' ... so it works on any host
+    // (including GitHub Pages project sites served under a subpath) without relying on '/index.html'.
+    function homeHref() {
+      const p = location.pathname;
+      const depth = p.split('/').filter(Boolean).length;
+      // If the last segment is a file (has a dot) subtract 1
+      const last = p.split('/').filter(Boolean).pop() || '';
+      const dirs = (last.indexOf('.') >= 0) ? depth - 1 : depth;
+      if (dirs <= 0) return './index.html';
+      return '../'.repeat(dirs) + 'index.html';
+    }
+
     const exitBtn = document.createElement('button');
     exitBtn.id = 'siteExitBtn';
     exitBtn.className = 'tb';
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
+      const home = homeHref();
       try {
-        // Prefer navigating back (like browser back button). If not possible, fall back to referrer or index.
         if (window.history && window.history.length > 1) {
           window.history.back();
         } else if (document.referrer && document.referrer !== '') {
@@ -49,16 +62,16 @@ if (!document.getElementById('site-top-bar')) {
             if (ref.origin === location.origin) {
               window.location.href = document.referrer;
             } else {
-              window.location.href = '/index.html';
+              window.location.href = home;
             }
           } catch (e) {
-            window.location.href = '/index.html';
+            window.location.href = home;
           }
         } else {
-          window.location.href = '/index.html';
+          window.location.href = home;
         }
       } catch(e) {
-        try { window.location.href = '/index.html'; } catch(e) { window.location.href = '/index.html'; }
+        try { window.location.href = home; } catch(e) { window.location.href = 'index.html'; }
       }
     });
 

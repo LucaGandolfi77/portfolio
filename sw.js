@@ -1,5 +1,5 @@
 // Service Worker per supporto offline
-const CACHE_NAME = 'portfolio-v2';
+const CACHE_NAME = 'portfolio-v3';
 const scopedStaticPaths = [
     './',
     'index.html',

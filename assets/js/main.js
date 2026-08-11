@@ -44,56 +44,81 @@ function updateActiveThemeInBar() {
     });
 }
 
-// Create theme bar
-function createThemeBar() {
-    const bar = document.createElement('div');
-    bar.className = 'theme-bar';
+// --- Top Bar with useful controls ---
+
+function createTopBar() {
+    // Remove existing theme bar if present
+    const existingBar = document.querySelector('.theme-bar');
+    if (existingBar) existingBar.remove();
     
-    // Move language selector into the bar
+    const bar = document.createElement('div');
+    bar.className = 'top-bar';
+    
+    // Left side: Language selector
+    const leftSection = document.createElement('div');
+    leftSection.className = 'top-bar-left';
+    
     const langSelector = document.querySelector('.lang-top-left');
     if (langSelector) {
-        bar.appendChild(langSelector);
+        leftSection.appendChild(langSelector);
     }
     
-    const itemsContainer = document.createElement('div');
-    itemsContainer.className = 'theme-bar-items';
+    // Right side: Useful controls
+    const rightSection = document.createElement('div');
+    rightSection.className = 'top-bar-right';
     
-    seasonalThemes.forEach(theme => {
-        const item = document.createElement('div');
-        item.className = 'theme-bar-item';
-        item.dataset.theme = theme.id;
-        item.innerHTML = `
-            <span class="theme-bar-emoji">${theme.emoji}</span>
-            <span class="theme-bar-name">${theme.name}</span>
-        `;
-        
-        item.addEventListener('click', () => {
-            applySeasonalTheme(theme.id);
-        });
-        
-        itemsContainer.appendChild(item);
+    // Search button (opens command palette)
+    const searchBtn = document.createElement('button');
+    searchBtn.className = 'top-bar-btn';
+    searchBtn.innerHTML = '<i class="fas fa-search"></i> <span class="btn-text">Search</span>';
+    searchBtn.title = 'Search (Ctrl+K)';
+    searchBtn.addEventListener('click', () => {
+        if (typeof toggleCommandPalette === 'function') {
+            toggleCommandPalette();
+        }
     });
+    rightSection.appendChild(searchBtn);
     
-    bar.appendChild(itemsContainer);
+    // Theme toggle (light/dark)
+    const themeBtn = document.createElement('button');
+    themeBtn.className = 'top-bar-btn';
+    const isDark = !document.documentElement.hasAttribute('data-theme') || document.documentElement.getAttribute('data-theme') !== 'light';
+    themeBtn.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    themeBtn.title = 'Toggle light/dark mode';
+    themeBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        if (currentTheme === 'light') {
+            document.documentElement.removeAttribute('data-theme');
+            themeBtn.innerHTML = '<i class="fas fa-sun"></i>';
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            themeBtn.innerHTML = '<i class="fas fa-moon"></i>';
+            localStorage.setItem('theme', 'light');
+        }
+    });
+    rightSection.appendChild(themeBtn);
+    
+    // Back to top button
+    const topBtn = document.createElement('button');
+    topBtn.className = 'top-bar-btn';
+    topBtn.innerHTML = '<i class="fas fa-arrow-up"></i>';
+    topBtn.title = 'Back to top';
+    topBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    rightSection.appendChild(topBtn);
+    
+    bar.appendChild(leftSection);
+    bar.appendChild(rightSection);
     document.body.prepend(bar);
-    
-    updateActiveThemeInBar();
 }
 
-// Load saved theme on page load
-const savedSeasonalTheme = localStorage.getItem('seasonal-theme');
-if (savedSeasonalTheme) {
-    const theme = seasonalThemes.find(t => t.id === savedSeasonalTheme);
-    if (theme && theme.data) {
-        document.documentElement.setAttribute('data-seasonal-theme', theme.data);
-    }
-}
-
-// Initialize theme bar when DOM is ready
+// Initialize top bar when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', createThemeBar);
+    document.addEventListener('DOMContentLoaded', createTopBar);
 } else {
-    createThemeBar();
+    createTopBar();
 }
 
 // --- Translations ---
@@ -444,8 +469,8 @@ function createContactModal() {
 const contactModal = createContactModal();
 const contactBtn = document.getElementById('contactBtn');
 if (contactBtn) contactBtn.addEventListener('click', (e) => {
-    // Open default email client with pre-filled recipient
-    window.location.href = 'mailto:l.g.gandalf@hotmail.it';
+    e.preventDefault();
+    try { if (contactModal && typeof contactModal.open === 'function') contactModal.open(); } catch (err) { }
 });
 
 const navContact = document.querySelector('.nav-link[href="#contact"]');
@@ -463,17 +488,17 @@ if (navContact) {
 const projects = [
     {
         title: "E-Commerce Platform",
-        description: "Full-stack e-commerce solution with real-time inventory management and payment integration",
-        image: "./assets/project1.jpg",
-        link: "https://github.com/lucagandolfi/project1",
-        tags: ["React", "Node.js", "MongoDB"]
+        description: "Demo e-commerce vanilla: catalogo prodotti, carrello e checkout — persistenza in localStorage.",
+        image: "",
+        link: "projects/ecommerce.html",
+        tags: ["HTML", "CSS", "JavaScript"]
     },
     {
         title: "AI Chat Assistant",
-        description: "Intelligent chatbot powered by machine learning for customer support automation",
-        image: "./assets/project2.gif",
-        link: "https://github.com/lucagandolfi/project2",
-        tags: ["Python", "TensorFlow", "Flask"]
+        description: "Chatbot AI client-side powered by Pollinations.ai (gratis,无需 chiave API). Storia sessione e multilingua.",
+        image: "",
+        link: "projects/ai_chat.html",
+        tags: ["AI", "Fetch API", "Vanilla JS"]
     }
 ];
 
@@ -624,17 +649,21 @@ function createStarsAndLights() {
 // Load projects
 function loadProjects() {
     const grid = document.getElementById('projectsGrid');
-    projects.forEach(project => {
-        const card = document.createElement('div');
+projects.forEach(project => {
+        const card = document.createElement('a');
         card.className = 'project-card';
-        card.onclick = () => window.open(project.link, '_blank');
+        card.href = project.link;
+        card.style.textDecoration = 'none';
+        card.style.color = 'inherit';
+        const fallbackSvg = `data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22%3E%3Crect fill=%22%231a2940%22 width=%22400%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2300d4ff%22 font-size=%2224%22%3E${encodeURIComponent(project.title)}%3C/text%3E%3C/svg%3E`;
+        const imgSrc = project.image ? project.image : fallbackSvg;
         
         const tagsHtml = project.tags ? 
             `<div class="project-tags">${project.tags.map(tag => `<span class="project-tag">${tag}</span>`).join('')}</div>` : '';
         
         card.innerHTML = `
-            <img src="${project.image}" alt="${project.title}" class="project-image" loading="lazy"
-                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22%3E%3Crect fill=%22%231a2940%22 width=%22400%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2300d4ff%22 font-size=%2224%22%3E${project.title}%3C/text%3E%3C/svg%3E'">
+            <img src="${imgSrc}" alt="${project.title}" class="project-image" loading="lazy"
+                 onerror="this.onerror=null;this.src='${fallbackSvg}'">
             <div class="project-info">
                 <div class="project-title">${project.title}</div>
                 <div class="project-description">${project.description}</div>
@@ -864,7 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update arrow visibility
         const updateArrows = () => {
             arrowLeft.style.opacity = carousel.scrollLeft > 0 ? '1' : '0.3';
-            arrowRight.style.opacity = (carousel.scrollLeft < carousel.scrollWidth - carousel.scrollWidth - 10) ? '1' : '0.3';
+            arrowRight.style.opacity = (carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth - 10) ? '1' : '0.3';
         };
         carousel.addEventListener('scroll', updateArrows);
         window.addEventListener('resize', updateArrows);
@@ -1081,15 +1110,15 @@ const commands = [
     { id: 'theme-dark', title: 'Theme: Dark', desc: 'Switch to dark mode', icon: '🌙', action: () => { applyTheme('dark'); localStorage.setItem('theme', 'dark'); } },
     
     // Games
-    { id: 'game-plane', title: 'Play Sky Ace', desc: 'Side-scrolling shooter game', icon: '✈️', action: () => window.location.href = 'plane.html' },
-    { id: 'game-snake', title: 'Play Snake', desc: 'Classic Snake game', icon: '🐍', action: () => window.location.href = 'snake.html' },
-    { id: 'game-tetris', title: 'Play Tetris', desc: 'Classic Tetris game', icon: '🧱', action: () => window.location.href = 'tetris.html' },
-    { id: 'game-chess', title: 'Play Chess', desc: 'Classic Chess game', icon: '♟️', action: () => window.location.href = 'chess.html' },
-    { id: 'game-poker', title: 'Play Poker', desc: 'Texas Hold\'em', icon: '🃏', action: () => window.location.href = 'poker.html' },
+    { id: 'game-plane', title: 'Play Sky Ace', desc: 'Side-scrolling shooter game', icon: '✈️', action: () => window.location.href = 'games/plane.html' },
+    { id: 'game-snake', title: 'Play Snake', desc: 'Classic Snake game', icon: '🐍', action: () => window.location.href = 'games/snake.html' },
+    { id: 'game-tetris', title: 'Play Tetris', desc: 'Classic Tetris game', icon: '🧱', action: () => window.location.href = 'games/tetris.html' },
+    { id: 'game-chess', title: 'Play Chess', desc: 'Classic Chess game', icon: '♟️', action: () => window.location.href = 'games/chess.html' },
+    { id: 'game-poker', title: 'Play Poker', desc: "Texas Hold'em", icon: '🃏', action: () => window.location.href = 'games/poker.html' },
     
     // Actions
-    { id: 'action-email', title: 'Send Email', desc: 'Open default email client', icon: '📧', action: () => window.location.href = 'mailto:l.g.gandalf@hotmail.it' },
-    { id: 'action-cv', title: 'Download CV', desc: 'Get my resume', icon: '📄', action: () => window.open('assets/CV_Gandolfi_Luca.pdf', '_blank') }
+    { id: 'action-email', title: 'Send Email', desc: 'Open default email client', icon: '📧', action: () => window.location.href = 'mailto:luca.gandolfi7@hotmail.com' },
+    { id: 'action-cv', title: 'Download CV', desc: 'Get my resume', icon: '📄', action: () => window.open('assets/CV_Gandolfi_Luca.pdf', '_blank') },
 ];
 
 let selectedIndex = 0;
@@ -1207,4 +1236,19 @@ if (commandOverlay) {
             toggleCommandPalette();
         }
     });
+}
+
+// === SECRET THEMES COMMANDS ===
+const secretThemeCommands = [
+    { id: 'theme-matrix', title: 'Theme: Matrix', desc: 'Enter the Matrix', icon: '🟢', action: () => document.documentElement.setAttribute('data-theme', 'matrix') },
+    { id: 'theme-vaporwave', title: 'Theme: Vaporwave', desc: 'Aesthetic vibes', icon: '🌸', action: () => document.documentElement.setAttribute('data-theme', 'vaporwave') },
+    { id: 'theme-pixel', title: 'Theme: Pixel Art', desc: '8-bit nostalgia', icon: '👾', action: () => document.documentElement.setAttribute('data-theme', 'pixel-art') },
+    { id: 'theme-retro', title: 'Theme: Retro 80s', desc: 'Neon synthwave', icon: '🌆', action: () => document.documentElement.setAttribute('data-theme', 'retro') },
+    { id: 'theme-minimal', title: 'Theme: Minimal', desc: 'Black & white', icon: '⚪', action: () => document.documentElement.setAttribute('data-theme', 'minimal') },
+    { id: 'theme-night', title: 'Theme: Night', desc: 'Dark mode++', icon: '🌙', action: () => document.documentElement.setAttribute('data-theme', 'night') }
+];
+
+// Merge con commands esistenti
+if (typeof commands !== 'undefined') {
+    commands.push(...secretThemeCommands);
 }
