@@ -23,6 +23,7 @@ const EasterEggs = {
     document.documentElement.setAttribute('data-theme', 'matrix');
     this.showHint('🟢 Matrix mode activated!');
     this.createMatrixRain();
+    if (window.PortfolioXP) window.PortfolioXP.add(20, 'Konami code', { once: true, toast: false });
   },
   
   createMatrixRain() {
@@ -114,6 +115,7 @@ const EasterEggs = {
     }
     
     this.showHint('💥 Boom!');
+    if (window.PortfolioXP) window.PortfolioXP.add(3, 'Logo explosion', { cooldown: 5000, toast: false });
   },
   
   // 3. Keyboard Shortcuts
@@ -182,6 +184,7 @@ const EasterEggs = {
         if (!this.footerHintShown) {
           this.showHint('🎉 You found the bottom!');
           this.footerHintShown = true;
+          if (window.PortfolioXP) window.PortfolioXP.add(5, 'Reached the bottom', { once: true, toast: false });
         }
       }
       
@@ -277,6 +280,7 @@ const EasterEggs = {
     const randomTheme = themes[Math.floor(Math.random() * themes.length)];
     document.documentElement.setAttribute('data-theme', randomTheme);
     this.showHint(`🎨 Random theme: ${randomTheme}`);
+    if (window.PortfolioXP) window.PortfolioXP.add(8, 'Random theme', { toast: false });
   },
   
   // 7. Time-based Themes

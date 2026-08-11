@@ -76,6 +76,7 @@ function createTopBar() {
         if (typeof toggleCommandPalette === 'function') {
             toggleCommandPalette();
         }
+        if (window.PortfolioXP) window.PortfolioXP.add(1, 'Command palette', { cooldown: 10000, toast: false });
     });
     rightSection.appendChild(searchBtn);
     
@@ -109,6 +110,19 @@ function createTopBar() {
     });
     rightSection.appendChild(topBtn);
     
+    // Terminal Mode toggle
+    const termBtn = document.createElement('button');
+    termBtn.className = 'top-bar-btn';
+    termBtn.id = 'terminalToggle';
+    termBtn.innerHTML = '<i class="fas fa-terminal"></i> <span class="btn-text">Terminal</span>';
+    termBtn.title = 'Terminal Mode (Ctrl+Shift+T)';
+    termBtn.addEventListener('click', () => {
+        if (window.TerminalMode && typeof window.TerminalMode.toggle === 'function') {
+            window.TerminalMode.toggle();
+        }
+    });
+    rightSection.appendChild(termBtn);
+
     // Twin Mode toggle (AI chat)
     const twinBtn = document.createElement('button');
     twinBtn.className = 'top-bar-btn';

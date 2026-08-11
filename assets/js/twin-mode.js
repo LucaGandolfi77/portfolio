@@ -253,6 +253,7 @@
         }
         renderSuggestions();
         setTimeout(() => document.getElementById('twinInput').focus(), 100);
+        if (window.PortfolioXP) window.PortfolioXP.add(2, 'Talked to Twin', { cooldown: 15000, toast: false });
     }
 
     function close() {
