@@ -337,3 +337,63 @@ if (document.readyState === 'loading') {
 } else {
   EasterEggs.init();
 }
+
+// Guard: disable easter eggs in Recruiter/Business mode
+(function patchEasterEggsForRecruiterMode() {
+  const originals = {
+    initKonami: EasterEggs.initKonami,
+    initShortcuts: EasterEggs.initShortcuts,
+    initTimeBased: EasterEggs.initTimeBased,
+    showHint: EasterEggs.showHint,
+    createExplosion: EasterEggs.createExplosion,
+    applyRandomTheme: EasterEggs.applyRandomTheme,
+  };
+
+  function isDisabled() {
+    return document.documentElement.dataset.easterDisabled === '1';
+  }
+
+  EasterEggs.initKonami = function () {
+    document.addEventListener('keydown', (e) => {
+      if (isDisabled()) return;
+      if (e.key === this.konamiCode[this.konamiIndex]) {
+        this.konamiIndex++;
+        if (this.konamiIndex === this.konamiCode.length) {
+          this.activateMatrix();
+          this.konamiIndex = 0;
+        }
+      } else {
+        this.konamiIndex = 0;
+      }
+    });
+  };
+
+  EasterEggs.initShortcuts = function () {
+    document.addEventListener('keydown', (e) => {
+      if (isDisabled()) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const handler = this.shortcuts[e.key];
+      if (handler && e.key !== '?') handler(); // keep ? help disabled in business
+    });
+  };
+
+  EasterEggs.initTimeBased = function () {
+    if (isDisabled()) return;
+    originals.initTimeBased.call(this);
+  };
+
+  EasterEggs.showHint = function (message) {
+    if (isDisabled()) return;
+    return originals.showHint.call(this, message);
+  };
+
+  EasterEggs.createExplosion = function (x, y) {
+    if (isDisabled()) return;
+    return originals.createExplosion.call(this, x, y);
+  };
+
+  EasterEggs.applyRandomTheme = function () {
+    if (isDisabled()) return;
+    return originals.applyRandomTheme.call(this);
+  };
+})();

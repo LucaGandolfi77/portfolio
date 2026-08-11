@@ -109,10 +109,166 @@ function createTopBar() {
     });
     rightSection.appendChild(topBtn);
     
+    // Twin Mode toggle (AI chat)
+    const twinBtn = document.createElement('button');
+    twinBtn.className = 'top-bar-btn';
+    twinBtn.id = 'twinToggle';
+    twinBtn.innerHTML = '<i class="fas fa-robot"></i> <span class="btn-text">Twin</span>';
+    twinBtn.title = 'Twin Mode — chat with Luca\'s AI twin';
+    twinBtn.addEventListener('click', () => {
+        if (window.TwinMode && typeof window.TwinMode.toggle === 'function') {
+            window.TwinMode.toggle();
+        }
+    });
+    rightSection.appendChild(twinBtn);
+    
+    // Recruiter Mode toggle (Creative / Business)
+    const recruiterBtn = document.createElement('button');
+    recruiterBtn.className = 'top-bar-btn top-bar-btn-mode';
+    recruiterBtn.id = 'recruiterToggle';
+    recruiterBtn.title = 'Toggle Recruiter Mode';
+    const isBusiness = document.documentElement.getAttribute('data-mode') === 'business';
+    recruiterBtn.innerHTML = isBusiness
+        ? '<i class="fas fa-masks-theater"></i> <span class="btn-text">Creative</span>'
+        : '<i class="fas fa-briefcase"></i> <span class="btn-text">Business</span>';
+    recruiterBtn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-mode');
+        setRecruiterMode(current === 'business' ? 'creative' : 'business');
+    });
+    rightSection.appendChild(recruiterBtn);
+    
     bar.appendChild(leftSection);
     bar.appendChild(rightSection);
     document.body.prepend(bar);
 }
+
+// --- Recruiter Mode ---
+const RECRUITER_ORDER = ['experience', 'skills', 'projects', 'contact', 'about', 'languages', 'achievements', 'interests', 'games'];
+const RECRUITER_PRIMARY = ['experience', 'skills', 'projects', 'contact']; // shown expanded & first
+
+function setRecruiterMode(mode) {
+    if (mode === 'business') {
+        document.documentElement.setAttribute('data-mode', 'business');
+        document.documentElement.setAttribute('data-theme', 'light'); // force clean light
+        localStorage.setItem('portfolio-mode', 'business');
+        reorderSectionsForRecruiter();
+        expandPrimarySections();
+        disableEasterEggs(true);
+    } else {
+        document.documentElement.removeAttribute('data-mode');
+        localStorage.setItem('portfolio-mode', 'creative');
+        restoreSectionsOrder();
+        restoreCollapseState();
+        disableEasterEggs(false);
+        // restore theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    }
+    // Update button label
+    const btn = document.getElementById('recruiterToggle');
+    if (btn) {
+        btn.innerHTML = (mode === 'business')
+            ? '<i class="fas fa-masks-theater"></i> <span class="btn-text">Creative</span>'
+            : '<i class="fas fa-briefcase"></i> <span class="btn-text">Business</span>';
+        if (mode === 'business') btn.classList.add('active-mode');
+        else btn.classList.remove('active-mode');
+    }
+    // Update URL without reload
+    try {
+        const url = new URL(location.href);
+        if (mode === 'business') url.searchParams.set('mode', 'business');
+        else url.searchParams.delete('mode');
+        history.replaceState({}, '', url);
+    } catch (e) { /* ignore */ }
+    // Update theme toggle icon if present
+    const themeBtn = document.querySelector('.top-bar-btn[title="Toggle light/dark mode"]');
+    if (themeBtn) {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        themeBtn.innerHTML = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+    }
+}
+
+function reorderSectionsForRecruiter() {
+    const main = document.querySelector('main.container');
+    if (!main || main.dataset.reordered === '1') return;
+    // Remember original order
+    if (!main.dataset.originalOrder) {
+        main.dataset.originalOrder = '1';
+        main._originalChildren = Array.from(main.children);
+    }
+    const sections = {};
+    main._originalChildren.forEach(el => {
+        const id = el.id;
+        if (id) sections[id] = el;
+    });
+    // Reorder: primary first (in RECRUITER_ORDER), then the rest in original order
+    const ordered = [];
+    RECRUITER_ORDER.forEach(id => { if (sections[id]) { ordered.push(sections[id]); delete sections[id]; } });
+    // Append any leftover (header, footer, etc.) in original order
+    main._originalChildren.forEach(el => {
+        if (!RECRUITER_ORDER.includes(el.id) && !ordered.includes(el)) ordered.push(el);
+    });
+    ordered.forEach(el => main.appendChild(el));
+}
+
+function restoreSectionsOrder() {
+    const main = document.querySelector('main.container');
+    if (!main || !main._originalChildren) return;
+    main._originalChildren.forEach(el => main.appendChild(el));
+}
+
+function expandPrimarySections() {
+    document.querySelectorAll('.collapsible-container').forEach(c => c.classList.remove('collapsed'));
+    // hide show-more buttons in primary sections (already expanded)
+    RECRUITER_PRIMARY.forEach(id => {
+        const sec = document.getElementById(id);
+        if (!sec) return;
+        const btn = sec.querySelector('.show-more-btn');
+        if (btn) btn.style.display = 'none';
+    });
+}
+
+function restoreCollapseState() {
+    document.querySelectorAll('.collapsible-container').forEach(c => c.classList.add('collapsed'));
+    document.querySelectorAll('.show-more-btn').forEach(btn => { btn.style.display = ''; });
+}
+
+function disableEasterEggs(disabled) {
+    if (typeof EasterEggs === 'undefined') return;
+    // Use a flag the easter-eggs system can check; also remove matrix rain if active
+    if (disabled) {
+        document.documentElement.dataset.easterDisabled = '1';
+        const rain = document.getElementById('matrix-rain');
+        if (rain) rain.remove();
+        const hint = document.querySelector('.easter-hint');
+        if (hint) hint.remove();
+    } else {
+        delete document.documentElement.dataset.easterDisabled;
+    }
+}
+
+// Apply recruiter mode on load (from URL or localStorage)
+(function initRecruiterMode() {
+    let mode = null;
+    try {
+        const url = new URL(location.href);
+        if (url.searchParams.get('mode') === 'business') mode = 'business';
+    } catch (e) {}
+    if (!mode) {
+        const saved = localStorage.getItem('portfolio-mode');
+        if (saved === 'business') mode = 'business';
+    }
+    // Defer until DOM is ready so sections exist
+    function apply() {
+        if (mode === 'business') setRecruiterMode('business');
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+    else apply();
+})();
 
 // Initialize top bar when DOM is ready
 if (document.readyState === 'loading') {
