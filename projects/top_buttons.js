@@ -33,13 +33,46 @@ if (!document.getElementById('site-top-bar')) {
     if (document.getElementById('exitTop')) {
       const old2 = document.getElementById('exitTop'); if (old2.parentNode) old2.parentNode.removeChild(old2);
     }
+    // Compute the path back to site index.html based on current page depth.
+    // Resolves to './index.html', '../index.html', '../../index.html' ... so it works on any host
+    // (including GitHub Pages project sites served under a subpath) without relying on '/index.html'.
+    function homeHref() {
+      const p = location.pathname;
+      const depth = p.split('/').filter(Boolean).length;
+      // If the last segment is a file (has a dot) subtract 1
+      const last = p.split('/').filter(Boolean).pop() || '';
+      const dirs = (last.indexOf('.') >= 0) ? depth - 1 : depth;
+      if (dirs <= 0) return './index.html';
+      return '../'.repeat(dirs) + 'index.html';
+    }
+
     const exitBtn = document.createElement('button');
     exitBtn.id = 'siteExitBtn';
     exitBtn.className = 'tb';
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      try { window.location.href = '../index.html'; } catch(e) { window.location.href = '../index.html'; }
+      const home = homeHref();
+      try {
+        if (window.history && window.history.length > 1) {
+          window.history.back();
+        } else if (document.referrer && document.referrer !== '') {
+          try {
+            const ref = new URL(document.referrer, location.href);
+            if (ref.origin === location.origin) {
+              window.location.href = document.referrer;
+            } else {
+              window.location.href = home;
+            }
+          } catch (e) {
+            window.location.href = home;
+          }
+        } else {
+          window.location.href = home;
+        }
+      } catch(e) {
+        try { window.location.href = home; } catch(e) { window.location.href = 'index.html'; }
+      }
     });
 
     // Create or reuse language selector (select with options like index.html)
@@ -63,35 +96,38 @@ if (!document.getElementById('site-top-bar')) {
     });
     langSelect.addEventListener('change', () => setLang(langSelect.value));
     async function loadTranslations(lang) {
-      // Try site root first, then parent folder. Return true on success.
-      try {
-        const res = await fetch(`/i18n/${lang}.json`);
-        if (!res.ok) throw new Error('no translations');
-        const translations = await res.json();
-        window.translations = translations;
-        applyTranslations();
-        if (langSelect) langSelect.disabled = false;
-        return true;
-      } catch (e) {
+      // Try current folder, then parent folder (useful for pages inside /games/), then try two levels up,
+      // then fall back to site root. Return true on success.
+      const candidates = [
+        `./i18n/${lang}.json`,
+        `../i18n/${lang}.json`,
+        `../../i18n/${lang}.json`,
+        `/portfolio/i18n/${lang}.json`,
+        `/i18n/${lang}.json`
+      ];
+
+      for (const path of candidates) {
         try {
-          const res2 = await fetch(`../i18n/${lang}.json`);
-          if (!res2.ok) throw new Error('no translations');
-          const translations = await res2.json();
+          const res = await fetch(path);
+          if (!res.ok) throw new Error('no translations at ' + path);
+          const translations = await res.json();
           window.translations = translations;
           applyTranslations();
           if (langSelect) langSelect.disabled = false;
           return true;
-        } catch (err) {
-          console.warn('Translations not found for', lang);
-          // Fallback to English and disable selector so user cannot pick unavailable languages
-          if (lang !== 'en') {
-            try { if (langSelect) langSelect.value = 'en'; } catch(e){}
-            try { await loadTranslations('en'); } catch(e){}
-          }
-          if (langSelect) langSelect.disabled = true;
-          return false;
+        } catch (e) {
+          // try next candidate
         }
       }
+
+      console.warn('Translations not found for', lang);
+      // Fallback to English and disable selector so user cannot pick unavailable languages
+      if (lang !== 'en') {
+        try { if (langSelect) langSelect.value = 'en'; } catch(e){}
+        try { await loadTranslations('en'); } catch(e){}
+      }
+      if (langSelect) langSelect.disabled = true;
+      return false;
     }
 
     function applyTranslations() {

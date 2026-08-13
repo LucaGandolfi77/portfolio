@@ -90,11 +90,11 @@
     const hfTokenInput = document.getElementById('hfToken');
     const saveTokenBtn = document.getElementById('saveToken');
 
-    // load saved token
-    const saved = localStorage.getItem('hf_token');
+    // load saved token (sessionStorage: token non persiste oltre la scheda)
+    const saved = sessionStorage.getItem('hf_token');
     if(saved) hfTokenInput.value = saved;
 
-    saveTokenBtn.addEventListener('click', ()=>{ localStorage.setItem('hf_token', hfTokenInput.value); alert('Token salvato in localStorage (sessione browser).'); });
+    saveTokenBtn.addEventListener('click', ()=>{ sessionStorage.setItem('hf_token', hfTokenInput.value); alert('Token salvato in sessionStorage (solo per questa scheda).'); });
 
     let lastDataUrl = null;
     fileInput.addEventListener('change', async (e)=>{
@@ -104,7 +104,7 @@
 
     function showPreview(dataUrl){ preview.innerHTML=''; const img = document.createElement('img'); img.src=dataUrl; img.style.maxWidth='100%'; img.style.maxHeight='100%'; preview.appendChild(img); }
 
-    function getToken(){ const t = hfTokenInput.value || localStorage.getItem('hf_token'); if(!t) { alert('Inserisci il token Hugging Face'); throw new Error('no token'); } return t; }
+    function getToken(){ const t = hfTokenInput.value || sessionStorage.getItem('hf_token'); if(!t) { alert('Inserisci il token Hugging Face'); throw new Error('no token'); } return t; }
 
     async function callHfModel(model, body){ const token = getToken(); const res = await fetch('https://api-inference.huggingface.co/models/' + model, { method:'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if(!res.ok){ const txt = await res.text(); throw new Error('HF error: '+res.status+' '+txt); } return res.json(); }
 
@@ -116,7 +116,7 @@
         const body = { inputs: lastDataUrl, parameters: { candidate_labels: candidateLabels, hypothesis_template: 'This is a photo of a {}.' } };
         const json = await callHfModel(hfModelZeroShot, body);
         renderResults(json);
-      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+err.message+'</div>'; }
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+escapeHtml(err.message)+'</div>'; }
     });
 
     // Product search: use zero-shot CLIP over product labels (name + desc) to rank catalog
@@ -141,14 +141,14 @@
           // show top 4
           const out = document.createElement('div'); out.style.display='flex'; out.style.gap='12px'; out.style.flexWrap='wrap';
           ranked.slice(0,4).forEach(r=>{
-            const d = document.createElement('div'); d.style.width='160px'; d.className='panel'; d.style.padding='8px'; d.innerHTML = `<div style="height:100px;overflow:hidden;border-radius:6px"><img src="${r.product.img}" style="width:100%;height:100%;object-fit:cover"></div><div style="margin-top:6px"><strong>${r.product.name}</strong><div class="muted" style="font-size:0.9rem">${Math.round(r.score*100)}%</div></div>`;
+            const d = document.createElement('div'); d.style.width='160px'; d.className='panel'; d.style.padding='8px'; d.innerHTML = `<div style="height:100px;overflow:hidden;border-radius:6px"><img src="${escapeHtml(r.product.img)}" style="width:100%;height:100%;object-fit:cover" alt="${escapeHtml(r.product.name)}"></div><div style="margin-top:6px"><strong>${escapeHtml(r.product.name)}</strong><div class="muted" style="font-size:0.9rem">${Math.round(r.score*100)}%</div></div>`;
             out.appendChild(d);
           });
           resultsList.appendChild(out);
         } else {
-          resultsList.innerHTML = 'No results: ' + JSON.stringify(json);
+          resultsList.innerHTML = 'No results: ' + escapeHtml(JSON.stringify(json));
         }
-      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Error: '+err.message+'</div>'; }
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Error: '+escapeHtml(err.message)+'</div>'; }
     });
 
     captionBtn.addEventListener('click', async ()=>{
@@ -163,7 +163,7 @@
         else if(json.generated_text) caption = json.generated_text;
         else caption = JSON.stringify(json);
         resultsList.innerHTML = '<div><strong>Caption:</strong> ' + escapeHtml(caption) + '</div>';
-      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+err.message+'</div>'; }
+      }catch(err){ resultsList.innerHTML = '<div style="color:salmon">Errore: '+escapeHtml(err.message)+'</div>'; }
     });
 
     function renderResults(json){
@@ -189,7 +189,7 @@
 
     function appendLabel(label,score){ const d = document.createElement('div'); d.className='label'; d.innerHTML = '<div>'+escapeHtml(label)+'</div><div style="opacity:0.9">'+(Math.round(score*100)+'%')+'</div>'; resultsList.appendChild(d); }
 
-    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function escapeHtml(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   </script>
 </body>
 <script src="top_buttons.js"></script>

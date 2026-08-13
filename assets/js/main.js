@@ -157,7 +157,7 @@ function createTopBar() {
 }
 
 // --- Recruiter Mode ---
-const RECRUITER_ORDER = ['experience', 'skills', 'projects', 'contact', 'about', 'languages', 'achievements', 'interests', 'games'];
+const RECRUITER_ORDER = ['experience', 'skills', 'selected-work', 'projects', 'contact', 'about', 'languages', 'achievements', 'lab', 'games', 'cabinet'];
 const RECRUITER_PRIMARY = ['experience', 'skills', 'projects', 'contact']; // shown expanded & first
 
 function setRecruiterMode(mode) {
@@ -507,16 +507,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Handle language change for cases where langSelect is already in DOM before DOMContentLoaded
 
-// --- EmailJS configuration (replace with your values) ---
-const EMAILJS_SERVICE_ID = 'your_service_id';
-const EMAILJS_TEMPLATE_ID = 'your_template_id';
-const EMAILJS_PUBLIC_KEY = 'your_public_key';
-const RECAPTCHA_SITE_KEY = 'your_recaptcha_site_key';
+// Optional EmailJS configuration. The mailto path remains available without credentials.
+const EMAILJS_CONFIG = window.PORTFOLIO_EMAILJS || {
+    serviceId: '',
+    templateId: '',
+    publicKey: ''
+};
 
-// Initialize EmailJS SDK (public key)
-if (window.emailjs) {
-    try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch (e) { console.warn('emailjs init failed', e); }
+function initEmailJs() {
+    if (!window.emailjs || !EMAILJS_CONFIG.publicKey) return false;
+    try {
+        window.emailjs.init(EMAILJS_CONFIG.publicKey);
+        return true;
+    } catch (e) {
+        console.warn('EmailJS init failed', e);
+        return false;
+    }
 }
+
+window.loadPortfolioEmailJs = function () {
+    if (!EMAILJS_CONFIG.publicKey) return false;
+    if (window.emailjs) return initEmailJs();
+    if (document.getElementById('emailjs-script')) return false;
+    const script = document.createElement('script');
+    script.id = 'emailjs-script';
+    script.src = 'https://cdn.emailjs.com/sdk/3.2.0/email.min.js';
+    script.async = true;
+    script.onload = initEmailJs;
+    document.head.appendChild(script);
+    return true;
+};
 
 // --- Contact modal ---
 function createContactModal() {
@@ -543,16 +563,19 @@ function createContactModal() {
         </div>`;
     document.body.appendChild(modal);
     modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-labelledby', 'contactModalTitle');
+    modal.querySelector('h3').id = 'contactModalTitle';
 
     function closeModal() { modal.style.display = 'none'; modal.style.pointerEvents = 'none'; }
     function openModal() { modal.style.display = 'flex'; modal.style.pointerEvents = 'all'; }
 
-    document.getElementById('modalClose').addEventListener('click', closeModal);
-    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('modalClose').addEventListener('click', () => closeModalWithFocus());
+    document.getElementById('modalCancel').addEventListener('click', () => closeModalWithFocus());
 
     let previousActive = null;
     function onKeyDown(e) {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') closeModalWithFocus();
     }
 
     function openModalWithFocus() {
@@ -586,12 +609,6 @@ function createContactModal() {
             return;
         }
 
-        if (EMAILJS_SERVICE_ID.includes('your_') || EMAILJS_TEMPLATE_ID.includes('your_') || EMAILJS_PUBLIC_KEY.includes('your_')) {
-            statusEl.textContent = 'EmailJS non configurato. Imposta EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID e EMAILJS_PUBLIC_KEY nello script.';
-            statusEl.style.color = 'orange';
-            return;
-        }
-
         submitBtn.disabled = true;
         submitBtn.setAttribute('aria-busy', 'true');
         const prevText = submitBtn.innerHTML;
@@ -599,29 +616,27 @@ function createContactModal() {
         statusEl.textContent = '';
 
         try {
-            let recaptchaToken = null;
-            if (window.grecaptcha && RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.includes('your_')) {
-                try {
-                    recaptchaToken = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: 'submit' });
-                } catch (rcErr) {
-                    console.warn('reCAPTCHA execute failed', rcErr);
-                }
+            const hasEmailJs = window.emailjs && EMAILJS_CONFIG.serviceId && EMAILJS_CONFIG.templateId && EMAILJS_CONFIG.publicKey;
+            if (hasEmailJs) {
+                await window.emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+                    from_email: email,
+                    message,
+                    subject: 'New contact from portfolio'
+                });
+                statusEl.textContent = 'Message sent. Thank you!';
+                statusEl.style.color = 'lightgreen';
+                document.getElementById('cfEmail').value = '';
+                document.getElementById('cfMessage').value = '';
+                submitBtn.innerHTML = 'Sent';
+                setTimeout(() => closeModalWithFocus(), 1200);
+            } else {
+                const subject = encodeURIComponent('Contact from Luca Gandolfi portfolio');
+                const body = encodeURIComponent(`${message}\n\nReply to: ${email}`);
+                window.location.href = `mailto:luca.gandolfi7@hotmail.com?subject=${subject}&body=${body}`;
+                statusEl.textContent = 'Your email app is opening.';
+                statusEl.style.color = 'lightgreen';
+                setTimeout(() => closeModalWithFocus(), 500);
             }
-
-            const templateParams = {
-                from_email: email,
-                message: message,
-                subject: 'New contact from portfolio',
-                recaptcha_token: recaptchaToken || ''
-            };
-
-            const res = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-            statusEl.innerHTML = '✅ Message sent. Thank you!';
-            statusEl.style.color = 'lightgreen';
-            document.getElementById('cfEmail').value = '';
-            document.getElementById('cfMessage').value = '';
-            submitBtn.innerHTML = 'Sent';
-            setTimeout(() => closeModalWithFocus(), 1200);
         } catch (err) {
             console.error('EmailJS send error', err);
             statusEl.textContent = 'Errore durante l\'invio. Riprova più tardi.';
@@ -642,6 +657,8 @@ if (contactBtn) contactBtn.addEventListener('click', (e) => {
     e.preventDefault();
     try { if (contactModal && typeof contactModal.open === 'function') contactModal.open(); } catch (err) { }
 });
+const closingContactBtn = document.getElementById('closingContactBtn');
+if (closingContactBtn) closingContactBtn.addEventListener('click', () => contactModal.open());
 
 const navContact = document.querySelector('.nav-link[href="#contact"]');
 if (navContact) {
@@ -654,24 +671,6 @@ if (navContact) {
     });
 }
 
-// Project configuration
-const projects = [
-    {
-        title: "E-Commerce Platform",
-        description: "Demo e-commerce vanilla: catalogo prodotti, carrello e checkout — persistenza in localStorage.",
-        image: "",
-        link: "projects/ecommerce.html",
-        tags: ["HTML", "CSS", "JavaScript"]
-    },
-    {
-        title: "AI Chat Assistant",
-        description: "Chatbot AI client-side powered by Pollinations.ai (gratis,无需 chiave API). Storia sessione e multilingua.",
-        image: "",
-        link: "projects/ai_chat.html",
-        tags: ["AI", "Fetch API", "Vanilla JS"]
-    }
-];
-
 // Burger menu toggle
 const burgerMenu = document.getElementById('burgerMenu');
 const sideNav = document.getElementById('sideNav');
@@ -682,18 +681,21 @@ function toggleMenu() {
     burgerMenu.classList.toggle('active');
     sideNav.classList.toggle('active');
     overlay.classList.toggle('active');
+    burgerMenu.setAttribute('aria-expanded', String(sideNav.classList.contains('active')));
 }
 
 function openMenu() {
     burgerMenu.classList.add('active');
     sideNav.classList.add('active');
     overlay.classList.add('active');
+    burgerMenu.setAttribute('aria-expanded', 'true');
 }
 
 function closeMenu() {
     burgerMenu.classList.remove('active');
     sideNav.classList.remove('active');
     overlay.classList.remove('active');
+    burgerMenu.setAttribute('aria-expanded', 'false');
 }
 
 burgerMenu.addEventListener('click', toggleMenu);
@@ -743,7 +745,7 @@ document.addEventListener('touchend', () => {
 
 navLinks.forEach(link => {
     const href = link.getAttribute('href');
-    if (href === '#contact') return;
+    if (!href || !href.startsWith('#') || href === '#contact') return;
     link.addEventListener('click', (e) => {
         e.preventDefault();
         const targetId = href;
@@ -814,72 +816,6 @@ function createStarsAndLights() {
         sparkle.style.animationDuration = (Math.random() * 1 + 1) + 's';
         particlesContainer.appendChild(sparkle);
     }
-}
-
-// Load projects
-function loadProjects() {
-    const grid = document.getElementById('projectsGrid');
-projects.forEach(project => {
-        const card = document.createElement('a');
-        card.className = 'project-card';
-        card.href = project.link;
-        card.style.textDecoration = 'none';
-        card.style.color = 'inherit';
-        const fallbackSvg = `data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22%3E%3Crect fill=%22%231a2940%22 width=%22400%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2300d4ff%22 font-size=%2224%22%3E${encodeURIComponent(project.title)}%3C/text%3E%3C/svg%3E`;
-        const imgSrc = project.image ? project.image : fallbackSvg;
-        
-        const tagsHtml = project.tags ? 
-            `<div class="project-tags">${project.tags.map(tag => `<span class="project-tag">${tag}</span>`).join('')}</div>` : '';
-        
-        card.innerHTML = `
-            <img src="${imgSrc}" alt="${project.title}" class="project-image" loading="lazy"
-                 onerror="this.onerror=null;this.src='${fallbackSvg}'">
-            <div class="project-info">
-                <div class="project-title">${project.title}</div>
-                <div class="project-description">${project.description}</div>
-                ${tagsHtml}
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-}
-
-// --- Interactive bubbles for Highlights ---
-function createBubbles() {
-    const keywords = ["The","Pianoforte","Musica","Poesie","Fisica Quantistica","Tecnologia","Storia"];
-    const wrap = document.getElementById('bubblesWrap');
-    const panel = document.getElementById('bubblePanel');
-    if(!wrap) return;
-
-    const desc = {
-        'The': 'Curiosity and wonder — a short personal note.',
-        'Pianoforte': 'Pianoforte: learned pieces and practice. Music shapes my rhythm.',
-        'Musica': 'Music is central: composing, listening, and inspiration.',
-        'Poesie': 'Poesie: I write and read poems to capture moments.',
-        'Fisica Quantistica': 'Fascinated by quantum physics? <br><a href="pages/main/quantum_lab.html" class="btn btn-sm btn-primary" style="margin-top:8px;display:inline-block;text-decoration:none;font-size:0.8rem;">⚛️ Enter Quantum Lab</a>',
-        'Tecnologia': 'Technology: building practical solutions with elegant code.',
-        'Storia': 'Storia: history shapes perspective and context.'
-    };
-
-    wrap.innerHTML = '';
-
-    keywords.forEach((k,i)=>{
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'bubble ' + (i%3===0? 'large animate':'small animate');
-        b.style.setProperty('--i', i);
-        b.setAttribute('aria-pressed','false');
-        b.setAttribute('title', k);
-        b.innerText = k;
-        b.addEventListener('click', ()=>{
-            wrap.querySelectorAll('.bubble').forEach(bb=> bb.setAttribute('aria-pressed','false'));
-            b.setAttribute('aria-pressed','true');
-            panel.style.opacity = '0';
-            setTimeout(()=>{ panel.innerHTML = desc[k] || ''; panel.style.opacity = '1'; }, 160);
-        });
-        b.addEventListener('keydown',(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); b.click(); } });
-        wrap.appendChild(b);
-    });
 }
 
 // Scroll animation
@@ -991,8 +927,6 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     createParticles();
-    loadProjects();
-    createBubbles();
     checkInitialVisibility(); // Check visibility on page load
     handleScroll(); // Also run handleScroll
     createPoems();

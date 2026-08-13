@@ -8,6 +8,8 @@
 
 ## SEO Changes
 
+> Status note: the canonical deployment is currently GitHub Pages at `https://lucagandolfi77.github.io/portfolio/`. The contact form now has a native `mailto:` fallback and optional EmailJS loading after functional consent. This file documents the audit history; verify live headers against the hosting platform before treating Apache-only settings as active.
+
 ### 1. Broken URLs — Double `https://` Protocol
 
 **What was wrong:** Multiple meta tags, canonical link, and Schema.org JSON-LD contained malformed URLs with a doubled protocol (`https://https://...`).

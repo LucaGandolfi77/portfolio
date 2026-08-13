@@ -83,6 +83,7 @@
     }
 
     function loadFunctionalScripts() {
+        if (typeof window.loadPortfolioEmailJs === 'function') window.loadPortfolioEmailJs();
         // Google reCAPTCHA v3 (only load if site key is configured)
         var recaptchaKey = document.querySelector('meta[name="recaptcha-site-key"]');
         if (recaptchaKey && recaptchaKey.content && recaptchaKey.content !== 'YOUR_RECAPTCHA_SITE_KEY') {

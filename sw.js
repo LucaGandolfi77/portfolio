@@ -1,23 +1,16 @@
 // Service Worker per supporto offline
-const CACHE_NAME = 'portfolio-v3';
+const CACHE_NAME = 'portfolio-v5';
 const scopedStaticPaths = [
     './',
     'index.html',
-    'pages/main/timeline.html',
-    'pages/main/books.html',
-    'pages/main/technology.html',
-    'pages/content/music.html',
-    'pages/content/movies.html',
-    'pages/main/piano.html',
-    'pages/content/poem.html',
-    'pages/content/photobook.html',
-    'pages/content/memes.html',
-    'pages/main/life_comic.html',
-    'pages/main/blog.html',
-    'pages/main/shop.html',
-    'projects/quiz.html',
+    // Core CSS per il primo paint della home
     'assets/css/main.css',
+    'assets/css/design-system.css',
+    // Core JS della home
     'assets/js/main.js',
+    'assets/js/projects-data.js',
+    'assets/js/projects-renderer.js',
+    // Icone + metadati PWA
     'assets/icon-192.png',
     'assets/icon-512.png',
     'manifest.json',

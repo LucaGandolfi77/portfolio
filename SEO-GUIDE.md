@@ -40,9 +40,9 @@
 
 1. **Sostituisci i Placeholder**
    ```
-   Sostituire "lucagandolfi.dev" con il tuo dominio reale
+   Dominio attuale: "lucagandolfi77.github.io/portfolio"
    Sostituire "LucaGandolfi77" con il tuo profilo GitHub
-   Sostituire l'email: "luca@lucagandolfi.dev"
+   Email attuale: "luca.gandolfi7@hotmail.com"
    ```
 
 2. **Aggiungi Immagini Open Graph**

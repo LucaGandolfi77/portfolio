@@ -3,9 +3,13 @@ from flask_cors import CORS
 import logging
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)
+# Allow requests only from the local demo page (avoid CSRF abuse of localhost)
+CORS(app, origins=['http://127.0.0.1:8000', 'http://localhost:8000'])
 
 logging.basicConfig(level=logging.INFO)
+
+MAX_PROMPT_LENGTH = 2000
+MAX_GENERATED_LENGTH = 512
 
 try:
     # Load a small model (distilgpt2) for local text-generation demo
@@ -24,9 +28,15 @@ def generate():
 
     data = request.get_json() or {}
     prompt = data.get('prompt', '')
-    max_length = int(data.get('max_length', 60))
-    if not prompt:
-        return jsonify({'error':'Empty prompt'}), 400
+    if not isinstance(prompt, str) or not prompt.strip():
+        return jsonify({'error': 'Empty prompt'}), 400
+    prompt = prompt.strip()[:MAX_PROMPT_LENGTH]
+
+    try:
+        max_length = int(data.get('max_length', 60))
+    except (TypeError, ValueError):
+        max_length = 60
+    max_length = max(1, min(max_length, MAX_GENERATED_LENGTH))
 
     try:
         out = generator(prompt, max_length=max_length, num_return_sequences=1, do_sample=True, temperature=0.95)
@@ -37,9 +47,9 @@ def generate():
         else:
             generated = text
         return jsonify({'generated': generated})
-    except Exception as e:
+    except Exception:
         logging.exception('Generation error')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Generation failed'}), 500
 
 
 # Serve the demo page and static assets from the project root. Open http://127.0.0.1:8000/ in the browser.
