@@ -469,5 +469,14 @@ const PROJECTS_DATA = [
     "emoji": "🛒",
     "badge": "E-Commerce",
     "badgeColor": "#00d4ff"
+  },
+  {
+    "id": "ios-file-manager",
+    "title": "File Manager & Reader",
+    "description": "Virtual file system with a Notepad++-style code viewer (.py, .cpp…), PDF reader and image preview — optimized for iPhone.",
+    "href": "projects/file_manager.html",
+    "emoji": "📁",
+    "badge": "Utility / iOS",
+    "badgeColor": "#00d4ff"
   }
 ];

@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>File Manager &amp; Reader — Luca Gandolfi</title>
+    <meta name="description" content="Virtual file system with a Notepad++-style code viewer (.py, .cpp...), PDF reader and image preview — optimized for iPhone.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1724;
+            --bg-soft: #131e30;
+            --card: #1a2639;
+            --card-hover: #1f2c42;
+            --border: rgba(255,255,255,0.1);
+            --accent: #00d4ff;
+            --accent-dim: rgba(0,212,255,0.12);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --danger: #ff5c5c;
+            --success: #4ade80;
+            --mono: 'JetBrains Mono', 'Menlo', monospace;
+            --bar-h: 52px;
+            --safe-t: env(safe-area-inset-top, 0px);
+            --safe-b: env(safe-area-inset-bottom, 0px);
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            -webkit-text-size-adjust: 100%;
+            overscroll-behavior: none;
+        }
+        button { font-family: inherit; cursor: pointer; }
+        input { font-family: inherit; }
+
+        /* ===== Top bar ===== */
+        .topbar {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            padding-top: calc(10px + var(--safe-t));
+            background: rgba(10,20,36,0.92);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 50;
+        }
+        .topbar h1 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #fff; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .topbar .sub { font-size: 0.68rem; color: var(--text-muted); font-weight: 400; margin-left: 2px; }
+        .usage { font-size: 0.68rem; color: var(--text-muted); padding: 4px 8px; background: var(--bg-soft); border-radius: 20px; border: 1px solid var(--border); white-space: nowrap; }
+
+        /* ===== Toolbar (back + actions in reader) ===== */
+        .toolbar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-soft);
+            border-bottom: 1px solid var(--border);
+        }
+        .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 44px; min-height: 44px;
+            background: var(--card); color: var(--text);
+            border: 1px solid var(--border); border-radius: 10px;
+            font-size: 1rem; transition: background 0.15s;
+        }
+        .icon-btn:active { background: var(--card-hover); }
+        .icon-btn.primary { background: var(--accent); color: #00121a; border-color: var(--accent); font-weight: 700; }
+        .icon-btn.danger { color: var(--danger); }
+        .icon-btn:disabled { opacity: 0.35; pointer-events: none; }
+
+        /* ===== Main content ===== */
+        main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .file-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .hidden { display: none !important; }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            display: flex; align-items: center; gap: 4px;
+            padding: 8px 12px; overflow-x: auto; white-space: nowrap;
+            border-bottom: 1px solid var(--border); font-size: 0.85rem;
+        }
+        .crumb { color: var(--text-muted); padding: 6px 6px; border-radius: 8px; text-decoration: none; min-height: 36px; display: inline-flex; align-items: center; }
+        .crumb:hover { color: var(--accent); }
+        .crumb.current { color: var(--accent); font-weight: 600; }
+        .crumb-sep { color: var(--text-muted); opacity: 0.5; }
+
+        /* List */
+        .list { flex: 1; overflow-y: auto; padding: 8px 0 12px; -webkit-overflow-scrolling: touch; }
+        .item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; min-height: 56px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer; user-select: none;
+        }
+        .item:active { background: var(--accent-dim); }
+        .item .icon { font-size: 1.4rem; width: 40px; text-align: center; flex-shrink: 0; }
+        .item .meta { flex: 1; min-width: 0; }
+        .item .name { font-weight: 500; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .item .detail { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+        .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .item .actions .icon-btn { min-width: 40px; min-height: 40px; font-size: 0.9rem; }
+
+        .empty {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 10px; color: var(--text-muted); padding: 40px 20px; text-align: center;
+        }
+        .empty .big { font-size: 2.6rem; }
+        .empty p { margin: 0; font-size: 0.9rem; max-width: 260px; }
+
+        /* ===== Bottom action bar ===== */
+        .actionbar {
+            display: flex; align-items: center; justify-content: space-around; gap: 4px;
+            padding: 8px 10px;
+            padding-bottom: calc(8px + var(--safe-b));
+            background: rgba(10,20,36,0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border);
+        }
+        .actionbar .icon-btn { flex: 1; max-width: 100px; flex-direction: column; gap: 3px; font-size: 0.68rem; background: transparent; border: none; color: var(--text-muted); min-height: 48px; }
+        .actionbar .icon-btn .glyph { font-size: 1.2rem; }
+        .actionbar .icon-btn:active { color: var(--accent); }
+
+        /* ===== Reader ===== */
+        .reader { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .reader-head {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+            background: var(--bg-soft); border-bottom: 1px solid var(--border);
+        }
+        .reader-head .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 0.82rem; color: #fff; }
+        .reader-body { flex: 1; overflow: auto; min-height: 0; position: relative; -webkit-overflow-scrolling: touch; background: #0c1220; }
+        .reader-bar {
+            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+            padding-bottom: calc(8px + var(--safe-b));
+            background: var(--bg-soft); border-top: 1px solid var(--border);
+        }
+        .reader-bar .info { flex: 1; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .reader-bar .spacer { flex: 1; }
+
+        /* Code */
+        .code-wrap { display: block; padding: 12px; line-height: 1.55; }
+        pre.code, .code-line { font-family: var(--mono); font-size: 0.82rem; margin: 0; white-space: pre; }
+        .code-wrap.wrap .code-line { white-space: pre-wrap; word-break: break-word; }
+        .code-line { display: flex; }
+        .code-line .ln { flex-shrink: 0; width: 3.2em; padding-right: 1.2em; text-align: right; color: #3a4a63; user-select: none; }
+        .code-line .src { white-space: inherit; }
+        .tok-kw { color: #ff7b72; }
+        .tok-str { color: #a5d6ff; }
+        .tok-com { color: #6b7a99; font-style: italic; }
+        .tok-num { color: #79c0ff; }
+        .tok-fn { color: #d2a8ff; }
+        .tok-type { color: #7ee787; }
+        .tok-op { color: #ff9b6a; }
+        .tok-def { color: #ffa657; }
+
+        .toggle-row { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-soft); font-size: 0.78rem; color: var(--text-muted); }
+        .toggle-row label { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; cursor: pointer; }
+
+        /* Switch */
+        .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .track { position: absolute; inset: 0; background: var(--card-hover); border-radius: 20px; transition: 0.2s; }
+        .switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: 0.2s; }
+        .switch input:checked + .track { background: var(--accent); }
+        .switch input:checked + .track::after { transform: translateX(18px); }
+
+        /* PDF */
+        .pdf-scroll { padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .pdf-scroll canvas { max-width: 100%; height: auto; background: #fff; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+
+        /* Image */
+        .img-view { display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 10px; }
+        .img-view img { max-width: 100%; height: auto; border-radius: 6px; transform-origin: center; touch-action: manipulation; }
+
+        /* Binary info */
+        .bin-view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100%; padding: 30px; text-align: center; color: var(--text-muted); }
+        .bin-view .big { font-size: 3rem; }
+        .bin-view .size { font-size: 0.85rem; }
+
+        /* ===== Modal ===== */
+        .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+        .modal-back.top { align-items: center; padding: 0 16px; }
+        .modal {
+            width: 100%; max-width: 420px; background: var(--card); border-radius: 18px 18px 0 0;
+            padding: 20px 18px calc(20px + var(--safe-b));
+            box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+            animation: slideUp 0.2s ease;
+        }
+        .modal-back.top .modal { border-radius: 14px; animation: popIn 0.15s ease; }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } }
+        @keyframes popIn { from { transform: scale(0.96); opacity: 0; } }
+        .modal h3 { margin: 0 0 4px; font-size: 1.05rem; color: #fff; }
+        .modal .hint { margin: 0 0 14px; font-size: 0.8rem; color: var(--text-muted); }
+        .modal input[type=text] {
+            width: 100%; padding: 12px; font-size: 1rem; color: #fff;
+            background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px;
+        }
+        .modal input[type=text]:focus { outline: none; border-color: var(--accent); }
+        .modal .row { display: flex; gap: 10px; }
+        .modal .row .btn { flex: 1; }
+
+        .btn { min-height: 48px; padding: 0 16px; border-radius: 12px; border: none; font-weight: 600; font-size: 0.95rem; }
+        .btn.primary { background: var(--accent); color: #00121a; }
+        .btn.ghost { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+
+        .toast {
+            position: fixed; left: 50%; bottom: calc(24px + var(--safe-b)); transform: translateX(-50%);
+            background: var(--card); color: var(--text); border: 1px solid var(--border);
+            padding: 10px 18px; border-radius: 30px; font-size: 0.85rem; z-index: 200;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.25s; pointer-events: none; max-width: 90vw;
+        }
+        .toast.show { opacity: 1; }
+
+        .spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid rgba(0,212,255,0.25); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (min-width: 720px) {
+            body { max-width: 720px; margin: 0 auto; box-shadow: 0 0 60px rgba(0,0,0,0.4); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top bar -->
+    <header class="topbar">
+        <h1>📁 File Manager <span class="sub">iOS</span></h1>
+        <span class="usage" id="usage">…</span>
+    </header>
+
+    <!-- ================= FILE VIEW ================= -->
+    <main id="fileView" class="file-view">
+        <nav class="breadcrumb" id="breadcrumb"></nav>
+        <div class="list" id="list"></div>
+        <div class="empty hidden" id="emptyState">
+            <span class="big">🗂️</span>
+            <p>Empty folder. Add files or folders with the buttons below.</p>
+        </div>
+        <nav class="actionbar">
+            <button class="icon-btn" data-act="home" title="Home"><span class="glyph">🏠</span>Home</button>
+            <button class="icon-btn" data-act="newfolder" title="New folder"><span class="glyph">📂</span>Folder</button>
+            <button class="icon-btn" data-act="newfile" title="New file"><span class="glyph">📄</span>File</button>
+            <button class="icon-btn" data-act="upload" title="Upload files"><span class="glyph">⬆️</span>Upload</button>
+            <button class="icon-btn" data-act="uploaddir" title="Upload folder"><span class="glyph">🗃️</span>Folder&nbsp;up</button>
+        </nav>
+    </main>
+
+    <!-- ================= READER VIEW ================= -->
+    <div class="reader hidden" id="readerView">
+        <div class="toolbar">
+            <button class="icon-btn" id="readerBack" title="Back">←</button>
+            <span class="fname" id="readerFileName"></span>
+            <button class="icon-btn primary hidden" id="dlBtn" title="Download">⬇</button>
+        </div>
+        <div class="toggle-row hidden" id="wrapRow">
+            <label class="switch"><input type="checkbox" id="wrapToggle"><span class="track"></span></label>
+            <span>Word wrap</span>
+            <span class="spacer" style="flex:1"></span>
+            <button class="icon-btn" id="fontMinus" style="min-width:38px;min-height:38px">A−</button>
+            <button class="icon-btn" id="fontPlus" style="min-width:38px;min-height:38px">A+</button>
+        </div>
+        <div class="reader-body" id="readerBody"></div>
+        <div class="reader-bar hidden" id="readerBar">
+            <button class="icon-btn" id="pdfPrev">◀</button>
+            <span class="info" id="pdfInfo">1 / 1</span>
+            <button class="icon-btn" id="pdfNext">▶</button>
+            <span class="spacer"></span>
+            <button class="icon-btn" id="pdfOut" style="min-width:38px;min-height:38px">−</button>
+            <span class="info" id="pdfZoom">100%</span>
+            <button class="icon-btn" id="pdfIn" style="min-width:38px;min-height:38px">+</button>
+        </div>
+    </div>
+
+    <!-- Modal container -->
+    <div id="modalRoot"></div>
+    <div class="toast" id="toast"></div>
+
+    <!-- Hidden inputs -->
+    <input type="file" id="fileInput" multiple style="display:none">
+    <input type="file" id="dirInput" webkitdirectory style="display:none">
+
+    <script>
+    (function () {
+        'use strict';
+
+        // ============================================================
+        //  Constants & helpers
+        // ============================================================
+        var META_KEY = 'fm_tree_v2';
+        var USE_OPFS = !!(navigator.storage && navigator.storage.getDirectory);
+        // OPFS metadata is kept in localStorage; blobs live in OPFS (or IDB fallback).
+
+        var fsHandle = null;      // OPFS root handle
+        var idbAvailable = 'indexedDB' in window;
+        var dbPromise = null;
+
+        function $(id) { return document.getElementById(id); }
+
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+        function formatBytes(b) {
+            if (b === null || b === undefined) return '';
+            if (b < 1024) return b + ' B';
+            var u = ['KB', 'MB', 'GB', 'TB'];
+            var i = -1;
+            do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1);
+            return b.toFixed(1) + ' ' + u[i];
+        }
+
+        function formatDate(ts) {
+            if (!ts) return '';
+            var d = new Date(ts);
+            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' +
+                   d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function toast(msg) {
+            var t = $('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._t);
+            t._t = setTimeout(function () { t.classList.remove('show'); }, 1800);
+        }
+
+        function isMobile() {
+            return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
+        }
+
+        // ============================================================
+        //  IndexedDB fallback storage
+        // ============================================================
+        function getDB() {
+            if (!idbAvailable) return Promise.reject(new Error('IndexedDB unavailable'));
+            if (dbPromise) return dbPromise;
+            dbPromise = new Promise(function (resolve, reject) {
+                var req = indexedDB.open('fm_store', 1);
+                req.onupgradeneeded = function (e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains('files')) {
+                        db.createObjectStore('files');
+                    }
+                };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { reject(req.error); };
+            });
+            return dbPromise;
+        }
+
+        function idbWrite(key, data) {
+            return getDB().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction('files', 'readwrite');
+                    tx.objectStore('files').put(data, key);
+                    tx.oncomplete = function () { resolve(); };
+                    tx.onerror = function () { reject(tx.error); };
+                });
+            });
+        }
+
+        function idbRead(key) {
+            return getDB().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction('files', 'readonly');
+                    var r = tx.objectStore('files').get(key);
+                    r.onsuccess = function () { resolve(r.result); };
+                    r.onerror = function () { reject(r.error); };
+                });
+            });
+        }
+
+        function idbDelete(key) {
+            return getDB().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction('files', 'readwrite');
+                    tx.objectStore('files').delete(key);
+                    tx.oncomplete = function () { resolve(); };
+                    tx.onerror = function () { reject(tx.error); };
+                });
+            });
+        }
+
+        // ============================================================
+        //  OPFS storage
+        // ============================================================
+        function getOPFS() {
+            if (!USE_OPFS) return Promise.reject(new Error('OPFS unavailable'));
+            if (fsHandle) return Promise.resolve(fsHandle);
+            return navigator.storage.getDirectory().then(function (root) {
+                fsHandle = root;
+                return root;
+            });
+        }
+
+        async function opfsGetFile(path, create) {
+            var root = await getOPFS();
+            var parts = path.split('/');
+            var dir = root;
+            for (var i = 0; i < parts.length - 1; i++) {
+                dir = await dir.getDirectoryHandle(parts[i], { create: !!create });
+            }
+            return dir.getFileHandle(parts[parts.length - 1], { create: !!create });
+        }
+
+        async function opfsGetDir(path, create) {
+            var root = await getOPFS();
+            var parts = path.split('/').filter(Boolean);
+            var dir = root;
+            for (var i = 0; i < parts.length; i++) {
+                dir = await dir.getDirectoryHandle(parts[i], { create: !!create });
+            }
+            return dir;
+        }
+
+        // ============================================================
+        //  Tree (metadata persisted in localStorage)
+        // ============================================================
+        // Tree shape:
+        // { children: { "name": { type:'dir'|'file', size, mtime, children? } } }
+        function loadTree() {
+            try {
+                var raw = localStorage.getItem(META_KEY);
+                if (raw) {
+                    var t = JSON.parse(raw);
+                    if (t && t.children) return t;
+                }
+            } catch (e) {}
+            return { children: {} };
+        }
+
+        var tree = loadTree();
+        var dirty = false;
+
+        function saveTree() {
+            try { localStorage.setItem(META_KEY, JSON.stringify(tree)); dirty = false; }
+            catch (e) { console.warn('Could not persist tree', e); }
+        }
+
+        function getNode(path) {
+            if (!path) return tree;
+            var node = tree;
+            var parts = path.split('/').filter(Boolean);
+            for (var i = 0; i < parts.length; i++) {
+                node = node.children && node.children[parts[i]];
+                if (!node) return null;
+            }
+            return node;
+        }
+
+        function getParent(path) {
+            var parts = path.split('/').filter(Boolean);
+            parts.pop();
+            return getNode(parts.join('/'));
+        }
+
+        function syncTree() {
+            var persisters = [saveTree];
+            return Promise.all(persisters).then(function () {
+                render();
+                updateUsage();
+            });
+        }
+
+        // ============================================================
+        //  Storage abstraction (OPFS preferred, IDB fallback)
+        // ============================================================
+        function storeWrite(path, data) {
+            if (USE_OPFS) {
+                return getOPFS().then(function () {
+                    return opfsGetFile(path, true).then(function (handle) {
+                        return handle.createWritable().then(function (w) {
+                            return w.write(data).then(function () { return w.close(); });
+                        });
+                    });
+                }).catch(function (err) {
+                    console.warn('OPFS write failed, falling back to IDB:', err);
+                    return idbWrite('f:' + path, data);
+                });
+            }
+            return idbWrite('f:' + path, data);
+        }
+
+        function storeRead(path) {
+            if (USE_OPFS) {
+                return getOPFS().then(function () {
+                    return opfsGetFile(path, false).then(function (handle) {
+                        return handle.getFile();
+                    });
+                }).catch(function () {
+                    return idbRead('f:' + path);
+                });
+            }
+            return idbRead('f:' + path);
+        }
+
+        function storeDelete(path) {
+            if (USE_OPFS) {
+                return getOPFS().then(function () {
+                    var root = fsHandle;
+                    var parts = path.split('/').filter(Boolean);
+                    return removeHandle(root, parts, 0);
+                }).catch(function () {
+                    return idbDelete('f:' + path);
+                });
+            }
+            return idbDelete('f:' + path);
+        }
+
+        function removeHandle(dir, parts, i) {
+            if (i === parts.length - 1) return dir.removeEntry(parts[i], { recursive: true });
+            return dir.getDirectoryHandle(parts[i]).then(function (d) {
+                return removeHandle(d, parts, i + 1);
+            });
+        }
+
+        // ============================================================
+        //  Filesystem operations
+        // ============================================================
+        function createFolder(path, name) {
+            var parent = getNode(path);
+            if (!parent) return Promise.reject(new Error('Parent missing'));
+            if (!parent.children) parent.children = {};
+            if (parent.children[name]) return Promise.reject(new Error('Already exists'));
+            parent.children[name] = { type: 'dir', mtime: Date.now(), children: {} };
+            return syncTree();
+        }
+
+        function createFile(path, name, data, mtime) {
+            var parent = getNode(path);
+            if (!parent) return Promise.reject(new Error('Parent missing'));
+            if (!parent.children) parent.children = {};
+            if (parent.children[name]) return Promise.reject(new Error('Already exists'));
+            parent.children[name] = { type: 'file', size: (data && data.size) || (data && data.byteLength) || (data && data.length) || 0, mtime: mtime || Date.now() };
+            saveTree();
+            return storeWrite(path ? path + '/' + name : name, data || new Blob([])).then(syncTree);
+        }
+
+        function removeEntry(path) {
+            var parent = getParent(path);
+            var parts = path.split('/').filter(Boolean);
+            var name = parts[parts.length - 1];
+            if (parent && parent.children) delete parent.children[name];
+            saveTree();
+            return storeDelete(path).then(syncTree).catch(function (e) {
+                console.warn('Blob delete failed', e);
+                syncTree();
+            });
+        }
+
+        function renameEntry(path, newName) {
+            if (!newName || newName.indexOf('/') !== -1) return Promise.reject(new Error('Invalid name'));
+            var parent = getParent(path);
+            var parts = path.split('/').filter(Boolean);
+            var oldName = parts[parts.length - 1];
+            if (!parent || !parent.children || !parent.children[oldName]) return Promise.reject(new Error('Missing'));
+            if (parent.children[newName]) return Promise.reject(new Error('Already exists'));
+            var node = parent.children[oldName];
+            delete parent.children[oldName];
+            node.mtime = Date.now();
+            parent.children[newName] = node;
+
+            var newPath = parts.slice(0, -1).concat(newName).join('/');
+            // move blobs in storage
+            var moveChain = Promise.resolve();
+            if (node.type === 'file') {
+                moveChain = storeRead(path).then(function (blob) {
+                    return storeWrite(newPath, blob);
+                }).then(function () { return storeDelete(path); });
+            } else {
+                // directory: rebuild all nested paths
+                moveChain = moveDirBlobs(path, newPath, node);
+            }
+            saveTree();
+            return moveChain.then(syncTree).catch(function (e) {
+                console.warn('Rename blob move failed (metadata kept):', e);
+                syncTree();
+            });
+        }
+
+        function moveDirBlobs(oldBase, newBase, node) {
+            var chain = Promise.resolve();
+            Object.keys(node.children || {}).forEach(function (name) {
+                var child = node.children[name];
+                if (child.type === 'file') {
+                    chain = chain.then(function () {
+                        return storeRead(oldBase + '/' + name).then(function (blob) {
+                            return storeWrite(newBase + '/' + name, blob);
+                        }).then(function () { return storeDelete(oldBase + '/' + name); });
+                    });
+                } else {
+                    chain = chain.then(function () {
+                        return moveDirBlobs(oldBase + '/' + name, newBase + '/' + name, child);
+                    });
+                }
+            });
+            return chain;
+        }
+
+        // ============================================================
+        //  Upload
+        // ============================================================
+        function uploadFiles(fileList, path) {
+            var files = Array.prototype.slice.call(fileList);
+            var total = files.length;
+            if (!total) return;
+            var done = 0;
+            var failed = 0;
+            var chain = Promise.resolve();
+            files.forEach(function (file) {
+                chain = chain.then(function () {
+                    return new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onload = function () {
+                            var blob = new Blob([reader.result], { type: file.type || 'application/octet-stream' });
+                            createFile(path, file.name, blob, file.lastModified).then(function () {
+                                done++;
+                                toast('Uploaded ' + done + '/' + total);
+                                resolve();
+                            }).catch(function (e) {
+                                if (e && e.message === 'Already exists') failed++;
+                                resolve();
+                            });
+                        };
+                        reader.onerror = reject;
+                        reader.readAsArrayBuffer(file);
+                    });
+                });
+            });
+            chain.then(function () {
+                toast(done > 0 ? 'Upload complete ✓' : 'Nothing uploaded');
+            });
+        }
+
+        function uploadDir(fileList, path) {
+            var files = Array.prototype.slice.call(fileList);
+            if (!files.length) return;
+            var current = path;
+            var entries = {};
+            // Build a map of relative path -> file
+            files.forEach(function (f) {
+                var rel = f.webkitRelativePath || f.name;
+                entries[rel] = f;
+            });
+
+            // Determine common base folder (first path component)
+            var base = '';
+            var first = files[0] && files[0].webkitRelativePath;
+            if (first) { base = first.split('/')[0]; }
+
+            function stripBase(rel) {
+                if (base && rel.indexOf(base + '/') === 0) return rel.slice(base.length + 1);
+                return rel;
+            }
+
+            var names = Object.keys(entries).sort();
+            var chain = Promise.resolve();
+            var done = 0;
+
+            function ensureFolders(relPath) {
+                var parts = relPath.split('/').filter(Boolean);
+                parts.pop();
+                var acc = current;
+                parts.forEach(function (p) {
+                    var node = getNode(acc);
+                    if (node && !node.children[p]) {
+                        node.children[p] = { type: 'dir', mtime: Date.now(), children: {} };
+                    }
+                    acc = acc ? acc + '/' + p : p;
+                });
+            }
+
+            names.forEach(function (rel) {
+                chain = chain.then(function () {
+                    var clean = stripBase(rel);
+                    var full = current ? current + '/' + clean : clean;
+                    var dirPath = full.split('/').slice(0, -1).join('/');
+                    ensureFolders(clean);
+                    return new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        var file = entries[rel];
+                        reader.onload = function () {
+                            var blob = new Blob([reader.result], { type: file.type || 'application/octet-stream' });
+                            var parentNode = getNode(dirPath);
+                            var name = clean.split('/').pop();
+                            if (parentNode && parentNode.children) {
+                                if (parentNode.children[name]) { done++; resolve(); return; }
+                                parentNode.children[name] = { type: 'file', size: blob.size, mtime: file.lastModified };
+                            }
+                            saveTree();
+                            storeWrite(full, blob).then(function () {
+                                done++;
+                                if (done % 10 === 0) toast('Uploaded ' + done + '/' + names.length);
+                                resolve();
+                            }).catch(resolve);
+                        };
+                        reader.onerror = resolve;
+                        reader.readAsArrayBuffer(file);
+                    });
+                });
+            });
+
+            chain.then(function () { toast('Folder uploaded (' + done + ' files)'); syncTree(); });
+        }
+
+        // ============================================================
+        //  Rendering
+        // ============================================================
+        var currentPath = '';
+
+        var EXT_ICON = {
+            pdf: '📕', py: '🐍', cpp: '📘', cc: '📘', c: '📘', h: '📘', hpp: '📘', java: '☕',
+            js: '📗', ts: '📗', jsx: '📗', tsx: '📗', html: '🌐', css: '🎨', json: '🧩', xml: '🧩',
+            md: '📝', txt: '📝', csv: '📊', sh: '🖥️', sql: '🗄️', go: '🐹', rs: '🦀', swift: '🍎',
+            png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
+            zip: '🗜️', gz: '🗜️', mp3: '🎵', wav: '🎵', mp4: '🎬', webm: '🎬',
+        };
+        function extOf(name) {
+            var i = name.lastIndexOf('.');
+            return i > 0 ? name.slice(i + 1).toLowerCase() : '';
+        }
+        function iconFor(name, isDir) {
+            if (isDir) return '📁';
+            return EXT_ICON[extOf(name)] || '📄';
+        }
+
+        function render() {
+            var list = $('list');
+            var node = getNode(currentPath);
+            var crumbs = $('breadcrumb');
+            crumbs.innerHTML = '';
+            var acc = '';
+            var segs = currentPath.split('/').filter(Boolean);
+            var home = document.createElement('a');
+            home.href = '#';
+            home.className = 'crumb' + (segs.length === 0 ? ' current' : '');
+            home.textContent = '📁 Home';
+            home.addEventListener('click', function (e) { e.preventDefault(); navigate(''); });
+            crumbs.appendChild(home);
+            segs.forEach(function (seg, i) {
+                var sep = document.createElement('span');
+                sep.className = 'crumb-sep';
+                sep.textContent = '›';
+                crumbs.appendChild(sep);
+                acc = acc ? acc + '/' + seg : seg;
+                var c = document.createElement('a');
+                c.href = '#';
+                c.className = 'crumb' + (i === segs.length - 1 ? ' current' : '');
+                c.textContent = seg;
+                (function (p) { c.addEventListener('click', function (e) { e.preventDefault(); navigate(p); }); })(acc);
+                crumbs.appendChild(c);
+            });
+
+            if (!node) { node = { children: {} }; }
+            var children = node.children || {};
+            var names = Object.keys(children);
+
+            if (!names.length) {
+                $('emptyState').classList.remove('hidden');
+                $('list').classList.add('hidden');
+                list.innerHTML = '';
+                return;
+            }
+            $('emptyState').classList.add('hidden');
+            $('list').classList.remove('hidden');
+
+            names.sort(function (a, b) {
+                var na = children[a], nb = children[b];
+                if (na.type !== nb.type) return na.type === 'dir' ? -1 : 1;
+                return a.localeCompare(b);
+            });
+
+            list.innerHTML = '';
+            names.forEach(function (name) {
+                var child = children[name];
+                var row = document.createElement('div');
+                row.className = 'item';
+                row.dataset.name = name;
+                row.dataset.type = child.type;
+
+                var icon = document.createElement('span');
+                icon.className = 'icon';
+                icon.textContent = iconFor(name, child.type === 'dir');
+
+                var meta = document.createElement('div');
+                meta.className = 'meta';
+                var nm = document.createElement('div');
+                nm.className = 'name';
+                nm.textContent = name;
+                var dt = document.createElement('div');
+                dt.className = 'detail';
+                dt.textContent = (child.type === 'dir' ? (Object.keys(child.children || {}).length) + ' items' : formatBytes(child.size)) + ' · ' + formatDate(child.mtime);
+                meta.appendChild(nm); meta.appendChild(dt);
+
+                var actions = document.createElement('div');
+                actions.className = 'actions';
+                var rn = document.createElement('button');
+                rn.className = 'icon-btn'; rn.textContent = '✏️'; rn.title = 'Rename';
+                var del = document.createElement('button');
+                del.className = 'icon-btn danger'; del.textContent = '🗑'; del.title = 'Delete';
+
+                rn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    promptRename(currentPath, name, child.type);
+                });
+                del.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    confirmDelete(currentPath, name, child.type);
+                });
+                actions.appendChild(rn); actions.appendChild(del);
+
+                row.appendChild(icon); row.appendChild(meta); row.appendChild(actions);
+
+                row.addEventListener('click', function () {
+                    openEntry(currentPath, name, child.type);
+                });
+                list.appendChild(row);
+            });
+        }
+
+        function navigate(path) {
+            currentPath = path || '';
+            render();
+        }
+
+        function updateUsage() {
+            var el = $('usage');
+            var est = navigator.storage && navigator.storage.estimate;
+            if (!est) { el.textContent = ''; return; }
+            navigator.storage.estimate().then(function (e) {
+                el.textContent = '💾 ' + formatBytes(e.usage || 0) + ' / ' + formatBytes(e.quota || 0);
+            }).catch(function () { el.textContent = ''; });
+        }
+
+        // ============================================================
+        //  Reader
+        // ============================================================
+        var TEXT_EXT = {
+            py: 1, cpp: 1, cc: 1, c: 1, h: 1, hpp: 1, java: 1, js: 1, ts: 1, jsx: 1, tsx: 1,
+            html: 1, htm: 1, css: 1, json: 1, xml: 1, svg: 1, md: 1, txt: 1, csv: 1, log: 1,
+            sh: 1, bash: 1, sql: 1, go: 1, rs: 1, swift: 1, kt: 1, rb: 1, php: 1, yaml: 1, yml: 1, ini: 1, cfg: 1, conf: 1, gitignore: 1, gitattributes: 1, toml: 1, mjs: 1, cjs: 1, scss: 1, less: 1, vue: 1, svelte: 1, env: 1,
+        };
+        var IMG_EXT = { png: 1, jpg: 1, jpeg: 1, gif: 1, webp: 1, bmp: 1, ico: 1, avif: 1 };
+        var PDF_EXT = { pdf: 1 };
+
+        var currentReader = null;
+        var pdfDoc = null;
+        var pdfPage = 1;
+        var pdfScale = 1;
+        var codeFontSize = 13;
+
+        function openEntry(path, name, type) {
+            var full = path ? path + '/' + name : name;
+            var ext = extOf(name);
+            if (type === 'dir') { navigate(full); return; }
+
+            if (PDF_EXT[ext]) { openPDF(full, name); return; }
+            if (IMG_EXT[ext]) { openImage(full, name); return; }
+            if (TEXT_EXT[ext] || name.toLowerCase() === 'makefile' || name === '.gitignore' || name === '.env' ||
+                name.toLowerCase().endsWith('.cmake') || name.toLowerCase().endsWith('.gradle')) {
+                openText(full, name, ext); return;
+            }
+            openBinary(full, name);
+        }
+
+        function closeReader() {
+            if (currentReader) { try { currentReader.destroy && currentReader.destroy(); } catch (e) {} }
+            currentReader = null;
+            pdfDoc = null;
+            $('readerView').classList.add('hidden');
+            $('fileView').classList.remove('hidden');
+            $('wrapRow').classList.add('hidden');
+            $('readerBar').classList.add('hidden');
+            $('dlBtn').classList.add('hidden');
+        }
+
+        function showReader(name, bodyHtml) {
+            $('readerFileName').textContent = name;
+            $('readerBody').innerHTML = bodyHtml;
+            $('fileView').classList.add('hidden');
+            $('readerView').classList.remove('hidden');
+        }
+
+        function downloadBlob(name, blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 2000);
+        }
+
+        // ---------- Text / code viewer ----------
+        var KEYWORDS = {
+            py: /^(def|class|return|if|elif|else|for|while|import|from|as|with|try|except|finally|raise|lambda|pass|break|continue|yield|global|nonlocal|in|not|and|or|is|None|True|False|async|await|del|assert|print|self|super)$/,
+            c: /^(if|else|for|while|do|switch|case|break|continue|return|struct|class|public|private|protected|void|int|float|double|char|bool|const|static|virtual|new|delete|template|typename|namespace|using|typedef|enum|union|this|try|catch|throw|auto|extern|inline|sizeof|true|false|nullptr|NULL|unsigned|long|short|signed|register|volatile|friend|operator|override|final|constexpr|goto)$/,
+            js: /^(var|let|const|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|super|this|typeof|instanceof|in|of|try|catch|finally|throw|async|await|yield|import|from|export|default|delete|void|null|undefined|true|false|arguments|NaN|Infinity|debugger)$/,
+            java: /^(public|private|protected|class|interface|extends|implements|static|final|void|int|long|float|double|boolean|char|byte|short|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|this|super|null|true|false|abstract|enum|volatile|synchronized|native|transient|instanceof)$/,
+            html: /^(<!DOCTYPE|html|head|body|title|meta|link|script|style|div|span|p|a|img|ul|ol|li|table|tr|td|th|form|input|button|textarea|select|option|nav|header|footer|section|article|main|aside|h1|h2|h3|h4|h5|h6|br|hr|iframe|canvas|video|audio|source|label|svg|path|strong|em|b|i|u|blockquote|pre|code|small|figure|figcaption|details|summary|datalist|optgroup|fieldset|legend)$/,
+            css: /^(@import|@media|@keyframes|@font-face|@supports|!important|rgba?|hsla?|url|calc|var|min|max|clamp|repeat|translate|scale|rotate|fixed|absolute|relative|sticky|static|flex|grid|block|inline|none|auto|inherit|initial|center|left|right|top|bottom|import|media|keyframes|font-face|supports)$/,
+            md: /^(#|##|###|####|#####|######)$/,
+            sh: /^(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|local|export|source|echo|cd|ls|mkdir|rm|cp|mv|touch|cat|grep|sed|awk|exit|sudo|chmod|chown|curl|wget|git|npm|yarn|node|python|pip|set|unset|shift|read|printf|test|alias|type|declare|eval|exec)$/,
+            sql: /^(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|DROP|ALTER|JOIN|LEFT|RIGHT|INNER|OUTER|ON|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|AS|DISTINCT|UNION|ALL|PRIMARY|KEY|FOREIGN|REFERENCES|INDEX|VIEW|AND|OR|NOT|NULL|LIKE|BETWEEN|IN|CASE|WHEN|THEN|ELSE|END|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE|TRUNCATE|DEFAULT|CHECK|CONSTRAINT)$/i
+        };
+
+        var TYPE_RE = {
+            c: /^(int|float|double|char|bool|void|unsigned|long|short|signed|struct|class|enum|union|auto|extern|static|const|typename|namespace|template|string|size_t|int8_t|uint8_t|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|vector|map|set|list|auto_ptr|unique_ptr|shared_ptr)$/,
+            js: /^(Array|Object|String|Number|Boolean|Promise|Date|RegExp|Map|Set|JSON|Math|Error|Function|console|window|document|Buffer|Symbol|BigInt)$/,
+            java: /^(String|Integer|Double|Float|Long|Boolean|Character|Object|System|Math|List|Map|Set|ArrayList|HashMap|Collection|Scanner|BufferedReader|File|Thread|Runnable|Exception|RuntimeException|void|int|long|double|float|boolean|char|byte|short)$/,
+            py: /^(str|int|float|bool|list|dict|set|tuple|bytes|object|type|super|self)$/
+        };
+
+        function langFor(ext) {
+            if (ext === 'py') return 'py';
+            if (ext === 'c' || ext === 'cpp' || ext === 'cc' || ext === 'h' || ext === 'hpp' || ext === 'cs') return 'c';
+            if (ext === 'js' || ext === 'ts' || ext === 'jsx' || ext === 'tsx' || ext === 'mjs' || ext === 'cjs' || ext === 'vue') return 'js';
+            if (ext === 'java' || ext === 'kt') return 'java';
+            if (ext === 'html' || ext === 'htm') return 'html';
+            if (ext === 'css' || ext === 'scss' || ext === 'less' || ext === 'svg') return 'css';
+            if (ext === 'md') return 'md';
+            if (ext === 'sh' || ext === 'bash' || ext === 'env') return 'sh';
+            if (ext === 'sql') return 'sql';
+            return null; // txt, json, yaml, xml, csv, log, etc. render as plain text
+        }
+
+        // Line-based lexer with persistent block state across lines.
+        function renderCode(src, ext) {
+            var lang = langFor(ext);
+            var st = {};
+            var out = [];
+            var lines = src.split('\n');
+            for (var i = 0; i < lines.length; i++) {
+                var res = lexLine(lines[i], st, lang);
+                st = res.st;
+                out.push(res.html);
+            }
+            return out;
+        }
+
+        function lexLine(line, st, lang) {
+            var kw = KEYWORDS[lang] || null;
+            var lineComment = null;
+            if (lang === 'py' || lang === 'sh') lineComment = '#';
+            else if (lang === 'c' || lang === 'js' || lang === 'java') lineComment = '//';
+            var hasBlock = (lang === 'c' || lang === 'js' || lang === 'java' || lang === 'css' || lang === 'sql');
+            var n = line.length;
+            var out = '';
+            var i = 0;
+
+            function push(type, text) {
+                var cls = {
+                    kw: 'tok-kw', type: 'tok-type', fn: 'tok-fn', num: 'tok-num',
+                    op: 'tok-op', str: 'tok-str', com: 'tok-com', def: 'tok-def'
+                }[type];
+                out += cls ? '<span class="' + cls + '">' + esc(text) + '</span>' : esc(text);
+            }
+
+            // Resume block comment / multiline string from previous line
+            if (st.comment) {
+                var cEnd = line.indexOf('*/');
+                if (cEnd === -1) { push('com', line); return { html: out, st: st }; }
+                push('com', line.slice(0, cEnd + 2));
+                i = cEnd + 2;
+                st = {};
+            } else if (st.string) {
+                var sEnd = line.indexOf(st.string);
+                if (sEnd === -1) { push('str', line); return { html: out, st: st }; }
+                push('str', line.slice(0, sEnd + st.string.length));
+                i = sEnd + st.string.length;
+                st = {};
+            }
+
+            while (i < n) {
+                var ch = line[i];
+                var rest = line.slice(i);
+
+                if (/\s/.test(ch)) { out += ch; i++; continue; }
+
+                if (lineComment && rest.indexOf(lineComment) === 0) { push('com', rest); break; }
+
+                if (hasBlock && rest.indexOf('/*') === 0) {
+                    var be = rest.indexOf('*/', 2);
+                    if (be === -1) { push('com', rest); st.comment = '*/'; break; }
+                    push('com', rest.slice(0, be + 2));
+                    i += be + 2;
+                    continue;
+                }
+
+                if (lang === 'py' && (rest.indexOf('"""') === 0 || rest.indexOf("'''") === 0)) {
+                    var dq = rest.slice(0, 3);
+                    var te = rest.indexOf(dq, 3);
+                    if (te === -1) { push('str', rest); st.string = dq; break; }
+                    push('str', rest.slice(0, te + 3));
+                    i += te + 3;
+                    continue;
+                }
+
+                if (ch === '"' || ch === "'" || ch === '`') {
+                    var s = readString(line, i, ch);
+                    push('str', s.text);
+                    i = s.next;
+                    continue;
+                }
+
+                var num = rest.match(/^(0x[0-9a-fA-F_]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFlLuU]?)/);
+                if (lang === 'css') num = rest.match(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/);
+                if (num) { push('num', num[0]); i += num[0].length; continue; }
+
+                var idm = /^[A-Za-z_$][\w$]*/.exec(rest);
+                if (idm) {
+                    var word = idm[0];
+                    var nextCh = line[i + word.length];
+                    var type = wordClass(word, lang, nextCh, kw);
+                    push(type, word);
+                    i += word.length;
+                    continue;
+                }
+
+                // CSS property names (kebab-case before ':')
+                if (lang === 'css') {
+                    var prop = /^[\w-]+(?=\s*:)/.exec(rest);
+                    if (prop) { push('def', prop[0]); i += prop[0].length; continue; }
+                }
+
+                var opm = /^(===|!==|==|!=|<=|>=|->|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<|>>|&&|\|\||\?\?|\?\.|=>|\+\+|--|::|~|\*|\/|%|<|>|!|&|\||\^|=|\+|-|:|;|,|\.)/.exec(rest);
+                if (opm) { push('op', opm[0]); i += opm[0].length; continue; }
+
+                if (/[(){}[\]]/.test(ch)) { push('op', ch); i++; continue; }
+
+                out += ch;
+                i++;
+            }
+
+            return { html: out, st: st };
+        }
+
+        function readString(line, i, quote) {
+            var j = i + 1;
+            while (j < line.length) {
+                var c = line[j];
+                if (c === '\\') { j += 2; continue; }
+                if (c === quote) return { text: line.slice(i, j + 1), next: j + 1 };
+                j++;
+            }
+            return { text: line.slice(i), next: line.length };
+        }
+
+        function wordClass(word, lang, nextCh, kw) {
+            if (kw) {
+                var isKw = lang === 'sql' ? kw.test(word) && word === word.toUpperCase() : kw.test(word);
+                if (isKw) return 'kw';
+            }
+            if (lang === 'py' && /^(None|True|False)$/.test(word)) return 'kw';
+            var tre = TYPE_RE[lang];
+            if (tre && tre.test(word)) return 'type';
+            if (nextCh === '(') return 'fn';
+            if (lang === 'html') return 'kw';
+            return '';
+        }
+
+        function openText(full, name, ext) {
+            storeRead(full).then(function (blob) {
+                var fr = new FileReader();
+                fr.onload = function () {
+                    var buf = fr.result;
+                    var u8 = new Uint8Array(buf);
+                    var offset = 0;
+                    if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) offset = 3;
+                    else if (u8[0] === 0xFF && u8[1] === 0xFE) offset = 2;
+                    var text;
+                    try { text = new TextDecoder('utf-8').decode(buf.slice(offset)); }
+                    catch (e) { text = ''; }
+                    var rendered = renderCode(text, ext);
+                    var body = '<div class="code-wrap' + (wrapEnabled ? ' wrap' : '') + '">';
+                    for (var i = 0; i < rendered.length; i++) {
+                        body += '<div class="code-line"><span class="ln">' + (i + 1) + '</span><span class="src">' + (rendered[i] || '') + '</span></div>';
+                    }
+                    body += '</div>';
+                    currentReader = { destroy: function () {} };
+                    showReader(name, body);
+                    $('wrapRow').classList.remove('hidden');
+                    $('dlBtn').classList.remove('hidden');
+                    $('dlBtn').onclick = function () { downloadBlob(name, blob); };
+                    applyWrap();
+                };
+                fr.readAsArrayBuffer(blob);
+            }).catch(function (err) {
+                toast('Could not open file');
+                console.error(err);
+            });
+        }
+
+        var wrapEnabled = false;
+        function applyWrap() {
+            var wrapEls = document.querySelectorAll('.code-wrap');
+            wrapEls.forEach(function (el) {
+                el.classList.toggle('wrap', wrapEnabled);
+            });
+        }
+
+        $('wrapToggle').addEventListener('change', function () {
+            wrapEnabled = this.checked;
+            applyWrap();
+        });
+        $('fontPlus').addEventListener('click', function () {
+            codeFontSize = Math.min(22, codeFontSize + 1);
+            document.querySelectorAll('.code-line').forEach(function (el) { el.style.fontSize = codeFontSize + 'px'; });
+        });
+        $('fontMinus').addEventListener('click', function () {
+            codeFontSize = Math.max(9, codeFontSize - 1);
+            document.querySelectorAll('.code-line').forEach(function (el) { el.style.fontSize = codeFontSize + 'px'; });
+        });
+
+        // ---------- PDF viewer ----------
+        function openPDF(full, name) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            var body = $('readerBody');
+            showReader(name, '<div class="pdf-scroll"><div class="spinner"></div><p style="color:#94a3b8;font-size:0.85rem;text-align:center">Loading PDF…</p></div>');
+            $('readerBar').classList.remove('hidden');
+            $('dlBtn').classList.remove('hidden');
+
+            storeRead(full).then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                $('dlBtn').onclick = function () { downloadBlob(name, blob); };
+                pdfjsLib.getDocument({ url: url, disableAutoFetch: false, isEvalSupported: true }).promise.then(function (doc) {
+                    pdfDoc = doc;
+                    pdfPage = 1;
+                    pdfScale = 1;
+                    currentReader = { destroy: function () { try { URL.revokeObjectURL(url); } catch (e) {} doc.destroy(); } };
+                    $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%';
+                    renderPdfPage();
+                }).catch(function (err) {
+                    console.error(err);
+                    body.innerHTML = '<div class="bin-view"><span class="big">📕</span><p>Could not load PDF.</p></div>';
+                });
+            }).catch(function (err) {
+                console.error(err);
+                body.innerHTML = '<div class="bin-view"><span class="big">📕</span><p>Could not read file.</p></div>';
+            });
+        }
+
+        function renderPdfPage() {
+            if (!pdfDoc) return;
+            var body = $('readerBody');
+            body.innerHTML = '<div class="pdf-scroll"><div class="spinner"></div></div>';
+            $('pdfInfo').textContent = pdfPage + ' / ' + pdfDoc.numPages;
+            var width = Math.max(280, body.clientWidth || window.innerWidth - 40);
+            pdfDoc.getPage(pdfPage).then(function (page) {
+                var vp1 = page.getViewport({ scale: 1 });
+                var fitScale = (width - 20) / vp1.width;
+                // Never overflow screen width, but honour user zoom where it fits
+                var effective = Math.min(Math.max(pdfScale, fitScale), Math.max(fitScale, 0.4));
+                if (pdfScale < fitScale) effective = fitScale;
+                var vp = page.getViewport({ scale: effective });
+                var canvas = document.createElement('canvas');
+                canvas.width = vp.width;
+                canvas.height = vp.height;
+                var ctx = canvas.getContext('2d');
+                page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+                    body.innerHTML = '';
+                    var wrap = document.createElement('div');
+                    wrap.className = 'pdf-scroll';
+                    wrap.appendChild(canvas);
+                    body.appendChild(wrap);
+                });
+            }).catch(function (err) { console.error(err); });
+        }
+
+        $('pdfPrev').addEventListener('click', function () { if (pdfDoc && pdfPage > 1) { pdfPage--; renderPdfPage(); } });
+        $('pdfNext').addEventListener('click', function () { if (pdfDoc && pdfPage < pdfDoc.numPages) { pdfPage++; renderPdfPage(); } });
+        $('pdfIn').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.min(4, pdfScale + 0.25); $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%'; renderPdfPage(); } });
+        $('pdfOut').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.max(0.5, pdfScale - 0.25); $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%'; renderPdfPage(); } });
+
+        // ---------- Image viewer ----------
+        function openImage(full, name) {
+            storeRead(full).then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                currentReader = { destroy: function () { try { URL.revokeObjectURL(url); } catch (e) {} } };
+                showReader(name, '<div class="img-view"><img id="imgView" src="' + url + '" alt=""></div>');
+                $('dlBtn').classList.remove('hidden');
+                $('dlBtn').onclick = function () { downloadBlob(name, blob); };
+                if (isMobile()) {
+                    // Pinch zoom with pointer events
+                    var img = $('imgView');
+                    var scale = 1;
+                    var pinchDist = 0;
+                    img.addEventListener('touchstart', function (e) {
+                        if (e.touches.length === 2) {
+                            pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                        }
+                    }, { passive: true });
+                    img.addEventListener('touchmove', function (e) {
+                        if (e.touches.length === 2) {
+                            var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                            if (pinchDist) {
+                                scale = Math.min(6, Math.max(1, scale * (d / pinchDist)));
+                                img.style.transform = 'scale(' + scale + ')';
+                            }
+                            pinchDist = d;
+                            e.preventDefault();
+                        }
+                    }, { passive: false });
+                    img.addEventListener('touchend', function () { pinchDist = 0; }, { passive: true });
+                }
+            }).catch(function () { toast('Could not open image'); });
+        }
+
+        // ---------- Binary ----------
+        function openBinary(full, name) {
+            storeRead(full).then(function (blob) {
+                currentReader = { destroy: function () {} };
+                showReader(name,
+                    '<div class="bin-view"><span class="big">📄</span>' +
+                    '<div class="size">' + name + '</div>' +
+                    '<div class="size">' + formatBytes(blob.size) + ' · binary file</div></div>');
+                $('dlBtn').classList.remove('hidden');
+                $('dlBtn').onclick = function () { downloadBlob(name, blob); };
+            }).catch(function () { toast('Could not open file'); });
+        }
+
+        // ============================================================
+        //  Dialogs
+        // ============================================================
+        var modalRoot = $('modalRoot');
+
+        function modal(html) {
+            var back = document.createElement('div');
+            back.className = 'modal-back top';
+            back.innerHTML = html;
+            back.addEventListener('click', function (e) { if (e.target === back) closeModal(); });
+            modalRoot.innerHTML = '';
+            modalRoot.appendChild(back);
+            var input = back.querySelector('input[type=text]');
+            if (input) setTimeout(function () { input.focus(); }, 60);
+            return back;
+        }
+
+        function closeModal() { modalRoot.innerHTML = ''; }
+
+        function promptName(title, hint, value, onOk) {
+            var back = modal(
+                '<div class="modal"><h3>' + esc(title) + '</h3>' +
+                '<p class="hint">' + esc(hint) + '</p>' +
+                '<input type="text" value="' + esc(value || '') + '" placeholder="Name…" autocomplete="off">' +
+                '<div class="row"><button class="btn ghost" data-cancel>Cancel</button>' +
+                '<button class="btn primary" data-ok>OK</button></div></div>');
+            var input = back.querySelector('input');
+            var ok = back.querySelector('[data-ok]');
+            var cancel = back.querySelector('[data-cancel]');
+            function commit() {
+                var v = input.value.trim();
+                if (!v) { input.style.borderColor = '#ff5c5c'; return; }
+                closeModal();
+                onOk(v);
+            }
+            ok.addEventListener('click', commit);
+            cancel.addEventListener('click', closeModal);
+            input.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit(); });
+        }
+
+        function confirmDelete(path, name, type) {
+            var back = modal(
+                '<div class="modal"><h3>Delete ' + esc(name) + '?</h3>' +
+                '<p class="hint">This will permanently remove the ' + (type === 'dir' ? 'folder' : 'file') + ' from your virtual file system.</p>' +
+                '<div class="row"><button class="btn ghost" data-cancel>Cancel</button>' +
+                '<button class="btn primary" style="background:var(--danger)" data-ok>Delete</button></div></div>');
+            back.querySelector('[data-cancel]').addEventListener('click', closeModal);
+            back.querySelector('[data-ok]').addEventListener('click', function () {
+                closeModal();
+                removeEntry(path ? path + '/' + name : name);
+            });
+        }
+
+        function promptRename(path, name, type) {
+            promptName('Rename', 'Enter a new name for ' + name, name, function (v) {
+                var oldFull = path ? path + '/' + name : name;
+                renameEntry(oldFull, v).then(function () {
+                    if (type === 'dir' && currentPath === oldFull) navigate(v);
+                });
+            });
+        }
+
+        function promptNewFolder() {
+            promptName('New folder', 'Name of the new folder in ' + (currentPath || 'Home'), '', function (v) {
+                createFolder(currentPath, v).catch(function (e) { toast(e.message || 'Error'); });
+            });
+        }
+
+        function promptNewFile() {
+            promptName('New file', 'Include the extension, e.g. script.py', '', function (v) {
+                var blob = new Blob([''], { type: 'text/plain' });
+                createFile(currentPath, v, blob).then(function () { toast('File created'); })
+                    .catch(function (e) { toast(e.message || 'Error'); });
+            });
+        }
+
+        // ============================================================
+        //  Event wiring
+        // ============================================================
+        document.querySelectorAll('.actionbar [data-act]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var act = btn.dataset.act;
+                if (act === 'home') navigate('');
+                else if (act === 'newfolder') promptNewFolder();
+                else if (act === 'newfile') promptNewFile();
+                else if (act === 'upload') $('fileInput').click();
+                else if (act === 'uploaddir') $('dirInput').click();
+            });
+        });
+
+        $('fileInput').addEventListener('change', function () {
+            uploadFiles(this.files, currentPath);
+            this.value = '';
+        });
+        $('dirInput').addEventListener('change', function () {
+            if (this.webkitdirectory === undefined) {
+                toast('Folder upload needs iOS 16.4+');
+                return;
+            }
+            uploadDir(this.files, currentPath);
+            this.value = '';
+        });
+        $('readerBack').addEventListener('click', closeReader);
+
+        // Keyboard shortcuts (desktop)
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { closeModal(); closeReader(); }
+        });
+
+        // ============================================================
+        //  Init
+        // ============================================================
+        function init() {
+            render();
+            updateUsage();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
+</body>
+<script src="top_buttons.js"></script>
+</html>
