@@ -172,8 +172,11 @@
         .switch input:checked + .track::after { transform: translateX(18px); }
 
         /* PDF */
-        .pdf-scroll { padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .pdf-scroll canvas { max-width: 100%; height: auto; background: #fff; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+        /* PDF: il canvas mantiene le dimensioni reali; a zoom >100% .reader-body
+           permette pan orizzontale/verticale. width:max-content + margin:auto =
+           centrato quando entra, bordo sinistro raggiungibile quando sfora. */
+        .pdf-scroll { padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; min-width: 100%; margin: 0 auto; transform-origin: top center; }
+        .pdf-scroll canvas { height: auto; background: #fff; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.4); touch-action: pan-x pan-y; }
 
         /* Image */
         .img-view { display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 10px; }
@@ -1137,7 +1140,7 @@
                     pdfPage = 1;
                     pdfScale = 1;
                     currentReader = { destroy: function () { try { URL.revokeObjectURL(url); } catch (e) {} doc.destroy(); } };
-                    $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%';
+                    setZoomLabel();
                     renderPdfPage();
                 }).catch(function (err) {
                     console.error(err);
@@ -1149,37 +1152,82 @@
             });
         }
 
+        var renderToken = 0; // invalida i render obsoleti se l'utente cambia zoom/pagina in fretta
         function renderPdfPage() {
             if (!pdfDoc) return;
+            var token = ++renderToken;
             var body = $('readerBody');
-            body.innerHTML = '<div class="pdf-scroll"><div class="spinner"></div></div>';
+            var sx = body.scrollLeft, sy = body.scrollTop;
+            // Se c'è già una pagina disegnata, lasciala visibile finché la nuova non è pronta (niente flash)
+            if (!body.querySelector('.pdf-scroll canvas'))
+                body.innerHTML = '<div class="pdf-scroll"><div class="spinner"></div></div>';
             $('pdfInfo').textContent = pdfPage + ' / ' + pdfDoc.numPages;
             var width = Math.max(280, body.clientWidth || window.innerWidth - 40);
             pdfDoc.getPage(pdfPage).then(function (page) {
-                var vp1 = page.getViewport({ scale: 1 });
-                var fitScale = (width - 20) / vp1.width;
-                // Never overflow screen width, but honour user zoom where it fits
-                var effective = Math.min(Math.max(pdfScale, fitScale), Math.max(fitScale, 0.4));
-                if (pdfScale < fitScale) effective = fitScale;
+                if (token !== renderToken || !pdfDoc) return;
+                // Scala di fit alla larghezza disponibile, moltiplicata per lo zoom scelto
+                var vpFit = page.getViewport({ scale: 1 });
+                var fitScale = (width - 20) / vpFit.width;
+                var effective = fitScale * pdfScale;
+                // Render ad alta risoluzione (devicePixelRatio) ma dimensioni CSS logiche
+                var dpr = Math.min(window.devicePixelRatio || 1, 2);
                 var vp = page.getViewport({ scale: effective });
                 var canvas = document.createElement('canvas');
-                canvas.width = vp.width;
-                canvas.height = vp.height;
+                canvas.width = Math.floor(vp.width * dpr);
+                canvas.height = Math.floor(vp.height * dpr);
+                canvas.style.width = Math.floor(vp.width) + 'px';
+                canvas.style.height = Math.floor(vp.height) + 'px';
                 var ctx = canvas.getContext('2d');
-                page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+                page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: effective * dpr }) }).promise.then(function () {
+                    if (token !== renderToken || !pdfDoc) return;
                     body.innerHTML = '';
                     var wrap = document.createElement('div');
                     wrap.className = 'pdf-scroll';
                     wrap.appendChild(canvas);
                     body.appendChild(wrap);
+                    // Ripristina la posizione di lettura dopo il re-render
+                    body.scrollLeft = sx; body.scrollTop = sy;
                 });
             }).catch(function (err) { console.error(err); });
         }
 
+        function setZoomLabel() { $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%'; }
+
         $('pdfPrev').addEventListener('click', function () { if (pdfDoc && pdfPage > 1) { pdfPage--; renderPdfPage(); } });
         $('pdfNext').addEventListener('click', function () { if (pdfDoc && pdfPage < pdfDoc.numPages) { pdfPage++; renderPdfPage(); } });
-        $('pdfIn').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.min(4, pdfScale + 0.25); $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%'; renderPdfPage(); } });
-        $('pdfOut').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.max(0.5, pdfScale - 0.25); $('pdfZoom').textContent = Math.round(pdfScale * 100) + '%'; renderPdfPage(); } });
+        $('pdfIn').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.min(4, pdfScale + 0.25); setZoomLabel(); renderPdfPage(); } });
+        $('pdfOut').addEventListener('click', function () { if (pdfDoc) { pdfScale = Math.max(0.5, pdfScale - 0.25); setZoomLabel(); renderPdfPage(); } });
+
+        // Pinch-zoom sul PDF (due dita): feedback immediato via transform, re-render al rilascio
+        (function () {
+            var body = $('readerBody');
+            var startDist = 0, startScale = 1, curScale = 1;
+            function dist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+            var wrapEl = function () { return body.querySelector('.pdf-scroll'); };
+            body.addEventListener('touchstart', function (e) {
+                if (pdfDoc && e.touches.length === 2) { startDist = dist(e.touches); startScale = pdfScale; curScale = pdfScale; }
+            }, { passive: true });
+            body.addEventListener('touchmove', function (e) {
+                if (!pdfDoc || e.touches.length !== 2 || !startDist) return;
+                e.preventDefault();
+                curScale = Math.min(4, Math.max(0.5, startScale * (dist(e.touches) / startDist)));
+                var w = wrapEl();
+                if (w) w.style.transform = 'scale(' + curScale + ')';
+            }, { passive: false });
+            function endPinch(e) {
+                if (!startDist || e.touches.length > 1) return;
+                startDist = 0;
+                var w = wrapEl();
+                if (w) w.style.transform = '';
+                if (Math.abs(curScale - pdfScale) > 0.01) {
+                    pdfScale = Math.round(curScale * 20) / 20; // scatti di 5%
+                    setZoomLabel();
+                    renderPdfPage();
+                }
+            }
+            body.addEventListener('touchend', endPinch, { passive: true });
+            body.addEventListener('touchcancel', endPinch, { passive: true });
+        })();
 
         // ---------- Image viewer ----------
         function openImage(full, name) {

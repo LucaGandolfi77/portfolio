@@ -2,423 +2,858 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#070b14">
     <title>USA People Simulator</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://d3js.org/topojson.v3.min.js"></script>
     <style>
-        body {
+        :root {
+            --bg0: #070b14;
+            --bg1: #0c1322;
+            --card: rgba(255, 255, 255, 0.045);
+            --card-strong: rgba(13, 20, 35, 0.92);
+            --stroke: rgba(255, 255, 255, 0.09);
+            --text: #e9eefb;
+            --muted: #8ea3c6;
+            --accent: #22d3ee;
+            --accent2: #8b5cf6;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            height: 100%;
             margin: 0;
-            background-color: #0f1724;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
+            overscroll-behavior: none;
         }
-        #map-container {
-            width: 100%;
-            max-width: 1200px;
-            height: 65vh;
-            margin: 40px auto;
-            cursor: grab;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #07101a;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-            touch-action: none; /* prevent page pinch-zoom while interacting with map */
+        body {
+            background:
+                radial-gradient(1100px 600px at 75% -10%, rgba(139, 92, 246, 0.14), transparent 60%),
+                radial-gradient(900px 500px at 10% 110%, rgba(34, 211, 238, 0.10), transparent 60%),
+                linear-gradient(180deg, var(--bg1), var(--bg0));
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Helvetica, Arial, sans-serif;
+            /* top_buttons.js adds the 36px bar offset itself */
+            padding-top: env(safe-area-inset-top, 0px);
+            touch-action: manipulation;
         }
-        #map-container:active {
-            cursor: grabbing;
-        }
-        .state {
-            fill: #2c3e50;
-            stroke: #fff;
-            stroke-width: 0.5px;
-            transition: fill 0.2s;
-        }
-        .state:hover {
-            fill: #3498db;
-        }
-        #info-panel {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto 40px;
-            background: rgba(15, 23, 36, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
-            padding: 20px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-            pointer-events: auto;
-            opacity: 1;
-            transition: opacity 0.25s ease;
-        }
-        h2 {
-            margin-top: 0;
-            color: #00d4ff;
-        }
-        .stat-row {
+
+        /* ---------- App layout: map on top, scrollable bottom sheet below ---------- */
+        #app {
+            height: 100%;
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 5px;
+            flex-direction: column;
         }
-        .stat-label {
-            color: #a0c0e0;
+
+        #map-wrap {
+            position: relative;
+            flex: 0 0 auto;
+            height: 44vh;
+            height: min(44dvh, 460px);
+            margin: 10px 12px 0;
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(3, 7, 15, 0.55);
+            border: 1px solid var(--stroke);
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55), inset 0 0 60px rgba(56, 130, 246, 0.05);
         }
-        .stat-value {
-            font-weight: bold;
+        #map-wrap svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+        #map-wrap svg:active { cursor: grabbing; }
+
+        .state {
+            stroke: rgba(255, 255, 255, 0.16);
+            stroke-width: 0.6;
+            transition: fill 0.8s linear, filter 0.2s;
         }
-        #loading {
+        .state:hover { filter: brightness(1.25); }
+        .state.selected {
+            stroke: #fff;
+            stroke-width: 1.5;
+            filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.95)) brightness(1.12);
+        }
+
+        /* Clock / HUD pill */
+        #hud {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.5rem;
-            color: #00d4ff;
-            z-index: 50;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 30;
+            max-width: calc(100% - 16px);
+        }
+        .pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card-strong);
+            border: 1px solid var(--stroke);
+            border-radius: 999px;
+            padding: 7px 14px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+            white-space: nowrap;
+        }
+        #clock-time { display: block; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        #clock-day { display: block; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+        .live-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #f43f5e;
+            box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+            animation: pulse 1.6s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.65); }
+            70% { box-shadow: 0 0 0 8px rgba(244, 63, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+        }
+        .icon-btn {
+            width: 34px; height: 34px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            border: 1px solid var(--stroke);
+            background: var(--card-strong);
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: background 0.2s, transform 0.1s;
+        }
+        .icon-btn:active { transform: scale(0.92); background: rgba(255, 255, 255, 0.14); }
+
+        #legend {
+            position: absolute;
+            left: 10px; right: 10px; bottom: 8px;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            z-index: 20;
+            padding-bottom: 2px;
+        }
+        #legend::-webkit-scrollbar { display: none; }
+        .lg-chip {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.62rem; color: var(--muted);
+            background: rgba(5, 10, 20, 0.72);
+            border: 1px solid var(--stroke);
+            border-radius: 999px;
+            padding: 3px 8px;
+            white-space: nowrap;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .lg-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+        #reset-view { position: absolute; right: 10px; bottom: 40px; z-index: 25; display: none; }
+
+        /* Loading */
+        #loading {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; gap: 14px;
+            align-items: center; justify-content: center;
+            z-index: 40;
+            color: var(--muted);
+            font-size: 0.85rem;
+            background: rgba(7, 11, 20, 0.7);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .spinner {
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.12);
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- Bottom sheet ---------- */
+        #sheet {
+            flex: 1 1 auto;
+            min-height: 0;
+            margin: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+            background: var(--card);
+            border: 1px solid var(--stroke);
+            border-radius: 18px 18px 14px 14px;
+            box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.4);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.18) transparent;
+        }
+        .sheet-handle {
+            position: sticky; top: 0; z-index: 5;
+            display: flex; justify-content: center;
+            padding: 8px 0 4px;
+            background: linear-gradient(180deg, rgba(12, 19, 34, 0.95), rgba(12, 19, 34, 0));
             pointer-events: none;
         }
-        #clock-panel {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 36, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 10px 25px;
-            backdrop-filter: blur(10px);
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #00d4ff;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-            text-align: center;
+        .sheet-handle::after {
+            content: "";
+            width: 42px; height: 4px; border-radius: 99px;
+            background: rgba(255, 255, 255, 0.22);
         }
-        #clock-label {
-            display: block;
-            font-size: 0.8rem;
-            color: #a0c0e0;
-            font-weight: normal;
-            margin-top: -5px;
+        #sheet-content { padding: 2px 14px 18px; }
+
+        /* Header */
+        #st-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        #st-flag {
+            font-size: 2rem;
+            width: 54px; height: 54px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            border: 1px solid var(--stroke);
+        }
+        #st-name { font-size: 1.25rem; font-weight: 800; margin: 0; line-height: 1.15; }
+        #st-nick { font-size: 0.78rem; color: var(--muted); }
+        #st-local {
+            margin-left: auto;
+            text-align: right;
+            font-size: 0.72rem; color: var(--muted);
+        }
+        #st-local b { display: block; font-size: 0.95rem; color: var(--text); font-variant-numeric: tabular-nums; }
+
+        /* Dominant banner */
+        #banner {
+            display: flex; align-items: center; gap: 10px;
+            border-radius: 14px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            transition: background 0.6s, border-color 0.6s;
+        }
+        #banner .bn-icon { font-size: 1.3rem; }
+        #banner .bn-pct {
+            margin-left: auto;
+            font-size: 1.15rem; font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Hero live cards */
+        #heroes {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .hero {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--stroke);
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+        .hero h4 {
+            margin: 0 0 4px;
+            font-size: 0.66rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .hero .hv { font-size: 1.28rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+        .hero .hs { font-size: 0.7rem; color: var(--muted); }
+
+        /* Section titles */
+        .sec-title {
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 16px 0 8px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sec-title::after { content: ""; flex: 1; height: 1px; background: var(--stroke); }
+
+        /* Activity bars */
+        #bars { display: flex; flex-direction: column; gap: 7px; }
+        .bar-row { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+        .bar-row.off { display: none; }
+        .bar-label {
+            flex: 0 0 108px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.74rem; color: var(--muted);
+            white-space: nowrap; overflow: hidden;
+        }
+        .bar-track {
+            flex: 1;
+            height: 12px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.07);
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 99px;
+            transition: width 0.45s ease;
+            min-width: 3px;
+        }
+        .bar-val {
+            flex: 0 0 38px;
+            text-align: right;
+            font-size: 0.76rem; font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Fact grid */
+        #facts {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+        }
+        .fact {
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid var(--stroke);
+            border-radius: 12px;
+            padding: 9px 11px;
+        }
+        .fact .fk { font-size: 0.64rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; display: flex; gap: 5px; align-items: center; }
+        .fact .fv { font-size: 0.88rem; font-weight: 700; margin-top: 3px; line-height: 1.25; }
+        .fact .fv small { font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+        .rank-badge {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 0.62rem;
+            padding: 1px 6px;
+            border-radius: 99px;
+            background: linear-gradient(90deg, rgba(34, 211, 238, 0.2), rgba(139, 92, 246, 0.2));
+            border: 1px solid rgba(34, 211, 238, 0.35);
+            color: var(--accent);
+            vertical-align: middle;
+        }
+        #foot-note { margin-top: 14px; font-size: 0.66rem; color: rgba(142, 163, 198, 0.65); text-align: center; }
+
+        /* ---------- Desktop: side by side ---------- */
+        @media (min-width: 900px) {
+            body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+            #app { flex-direction: row; gap: 12px; padding: 12px; }
+            #map-wrap { flex: 1 1 auto; height: auto; margin: 0; }
+            #sheet {
+                flex: 0 0 400px;
+                margin: 0;
+                border-radius: 16px;
+            }
+            .sheet-handle { display: none; }
+            #sheet-content { padding-top: 14px; }
+            #heroes { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 360px) {
+            .bar-label { flex-basis: 96px; font-size: 0.68rem; }
+            #st-name { font-size: 1.05rem; }
         }
     </style>
 </head>
 <body>
-    <div id="clock-panel">
-        <span id="clock-time">12:00 PM</span>
-        <span id="clock-label">EST (New York)</span>
-    </div>
-    <div id="loading">Loading Map & Data...</div>
-    <div id="map-container"></div>
+    <div id="app">
+        <div id="map-wrap">
+            <div id="loading"><div class="spinner"></div>Loading map &amp; data…</div>
+            <div id="hud">
+                <div class="pill">
+                    <span class="live-dot"></span>
+                    <div>
+                        <span id="clock-time">--:--</span>
+                        <span id="clock-day">—</span>
+                    </div>
+                </div>
+                <button class="icon-btn" id="btn-pause" title="Pause / resume">⏸</button>
+                <button class="icon-btn" id="btn-speed" title="Simulation speed">1×</button>
+            </div>
+            <div id="legend"></div>
+            <button class="icon-btn" id="reset-view" title="Reset view">⤢</button>
+        </div>
 
-    <div id="info-panel">
-        <h2 id="state-name">State Name</h2>
-        <div class="stat-row">
-            <span class="stat-label">Population:</span>
-            <span class="stat-value" id="state-pop">-</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">GDP (Est.):</span>
-            <span class="stat-value" id="state-gdp">-</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Area:</span>
-            <span class="stat-value" id="state-area">-</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Density:</span>
-            <span class="stat-value" id="state-density">-</span>
-        </div>
-        <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-            <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #fff;">Live Activity</h3>
-            <div class="stat-row"><span class="stat-label">😴 Sleeping:</span><span class="stat-value" id="stat-sleep">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🏠 At Home (Awake):</span><span class="stat-value" id="stat-home">0%</span></div>
-            <div class="stat-row"><span class="stat-label">💼 Work:</span><span class="stat-value" id="stat-work">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🎓 School:</span><span class="stat-value" id="stat-school">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🧹 Household/Chores:</span><span class="stat-value" id="stat-chores">0%</span></div>
-            <div class="stat-row"><span class="stat-label">📺 Leisure/TV:</span><span class="stat-value" id="stat-leisure">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🛍️ Shopping:</span><span class="stat-value" id="stat-shopping">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🚗 Travel/Commute:</span><span class="stat-value" id="stat-travel">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🍽️ Eating:</span><span class="stat-value" id="stat-eating">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🛁 Personal Care:</span><span class="stat-value" id="stat-personal">0%</span></div>
-            <div class="stat-row"><span class="stat-label">⛪ Religious/Civic:</span><span class="stat-value" id="stat-civic">0%</span></div>
-            <div class="stat-row"><span class="stat-label">🏃 Sport:</span><span class="stat-value" id="stat-sport">0%</span></div>
-            <div class="stat-row"><span class="stat-label">👴 Retirement Home:</span><span class="stat-value" id="stat-retirement">0%</span></div>
-        </div>
+        <aside id="sheet">
+            <div class="sheet-handle"></div>
+            <div id="sheet-content"></div>
+        </aside>
     </div>
 
-    <script>
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+<script>
+"use strict";
 
-        const svg = d3.select("#map-container")
-            .append("svg")
-            .attr("width", "100%")
-            .attr("height", "100%")
-            .attr("viewBox", [0, 0, 975, 610]);
+/* ============================== DATA ============================== */
 
-        const g = svg.append("g");
+// [name, abbr(flag emoji code), population(2023 est.), capital, largest city,
+//  nickname, year admitted, GDP $B (2023 BEA approx.), median household income $, area sq mi]
+const STATES = [
+ ["Alabama","AL",5108468,"Montgomery","Huntsville","Yellowhammer State",1819,305,59609,52420],
+ ["Alaska","AK",733406,"Juneau","Anchorage","The Last Frontier",1959,64,86370,665384],
+ ["Arizona","AZ",7431344,"Phoenix","Phoenix","Grand Canyon State",1912,491,76872,113990],
+ ["Arkansas","AR",3067732,"Little Rock","Little Rock","The Natural State",1836,156,56335,53179],
+ ["California","CA",38965193,"Sacramento","Los Angeles","The Golden State",1850,3786,95521,163696],
+ ["Colorado","CO",5877610,"Denver","Denver","The Centennial State",1876,456,87698,104094],
+ ["Connecticut","CT",3617176,"Hartford","Bridgeport","Constitution State",1788,346,90213,5543],
+ ["Delaware","DE",1031890,"Dover","Wilmington","The First State",1787,98,82174,2489],
+ ["District of Columbia","DC",678972,"Washington","Washington","The Nation's Capital",1790,163,106821,68],
+ ["Florida","FL",22610726,"Tallahassee","Jacksonville","Sunshine State",1845,1596,73311,65758],
+ ["Georgia","GA",11029227,"Atlanta","Atlanta","The Peach State",1788,832,74091,59425],
+ ["Hawaii","HI",1435138,"Honolulu","Honolulu","The Aloha State",1959,111,95322,10932],
+ ["Idaho","ID",1964726,"Boise","Boise","The Gem State",1890,122,72733,83569],
+ ["Illinois","IL",12549689,"Springfield","Chicago","The Prairie State",1818,1090,80306,57914],
+ ["Indiana","IN",6862199,"Indianapolis","Indianapolis","The Hoosier State",1816,502,72353,36420],
+ ["Iowa","IA",3207004,"Des Moines","Des Moines","The Hawkeye State",1846,259,72429,56273],
+ ["Kansas","KS",2940546,"Topeka","Wichita","The Sunflower State",1861,230,71406,82278],
+ ["Kentucky","KY",4526154,"Frankfort","Louisville","The Bluegrass State",1792,300,62417,40408],
+ ["Louisiana","LA",4573749,"Baton Rouge","New Orleans","The Pelican State",1812,340,58229,52378],
+ ["Maine","ME",1395722,"Augusta","Portland","The Pine Tree State",1820,93,71963,35380],
+ ["Maryland","MD",6180253,"Annapolis","Baltimore","The Old Line State",1788,516,101652,12406],
+ ["Massachusetts","MA",7001399,"Boston","Boston","The Bay State",1788,736,104828,10554],
+ ["Michigan","MI",10037261,"Lansing","Detroit","The Great Lakes State",1837,706,69183,96714],
+ ["Minnesota","MN",5737915,"Saint Paul","Minneapolis","The North Star State",1858,479,90374,86936],
+ ["Mississippi","MS",2939690,"Jackson","Jackson","The Magnolia State",1817,152,54203,48432],
+ ["Missouri","MO",6196156,"Jefferson City","Kansas City","The Show-Me State",1821,448,68420,69707],
+ ["Montana","MT",1132812,"Helena","Billings","Big Sky Country",1889,77,67631,147040],
+ ["Nebraska","NE",1978379,"Lincoln","Omaha","The Cornhusker State",1867,177,74985,77348],
+ ["Nevada","NV",3194176,"Carson City","Las Vegas","The Silver State",1864,266,79198,110572],
+ ["New Hampshire","NH",1402054,"Concord","Manchester","The Granite State",1788,121,94662,9349],
+ ["New Jersey","NJ",9290841,"Trenton","Newark","The Garden State",1787,748,99751,8723],
+ ["New Mexico","NM",2114371,"Santa Fe","Albuquerque","Land of Enchantment",1912,135,59726,121590],
+ ["New York","NY",19571216,"Albany","New York City","The Empire State",1788,2172,84878,54555],
+ ["North Carolina","NC",10835491,"Raleigh","Charlotte","The Tar Heel State",1789,788,70522,53819],
+ ["North Dakota","ND",783926,"Bismarck","Fargo","Peace Garden State",1889,82,74528,70698],
+ ["Ohio","OH",11785935,"Columbus","Columbus","The Buckeye State",1803,885,66800,44826],
+ ["Oklahoma","OK",4053824,"Oklahoma City","Oklahoma City","The Sooner State",1907,264,63206,69899],
+ ["Oregon","OR",4233358,"Salem","Portland","The Beaver State",1859,331,80145,98379],
+ ["Pennsylvania","PA",12961683,"Harrisburg","Philadelphia","Keystone State",1787,1024,73170,46054],
+ ["Rhode Island","RI",1095962,"Providence","Providence","The Ocean State",1790,79,84842,1545],
+ ["South Carolina","SC",5373555,"Columbia","Charleston","The Palmetto State",1788,332,66818,32020],
+ ["South Dakota","SD",919318,"Pierre","Sioux Falls","The Mount Rushmore State",1889,76,71851,77116],
+ ["Tennessee","TN",7126489,"Nashville","Nashville","The Volunteer State",1796,543,67633,42144],
+ ["Texas","TX",30503301,"Austin","Houston","The Lone Star State",1845,2592,75780,268596],
+ ["Utah","UT",3417734,"Salt Lake City","Salt Lake City","The Beehive State",1896,291,91750,84896],
+ ["Vermont","VT",647464,"Montpelier","Burlington","The Green Mountain State",1791,45,81211,9616],
+ ["Virginia","VA",8715698,"Richmond","Virginia Beach","Old Dominion",1788,748,89331,42775],
+ ["Washington","WA",7812880,"Olympia","Seattle","The Evergreen State",1889,813,94605,71298],
+ ["West Virginia","WV",1770071,"Charleston","Charleston","The Mountain State",1863,103,57912,24230],
+ ["Wisconsin","WI",5910955,"Madison","Milwaukee","America's Dairyland",1848,441,72458,65496],
+ ["Wyoming","WY",584057,"Cheyenne","Cheyenne","The Equality State",1890,54,72795,97813]
+];
 
-        const zoom = d3.zoom()
-            .scaleExtent([1, 8])
-            .on("zoom", (event) => {
-                g.attr("transform", event.transform);
-            });
+const flag = abbr => abbr.split("").map(c => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
 
-        svg.call(zoom);
+const DB = {};
+STATES.forEach(s => {
+    DB[s[0]] = { abbr: s[1], pop: s[2], capital: s[3], largest: s[4],
+                 nick: s[5], since: s[6], gdpB: s[7], income: s[8], area: s[9] };
+});
+const POP_RANK = [...STATES].sort((a, b) => b[2] - a[2]).map(s => s[0]);
 
-        const projection = d3.geoAlbersUsa();
-        const path = d3.geoPath().projection(projection);
+const USA = {
+    pop: STATES.reduce((t, s) => t + s[2], 0),
+    gdpB: STATES.reduce((t, s) => t + s[7], 0),
+    area: STATES.reduce((t, s) => t + s[9], 0)
+};
+USA.density = USA.pop / USA.area;
 
-        // State Data Cache
-        let stateData = {};
-        let selectedStateName = null;
+const stateTimezones = {
+    "Alabama":-1,"Alaska":-4,"Arizona":-2,"Arkansas":-1,"California":-3,
+    "Colorado":-2,"Connecticut":0,"Delaware":0,"Florida":0,"Georgia":0,
+    "Hawaii":-5,"Idaho":-2,"Illinois":-1,"Indiana":0,"Iowa":-1,
+    "Kansas":-1,"Kentucky":0,"Louisiana":-1,"Maine":0,"Maryland":0,
+    "Massachusetts":0,"Michigan":0,"Minnesota":-1,"Mississippi":-1,"Missouri":-1,
+    "Montana":-2,"Nebraska":-1,"Nevada":-3,"New Hampshire":0,"New Jersey":0,
+    "New Mexico":-2,"New York":0,"North Carolina":0,"North Dakota":-1,"Ohio":0,
+    "Oklahoma":-1,"Oregon":-3,"Pennsylvania":0,"Rhode Island":0,"South Carolina":0,
+    "South Dakota":-1,"Tennessee":-1,"Texas":-1,"Utah":-2,"Vermont":0,
+    "Virginia":0,"Washington":-3,"West Virginia":0,"Wisconsin":-1,"Wyoming":-2,
+    "District of Columbia":0,"Puerto Rico":-1
+};
 
-        // Time Simulation
-        let simTime = new Date();
-        simTime.setHours(8, 0, 0); // Start at 8:00 AM EST
-        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/* Activities: icon, label, color, banner phrase */
+const ACT = [
+    ["sleep",     "😴", "Sleeping",       "#6366f1", "fast asleep"],
+    ["work",      "💼", "At work",        "#f59e0b", "hard at work"],
+    ["school",    "🎓", "At school",      "#ec4899", "in class"],
+    ["travel",    "🚗", "Commuting",      "#eab308", "on the move"],
+    ["home",      "🏠", "At home",        "#0ea5e9", "relaxing at home"],
+    ["chores",    "🧺", "Household",      "#fb7185", "doing chores"],
+    ["leisure",   "📺", "Leisure & TV",   "#a855f7", "watching TV & relaxing"],
+    ["shopping",  "🛍️", "Shopping",       "#f97316", "out shopping"],
+    ["eating",    "🍽️", "Eating",         "#22c55e", "having a meal"],
+    ["personal",  "🛁", "Personal care",  "#2dd4bf", "getting ready"],
+    ["civic",     "⛪", "Civic/Religious","#94a3b8", "at church or civic events"],
+    ["sport",     "🏃", "Sports",         "#84cc16", "playing sports"],
+    ["retirement","👴", "Retirement home","#c084fc", "in retirement homes"]
+];
+const ACT_MAP = Object.fromEntries(ACT.map(a => [a[0], { icon: a[1], label: a[2], color: a[3], phrase: a[4] }]));
+const ACT_KEYS = ACT.map(a => a[0]);
 
-        const stateTimezones = {
-            "Alabama": -1, "Alaska": -4, "Arizona": -2, "Arkansas": -1, "California": -3,
-            "Colorado": -2, "Connecticut": 0, "Delaware": 0, "Florida": 0, "Georgia": 0,
-            "Hawaii": -5, "Idaho": -2, "Illinois": -1, "Indiana": 0, "Iowa": -1,
-            "Kansas": -1, "Kentucky": 0, "Louisiana": -1, "Maine": 0, "Maryland": 0,
-            "Massachusetts": 0, "Michigan": 0, "Minnesota": -1, "Mississippi": -1, "Missouri": -1,
-            "Montana": -2, "Nebraska": -1, "Nevada": -3, "New Hampshire": 0, "New Jersey": 0,
-            "New Mexico": -2, "New York": 0, "North Carolina": 0, "North Dakota": -1, "Ohio": 0,
-            "Oklahoma": -1, "Oregon": -3, "Pennsylvania": 0, "Rhode Island": 0, "South Carolina": 0,
-            "South Dakota": -1, "Tennessee": -1, "Texas": -1, "Utah": -2, "Vermont": 0,
-            "Virginia": 0, "Washington": -3, "West Virginia": 0, "Wisconsin": -1, "Wyoming": -2
-        };
+/* ============================== SIMULATION CORE ============================== */
 
-        function getActivities(localHour, dayIndex) {
-            const h = localHour % 24;
-            const isWeekend = (dayIndex === 0 || dayIndex === 6);
-            const isSunday = (dayIndex === 0);
-            
-            // Initialize stats
-            let stats = { 
-                sleep: 0, home: 0, work: 0, school: 0, chores: 0, leisure: 0,
-                shopping: 0, travel: 0, eating: 0, personal: 0, civic: 0, sport: 0, retirement: 2 
-            };
+function getActivities(localHour, dayIndex) {
+    const h = localHour % 24;
+    const isWeekend = (dayIndex === 0 || dayIndex === 6);
+    const isSunday = (dayIndex === 0);
+    let stats = { sleep:0, work:0, school:0, travel:0, home:0, chores:0, leisure:0,
+                  shopping:0, eating:0, personal:0, civic:0, sport:0, retirement:2 };
+    const set = s => { stats = { ...stats, ...s }; };
 
-            const set = (s) => { stats = { ...stats, ...s }; };
+    if (isWeekend) {
+        if (h >= 0 && h < 6)       set({ sleep: 92, home: 2, leisure: 2, work: 1, personal: 1 });
+        else if (h >= 6 && h < 8)  set({ sleep: 70, personal: 10, eating: 10, leisure: 5, home: 3 });
+        else if (h >= 8 && h < 10) set({ sleep: 30, personal: 10, eating: 15, chores: 15, leisure: 10, civic: isSunday ? 15 : 2, sport: 5 });
+        else if (h >= 10 && h < 12)set({ home: 20, chores: 20, shopping: 20, leisure: 15, sport: 10, travel: 10, civic: isSunday ? 10 : 2 });
+        else if (h >= 12 && h < 13)set({ eating: 40, home: 20, leisure: 20, shopping: 10, travel: 5 });
+        else if (h >= 13 && h < 17)set({ home: 25, leisure: 25, shopping: 20, chores: 10, sport: 10, travel: 5 });
+        else if (h >= 17 && h < 19)set({ home: 30, eating: 20, leisure: 20, shopping: 15, travel: 10 });
+        else if (h >= 19 && h < 21)set({ home: 40, leisure: 35, eating: 15, personal: 5 });
+        else if (h >= 21 && h < 23)set({ home: 20, leisure: 50, sleep: 20, personal: 5 });
+        else                       set({ sleep: 80, leisure: 10, home: 5, personal: 3 });
+    } else {
+        if (h >= 0 && h < 5)       set({ sleep: 95, home: 1, work: 1, personal: 1 });
+        else if (h >= 5 && h < 6)  set({ sleep: 80, personal: 10, eating: 5, travel: 3 });
+        else if (h >= 6 && h < 7)  set({ sleep: 40, personal: 25, eating: 15, travel: 15, chores: 3 });
+        else if (h >= 7 && h < 8)  set({ travel: 35, work: 20, school: 20, eating: 10, personal: 10, sleep: 3 });
+        else if (h >= 8 && h < 9)  set({ work: 45, school: 35, travel: 10, home: 5 });
+        else if (h >= 9 && h < 12) set({ work: 55, school: 30, home: 10, shopping: 2, chores: 1 });
+        else if (h >= 12 && h < 13)set({ eating: 45, work: 25, school: 20, home: 5 });
+        else if (h >= 13 && h < 15)set({ work: 55, school: 30, home: 10, shopping: 2 });
+        else if (h >= 15 && h < 16)set({ work: 50, school: 10, travel: 20, home: 15, shopping: 3 });
+        else if (h >= 16 && h < 17)set({ work: 40, travel: 25, home: 20, shopping: 10, sport: 3 });
+        else if (h >= 17 && h < 18)set({ travel: 30, home: 30, shopping: 15, chores: 10, sport: 10, work: 3 });
+        else if (h >= 18 && h < 19)set({ home: 40, eating: 25, chores: 15, leisure: 15, shopping: 3 });
+        else if (h >= 19 && h < 21)set({ home: 30, leisure: 40, eating: 10, chores: 10, personal: 5 });
+        else if (h >= 21 && h < 23)set({ sleep: 30, leisure: 50, personal: 10, home: 8 });
+        else                       set({ sleep: 85, leisure: 10, personal: 3 });
+    }
 
-            // Base Logic based on American Time Use Survey (ATUS) patterns
-            
-            if (isWeekend) {
-                // Weekend Pattern
-                if (h >= 0 && h < 6)      set({ sleep: 92, home: 2, leisure: 2, work: 1, personal: 1 });
-                else if (h >= 6 && h < 8) set({ sleep: 70, personal: 10, eating: 10, leisure: 5, home: 3 });
-                else if (h >= 8 && h < 10) set({ sleep: 30, personal: 10, eating: 15, chores: 15, leisure: 10, civic: isSunday ? 15 : 2, sport: 5 });
-                else if (h >= 10 && h < 12) set({ home: 20, chores: 20, shopping: 20, leisure: 15, sport: 10, travel: 10, civic: isSunday ? 10 : 2 });
-                else if (h >= 12 && h < 13) set({ eating: 40, home: 20, leisure: 20, shopping: 10, travel: 5 });
-                else if (h >= 13 && h < 17) set({ home: 25, leisure: 25, shopping: 20, chores: 10, sport: 10, travel: 5 });
-                else if (h >= 17 && h < 19) set({ home: 30, eating: 20, leisure: 20, shopping: 15, travel: 10 });
-                else if (h >= 19 && h < 21) set({ home: 40, leisure: 35, eating: 15, personal: 5 });
-                else if (h >= 21 && h < 23) set({ home: 20, leisure: 50, sleep: 20, personal: 5 });
-                else if (h >= 23 && h < 24) set({ sleep: 80, leisure: 10, home: 5, personal: 3 });
-            } else {
-                // Weekday Pattern
-                if (h >= 0 && h < 5)      set({ sleep: 95, home: 1, work: 1, personal: 1 });
-                else if (h >= 5 && h < 6) set({ sleep: 80, personal: 10, eating: 5, travel: 3 });
-                else if (h >= 6 && h < 7) set({ sleep: 40, personal: 25, eating: 15, travel: 15, chores: 3 });
-                else if (h >= 7 && h < 8) set({ travel: 35, work: 20, school: 20, eating: 10, personal: 10, sleep: 3 });
-                else if (h >= 8 && h < 9) set({ work: 45, school: 35, travel: 10, home: 5 });
-                else if (h >= 9 && h < 12) set({ work: 55, school: 30, home: 10, shopping: 2, chores: 1 });
-                else if (h >= 12 && h < 13) set({ eating: 45, work: 25, school: 20, home: 5 });
-                else if (h >= 13 && h < 15) set({ work: 55, school: 30, home: 10, shopping: 2 });
-                else if (h >= 15 && h < 16) set({ work: 50, school: 10, travel: 20, home: 15, shopping: 3 }); // School out
-                else if (h >= 16 && h < 17) set({ work: 40, travel: 25, home: 20, shopping: 10, sport: 3 });
-                else if (h >= 17 && h < 18) set({ travel: 30, home: 30, shopping: 15, chores: 10, sport: 10, work: 3 }); // Rush hour
-                else if (h >= 18 && h < 19) set({ home: 40, eating: 25, chores: 15, leisure: 15, shopping: 3 });
-                else if (h >= 19 && h < 21) set({ home: 30, leisure: 40, eating: 10, chores: 10, personal: 5 });
-                else if (h >= 21 && h < 23) set({ sleep: 30, leisure: 50, personal: 10, home: 8 });
-                else if (h >= 23 && h < 24) set({ sleep: 85, leisure: 10, personal: 3 });
-            }
+    let sum = 0;
+    for (const k in stats) sum += stats[k];
+    const filler = (h >= 23 || h < 6) ? "sleep" : "home";
+    stats[filler] += 100 - sum;
+    let total = 0;
+    for (const k in stats) { if (stats[k] < 0) stats[k] = 0; total += stats[k]; }
+    if (total > 0) for (const k in stats) stats[k] = Math.round(stats[k] * 100 / total);
+    return stats;
+}
 
-            // Normalize to ensure sum is 100
-            // We treat 'home' (awake) as the filler if sum < 100, or scale down if > 100
-            let sum = 0;
-            for (let key in stats) sum += stats[key];
-            
-            if (sum !== 100) {
-                // Adjust 'home' (awake) to balance, or 'sleep' if night
-                const diff = 100 - sum;
-                if (h >= 23 || h < 6) stats.sleep += diff;
-                else stats.home += diff;
-            }
-            
-            // Safety clamp
-            for (let key in stats) stats[key] = Math.max(0, stats[key]);
+function localStats(name) {
+    const offset = stateTimezones[name] || 0;
+    const localDate = new Date(simTime.getTime() + offset * 3600000);
+    const hour = localDate.getHours() + localDate.getMinutes() / 60;
+    return getActivities(hour, localDate.getDay());
+}
 
-            return stats;
-        }
+/* ============================== FORMATTING ============================== */
 
-        function updateSimulation() {
-            // Advance time: 10 minutes every tick
-            simTime.setMinutes(simTime.getMinutes() + 1);
-            
-            // Update Clock UI
-            const dayStr = days[simTime.getDay()];
-            const timeStr = simTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('clock-time').textContent = timeStr;
-            document.getElementById('clock-label').textContent = `${dayStr} • EST (New York)`;
+const fmtPeople = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M"
+                    : n >= 1e3 ? Math.round(n / 1e3) + "K" : Math.round(n);
+const fmtMoney = b => b >= 1000 ? "$" + (b / 1000).toFixed(2).replace(/\.?0+$/, "") + "T"
+                   : "$" + b + "B";
+const fmtInt = n => n.toLocaleString("en-US");
 
-            // Update Panel if open
-            if (selectedStateName) {
-                updatePanelStats(selectedStateName);
-            }
-        }
-        
-        // Slow down the loop slightly
-        setInterval(updateSimulation, 100); // 100ms = 1 min game time
+/* ============================== STATE ============================== */
 
-        function updatePanelStats(name) {
-            const offset = stateTimezones[name] || 0;
-            // Calculate local time for state
-            const localDate = new Date(simTime.getTime() + offset * 3600000);
-            const localHour = localDate.getHours() + localDate.getMinutes() / 60;
-            const dayIndex = localDate.getDay();
-            
-            const stats = getActivities(localHour, dayIndex);
-            
-            document.getElementById('stat-sleep').textContent = stats.sleep.toFixed(0) + "%";
-            document.getElementById('stat-home').textContent = stats.home.toFixed(0) + "%";
-            document.getElementById('stat-work').textContent = stats.work.toFixed(0) + "%";
-            document.getElementById('stat-school').textContent = stats.school.toFixed(0) + "%";
-            document.getElementById('stat-chores').textContent = stats.chores.toFixed(0) + "%";
-            document.getElementById('stat-leisure').textContent = stats.leisure.toFixed(0) + "%";
-            document.getElementById('stat-shopping').textContent = stats.shopping.toFixed(0) + "%";
-            document.getElementById('stat-travel').textContent = stats.travel.toFixed(0) + "%";
-            document.getElementById('stat-eating').textContent = stats.eating.toFixed(0) + "%";
-            document.getElementById('stat-personal').textContent = stats.personal.toFixed(0) + "%";
-            document.getElementById('stat-civic').textContent = stats.civic.toFixed(0) + "%";
-            document.getElementById('stat-sport').textContent = stats.sport.toFixed(0) + "%";
-            document.getElementById('stat-retirement').textContent = stats.retirement.toFixed(0) + "%";
-        }
+let simTime = new Date(); simTime.setHours(8, 0, 0, 0);
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let paused = false;
+const SPEEDS = [[1, "1×"], [4, "4×"], [20, "20×"]];
+let speedIdx = 0;
+let selectedStateName = null;
+let g;               // map group
+let pathGen;         // geo path generator
+let zoomRef = null;  // d3 zoom behavior
+let factsFor;        // state currently rendered in fact grid
+const VB = [975, 610];
 
-        // Fetch Data
-        Promise.all([
-            d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"),
-            fetch("https://datausa.io/api/data?drilldowns=State&measures=Population,GDP")
-                .then(res => {
-                    if (!res.ok) throw new Error('API Error');
-                    return res.json();
-                })
-                .catch(err => {
-                    console.warn("DataUSA API failed, using mock data", err);
-                    return { data: [] }; // Return empty structure to avoid breaking destructuring
-                })
-        ]).then(([us, apiData]) => {
-            document.getElementById('loading').style.display = 'none';
+/* ============================== SHEET DOM ============================== */
 
-            // Process API Data
-            // Note: The API might return data for multiple years. We'll take the latest.
-            // If API fails or is empty, we fallback to some mock data or empty.
-            
-            if (apiData && apiData.data) {
-                apiData.data.forEach(d => {
-                    if (!stateData[d.State]) {
-                        stateData[d.State] = {};
-                    }
-                    // Update with latest year found
-                    if (!stateData[d.State].year || d.Year > stateData[d.State].year) {
-                        stateData[d.State] = {
-                            population: d.Population,
-                            // GDP might not be in this specific query if not supported together, 
-                            // but let's try. If not, we might need separate calls.
-                            // Actually datausa often requires separate calls or specific measures.
-                            // Let's simplify and use a static lookup for demo purposes if API is complex.
-                            year: d.Year
-                        };
-                    }
-                });
-            }
+const sheetContent = document.getElementById("sheet-content");
 
-            // Static fallback/supplemental data for Area (sq miles) approx
-            const stateAreas = {
-                "Alabama": 52420, "Alaska": 665384, "Arizona": 113990, "Arkansas": 53179, "California": 163696,
-                "Colorado": 104094, "Connecticut": 5543, "Delaware": 2489, "Florida": 65758, "Georgia": 59425,
-                "Hawaii": 10932, "Idaho": 83569, "Illinois": 57914, "Indiana": 36420, "Iowa": 56273,
-                "Kansas": 82278, "Kentucky": 40408, "Louisiana": 52378, "Maine": 35380, "Maryland": 12406,
-                "Massachusetts": 10554, "Michigan": 96714, "Minnesota": 86936, "Mississippi": 48432, "Missouri": 69707,
-                "Montana": 147040, "Nebraska": 77348, "Nevada": 110572, "New Hampshire": 9349, "New Jersey": 8723,
-                "New Mexico": 121590, "New York": 54555, "North Carolina": 53819, "North Dakota": 70698, "Ohio": 44826,
-                "Oklahoma": 69899, "Oregon": 98379, "Pennsylvania": 46054, "Rhode Island": 1545, "South Carolina": 32020,
-                "South Dakota": 77116, "Tennessee": 42144, "Texas": 268596, "Utah": 84896, "Vermont": 9616,
-                "Virginia": 42775, "Washington": 71298, "West Virginia": 24230, "Wisconsin": 65496, "Wyoming": 97813
-            };
+function buildSheet() {
+    sheetContent.innerHTML = `
+        <div id="st-head">
+            <div id="st-flag">🇺🇸</div>
+            <div>
+                <h2 id="st-name">United States</h2>
+                <div id="st-nick">Tap a state to zoom in</div>
+            </div>
+            <div id="st-local"><b>--:--</b>local time</div>
+        </div>
 
-            const statesFeature = topojson.feature(us, us.objects.states);
-            // Fit projection to the SVG viewBox size so the map is centered and properly scaled
-            projection.fitSize([975, 610], statesFeature);
-            const states = statesFeature.features;
+        <div id="banner"><span class="bn-icon">🌙</span><span class="bn-text">…</span><span class="bn-pct">–%</span></div>
 
-            g.selectAll("path")
-                .data(states)
-                .join("path")
-                .attr("class", "state")
-                .attr("d", path)
-                .on("click", (event, d) => {
-                    const name = d.properties.name;
-                    selectedStateName = name;
-                    showStateInfo(name);
-                    event.stopPropagation();
-                });
+        <div id="heroes"></div>
 
-            // Reset on background click
-            svg.on("click", () => {
-                document.getElementById('info-panel').classList.remove('visible');
-                selectedStateName = null;
-            });
+        <div class="sec-title">Live activity breakdown</div>
+        <div id="bars"></div>
 
-            function showStateInfo(name) {
-                const panel = document.getElementById('info-panel');
-                const nameEl = document.getElementById('state-name');
-                const popEl = document.getElementById('state-pop');
-                const gdpEl = document.getElementById('state-gdp');
-                const areaEl = document.getElementById('state-area');
-                const densityEl = document.getElementById('state-density');
+        <div class="sec-title">State facts</div>
+        <div id="facts"></div>
 
-                nameEl.textContent = name;
-                
-                // Mock/Real Data Logic
-                // Since the API call above might be tricky with CORS or format without extensive testing,
-                // I will generate realistic looking data based on the name hash if missing, 
-                // or use the API data if it worked.
-                
-                let pop = 0;
-                if (stateData[name] && stateData[name].population) {
-                    pop = stateData[name].population;
-                } else {
-                    // Fallback: Hash name to get a stable random number for demo
-                    const hash = name.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
-                    pop = hash * 10000 + 500000; 
-                }
+        <div id="foot-note">Live numbers estimated from population × ATUS time-use patterns · Data: US Census / BEA 2023</div>
+    `;
 
-                const area = stateAreas[name] || 50000;
-                const density = (pop / area).toFixed(1);
-                const gdp = (pop * (45000 + Math.random() * 20000)).toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumSignificantDigits: 3});
+    const heroes = document.getElementById("heroes");
+    [["hero-sleep","😴","Sleeping now"],["hero-work","💼","At work"],
+     ["hero-school","🎓","In school"],["hero-travel","🚗","Commuting"]].forEach(([id, ic, lb]) => {
+        const d = document.createElement("div");
+        d.className = "hero";
+        d.innerHTML = `<h4>${ic} ${lb}</h4><div class="hv" id="${id}">–</div><div class="hs" id="${id}-pct">–</div>`;
+        heroes.appendChild(d);
+    });
 
-                popEl.textContent = pop.toLocaleString();
-                gdpEl.textContent = gdp; // Rough estimate per capita
-                areaEl.textContent = area.toLocaleString() + " sq mi";
-                densityEl.textContent = density + " / sq mi";
+    const bars = document.getElementById("bars");
+    ACT.forEach(a => {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        row.id = "bar-" + a[0];
+        row.innerHTML = `<span class="bar-label">${a[1]} ${a[2]}</span>
+            <div class="bar-track"><div class="bar-fill" style="background:linear-gradient(90deg,${a[3]}aa,${a[3]})"></div></div>
+            <span class="bar-val">–</span>`;
+        bars.appendChild(row);
+    });
 
-                updatePanelStats(name); // Initial update
-                panel.classList.add('visible');
-            }
+    // Legend chips over the map
+    const legend = document.getElementById("legend");
+    ACT.forEach(a => {
+        const c = document.createElement("span");
+        c.className = "lg-chip";
+        c.innerHTML = `<span class="lg-dot" style="background:${a[3]}"></span>${a[2]}`;
+        legend.appendChild(c);
+    });
+}
 
-        }).catch(err => {
-            console.error(err);
-            document.getElementById('loading').textContent = "Error loading map data.";
+function updateFacts(name) {
+    const facts = document.getElementById("facts");
+    const rank = POP_RANK.indexOf(name);
+    const usAvgIncome = STATES.reduce((t, s) => t + s[8] * s[2], 0) / USA.pop;
+    let rows;
+
+    if (!name) {
+        rows = [
+            ["👥", "Population", fmtInt(USA.pop)],
+            ["🏙️", "Largest city", "New York City"],
+            ["🏛️", "Capital", "Washington, D.C."],
+            ["⭐", "Founded", "July 4, 1776"],
+            ["📐", "Total area", fmtInt(USA.area) + " mi²"],
+            ["🌾", "Density", USA.density.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " /mi²"],
+            ["💰", "GDP (2023)", fmtMoney(USA.gdpB)],
+            ["💵", "GDP per capita", "$" + Math.round(USA.gdpB * 1e9 / USA.pop / 1000) + "K"],
+            ["🏠", "Avg. household income", "$" + fmtInt(Math.round(usAvgIncome))]
+        ];
+    } else {
+        const d = DB[name];
+        const dens = d.pop / d.area;
+        rows = [
+            ["👥", "Population", fmtInt(d.pop) + (rank >= 0 ? `<span class="rank-badge">#${rank + 1}</span>` : "")],
+            ["🏙️", "Largest city", d.largest],
+            ["🏛️", "Capital", d.capital],
+            ["⭐", "State since", d.since],
+            ["📐", "Total area", fmtInt(d.area) + " mi²"],
+            ["🌾", "Density", dens.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " /mi²" +
+                `<br><small>${(dens / USA.density).toFixed(1)}× US average</small>`],
+            ["💰", "GDP (2023)", fmtMoney(d.gdpB)],
+            ["💵", "GDP per capita", "$" + Math.round(d.gdpB * 1e9 / d.pop / 1000) + "K"],
+            ["🏠", "Median income", "$" + fmtInt(d.income)]
+        ];
+    }
+    facts.innerHTML = rows.map(r =>
+        `<div class="fact"><div class="fk">${r[0]} ${r[1]}</div><div class="fv">${r[2]}</div></div>`
+    ).join("");
+}
+
+/* ============================== LIVE UPDATE ============================== */
+
+function updateSheet() {
+    const isUSA = !selectedStateName;
+    const name = isUSA ? null : selectedStateName;
+    const data = name ? DB[name] : { pop: USA.pop, abbr: "US" };
+
+    document.getElementById("st-flag").textContent = isUSA ? "🇺🇸" : flag(data.abbr);
+    document.getElementById("st-name").textContent = isUSA ? "United States" : name;
+    document.getElementById("st-nick").textContent = isUSA ? "Land of the free · tap any state" : (DB[name].nick || "");
+
+    if (factsFor !== (name || "usa")) updateFacts(name);
+    factsFor = name || "usa";
+
+    const offset = isUSA ? 0 : (stateTimezones[name] || 0);
+    const ld = new Date(simTime.getTime() + offset * 3600000);
+    document.querySelector("#st-local b").textContent =
+        formatClock(ld);
+
+    const stats = localStats(isUSA ? "New York" : name);
+
+    // Hero live counts
+    [["sleep", "hero-sleep"], ["work", "hero-work"], ["school", "hero-school"], ["travel", "hero-travel"]]
+    .forEach(([k, id]) => {
+        document.getElementById(id).textContent = fmtPeople(data.pop * stats[k] / 100);
+        document.getElementById(id + "-pct").textContent = stats[k] + "% of people";
+    });
+
+    // Dominant activity banner
+    let domKey = "sleep";
+    for (const k of ACT_KEYS) if (stats[k] > stats[domKey]) domKey = k;
+    const meta = ACT_MAP[domKey];
+    const banner = document.getElementById("banner");
+    banner.style.background = hexA(meta.color, 0.13);
+    banner.style.borderColor = hexA(meta.color, 0.45);
+    banner.style.color = "#fff";
+    banner.querySelector(".bn-icon").textContent = meta.icon;
+    banner.querySelector(".bn-text").innerHTML =
+        `Right now most people in <b>${isUSA ? "the US" : name}</b> are ${meta.phrase}`;
+    banner.querySelector(".bn-pct").textContent = stats[domKey] + "%";
+
+    // Activity bars (sorted by value)
+    const order = [...ACT_KEYS].sort((a, b) => stats[b] - stats[a]);
+    const barsEl = document.getElementById("bars");
+    order.forEach(k => {
+        const row = document.getElementById("bar-" + k);
+        const v = stats[k];
+        row.classList.toggle("off", v <= 0);
+        row.querySelector(".bar-fill").style.width = v + "%";
+        row.querySelector(".bar-val").textContent = v + "%";
+        barsEl.appendChild(row); // reorder
+    });
+}
+
+function hexA(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+
+function formatClock(date) {
+    let h = date.getHours(), m = date.getMinutes();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2, "0")} ${ap}`;
+}
+
+/* ============================== CHOROPLETH ============================== */
+
+function updateMapColors() {
+    if (!g) return;
+    g.selectAll("path.state").each(function (d) {
+        const name = d.properties.name;
+        if (!stateTimezones.hasOwnProperty(name) && !DB[name]) return;
+        const st = localStats(name);
+        let k = "sleep";
+        for (const key of ACT_KEYS) if (st[key] > st[k]) k = key;
+        const t = Math.min(1, Math.sqrt(st[k] / 70)) * 0.85 + 0.15;
+        const col = d3.interpolateRgb("#141d33", ACT_MAP[k].color)(t);
+        d3.select(this).attr("fill", col);
+    });
+}
+
+/* ============================== CLOCK LOOP ============================== */
+
+function tick() {
+    if (!paused) {
+        simTime.setMinutes(simTime.getMinutes() + SPEEDS[speedIdx][0] * 2);
+    }
+    document.getElementById("clock-time").textContent = formatClock(simTime);
+    document.getElementById("clock-day").textContent =
+        `${DAYS[simTime.getDay()]} ${MONTHS[simTime.getMonth()]} ${simTime.getDate()} • ET`;
+    updateSheet();
+    updateMapColors();
+}
+
+document.getElementById("btn-pause").addEventListener("click", function () {
+    paused = !paused;
+    this.textContent = paused ? "▶" : "⏸";
+    document.querySelector(".live-dot").style.animationPlayState = paused ? "paused" : "running";
+    document.querySelector(".live-dot").style.background = paused ? "#64748b" : "#f43f5e";
+});
+document.getElementById("btn-speed").addEventListener("click", function () {
+    speedIdx = (speedIdx + 1) % SPEEDS.length;
+    this.textContent = SPEEDS[speedIdx][1];
+});
+
+/* ============================== MAP ============================== */
+
+buildSheet();
+updateFacts(null);
+tick();
+setInterval(tick, 150);
+
+Promise.all([
+    d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json")
+]).then(([us]) => {
+    const projection = d3.geoAlbersUsa();
+    pathGen = d3.geoPath().projection(projection);
+
+    const svg = d3.select("#map-wrap").append("svg")
+        .attr("viewBox", [0, 0, VB[0], VB[1]])
+        .attr("preserveAspectRatio", "xMidYMid meet");
+
+    g = svg.append("g");
+
+    const zoom = d3.zoom()
+        .scaleExtent([1, 12])
+        .on("zoom", ev => g.attr("transform", ev.transform));
+    zoomRef = zoom;
+    svg.call(zoom).on("dblclick.zoom", null);
+
+    const features = topojson.feature(us, us.objects.states).features
+        .filter(f => pathGen(f)); // drop unprojectable (e.g. PR)
+
+    g.selectAll("path")
+        .data(features)
+        .join("path")
+        .attr("class", "state")
+        .attr("d", pathGen)
+        .attr("fill", "#141d33")
+        .on("click", (ev, d) => {
+            ev.stopPropagation();
+            const name = d.properties.name;
+            if (selectedStateName === name) selectState(null);
+            else selectState(name, d);
         });
 
-    </script>
-</body>
+    svg.on("click", () => selectState(null));
+
+    document.getElementById("reset-view").addEventListener("click", () => selectState(null));
+
+    document.getElementById("loading").style.display = "none";
+    updateMapColors();
+
+}).catch(err => {
+    console.error(err);
+    const l = document.getElementById("loading");
+    l.innerHTML = `<div style="color:#f87171;font-size:.9rem">⚠️ Could not load map.<br>Check your connection and reload.</div>`;
+});
+
+function selectState(name, feature) {
+    selectedStateName = name;
+    document.querySelectorAll(".state.selected").forEach(el => el.classList.remove("selected"));
+    const resetBtn = document.getElementById("reset-view");
+
+    if (name && feature && g) {
+        const el = g.selectAll("path.state").filter(d => d.properties.name === name);
+        el.node()?.classList.add("selected");
+
+        // Smoothly zoom to the selected state (viewBox units)
+        const [[x0, y0], [x1, y1]] = pathGen.bounds(feature);
+        const dx = x1 - x0, dy = y1 - y0;
+        const k = Math.max(1, Math.min(12, 0.82 / Math.max(dx / VB[0], dy / VB[1])));
+        const tx = VB[0] / 2 - k * (x0 + x1) / 2;
+        const ty = VB[1] / 2 - k * (y0 + y1) / 2;
+        d3.select("#map-wrap svg").transition().duration(850)
+            .call(zoomRef.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+        resetBtn.style.display = "inline-flex";
+    } else {
+        if (zoomRef) {
+            d3.select("#map-wrap svg").transition().duration(650)
+                .call(zoomRef.transform, d3.zoomIdentity);
+        }
+        resetBtn.style.display = "none";
+    }
+    updateSheet();
+}
+</script>
 <script src="top_buttons.js"></script>
+</body>
 </html>

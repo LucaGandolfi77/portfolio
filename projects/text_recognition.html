@@ -127,19 +127,32 @@
             canvas.getContext('2d').drawImage(video, 0, 0);
             
             loading.style.display = 'block';
+            progressDiv.innerText = 'Loading Tesseract...';
             
             try {
+                // Prima verifica che Tesseract sia caricato
+                if (typeof Tesseract === 'undefined') {
+                    throw new Error('Tesseract.js non è stato caricato. Ricarica la pagina.');
+                }
+                
                 const worker = await Tesseract.createWorker({
                     logger: m => {
-                        if(m.status === 'recognizing text') {
-                            progressDiv.innerText = Math.round(m.progress * 100) + '%';
+                        console.log('Tesseract status:', m);
+                        if (m.status === 'loading') {
+                            progressDiv.innerText = 'Caricamento: ' + Math.round(m.progress * 100) + '%';
+                        } else if (m.status === 'loading tessit') {
+                            progressDiv.innerText = 'Inizializzazione Tesseract...';
+                        } else if (m.status === 'recognizing text') {
+                            progressDiv.innerText = 'Riconoscimento: ' + Math.round(m.progress * 100) + '%';
                         }
                     }
                 });
                 
+                progressDiv.innerText = 'Caricamento lingue...';
                 await worker.loadLanguage('eng+ita');
                 await worker.initialize('eng+ita');
                 
+                progressDiv.innerText = 'Riconoscimento in corso...';
                 const { data: { text } } = await worker.recognize(canvas);
                 
                 await worker.terminate();
@@ -149,9 +162,9 @@
                 resultOverlay.style.display = 'flex';
                 
             } catch (err) {
-                console.error(err);
-                alert("Error processing image");
+                console.error('Tesseract error:', err);
                 loading.style.display = 'none';
+                alert("Errore nel riconoscimento: " + err.message + "\n\nVerifica la console per dettagli.");
             }
         }
 
