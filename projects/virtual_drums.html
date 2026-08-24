@@ -2,559 +2,925 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d0f">
     <title>Virtual Drums</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { 
-            margin: 0; 
-            background: #1a1a1a; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh; 
+        * { -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: #0d0d0f;
+            overflow: hidden;
             font-family: 'Inter', sans-serif;
+            height: 100vh;
+            height: 100dvh;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
-        canvas { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
+        #stage {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
             display: block;
+            touch-action: none;
         }
+        .back-btn {
+            position: fixed;
+            top: calc(var(--site-top-bar-height, 36px) + env(safe-area-inset-top) + 8px);
+            left: calc(env(safe-area-inset-left) + 12px);
+            z-index: 60;
+            color: #fff;
+            text-decoration: none;
+            background: rgba(0,0,0,0.55);
+            padding: 10px 14px;
+            border-radius: 10px;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            font-size: 14px;
+            font-weight: 600;
+            touch-action: manipulation;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .back-btn:active { background: rgba(255,255,255,0.18); }
+        #status-chip {
+            position: fixed;
+            top: calc(var(--site-top-bar-height, 36px) + env(safe-area-inset-top) + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 55;
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 700;
+            padding: 9px 14px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            touch-action: manipulation;
+            white-space: nowrap;
+        }
+        #status-chip .dot {
+            width: 9px; height: 9px; border-radius: 50%;
+            background: #888;
+        }
+        #status-chip.loading .dot { background: #ffaa00; animation: blink 1s infinite; }
+        #status-chip.live .dot { background: #2ee56b; box-shadow: 0 0 8px #2ee56b; }
+        #status-chip.off .dot { background: #666; }
+        #status-chip.error .dot { background: #ff4466; }
+        @keyframes blink { 50% { opacity: 0.25; } }
+
         #loader-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 2000;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            color: #ff0055; font-family: 'Inter', sans-serif;
+            color: #ff0055;
             transition: opacity 0.5s;
+            padding: 24px;
         }
         .progress-container {
             width: 80%; max-width: 300px; height: 4px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.15);
             margin-top: 20px; border-radius: 2px; overflow: hidden;
         }
         #progress-bar {
-            width: 0%; height: 100%; background: #ff0055; transition: width 0.2s;
+            width: 0%; height: 100%; background: #ff0055; transition: width 0.3s;
         }
-        .back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 20;
-            color: white;
-            text-decoration: none;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 12px;
-            border-radius: 8px;
-            backdrop-filter: blur(4px);
-            font-size: 14px;
+        #progress-bar.busy { animation: pulse 1.1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+        #loader-log {
+            max-width: 90%; max-height: 160px; overflow: auto;
+            margin-top: 14px; color: #9aa; font-size: 11px; line-height: 1.5;
         }
-        #start-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+        .overlay-panel {
+            position: fixed;
+            inset: 0;
             z-index: 100;
+            background: rgba(5,5,8,0.82);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: #fff;
+            text-align: center;
+            padding: 28px;
         }
+        #start-overlay h1 {
+            font-size: clamp(2rem, 9vw, 3.2rem);
+            margin: 0 0 8px;
+            letter-spacing: 1px;
+            background: linear-gradient(92deg, #fff, #ff0055);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #start-overlay p { color: #cfd0d6; margin: 4px 0; font-size: clamp(0.95rem, 4vw, 1.1rem); line-height: 1.55; }
         .btn {
             background: #ff0055;
             color: white;
             border: none;
-            padding: 15px 40px;
-            font-size: 24px;
+            padding: 17px 44px;
+            font-size: clamp(19px, 5.5vw, 24px);
             font-weight: 800;
             border-radius: 50px;
             cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
-            transition: transform 0.2s;
+            margin-top: 26px;
+            box-shadow: 0 0 24px rgba(255, 0, 85, 0.45);
+            transition: transform 0.15s;
+            touch-action: manipulation;
+            min-height: 44px;
         }
-        .btn:hover {
-            transform: scale(1.05);
+        .btn:active { transform: scale(0.95); }
+        .btn-secondary {
+            background: transparent;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            color: #cfd0d6;
+            padding: 12px 26px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 40px;
+            margin-top: 16px;
+            cursor: pointer;
+            touch-action: manipulation;
+            font-family: inherit;
         }
+        .btn-secondary:active { background: rgba(255,255,255,0.12); }
+        #cam-overlay { display: none; z-index: 150; }
+        #cam-overlay.open { display: flex; }
+        #cam-overlay h2 { font-size: 1.4rem; margin: 0 0 10px; }
+        #cam-overlay p { color: #cfd0d6; line-height: 1.6; max-width: 420px; font-size: 0.95rem; }
+        #toast {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 22px);
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(20,20,26,0.94);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: #eee;
+            padding: 11px 18px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 300;
+            opacity: 0;
+            transition: opacity 0.25s, transform 0.25s;
+            pointer-events: none;
+            max-width: 88vw;
+            text-align: center;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%); }
     </style>
 </head>
 <body>
+    <script src="top_buttons.js"></script>
+
+    <div id="stage">
+        <video id="video" playsinline autoplay muted style="display:none"></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <a href="../pages/main/technology.html" class="back-btn">&#8592; Back</a>
+    <button id="status-chip" class="loading"><span class="dot"></span><span id="chip-label">Hands: loading&hellip;</span></button>
+
     <div id="loader-overlay">
         <div class="loader-text">Setting up Drum Kit... <span id="time-left"></span></div>
         <div class="progress-container"><div id="progress-bar"></div></div>
-        <pre id="loader-log" style="max-width:80%;max-height:200px;overflow:auto;margin-top:12px;color:#fff;font-size:12px"></pre>
+        <pre id="loader-log"></pre>
     </div>
 
-    <div id="start-overlay">
+    <div id="start-overlay" class="overlay-panel">
         <h1>Virtual Drums</h1>
-        <p>Use your hands to hit the pads!</p>
-        <button class="btn" onclick="startAudio()">START ROCKING</button>
+        <p>Move your hands to smash the pads &mdash;<br>or simply tap them with your fingers.</p>
+        <p id="load-note" style="font-size:0.8rem;color:#8a8b92">Checking the AI hand tracker&hellip;</p>
+        <button class="btn" id="startBtn">START ROCKING</button>
+        <button class="btn-secondary" id="skipCam">Play without camera (tap mode)</button>
     </div>
 
-    <a href="../pages/main/technology.html" class="back-btn">← Back</a>
-    
-    <video id="video" playsinline style="display:none" autoplay muted></video>
-    <canvas id="canvas"></canvas>
+    <div id="cam-overlay" class="overlay-panel">
+        <h2>Camera unavailable</h2>
+        <p id="cam-msg">Camera permission was denied. You can allow it in Settings, or keep rocking in tap mode.</p>
+        <button class="btn" id="cam-retry" style="font-size:18px;padding:14px 34px;">Retry camera</button>
+        <button class="btn-secondary" id="cam-tapmode">Keep tapping instead</button>
+    </div>
+
+    <div id="toast"></div>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let audioCtx;
-        let isAudioStarted = false;
-        let isModelLoading = false;
+        (function () {
+            'use strict';
 
-        // Drum Zones Configuration
-        // Coordinates are percentages (0.0 to 1.0)
-        const DRUM_PADS = [
-            { id: 'crash', label: '📀 CRASH', x: 0.15, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'crash' },
-            { id: 'ride', label: '🔔 RIDE', x: 0.85, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'ride' },
-            { id: 'hihat', label: '🥯 HI-HAT', x: 0.1, y: 0.5, r: 0.1, color: '#ffff00', sound: 'hihat' },
-            { id: 'tom1', label: '🥁 TOM 1', x: 0.35, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom1' },
-            { id: 'tom2', label: '🥁 TOM 2', x: 0.65, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom2' },
-            { id: 'snare', label: '🥡 SNARE', x: 0.3, y: 0.7, r: 0.12, color: '#ff0055', sound: 'snare' },
-            { id: 'floor', label: '🪣 FLOOR', x: 0.7, y: 0.7, r: 0.12, color: '#00d4ff', sound: 'floor' },
-            { id: 'kick', label: '🦶 KICK', x: 0.5, y: 0.85, r: 0.12, color: '#ffffff', sound: 'kick' }
-        ];
+            var $ = function (id) { return document.getElementById(id); };
+            var video = $('video');
+            var canvas = $('canvas');
+            var ctx = canvas.getContext('2d');
 
-        // State to track if a hand is currently inside a pad to prevent machine-gun triggering
-        // Map<HandIndex, Set<PadId>>
-        const activeCollisions = new Map();
-
-        // Audio Synthesis
-        const DrumSynth = {
-            ctx: null,
-            
-            init: function() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            },
-
-            play: function(type) {
-                if (!this.ctx) return;
-                const t = this.ctx.currentTime;
-
-                switch(type) {
-                    case 'kick':
-                        this.playKick(t);
-                        break;
-                    case 'snare':
-                        this.playSnare(t);
-                        break;
-                    case 'hihat':
-                        this.playHiHat(t);
-                        break;
-                    case 'crash':
-                        this.playCrash(t);
-                        break;
-                    case 'ride':
-                        this.playRide(t);
-                        break;
-                    case 'tom1':
-                        this.playTom(t, 200);
-                        break;
-                    case 'tom2':
-                        this.playTom(t, 150);
-                        break;
-                    case 'floor':
-                        this.playTom(t, 100);
-                        break;
-                }
-            },
-
-            playKick: function(t) {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                osc.frequency.setValueAtTime(150, t);
-                osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
-                
-                gain.gain.setValueAtTime(1, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-
-                osc.start(t);
-                osc.stop(t + 0.5);
-            },
-
-            playSnare: function(t) {
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = this.noiseBuffer();
-                const noiseFilter = this.ctx.createBiquadFilter();
-                noiseFilter.type = 'highpass';
-                noiseFilter.frequency.value = 1000;
-                const noiseGain = this.ctx.createGain();
-                
-                noise.connect(noiseFilter);
-                noiseFilter.connect(noiseGain);
-                noiseGain.connect(this.ctx.destination);
-
-                noiseGain.gain.setValueAtTime(1, t);
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-                noise.start(t);
-
-                const osc = this.ctx.createOscillator();
-                osc.type = 'triangle';
-                const oscGain = this.ctx.createGain();
-                osc.connect(oscGain);
-                oscGain.connect(this.ctx.destination);
-                
-                osc.frequency.setValueAtTime(100, t);
-                oscGain.gain.setValueAtTime(0.7, t);
-                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-                osc.start(t);
-                osc.stop(t + 0.2);
-            },
-
-            playHiHat: function(t) {
-                const fund = 40;
-                const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
-                const bandpass = this.ctx.createBiquadFilter();
-                bandpass.type = "bandpass";
-                bandpass.frequency.value = 10000;
-                const hp = this.ctx.createBiquadFilter();
-                hp.type = "highpass";
-                hp.frequency.value = 7000;
-                
-                const gain = this.ctx.createGain();
-                
-                ratios.forEach(ratio => {
-                    const osc = this.ctx.createOscillator();
-                    osc.type = "square";
-                    osc.frequency.value = fund * ratio;
-                    osc.connect(bandpass);
-                    osc.start(t);
-                    osc.stop(t + 0.05);
-                });
-
-                bandpass.connect(hp);
-                hp.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                gain.gain.setValueAtTime(0.3, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-            },
-
-            playTom: function(t, freq) {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                osc.frequency.setValueAtTime(freq, t);
-                osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.4);
-                
-                gain.gain.setValueAtTime(1, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-
-                osc.start(t);
-                osc.stop(t + 0.4);
-            },
-
-            playCrash: function(t) {
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = this.noiseBuffer();
-                const gain = this.ctx.createGain();
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = 'highpass';
-                filter.frequency.value = 2000;
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                gain.gain.setValueAtTime(0.8, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
-                noise.start(t);
-                noise.stop(t + 1.5);
-            },
-
-            playRide: function(t) {
-                // Similar to hi-hat but longer ring
-                const fund = 60;
-                const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
-                const bandpass = this.ctx.createBiquadFilter();
-                bandpass.type = "bandpass";
-                bandpass.frequency.value = 8000;
-                
-                const gain = this.ctx.createGain();
-                
-                ratios.forEach(ratio => {
-                    const osc = this.ctx.createOscillator();
-                    osc.type = "square";
-                    osc.frequency.value = fund * ratio;
-                    osc.connect(bandpass);
-                    osc.start(t);
-                    osc.stop(t + 0.8);
-                });
-
-                bandpass.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                gain.gain.setValueAtTime(0.2, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
-            },
-
-            noiseBuffer: function() {
-                const bufferSize = this.ctx.sampleRate * 2;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const output = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    output[i] = Math.random() * 2 - 1;
-                }
-                return buffer;
-            }
-        };
-
-        function startAudio() {
-            DrumSynth.init();
-            document.getElementById('start-overlay').style.display = 'none';
-            isAudioStarted = true;
-            initCamera();
-        }
-
-        // Capture console messages into loader log for easier debugging
-        (function(){
-            const logEl = document.getElementById('loader-log');
-            if (!logEl) return;
-            const origLog = console.log.bind(console);
-            const origErr = console.error.bind(console);
-            const origWarn = console.warn.bind(console);
-            function append(msg){
-                const line = document.createElement('div');
-                line.textContent = (new Date()).toISOString() + ' ' + msg;
-                logEl.appendChild(line);
-                while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
-                logEl.scrollTop = logEl.scrollHeight;
-            }
-            console.log = function(...args){ origLog(...args); try{ append(args.join(' ')); }catch(e){} };
-            console.error = function(...args){ origErr(...args); try{ append('ERROR: '+args.join(' ')); }catch(e){} };
-            console.warn = function(...args){ origWarn(...args); try{ append('WARN: '+args.join(' ')); }catch(e){} };
-        })();
-
-        // Start loading immediately
-        window.addEventListener('load', loadScripts);
-
-        // Load Scripts — robust injection with fallback URLs
-        async function loadScripts() {
-            const scripts = [
-                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                '/assets/js/hand_tracker.js'
+            var DRUM_PADS = [
+                { id: 'crash', label: 'CRASH', x: 0.15, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'crash' },
+                { id: 'ride', label: 'RIDE', x: 0.85, y: 0.2, r: 0.12, color: '#ffaa00', sound: 'ride' },
+                { id: 'hihat', label: 'HI-HAT', x: 0.1, y: 0.5, r: 0.1, color: '#ffff00', sound: 'hihat' },
+                { id: 'tom1', label: 'TOM 1', x: 0.35, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom1' },
+                { id: 'tom2', label: 'TOM 2', x: 0.65, y: 0.3, r: 0.1, color: '#00d4ff', sound: 'tom2' },
+                { id: 'snare', label: 'SNARE', x: 0.3, y: 0.7, r: 0.12, color: '#ff0055', sound: 'snare' },
+                { id: 'floor', label: 'FLOOR', x: 0.7, y: 0.7, r: 0.12, color: '#00d4ff', sound: 'floor' },
+                { id: 'kick', label: 'KICK', x: 0.5, y: 0.85, r: 0.12, color: '#ffffff', sound: 'kick' }
             ];
 
-            const progressBar = document.getElementById('progress-bar');
-            const timeLeft = document.getElementById('time-left');
-            let loaded = 0;
+            var activeCollisions = new Map();
+            var ripples = [];
+            var tips = [];
 
-            function setProgress(stage){
-                // stage: 0..1 overall progress
-                progressBar.style.width = Math.round(stage*100) + '%';
-            }
+            var appState = {
+                audioReady: false,
+                cameraStarted: false,
+                cameraSkipped: false,
+                trackerReady: false,
+                trackingDesired: true,
+                trackingLive: false,
+                loaderDone: false,
+                loadFailed: false,
+                timedOut: false,
+                started: false,
+                lastHit: null,
+                lastError: null
+            };
 
-            function insertScript(url){
-                return new Promise((resolve,reject)=>{
-                    console.log('[loader] inserting', url);
-                    const s = document.createElement('script');
-                    s.src = url;
-                    if (url.includes('cdn.jsdelivr.net')||url.includes('unpkg.com')) s.crossOrigin='anonymous';
-                    s.onload = ()=>{ console.log('[loader] loaded', url); resolve(); };
-                    s.onerror = (e)=>{ console.error('[loader] failed', url, e); reject(e); };
-                    document.body.appendChild(s);
-                });
-            }
-
-            try {
-                for (let i=0;i<scripts.length;i++){
-                    const url = scripts[i];
-                    console.log('[loader] try load', url);
-                    let tried = false;
-                    let lastErr = null;
-                    const candidates = url.includes('mediapipe') ? [
-                        'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                        'https://unpkg.com/@mediapipe/hands/hands.js',
-                        url
-                    ] : [url];
-                    for (const u of candidates) {
-                        try {
-                            await insertScript(u);
-                            tried = true; break;
-                        } catch (e) { lastErr = e; console.warn('[loader] fallback failed', u, e); }
-                    }
-                    if (!tried) throw lastErr || new Error('Failed loading '+url);
-                    loaded++;
-                    setProgress(0.5 * (loaded / scripts.length)); // first half reserved for script loading
-                }
-
-                timeLeft.textContent = 'Initializing AI Model...';
-                // Initialize model if present
-                if (window.HandTracker) {
+            var DrumSynth = {
+                ctx: null,
+                bus: null,
+                init: function () {
+                    if (this.ctx) return;
                     try {
-                        await window.HandTracker.load();
-                        setProgress(1);
-                    } catch(e) {
-                        console.error('HandTracker.load() failed', e);
-                        timeLeft.textContent = 'Error initializing model';
-                        timeLeft.style.color = 'red';
-                        return;
+                        var AC = window.AudioContext || window.webkitAudioContext;
+                        this.ctx = new AC();
+                        var comp = this.ctx.createDynamicsCompressor();
+                        comp.threshold.value = -14;
+                        comp.ratio.value = 5;
+                        comp.connect(this.ctx.destination);
+                        this.bus = this.ctx.createGain();
+                        this.bus.gain.value = 0.9;
+                        this.bus.connect(comp);
+                    } catch (e) { this.ctx = null; }
+                },
+                resume: function () {
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        try { this.ctx.resume(); } catch (e) {}
                     }
+                },
+                play: function (type) {
+                    if (!this.ctx) return;
+                    this.resume();
+                    var t = this.ctx.currentTime;
+                    switch (type) {
+                        case 'kick': this.playKick(t); break;
+                        case 'snare': this.playSnare(t); break;
+                        case 'hihat': this.playHiHat(t); break;
+                        case 'crash': this.playCrash(t); break;
+                        case 'ride': this.playRide(t); break;
+                        case 'tom1': this.playTom(t, 200); break;
+                        case 'tom2': this.playTom(t, 150); break;
+                        case 'floor': this.playTom(t, 100); break;
+                    }
+                },
+                playKick: function (t) {
+                    var osc = this.ctx.createOscillator();
+                    var gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.bus);
+                    osc.frequency.setValueAtTime(150, t);
+                    osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+                    gain.gain.setValueAtTime(1, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                    osc.start(t); osc.stop(t + 0.5);
+                },
+                playSnare: function (t) {
+                    var noise = this.ctx.createBufferSource();
+                    noise.buffer = this.noiseBuffer();
+                    var hp = this.ctx.createBiquadFilter();
+                    hp.type = 'highpass';
+                    hp.frequency.value = 1000;
+                    var g = this.ctx.createGain();
+                    noise.connect(hp); hp.connect(g); g.connect(this.bus);
+                    g.gain.setValueAtTime(0.8, t);
+                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                    noise.start(t);
+                    var osc = this.ctx.createOscillator();
+                    osc.type = 'triangle';
+                    var og = this.ctx.createGain();
+                    osc.connect(og); og.connect(this.bus);
+                    osc.frequency.setValueAtTime(100, t);
+                    og.gain.setValueAtTime(0.6, t);
+                    og.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                    osc.start(t); osc.stop(t + 0.2);
+                },
+                playHiHat: function (t) {
+                    var fund = 40;
+                    var ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+                    var bandpass = this.ctx.createBiquadFilter();
+                    bandpass.type = 'bandpass';
+                    bandpass.frequency.value = 10000;
+                    var hp = this.ctx.createBiquadFilter();
+                    hp.type = 'highpass';
+                    hp.frequency.value = 7000;
+                    var gain = this.ctx.createGain();
+                    ratios.forEach(function (ratio) {
+                        var osc = DrumSynth.ctx.createOscillator();
+                        osc.type = 'square';
+                        osc.frequency.value = fund * ratio;
+                        osc.connect(bandpass);
+                        osc.start(t); osc.stop(t + 0.05);
+                    });
+                    bandpass.connect(hp); hp.connect(gain); gain.connect(this.bus);
+                    gain.gain.setValueAtTime(0.25, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                },
+                playTom: function (t, freq) {
+                    var osc = this.ctx.createOscillator();
+                    var gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.bus);
+                    osc.frequency.setValueAtTime(freq, t);
+                    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.4);
+                    gain.gain.setValueAtTime(0.9, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+                    osc.start(t); osc.stop(t + 0.4);
+                },
+                playCrash: function (t) {
+                    var noise = this.ctx.createBufferSource();
+                    noise.buffer = this.noiseBuffer();
+                    var gain = this.ctx.createGain();
+                    var filter = this.ctx.createBiquadFilter();
+                    filter.type = 'highpass';
+                    filter.frequency.value = 2000;
+                    noise.connect(filter); filter.connect(gain); gain.connect(this.bus);
+                    gain.gain.setValueAtTime(0.6, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 1.4);
+                    noise.start(t); noise.stop(t + 1.4);
+                },
+                playRide: function (t) {
+                    var fund = 60;
+                    var ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+                    var bandpass = this.ctx.createBiquadFilter();
+                    bandpass.type = 'bandpass';
+                    bandpass.frequency.value = 8000;
+                    var gain = this.ctx.createGain();
+                    ratios.forEach(function (ratio) {
+                        var osc = DrumSynth.ctx.createOscillator();
+                        osc.type = 'square';
+                        osc.frequency.value = fund * ratio;
+                        osc.connect(bandpass);
+                        osc.start(t); osc.stop(t + 0.8);
+                    });
+                    bandpass.connect(gain); gain.connect(this.bus);
+                    gain.gain.setValueAtTime(0.16, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+                },
+                noiseBuffer: function () {
+                    var size = Math.floor(this.ctx.sampleRate * 1.2);
+                    var buffer = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+                    var out = buffer.getChannelData(0);
+                    for (var i = 0; i < size; i++) out[i] = Math.random() * 2 - 1;
+                    return buffer;
                 }
+            };
 
-                setTimeout(()=>{
-                    document.getElementById('loader-overlay').style.opacity = 0;
-                    setTimeout(()=>{ document.getElementById('loader-overlay').style.display='none'; },500);
-                },500);
-            } catch (err) {
-                console.error('Script loading failed', err);
-                timeLeft.textContent = 'Error loading resources!';
-                timeLeft.style.color = 'red';
-            }
-        }
-
-        // Removed initHandTracker as we do it in steps now
-
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                    audio: false 
-                });
-                video.srcObject = stream;
-                video.play();
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    detectLoop();
-                    requestAnimationFrame(draw);
+            (function () {
+                var logEl = $('loader-log');
+                if (!logEl) return;
+                var origLog = console.log.bind(console);
+                var origErr = console.error.bind(console);
+                var origWarn = console.warn.bind(console);
+                function append(msg) {
+                    try {
+                        var line = document.createElement('div');
+                        line.textContent = msg;
+                        logEl.appendChild(line);
+                        while (logEl.childNodes.length > 120) logEl.removeChild(logEl.firstChild);
+                        logEl.scrollTop = logEl.scrollHeight;
+                    } catch (e) {}
+                }
+                console.log = function () {
+                    origLog.apply(null, arguments);
+                    append('[log] ' + Array.prototype.join.call(arguments, ' '));
                 };
-            } catch (err) {
-                console.error("Camera error:", err);
+                console.error = function () {
+                    origErr.apply(null, arguments);
+                    append('[ERR] ' + Array.prototype.join.call(arguments, ' '));
+                };
+                console.warn = function () {
+                    origWarn.apply(null, arguments);
+                    append('[warn] ' + Array.prototype.join.call(arguments, ' '));
+                };
+            })();
+
+            function toast(msg, ms) {
+                var el = $('toast');
+                el.textContent = msg;
+                el.classList.add('show');
+                clearTimeout(toast.t);
+                toast.t = setTimeout(function () { el.classList.remove('show'); }, ms || 2600);
             }
-        }
 
-        async function detectLoop() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && window.HandTracker) {
-                await window.HandTracker.detect(video);
-                checkCollisions();
+            function setChip(mode, label) {
+                var chip = $('status-chip');
+                chip.className = mode;
+                $('chip-label').textContent = label;
             }
-            requestAnimationFrame(detectLoop);
-        }
+            function updateChip() {
+                if (!appState.loaderDone) { setChip('loading', 'Hands: loading\u2026'); return; }
+                if (appState.trackingDesired && appState.trackerReady && appState.trackingLive) { setChip('live', 'Hands: live'); return; }
+                if (appState.loadFailed || !appState.trackerReady) { setChip('error', 'Hands failed \u2014 tap to retry'); return; }
+                setChip('off', 'Hands: off \u2014 tap mode');
+            }
 
-        function checkCollisions() {
-            if (!window.HandTracker.results || !window.HandTracker.results.multiHandLandmarks) return;
+            var customScriptLoader = null;
+            function insertScript(url, timeoutMs) {
+                if (customScriptLoader) return customScriptLoader(url, timeoutMs);
+                return new Promise(function (resolve, reject) {
+                    var done = false;
+                    var s = document.createElement('script');
+                    s.src = url;
+                    s.crossOrigin = 'anonymous';
+                    var timer = setTimeout(function () {
+                        if (done) return;
+                        done = true;
+                        reject(new Error('timeout: ' + url));
+                    }, timeoutMs || 12000);
+                    s.onload = function () {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(timer);
+                        resolve();
+                    };
+                    s.onerror = function () {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(timer);
+                        reject(new Error('network error: ' + url));
+                    };
+                    (document.body || document.head).appendChild(s);
+                });
+            }
+            function loadFirst(urls, perTimeout) {
+                var p = Promise.reject(new Error('start'));
+                urls.forEach(function (u) {
+                    p = p.catch(function () {
+                        console.log('[loader] trying ' + u);
+                        return insertScript(u, perTimeout);
+                    });
+                });
+                return p;
+            }
+            function withTimeout(promise, ms, tag) {
+                return new Promise(function (resolve, reject) {
+                    var timer = setTimeout(function () { reject(new Error('timeout: ' + tag)); }, ms);
+                    promise.then(function (v) { clearTimeout(timer); resolve(v); },
+                                 function (e) { clearTimeout(timer); reject(e); });
+                });
+            }
 
-            const hands = window.HandTracker.results.multiHandLandmarks;
-            
-            hands.forEach((landmarks, handIndex) => {
-                if (!activeCollisions.has(handIndex)) {
-                    activeCollisions.set(handIndex, new Set());
+            var MEDIAPIPE_URLS = [
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'https://unpkg.com/@mediapipe/hands/hands.js'
+            ];
+            var TRACKER_URLS = [
+                '../assets/js/hand_tracker.js',
+                'assets/js/hand_tracker.js',
+                '/assets/js/hand_tracker.js'
+            ];
+            var LOAD_BUDGET_MS = 25000;
+
+            var progressStage = 0;
+            function setProgress(v) {
+                progressStage = Math.max(progressStage, v);
+                $('progress-bar').style.width = Math.round(progressStage * 100) + '%';
+            }
+
+            function startLoading() {
+                if (appState.started) return;
+                appState.started = true;
+                updateChip();
+                var overallTimer = setTimeout(function () {
+                    if (appState.loaderDone) return;
+                    appState.timedOut = true;
+                    finalizeLoad('timeout');
+                    scheduleSilentRetry();
+                }, LOAD_BUDGET_MS);
+
+                var chain = loadFirst(MEDIAPIPE_URLS, 9000)
+                    .then(function () {
+                        setProgress(0.3);
+                        $('time-left').textContent = 'Loading tracker\u2026';
+                        return loadFirst(TRACKER_URLS, 9000);
+                    })
+                    .then(function () {
+                        setProgress(0.55);
+                        $('time-left').textContent = 'Initializing AI model\u2026';
+                        $('progress-bar').classList.add('busy');
+                        if (!window.HandTracker) throw new Error('HandTracker missing after load');
+                        return withTimeout(window.HandTracker.load(), 14000, 'model init');
+                    })
+                    .then(function () {
+                        if (!window.HandTracker.isReady) throw new Error('tracker not ready');
+                        clearTimeout(overallTimer);
+                        appState.trackerReady = true;
+                        setProgress(1);
+                        $('progress-bar').classList.remove('busy');
+                        finalizeLoad('ok');
+                    })
+                    .catch(function (err) {
+                        clearTimeout(overallTimer);
+                        appState.lastError = err && err.message || String(err);
+                        console.error('[loader] failed:', appState.lastError);
+                        $('progress-bar').classList.remove('busy');
+                        finalizeLoad(appState.timedOut ? 'timeout' : 'fail');
+                    });
+                return chain;
+            }
+
+            function finalizeLoad(status) {
+                if (appState.loaderDone) return;
+                appState.loaderDone = true;
+                appState.loadFailed = status !== 'ok';
+                if (appState.trackerReady && appState.trackingDesired) {
+                    appState.trackingLive = true;
+                } else {
+                    appState.trackingLive = false;
                 }
-                const currentCollisions = activeCollisions.get(handIndex);
-                
-                // Use Index Finger Tip (8) and Wrist (0) as triggers? Just Index Tip for precision.
-                const tip = landmarks[8];
-                
-                // Convert to screen coords (mirrored)
-                const x = 1.0 - tip.x; 
-                const y = tip.y;
-
-                // Check against all pads
-                DRUM_PADS.forEach(pad => {
-                    // Simple circle collision
-                    // Aspect ratio correction for circle distance? 
-                    // Let's just use normalized distance for simplicity, assuming roughly square aspect or forgiving hitboxes
-                    const dx = x - pad.x;
-                    const dy = y - pad.y;
-                    // Adjust x for aspect ratio to make circles actually circular? 
-                    // canvas.width/canvas.height usually ~1.77. 
-                    // dist^2 = (dx * aspect)^2 + dy^2
-                    const aspect = canvas.width / canvas.height;
-                    const dist = Math.sqrt((dx * aspect) * (dx * aspect) + dy * dy);
-                    
-                    // Use pad.r as vertical radius reference
-                    if (dist < pad.r) {
-                        if (!currentCollisions.has(pad.id)) {
-                            // New Hit!
-                            triggerDrum(pad);
-                            currentCollisions.add(pad.id);
-                        }
-                    } else {
-                        if (currentCollisions.has(pad.id)) {
-                            // Left the pad
-                            currentCollisions.delete(pad.id);
-                            pad.active = false; // Visual reset
-                        }
-                    }
-                });
-            });
-        }
-
-        function triggerDrum(pad) {
-            if (isAudioStarted) {
-                DrumSynth.play(pad.sound);
+                var loader = $('loader-overlay');
+                loader.style.opacity = '0';
+                setTimeout(function () { loader.style.display = 'none'; }, 480);
+                $('load-note').textContent = status === 'ok'
+                    ? 'Hand tracking ready \u2014 raise a hand to hit the pads!'
+                    : 'AI tracker unavailable \u2014 tap the pads to rock!';
+                updateChip();
+                if (status === 'timeout') toast('Loading took too long \u2014 Tap Mode is on.');
+                else if (status === 'fail') toast('Hand tracking unavailable \u2014 Tap Mode is on.');
             }
-            pad.active = true;
-            pad.hitTime = Date.now();
-        }
 
-        function draw() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Mirror video
-                ctx.save();
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                ctx.restore();
+            var silentRetried = false;
+            function scheduleSilentRetry() {
+                if (silentRetried) return;
+                silentRetried = true;
+                setTimeout(function () {
+                    if (appState.trackerReady || appState.started !== true) return;
+                    retryLoad(true);
+                }, 20000);
+            }
+            var retrying = false;
+            function retryLoad(silent) {
+                if (retrying || appState.trackerReady) return;
+                retrying = true;
+                appState.loaderDone = false;
+                appState.loadFailed = false;
+                appState.timedOut = false;
+                appState.started = false;
+                progressStage = 0;
+                if (!silent) {
+                    var loader = $('loader-overlay');
+                    loader.style.display = 'flex';
+                    loader.style.opacity = '1';
+                    $('time-left').textContent = '';
+                    $('time-left').style.color = '';
+                }
+                updateChip();
+                startLoading();
+                setTimeout(function () { retrying = false; }, 500);
+            }
 
-                // Draw Pads
-                DRUM_PADS.forEach(pad => {
-                    const cx = pad.x * canvas.width;
-                    const cy = pad.y * canvas.height;
-                    // Radius in pixels (based on height to keep consistent size)
-                    const r = pad.r * canvas.height;
+            function beginSession(withCamera) {
+                DrumSynth.init();
+                DrumSynth.resume();
+                appState.audioReady = true;
+                $('start-overlay').style.display = 'none';
+                if (withCamera) {
+                    startCamera();
+                } else {
+                    appState.cameraSkipped = true;
+                    appState.trackingDesired = false;
+                    appState.trackingLive = false;
+                    ensureCanvasSize(1280, 720);
+                    updateChip();
+                    toast('Tap Mode \u2014 smash the pads!');
+                    startLoops();
+                }
+            }
 
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                    
-                    if (pad.active && (Date.now() - pad.hitTime < 150)) {
-                        ctx.fillStyle = pad.color;
-                        ctx.globalAlpha = 0.6;
-                        ctx.fill();
-                        ctx.globalAlpha = 1.0;
-                        ctx.lineWidth = 5;
-                        ctx.strokeStyle = 'white';
-                    } else {
-                        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                        ctx.globalAlpha = 0.4;
-                        ctx.fill();
-                        ctx.globalAlpha = 1.0;
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = pad.color;
-                    }
-                    
-                    ctx.stroke();
+            function ensureCanvasSize(w, h) {
+                if (canvas.width !== w || canvas.height !== h) {
+                    canvas.width = w;
+                    canvas.height = h;
+                }
+            }
 
-                    // Label
-                    ctx.fillStyle = 'white';
-                    ctx.font = 'bold 16px Inter';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(pad.label, cx, cy);
+            function startCamera() {
+                if (appState.cameraStarted) { startLoops(); return; }
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showCamError('Camera API not available in this browser.');
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                }).then(function (stream) {
+                    appState.cameraStarted = true;
+                    video.srcObject = stream;
+                    var p = video.play();
+                    if (p && p.catch) p.catch(function () {});
+                    video.onloadedmetadata = function () {
+                        ensureCanvasSize(video.videoWidth || 1280, video.videoHeight || 720);
+                        $('cam-overlay').classList.remove('open');
+                        startLoops();
+                    };
+                    setTimeout(function () {
+                        if (!appState.cameraReadyFallbackDone && video.videoWidth) {
+                            appState.cameraReadyFallbackDone = true;
+                            ensureCanvasSize(video.videoWidth, video.videoHeight);
+                            startLoops();
+                        }
+                    }, 2500);
+                }).catch(function (err) {
+                    console.error('Camera error:', err && err.name, err && err.message);
+                    showCamError(err && err.name === 'NotAllowedError'
+                        ? 'Camera permission was denied. Allow it in Settings, or keep rocking in tap mode.'
+                        : 'Could not start the camera (' + ((err && err.name) || 'error') + '). Tap mode works great too.');
                 });
+            }
+            function showCamError(msg) {
+                $('cam-msg').textContent = msg;
+                $('cam-overlay').classList.add('open');
+            }
 
-                // Draw Hands
-                if (window.HandTracker && window.HandTracker.results) {
+            var loopsRunning = false;
+            var lastInfer = 0;
+            var inferFailures = 0;
+            function startLoops() {
+                if (loopsRunning) return;
+                loopsRunning = true;
+                requestAnimationFrame(mainLoop);
+            }
+            function mainLoop(now) {
+                requestAnimationFrame(mainLoop);
+                draw();
+                if (!document.hidden && shouldInfer(now)) doInference(now);
+            }
+            function shouldInfer(now) {
+                if (!appState.trackingLive || appState.cameraSkipped || !appState.cameraStarted) return false;
+                if (video.readyState !== 4) return false;
+                return now - lastInfer >= 42;
+            }
+            function doInference(now) {
+                lastInfer = now;
+                var ht = window.HandTracker;
+                if (!ht || !ht.isReady) return;
+                try {
+                    var r = ht.detect(video);
+                    if (r && typeof r.then === 'function') {
+                        r.then(function () {
+                            inferFailures = 0;
+                            extractTips();
+                            checkCollisions();
+                        }).catch(function (e) {
+                            handleInferError(e);
+                        });
+                    } else {
+                        inferFailures = 0;
+                        extractTips();
+                        checkCollisions();
+                    }
+                } catch (e) {
+                    handleInferError(e);
+                }
+            }
+            function handleInferError(e) {
+                inferFailures++;
+                console.warn('inference error', e);
+                if (inferFailures > 10) {
+                    appState.trackingLive = false;
+                    appState.trackingDesired = false;
+                    updateChip();
+                    toast('Hand tracking stopped \u2014 switched to Tap Mode.');
+                    inferFailures = 0;
+                }
+            }
+            function extractTips() {
+                tips.length = 0;
+                var res = window.HandTracker && window.HandTracker.results;
+                if (!res || !res.multiHandLandmarks) return;
+                for (var i = 0; i < res.multiHandLandmarks.length; i++) {
+                    var lm = res.multiHandLandmarks[i];
+                    if (lm && lm[8]) tips.push({ x: (1 - lm[8].x) * canvas.width, y: lm[8].y * canvas.height });
+                }
+            }
+
+            function padPixelCenter(pad) {
+                return { x: pad.x * canvas.width, y: pad.y * canvas.height, r: pad.r * canvas.height };
+            }
+            function triggerDrum(pad, px, py) {
+                DrumSynth.play(pad.sound);
+                pad.active = true;
+                pad.hitTime = Date.now();
+                appState.lastHit = pad.id;
+                var c = padPixelCenter(pad);
+                ripples.push({ x: c.x, y: c.y, r: c.r * 0.45, max: c.r * 1.25, a: 0.9, color: pad.color });
+                if (ripples.length > 14) ripples.shift();
+            }
+            function checkCollisions() {
+                var res = window.HandTracker && window.HandTracker.results;
+                if (!res || !res.multiHandLandmarks) return;
+                for (var hi = 0; hi < res.multiHandLandmarks.length; hi++) {
+                    if (!activeCollisions.has(hi)) activeCollisions.set(hi, new Set());
+                    var cur = activeCollisions.get(hi);
+                    var lm = res.multiHandLandmarks[hi];
+                    var tip = lm && lm[8];
+                    if (!tip) continue;
+                    var x = (1 - tip.x) * canvas.width;
+                    var y = tip.y * canvas.height;
+                    for (var pi = 0; pi < DRUM_PADS.length; pi++) {
+                        var pad = DRUM_PADS[pi];
+                        var c = padPixelCenter(pad);
+                        var dx = x - c.x, dy = y - c.y;
+                        var dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < c.r) {
+                            if (!cur.has(pad.id)) {
+                                triggerDrum(pad);
+                                cur.add(pad.id);
+                            }
+                        } else if (cur.has(pad.id)) {
+                            cur.delete(pad.id);
+                            pad.active = false;
+                        }
+                    }
+                }
+            }
+
+            canvas.addEventListener('pointerdown', function (ev) {
+                ev.preventDefault();
+                var rect = canvas.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return;
+                var x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+                var y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+                for (var i = 0; i < DRUM_PADS.length; i++) {
+                    var pad = DRUM_PADS[i];
+                    var c = padPixelCenter(pad);
+                    var dx = x - c.x, dy = y - c.y;
+                    if (Math.sqrt(dx * dx + dy * dy) <= c.r) {
+                        triggerDrum(pad);
+                        break;
+                    }
+                }
+            });
+
+            function draw() {
+                if (canvas.width <= 0) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (appState.cameraStarted && video.readyState === 4) {
                     ctx.save();
                     ctx.translate(canvas.width, 0);
                     ctx.scale(-1, 1);
-                    window.HandTracker.draw(ctx, canvas.width, canvas.height);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = '#101014';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                var now = Date.now();
+                var fontSize = Math.max(13, Math.round(canvas.height * 0.024));
+                for (var i = 0; i < DRUM_PADS.length; i++) {
+                    var pad = DRUM_PADS[i];
+                    var c = padPixelCenter(pad);
+                    ctx.beginPath();
+                    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+                    if (pad.active && now - pad.hitTime < 150) {
+                        ctx.fillStyle = pad.color;
+                        ctx.globalAlpha = 0.65;
+                        ctx.fill();
+                        ctx.globalAlpha = 1;
+                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = '#ffffff';
+                    } else {
+                        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                        ctx.globalAlpha = 0.45;
+                        ctx.fill();
+                        ctx.globalAlpha = 1;
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeStyle = pad.color;
+                    }
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold ' + fontSize + 'px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pad.label, c.x, c.y);
+                }
+
+                for (var r = ripples.length - 1; r >= 0; r--) {
+                    var rp = ripples[r];
+                    rp.r += (rp.max - rp.r) * 0.18;
+                    rp.a -= 0.06;
+                    if (rp.a <= 0) { ripples.splice(r, 1); continue; }
+                    ctx.beginPath();
+                    ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+                    ctx.strokeStyle = rp.color;
+                    ctx.globalAlpha = Math.max(0, rp.a);
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+
+                for (var t = 0; t < tips.length; t++) {
+                    var tp = tips[t];
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y, 16, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fff';
+                    ctx.fill();
+                }
+
+                if (appState.trackingLive && window.HandTracker && window.HandTracker.results) {
+                    ctx.save();
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    try { window.HandTracker.draw(ctx, canvas.width, canvas.height); } catch (e) {}
                     ctx.restore();
                 }
             }
-            requestAnimationFrame(draw);
-        }
+
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden) DrumSynth.resume();
+            });
+
+            $('startBtn').addEventListener('click', function () { beginSession(true); });
+            $('skipCam').addEventListener('click', function () { beginSession(false); });
+            $('cam-retry').addEventListener('click', function () {
+                $('cam-overlay').classList.remove('open');
+                startCamera();
+            });
+            $('cam-tapmode').addEventListener('click', function () {
+                $('cam-overlay').classList.remove('open');
+                appState.trackingDesired = false;
+                appState.trackingLive = false;
+                ensureCanvasSize(1280, 720);
+                updateChip();
+                toast('Tap Mode \u2014 smash the pads!');
+                startLoops();
+            });
+            $('status-chip').addEventListener('click', function () {
+                if (appState.trackerReady) {
+                    appState.trackingDesired = !appState.trackingDesired;
+                    appState.trackingLive = appState.trackingDesired;
+                    updateChip();
+                    toast(appState.trackingDesired ? 'Hand tracking on' : 'Hand tracking off \u2014 tap mode');
+                } else if (appState.loaderDone) {
+                    toast('Retrying hand tracker\u2026');
+                    retryLoad(false);
+                }
+            });
+
+            updateChip();
+            startLoading();
+
+            window.__vdDebug = {
+                get state() { return appState; },
+                get collisionCount() { var n = 0; activeCollisions.forEach(function (s) { n += s.size; }); return n; },
+                DRUM_PADS: DRUM_PADS,
+                padPixelCenter: padPixelCenter,
+                startLoading: startLoading,
+                retryLoad: retryLoad,
+                insertScript: insertScript,
+                loadFirst: loadFirst,
+                triggerDrum: triggerDrum,
+                beginSession: beginSession,
+                startCamera: startCamera,
+                showCamError: showCamError,
+                setScriptLoader: function (fn) { customScriptLoader = fn; },
+                MEDIAPIPE_URLS: MEDIAPIPE_URLS,
+                TRACKER_URLS: TRACKER_URLS,
+                LOAD_BUDGET_MS: LOAD_BUDGET_MS
+            };
+        })();
     </script>
 </body>
-<script src="top_buttons.js"></script>
 </html>

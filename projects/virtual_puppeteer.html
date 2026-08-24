@@ -2,491 +2,1196 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#120f1d">
     <title>Virtual Puppeteer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { 
-            margin: 0; 
-            background: #1a1a1a; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh; 
+        * { -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: #120f1d;
+            overflow: hidden;
             font-family: 'Inter', sans-serif;
+            height: 100vh;
+            height: 100dvh;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
-        canvas { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
+        #stage {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(130% 100% at 50% 0%, #241b3a 0%, #120f1d 70%);
+        }
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
             display: block;
-        }
-        #loader-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 2000;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            color: #ff6b6b; font-family: 'Inter', sans-serif;
-            transition: opacity 0.5s;
-        }
-        .progress-container {
-            width: 80%; max-width: 300px; height: 4px;
-            background: rgba(255,255,255,0.2);
-            margin-top: 20px; border-radius: 2px; overflow: hidden;
-        }
-        #progress-bar {
-            width: 0%; height: 100%; background: #ff6b6b; transition: width 0.2s;
+            touch-action: none;
         }
         .back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 20;
-            color: white;
+            position: fixed;
+            top: calc(var(--site-top-bar-height, 36px) + env(safe-area-inset-top) + 8px);
+            left: calc(env(safe-area-inset-left) + 12px);
+            z-index: 60;
+            color: #fff;
             text-decoration: none;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 12px;
-            border-radius: 8px;
-            backdrop-filter: blur(4px);
+            background: rgba(20,16,32,0.65);
+            padding: 10px 14px;
+            border-radius: 12px;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             font-size: 14px;
+            font-weight: 600;
+            touch-action: manipulation;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
         }
-        #controls {
-            position: absolute;
-            bottom: 30px;
+        .back-btn:active { background: rgba(255,255,255,0.16); }
+        #status-chip {
+            position: fixed;
+            top: calc(var(--site-top-bar-height, 36px) + env(safe-area-inset-top) + 8px);
             left: 50%;
             transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            z-index: 20;
-            background: rgba(0,0,0,0.6);
-            padding: 10px;
+            z-index: 55;
+            background: rgba(20,16,32,0.7);
+            border: 1px solid rgba(255,255,255,0.14);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 700;
+            padding: 9px 14px;
             border-radius: 20px;
-            backdrop-filter: blur(4px);
-        }
-        .mode-btn {
-            background: transparent;
-            border: 2px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
+            touch-action: manipulation;
+            white-space: nowrap;
         }
-        .mode-btn.active {
-            background: #ff6b6b;
-            border-color: #ff6b6b;
-            color: black;
-        }
-        #instructions {
-            position: absolute;
-            top: 80px;
-            width: 100%;
+        #status-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: #888; }
+        #status-chip.loading .dot { background: #ffb84d; animation: blink 1s infinite; }
+        #status-chip.live .dot { background: #2ee56b; box-shadow: 0 0 8px #2ee56b; }
+        #status-chip.off .dot { background: #666; }
+        #status-chip.error .dot { background: #ff4466; }
+        @keyframes blink { 50% { opacity: 0.25; } }
+
+        #loader-overlay {
+            position: fixed; inset: 0;
+            background: #120f1d; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #b892ff;
+            transition: opacity 0.5s;
+            padding: 24px;
             text-align: center;
-            color: rgba(255,255,255,0.8);
-            pointer-events: none;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
+        .progress-container {
+            width: 80%; max-width: 300px; height: 5px;
+            background: rgba(255,255,255,0.12);
+            margin-top: 18px; border-radius: 3px; overflow: hidden;
+        }
+        #progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg,#b892ff,#7ae0c3); transition: width 0.3s; }
+        #progress-bar.busy { animation: pulse 1.1s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: 0.35; } }
+        #loader-log {
+            max-width: 90%; max-height: 150px; overflow: auto;
+            margin-top: 12px; color: #7d7593; font-size: 11px; line-height: 1.5;
+            text-align: left;
+        }
+
+        .overlay-panel {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(10,8,18,0.82);
+            backdrop-filter: blur(9px);
+            -webkit-backdrop-filter: blur(9px);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #fff; text-align: center; padding: 28px;
+        }
+        #start-overlay h1 {
+            font-family: 'Fredoka', sans-serif;
+            font-size: clamp(2rem, 9vw, 3.1rem);
+            margin: 0 0 8px;
+            background: linear-gradient(92deg, #b892ff, #7ae0c3 60%, #ffd166);
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #start-overlay p { color: #cbc6dd; margin: 4px 0; font-size: clamp(0.95rem, 4vw, 1.08rem); line-height: 1.55; }
+        #load-note { font-size: 0.8rem !important; color: #8a83a0 !important; }
+        .btn {
+            background: linear-gradient(140deg, #b892ff, #8e6bff);
+            color: #17122a;
+            border: none;
+            padding: 17px 44px;
+            font-size: clamp(19px, 5.5vw, 23px);
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 26px;
+            box-shadow: 0 10px 26px rgba(142,107,255,0.35);
+            transition: transform 0.15s;
+            touch-action: manipulation;
+            min-height: 44px;
+            font-family: 'Fredoka', sans-serif;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-secondary {
+            background: transparent;
+            border: 1.5px solid rgba(255,255,255,0.28);
+            color: #cbc6dd;
+            padding: 12px 26px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 40px;
+            margin-top: 16px;
+            cursor: pointer;
+            touch-action: manipulation;
+            font-family: inherit;
+        }
+        .btn-secondary:active { background: rgba(255,255,255,0.12); }
+        #cam-overlay { display: none; z-index: 150; }
+        #cam-overlay.open { display: flex; }
+        #cam-overlay h2 { font-family: 'Fredoka', sans-serif; margin: 0 0 10px; }
+        #cam-overlay p { color: #cbc6dd; line-height: 1.6; max-width: 420px; font-size: 0.95rem; }
+
+        #dock {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 12px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(20,16,32,0.72);
+            border: 1px solid rgba(255,255,255,0.12);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 10px 12px;
+            border-radius: 22px;
+            max-width: min(94vw, 480px);
+        }
+        .char-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.08);
+            border: 1.5px solid transparent;
+            color: #e8e4f5;
+            padding: 9px 13px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            font-family: inherit;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: transform 0.12s, background 0.15s;
+        }
+        .char-btn:active { transform: scale(0.94); }
+        .char-btn.active { background: rgba(184,146,255,0.25); border-color: #b892ff; }
+        .char-btn .cdot { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 7px currentColor; }
+        .dock-tools { display: flex; gap: 8px; width: 100%; justify-content: center; }
+        .tool-btn {
+            background: rgba(255,255,255,0.09);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: #e8e4f5;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.78rem;
+            font-family: inherit;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .tool-btn:active { transform: scale(0.95); }
+        .tool-btn.sfx-off { opacity: 0.4; }
+        #hint {
+            position: fixed;
+            top: calc(var(--site-top-bar-height, 36px) + env(safe-area-inset-top) + 52px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 30;
+            color: rgba(232,228,245,0.85);
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 500;
+            font-size: clamp(0.85rem, 3.6vw, 1.02rem);
+            text-align: center;
+            pointer-events: none;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+            width: 92vw;
+            transition: opacity 0.6s;
+        }
+        #hint.fade { opacity: 0; }
+        #toast {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 96px);
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(30,24,48,0.95);
+            border: 1px solid rgba(184,146,255,0.3);
+            color: #efeaff;
+            padding: 11px 18px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 300;
+            opacity: 0;
+            transition: opacity 0.25s, transform 0.25s;
+            pointer-events: none;
+            max-width: 88vw;
+            text-align: center;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%); }
     </style>
 </head>
 <body>
+    <script src="top_buttons.js"></script>
+
+    <div id="stage">
+        <video id="video" playsinline autoplay muted style="display:none"></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <a href="../pages/main/technology.html" class="back-btn">&#8592; Back</a>
+    <button id="status-chip" class="loading"><span class="dot"></span><span id="chip-label">Hands: loading&hellip;</span></button>
+
+    <div id="hint">Make a &ldquo;C&rdquo; &mdash; open &amp; close thumb+index to talk!</div>
+
+    <div id="dock">
+        <div class="dock-tools">
+            <button class="tool-btn" id="photoBtn"><i class="fa-solid fa-camera"></i> Photo</button>
+            <button class="tool-btn" id="sfxBtn"><i class="fa-solid fa-volume-high"></i> SFX</button>
+        </div>
+        <div class="dock-tools" id="charRow"></div>
+    </div>
+
     <div id="loader-overlay">
         <div class="loader-text">Summoning Puppets... <span id="time-left"></span></div>
         <div class="progress-container"><div id="progress-bar"></div></div>
-        <pre id="loader-log" style="max-width:80%;max-height:200px;overflow:auto;margin-top:12px;color:#fff;font-size:12px"></pre>
-    </div>
-    
-    <div id="instructions">
-        <h2>Make a "C" shape with your hand!</h2>
-        <p>Open and close your thumb and index finger to talk.</p>
+        <pre id="loader-log"></pre>
     </div>
 
-    <div id="controls">
-        <button class="mode-btn active" onclick="setMode('sock')">🧦 Socky</button>
-        <button class="mode-btn" onclick="setMode('monster')">👾 Monster</button>
-        <button class="mode-btn" onclick="setMode('robot')">🤖 Robo</button>
+    <div id="start-overlay" class="overlay-panel">
+        <h1>Virtual Puppeteer</h1>
+        <p>Your hand becomes a talking puppet.<br>No hand? Tap the stage and it still performs!</p>
+        <p id="load-note">Waking up the puppets&hellip;</p>
+        <button class="btn" id="startBtn">START THE SHOW</button>
+        <button class="btn-secondary" id="skipCam">Play without camera (tap mode)</button>
     </div>
 
-    <video id="video" playsinline style="display:none" autoplay muted></video>
-    <canvas id="canvas"></canvas>
+    <div id="cam-overlay" class="overlay-panel">
+        <h2>Camera unavailable</h2>
+        <p id="cam-msg"></p>
+        <button class="btn" id="cam-retry" style="font-size:18px;padding:14px 34px;">Retry camera</button>
+        <button class="btn-secondary" id="cam-tapmode">Perform in tap mode</button>
+    </div>
+
+    <div id="toast"></div>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let animationId;
-        let isModelLoading = false;
-        let currentMode = 'sock';
-        
-        // Puppet State
-        let eyeOffset = { x: 0, y: 0 };
-        let blinkState = 0; // 0 = open, 1 = closed
+        (function () {
+            'use strict';
 
-        // Capture console messages into loader log for easier debugging
-        (function(){
-            const logEl = document.getElementById('loader-log');
-            if (!logEl) return;
-            const origLog = console.log.bind(console);
-            const origErr = console.error.bind(console);
-            const origWarn = console.warn.bind(console);
-            function append(msg){
-                const line = document.createElement('div');
-                line.textContent = (new Date()).toISOString() + ' ' + msg;
-                logEl.appendChild(line);
-                while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
-                logEl.scrollTop = logEl.scrollHeight;
-            }
-            console.log = function(...args){ origLog(...args); try{ append(args.join(' ')); }catch(e){} };
-            console.error = function(...args){ origErr(...args); try{ append('ERROR: '+args.join(' ')); }catch(e){} };
-            console.warn = function(...args){ origWarn(...args); try{ append('WARN: '+args.join(' ')); }catch(e){} };
-        })();
+            var $ = function (id) { return document.getElementById(id); };
+            function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+            function lerp(a, b, t) { return a + (b - a) * t; }
+            function rnd(a, b) { return a + Math.random() * (b - a); }
+            function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
 
-        // Load Scripts (robust: inject script tags, fallback URLs)
-        async function loadScripts() {
-            const scripts = [
-                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
-                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                '/assets/js/hand_tracker.js'
+            var video = $('video');
+            var canvas = $('canvas');
+            var ctx = canvas.getContext('2d');
+
+            var appState = {
+                audioReady: false,
+                cameraStarted: false,
+                cameraSkipped: false,
+                trackerReady: false,
+                trackingDesired: true,
+                trackingLive: false,
+                loaderDone: false,
+                loadFailed: false,
+                timedOut: false,
+                started: false,
+                sfxOn: true,
+                lastError: null
+            };
+
+            var CHARS = [
+                { id: 'sock', name: 'Socky', dot: '#ff8fb3', lip: '#ff6b8f', inner: '#3d1020', tongue: '#ff5d73',
+                  eyeStyle: 'googly', mouth: 'soft', voice: { base: 340, wave: 'triangle', gap: 110 }, acc: null },
+                { id: 'monster', name: 'Monster', dot: '#7ae06a', lip: '#2d5a27', inner: '#07130a', tongue: '#c9ff8a',
+                  eyeStyle: 'slit', mouth: 'spiky', voice: { base: 150, wave: 'sawtooth', gap: 130 }, acc: 'horns' },
+                { id: 'robot', name: 'Robo', dot: '#00d4ff', lip: '#8a97ad', inner: '#0a1622', tongue: '#00d4ff',
+                  eyeStyle: 'rect', mouth: 'jaw', voice: { base: 220, wave: 'square', gap: 150 }, acc: 'antenna' },
+                { id: 'ghost', name: 'Ghosty', dot: '#dfe7ff', lip: '#aab6df', inner: '#141a33', tongue: '#8f9fe0',
+                  eyeStyle: 'roundGlow', mouth: 'oooh', voice: { base: 520, wave: 'sine', gap: 160 }, acc: null },
+                { id: 'froggy', name: 'Froggy', dot: '#57d98a', lip: '#1f6b3a', inner: '#12331f', tongue: '#ff8fa8',
+                  eyeStyle: 'frog', mouth: 'wide', voice: { base: 260, wave: 'square', gap: 170 }, acc: null },
+                { id: 'unicorn', name: 'Uni', dot: '#ffd166', lip: '#ff9ecb', inner: '#4a1140', tongue: '#ff7ab8',
+                  eyeStyle: 'lash', mouth: 'rainbow', voice: { base: 430, wave: 'sine', gap: 120 }, acc: 'horn' }
             ];
 
-            const progressBar = document.getElementById('progress-bar');
-            const timeLeft = document.getElementById('time-left');
-            let loaded = 0;
-
-            function setProgress() {
-                const percent = (loaded / scripts.length) * 100;
-                progressBar.style.width = percent + '%';
-                timeLeft.textContent = Math.round(100 - percent) + '% left';
-            }
-
-            function insertScriptTag(url) {
-                return new Promise((resolve, reject) => {
-                    console.log('[loader] injecting script tag:', url);
-                    const script = document.createElement('script');
-                    script.src = url;
-                    if (url.includes('cdn.jsdelivr.net') || url.includes('unpkg.com')) script.crossOrigin = 'anonymous';
-                    script.onload = () => { console.log('[loader] loaded:', url); resolve(); };
-                    script.onerror = (e) => { console.error('[loader] failed to load:', url, e); reject(new Error('Failed to load ' + url)); };
-                    document.body.appendChild(script);
-                });
-            }
-
-            for (let i = 0; i < scripts.length; i++) {
-                const url = scripts[i];
+            var actx = null, sfxBus = null;
+            function ensureAudio() {
                 try {
-                    console.log('[loader] fetching', url);
-                    let tryUrls = [url];
-                    if (url.includes('@tensorflow/tfjs')) {
-                        tryUrls = [
-                            'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js',
-                            'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
-                            url
-                        ];
+                    if (!actx) {
+                        var AC = window.AudioContext || window.webkitAudioContext;
+                        if (!AC) return false;
+                        actx = new AC();
+                        sfxBus = actx.createGain();
+                        sfxBus.gain.value = appState.sfxOn ? 0.9 : 0;
+                        sfxBus.connect(actx.destination);
                     }
-
-                    let success = false;
-                    let lastErr = null;
-                    for (const u of tryUrls) {
-                        try {
-                            await insertScriptTag(u);
-                            success = true; break;
-                        } catch (err) { lastErr = err; console.warn('[loader] fallback failed for', u, err); }
-                    }
-                    if (!success) throw lastErr || new Error('Unknown error loading ' + url);
-                    loaded++; setProgress();
-                } catch (err) {
-                    console.error('[loader] error loading script', url, err);
-                    document.getElementById('loader-overlay').style.opacity = 1;
-                    document.getElementById('loader-overlay').textContent = 'Errore caricamento librerie: ' + url + '\n' + (err.message || err);
-                    break;
-                }
+                    if (actx.state === 'suspended') actx.resume();
+                    return true;
+                } catch (e) { return false; }
             }
-
-            setTimeout(() => {
-                document.getElementById('loader-overlay').style.opacity = 0;
-                setTimeout(() => {
-                    document.getElementById('loader-overlay').style.display = 'none';
-                    initHandTracker();
-                }, 500);
-            }, 500);
-        }
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-        }
-
-        async function initHandTracker() {
-            if (!isModelLoading) {
-                isModelLoading = true;
+            function tone(freq, dur, type, vol, when, freqEnd) {
+                if (!ensureAudio()) return;
                 try {
-                    await window.HandTracker.load();
-                    initCamera();
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    isModelLoading = false;
-                }
+                    var t0 = actx.currentTime + (when || 0);
+                    var o = actx.createOscillator(), g = actx.createGain();
+                    o.type = type;
+                    o.frequency.setValueAtTime(freq, t0);
+                    if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+                    g.gain.setValueAtTime(0.0001, t0);
+                    g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                    o.connect(g); g.connect(sfxBus);
+                    o.start(t0); o.stop(t0 + dur + 0.05);
+                } catch (e) {}
             }
-        }
+            function blip(char) {
+                var f = char.voice.base * rnd(0.86, 1.22);
+                tone(f, 0.07, char.voice.wave, 0.12, 0, f * rnd(0.8, 1.25));
+            }
+            function sfxBoing() { tone(190, 0.2, 'triangle', 0.15, 0, 420); }
+            function sfxShutter() {
+                tone(1400, 0.04, 'square', 0.1);
+                tone(900, 0.06, 'square', 0.08, 0.05);
+            }
+            function sfxPop() { tone(rnd(700, 1000), 0.07, 'sine', 0.1, 0, 1600); }
 
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                    audio: false 
-                });
-                video.srcObject = stream;
-                video.play();
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    detectLoop();
-                    requestAnimationFrame(draw);
+            try { appState.sfxOn = localStorage.getItem('vp_sfx_off') !== '1'; } catch (e) {}
+
+            (function () {
+                var logEl = $('loader-log');
+                if (!logEl) return;
+                var origLog = console.log.bind(console);
+                var origErr = console.error.bind(console);
+                function append(msg) {
+                    try {
+                        var line = document.createElement('div');
+                        line.textContent = msg;
+                        logEl.appendChild(line);
+                        while (logEl.childNodes.length > 120) logEl.removeChild(logEl.firstChild);
+                        logEl.scrollTop = logEl.scrollHeight;
+                    } catch (e) {}
+                }
+                console.log = function () {
+                    origLog.apply(null, arguments);
+                    append('[log] ' + Array.prototype.join.call(arguments, ' '));
                 };
-            } catch (err) {
-                console.error("Camera error:", err);
-            }
-        }
+                console.error = function () {
+                    origErr.apply(null, arguments);
+                    append('[ERR] ' + Array.prototype.join.call(arguments, ' '));
+                };
+            })();
 
-        async function detectLoop() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && window.HandTracker) {
-                await window.HandTracker.detect(video);
+            function toast(msg, ms) {
+                var el = $('toast');
+                el.textContent = msg;
+                el.classList.add('show');
+                clearTimeout(toast.t);
+                toast.t = setTimeout(function () { el.classList.remove('show'); }, ms || 2400);
             }
-            requestAnimationFrame(detectLoop);
-        }
 
-        function draw() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Mirror video
-                ctx.save();
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                if (window.HandTracker && window.HandTracker.results && window.HandTracker.results.multiHandLandmarks) {
-                    const landmarks = window.HandTracker.results.multiHandLandmarks[0];
-                    if (landmarks) {
-                        drawPuppet(landmarks);
+            function setChip(mode, label) {
+                $('status-chip').className = mode;
+                $('chip-label').textContent = label;
+            }
+            function updateChip() {
+                if (!appState.loaderDone) { setChip('loading', 'Hands: loading\u2026'); return; }
+                if (appState.trackingDesired && appState.trackerReady && appState.trackingLive) { setChip('live', 'Hands: live'); return; }
+                if (appState.loadFailed || !appState.trackerReady) { setChip('error', 'Hands failed \u2014 tap to retry'); return; }
+                setChip('off', 'Hands: off \u2014 tap mode');
+            }
+
+            var customScriptLoader = null;
+            function insertScript(url, timeoutMs) {
+                if (customScriptLoader) return customScriptLoader(url, timeoutMs);
+                return new Promise(function (resolve, reject) {
+                    var done = false;
+                    var s = document.createElement('script');
+                    s.src = url;
+                    s.crossOrigin = 'anonymous';
+                    var timer = setTimeout(function () {
+                        if (done) return;
+                        done = true;
+                        reject(new Error('timeout: ' + url));
+                    }, timeoutMs || 12000);
+                    s.onload = function () {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(timer);
+                        resolve();
+                    };
+                    s.onerror = function () {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(timer);
+                        reject(new Error('network error: ' + url));
+                    };
+                    (document.body || document.head).appendChild(s);
+                });
+            }
+            function loadFirst(urls, perTimeout) {
+                var p = Promise.reject(new Error('start'));
+                urls.forEach(function (u) {
+                    p = p.catch(function () {
+                        console.log('[loader] trying ' + u);
+                        return insertScript(u, perTimeout);
+                    });
+                });
+                return p;
+            }
+            function withTimeout(promise, ms, tag) {
+                return new Promise(function (resolve, reject) {
+                    var timer = setTimeout(function () { reject(new Error('timeout: ' + tag)); }, ms);
+                    promise.then(function (v) { clearTimeout(timer); resolve(v); },
+                                 function (e) { clearTimeout(timer); reject(e); });
+                });
+            }
+
+            var MEDIAPIPE_URLS = [
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                'https://unpkg.com/@mediapipe/hands/hands.js'
+            ];
+            var TRACKER_URLS = [
+                '../assets/js/hand_tracker.js',
+                'assets/js/hand_tracker.js',
+                '/assets/js/hand_tracker.js'
+            ];
+            var LOAD_BUDGET_MS = 25000;
+
+            function setProgress(v) {
+                $('progress-bar').style.width = Math.round(clamp(v, 0, 1) * 100) + '%';
+            }
+
+            function startLoading() {
+                if (appState.started) return;
+                appState.started = true;
+                updateChip();
+                var overallTimer = setTimeout(function () {
+                    if (appState.loaderDone) return;
+                    appState.timedOut = true;
+                    finalizeLoad('timeout');
+                    scheduleSilentRetry();
+                }, LOAD_BUDGET_MS);
+
+                loadFirst(MEDIAPIPE_URLS, 9000)
+                    .then(function () {
+                        setProgress(0.35);
+                        $('time-left').textContent = 'Loading tracker\u2026';
+                        return loadFirst(TRACKER_URLS, 9000);
+                    })
+                    .then(function () {
+                        setProgress(0.6);
+                        $('time-left').textContent = 'Initializing AI model\u2026';
+                        $('progress-bar').classList.add('busy');
+                        if (!window.HandTracker) throw new Error('HandTracker missing after load');
+                        return withTimeout(window.HandTracker.load(), 14000, 'model init');
+                    })
+                    .then(function () {
+                        if (!window.HandTracker.isReady) throw new Error('tracker not ready');
+                        clearTimeout(overallTimer);
+                        appState.trackerReady = true;
+                        setProgress(1);
+                        $('progress-bar').classList.remove('busy');
+                        finalizeLoad('ok');
+                    })
+                    .catch(function (err) {
+                        clearTimeout(overallTimer);
+                        appState.lastError = err && err.message || String(err);
+                        console.error('[loader] failed:', appState.lastError);
+                        $('progress-bar').classList.remove('busy');
+                        finalizeLoad(appState.timedOut ? 'timeout' : 'fail');
+                    });
+            }
+
+            function finalizeLoad(status) {
+                if (appState.loaderDone) return;
+                appState.loaderDone = true;
+                appState.loadFailed = status !== 'ok';
+                appState.trackingLive = appState.trackerReady && appState.trackingDesired;
+                var loader = $('loader-overlay');
+                loader.style.opacity = '0';
+                setTimeout(function () { loader.style.display = 'none'; }, 480);
+                $('load-note').textContent = status === 'ok'
+                    ? 'Hand tracking ready \u2014 your hand is the puppet!'
+                    : 'AI tracker unavailable \u2014 tap the stage to perform!';
+                updateChip();
+                if (status !== 'ok') toast('Tap Mode ready \u2014 tap the stage to talk!');
+            }
+
+            var silentRetried = false;
+            function scheduleSilentRetry() {
+                if (silentRetried) return;
+                silentRetried = true;
+                setTimeout(function () {
+                    if (appState.trackerReady) return;
+                    retryLoad(true);
+                }, 20000);
+            }
+            var retrying = false;
+            function retryLoad(silent) {
+                if (retrying || appState.trackerReady) return;
+                retrying = true;
+                appState.loaderDone = false;
+                appState.loadFailed = false;
+                appState.timedOut = false;
+                appState.started = false;
+                if (!silent) {
+                    var loader = $('loader-overlay');
+                    loader.style.display = 'flex';
+                    loader.style.opacity = '1';
+                    $('time-left').textContent = '';
+                }
+                updateChip();
+                startLoading();
+                setTimeout(function () { retrying = false; }, 500);
+            }
+
+            function beginSession(withCamera) {
+                ensureAudio();
+                appState.audioReady = true;
+                $('start-overlay').style.display = 'none';
+                fadeHintLater();
+                if (withCamera) {
+                    appState.cameraSkipped = false;
+                    startCamera();
+                } else {
+                    appState.cameraSkipped = true;
+                    appState.trackingDesired = false;
+                    appState.trackingLive = false;
+                    ensureCanvasSize(1280, 720);
+                    updateChip();
+                    startLoops();
+                }
+            }
+
+            function ensureCanvasSize(w, h) {
+                if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+            }
+            function startCamera() {
+                if (appState.cameraStarted) { startLoops(); return; }
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showCamError('Camera API not available in this browser.');
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                }).then(function (stream) {
+                    appState.cameraStarted = true;
+                    video.srcObject = stream;
+                    var p = video.play();
+                    if (p && p.catch) p.catch(function () {});
+                    video.onloadedmetadata = function () {
+                        ensureCanvasSize(video.videoWidth || 1280, video.videoHeight || 720);
+                        $('cam-overlay').classList.remove('open');
+                        startLoops();
+                    };
+                    setTimeout(function () {
+                        if (video.videoWidth && !loopsRunning) {
+                            ensureCanvasSize(video.videoWidth, video.videoHeight);
+                            startLoops();
+                        }
+                    }, 2500);
+                }).catch(function (err) {
+                    showCamError(err && err.name === 'NotAllowedError'
+                        ? 'Camera permission was denied. Allow it in Settings, or perform in tap mode.'
+                        : 'Could not start the camera (' + ((err && err.name) || 'error') + '). Tap mode works great too.');
+                });
+            }
+            function showCamError(msg) {
+                $('cam-msg').textContent = msg;
+                $('cam-overlay').classList.add('open');
+            }
+
+            function mouthOpenFromRatio(ratio) {
+                return clamp((ratio - 0.18) / (0.55 - 0.18), 0, 1);
+            }
+
+            var puppets = [makePuppet(0), makePuppet(1)];
+            var touchPuppet = makePuppet(-1);
+            var particles = [];
+            var lastDrawnPuppets = 0;
+            var blinkT = 0, blinkNext = rnd(2, 5);
+
+            function makePuppet(handIdx) {
+                return {
+                    handIdx: handIdx,
+                    x: 0, y: 0, angle: 0,
+                    open: 0,
+                    scale: 80,
+                    hasTarget: false,
+                    eyeVX: 0, eyeVY: 0,
+                    lastBlip: 0,
+                    prevX: 0, prevY: 0
+                };
+            }
+
+            function updatePuppetFromLandmarks(p, lm, w, h) {
+                var P = function (i) { return { x: lm[i].x * w, y: lm[i].y * h }; };
+                var wr = P(0), iMCP = P(5), mMCP = P(9);
+                var tTip = P(4), iTip = P(8);
+                var palm = Math.hypot(mMCP.x - wr.x, mMCP.y - wr.y) || 1;
+                var mouthDist = Math.hypot(tTip.x - iTip.x, tTip.y - iTip.y);
+                var target = { x: (tTip.x + iTip.x) / 2, y: (tTip.y + iTip.y) / 2 };
+                var angle = Math.atan2(mMCP.y - wr.y, mMCP.x - wr.x) - Math.PI / 2;
+
+                if (!p.hasTarget) {
+                    p.x = target.x; p.y = target.y; p.angle = angle;
+                    p.hasTarget = true;
+                }
+                p.eyeVX = clamp((target.x - p.prevX) * 0.06 + p.eyeVX * 0.82, -14, 14);
+                p.eyeVY = clamp((target.y - p.prevY) * 0.06 + p.eyeVY * 0.82, -14, 14);
+                p.prevX = target.x; p.prevY = target.y;
+
+                p.x = lerp(p.x, target.x, 0.4);
+                p.y = lerp(p.y, target.y, 0.4);
+                var da = angle - p.angle;
+                while (da > Math.PI) da -= Math.PI * 2;
+                while (da < -Math.PI) da += Math.PI * 2;
+                p.angle += da * 0.35;
+                p.scale = Math.max(46, palm * 0.62);
+                p.open = lerp(p.open, mouthOpenFromRatio(mouthDist / palm), 0.45);
+            }
+
+            function charFor(i) {
+                var c = CHARS[charIndex];
+                if (i === 1) {
+                    var alt = {
+                        sock: 'ghost', monster: 'froggy', robot: 'monster',
+                        ghost: 'sock', froggy: 'unicorn', unicorn: 'robot'
+                    };
+                    c = CHARS.find(function (ch) { return ch.id === alt[c.id]; }) || c;
+                }
+                return c;
+            }
+
+            function speakTick(p, ch, now) {
+                if (p.open > 0.35 && now - p.lastBlip > ch.voice.gap * rnd(0.75, 1.35)) {
+                    blip(ch);
+                    p.lastBlip = now;
+                    spawnBurst(ch, p);
+                }
+            }
+
+            function spawnBurst(ch, p) {
+                var ox = p.x + Math.sin(p.angle) * p.scale * 0.25;
+                var oy = p.y + Math.cos(p.angle) * p.scale * 0.25;
+                for (var i = 0; i < 3; i++) {
+                    particles.push({
+                        x: ox, y: oy,
+                        vx: rnd(-1.4, 1.4), vy: rnd(-2.6, -1),
+                        life: rnd(0.5, 0.85), m: 0.85,
+                        size: rnd(3, 7),
+                        color: pick([ch.dot, ch.lip, '#ffe9a8']),
+                        star: Math.random() < 0.4
+                    });
+                }
+                if (particles.length > 90) particles.splice(0, particles.length - 90);
+            }
+
+            function drawEye(ctx2, style, x, y, r, ang, p) {
+                ctx2.save();
+                ctx2.translate(x, y);
+                ctx2.rotate(ang);
+                if (style === 'googly') {
+                    ctx2.fillStyle = '#fff';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r, 0, 6.29); ctx2.fill();
+                    ctx2.strokeStyle = '#d8d2e6'; ctx2.lineWidth = 1.5; ctx2.stroke();
+                    if (blinkT > 0.5) {
+                        ctx2.strokeStyle = '#222'; ctx2.lineWidth = 3;
+                        ctx2.beginPath(); ctx2.moveTo(-r * 0.7, 0); ctx2.lineTo(r * 0.7, 0); ctx2.stroke();
+                    } else {
+                        var px = clamp(p.eyeVX, -r * 0.45, r * 0.45) + Math.sin(Date.now() / 420 + r) * r * 0.08;
+                        var py = clamp(r * 0.25 + p.eyeVY, -r * 0.45, r * 0.6);
+                        ctx2.fillStyle = '#16121f';
+                        ctx2.beginPath(); ctx2.arc(px, py, r * 0.38, 0, 6.29); ctx2.fill();
+                        ctx2.fillStyle = '#fff';
+                        ctx2.beginPath(); ctx2.arc(px - r * 0.1, py - r * 0.12, r * 0.1, 0, 6.29); ctx2.fill();
+                    }
+                } else if (style === 'slit') {
+                    ctx2.fillStyle = '#ffeb3b';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = '#d50000';
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, r * 0.22, r * 0.62, 0, 0, 6.29); ctx2.fill();
+                } else if (style === 'rect') {
+                    ctx2.shadowColor = '#00d4ff';
+                    ctx2.shadowBlur = 12;
+                    ctx2.fillStyle = '#00d4ff';
+                    ctx2.fillRect(-r * 0.8, -r * 0.5, r * 1.6, r);
+                    ctx2.shadowBlur = 0;
+                    ctx2.fillStyle = '#05202a';
+                    ctx2.fillRect(-r * 0.15, -r * 0.5, r * 0.3, r);
+                } else if (style === 'roundGlow') {
+                    ctx2.shadowColor = '#cfe0ff';
+                    ctx2.shadowBlur = 14;
+                    ctx2.fillStyle = '#eef4ff';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r, 0, 6.29); ctx2.fill();
+                    ctx2.shadowBlur = 0;
+                    ctx2.fillStyle = '#39406e';
+                    ctx2.beginPath(); ctx2.arc(0, r * 0.1, r * 0.42, 0, 6.29); ctx2.fill();
+                } else if (style === 'frog') {
+                    ctx2.fillStyle = '#57d98a';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r * 1.12, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = '#fff';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r * 0.78, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = '#16121f';
+                    ctx2.beginPath(); ctx2.ellipse(clamp(p.eyeVX * 0.3, -r * 0.3, r * 0.3), 0, r * 0.3, r * 0.42, 0, 0, 6.29); ctx2.fill();
+                } else if (style === 'lash') {
+                    ctx2.fillStyle = '#fff';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r, 0, 6.29); ctx2.fill();
+                    var hue = (Date.now() / 24) % 360;
+                    ctx2.fillStyle = 'hsl(' + hue + ',80%,62%)';
+                    ctx2.beginPath(); ctx2.arc(0, 0, r * 0.42, 0, 6.29); ctx2.fill();
+                    ctx2.strokeStyle = '#5a4a7a'; ctx2.lineWidth = 2; ctx2.lineCap = 'round';
+                    for (var k = -1; k <= 1; k++) {
+                        ctx2.beginPath();
+                        ctx2.moveTo(k * r * 0.45, -r * 0.85);
+                        ctx2.lineTo(k * r * 0.62, -r * 1.22);
+                        ctx2.stroke();
                     }
                 }
-                ctx.restore();
+                ctx2.restore();
             }
-            
-            // Update eye animation
-            if (Math.random() < 0.02) blinkState = 1;
-            if (blinkState > 0) blinkState -= 0.1;
-            if (blinkState < 0) blinkState = 0;
 
-            animationId = requestAnimationFrame(draw);
-        }
-
-        function drawPuppet(landmarks) {
-            const thumbTip = landmarks[4];
-            const indexTip = landmarks[8];
-            const indexMCP = landmarks[5];
-            const middleMCP = landmarks[9];
-            const wrist = landmarks[0];
-
-            // Scale coordinates to canvas
-            const w = canvas.width;
-            const h = canvas.height;
-
-            const tTip = { x: thumbTip.x * w, y: thumbTip.y * h };
-            const iTip = { x: indexTip.x * w, y: indexTip.y * h };
-            const iMCP = { x: indexMCP.x * w, y: indexMCP.y * h };
-            const mMCP = { x: middleMCP.x * w, y: middleMCP.y * h };
-            const wr = { x: wrist.x * w, y: wrist.y * h };
-
-            // Calculate orientation angle based on wrist to middle finger knuckle
-            const dx = mMCP.x - wr.x;
-            const dy = mMCP.y - wr.y;
-            const angle = Math.atan2(dy, dx) - Math.PI / 2;
-
-            // Mouth calculations
-            const mouthCenter = { x: (tTip.x + iTip.x) / 2, y: (tTip.y + iTip.y) / 2 };
-            const mouthDist = Math.hypot(tTip.x - iTip.x, tTip.y - iTip.y);
-            const isOpen = mouthDist > 30; // Threshold
-
-            ctx.save();
-            
-            // --- RENDER PUPPET ---
-            
-            if (currentMode === 'sock') {
-                // Googly Eyes on Knuckles
-                drawGooglyEye(iMCP, 20, angle);
-                drawGooglyEye(mMCP, 20, angle);
-
-                // Mouth
-                ctx.translate(mouthCenter.x, mouthCenter.y);
-                ctx.rotate(angle);
-                
-                // Lips
-                ctx.fillStyle = '#ff6b6b';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, mouthDist/1.5 + 10, 15, 0, 0, Math.PI*2);
-                ctx.fill();
-
-                // Inner Mouth (Void)
-                ctx.fillStyle = '#330000';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, mouthDist/1.5, Math.max(5, mouthDist/3), 0, 0, Math.PI*2);
-                ctx.fill();
-                
-                // Tongue
-                if (isOpen) {
-                    ctx.fillStyle = '#ff4444';
-                    ctx.beginPath();
-                    ctx.arc(0, mouthDist/3, 10, 0, Math.PI, false);
-                    ctx.fill();
-                }
-
-            } else if (currentMode === 'monster') {
-                // Green Skin tint (optional, maybe too complex to mask properly, so just add features)
-                
-                // Three Eyes
-                const midEye = { x: (iMCP.x + mMCP.x)/2, y: (iMCP.y + mMCP.y)/2 - 20 };
-                drawMonsterEye(iMCP, 15, angle);
-                drawMonsterEye(mMCP, 15, angle);
-                drawMonsterEye(midEye, 20, angle);
-
-                // Spiky Mouth
-                ctx.translate(mouthCenter.x, mouthCenter.y);
-                ctx.rotate(angle);
-                
-                ctx.fillStyle = '#2d5a27'; // Dark green lips
-                ctx.beginPath();
-                ctx.ellipse(0, 0, mouthDist/1.2 + 10, 20, 0, 0, Math.PI*2);
-                ctx.fill();
-
-                ctx.fillStyle = '#000';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, mouthDist/1.2, Math.max(5, mouthDist/2.5), 0, 0, Math.PI*2);
-                ctx.fill();
-
-                // Teeth
-                if (isOpen) {
-                    ctx.fillStyle = '#fff';
-                    ctx.beginPath();
-                    // Top teeth
-                    for(let i=-20; i<=20; i+=10) {
-                        ctx.moveTo(i, -10);
-                        ctx.lineTo(i+5, 5);
-                        ctx.lineTo(i+10, -10);
+            function drawMouth(ctx2, ch, cx, cy, ang, open01, size) {
+                var wide = size * (0.55 + open01 * 0.75);
+                var tall = size * (0.12 + open01 * 0.5);
+                ctx2.save();
+                ctx2.translate(cx, cy);
+                ctx2.rotate(ang);
+                if (ch.mouth === 'soft' || ch.mouth === 'wide') {
+                    ctx2.fillStyle = ch.lip;
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, wide + size * 0.1, tall + size * 0.08, 0, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = ch.inner;
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, wide, Math.max(size * 0.06, tall), 0, 0, 6.29); ctx2.fill();
+                    if (open01 > 0.35) {
+                        ctx2.fillStyle = ch.tongue;
+                        ctx2.beginPath();
+                        ctx2.ellipse(0, tall * 0.55, wide * 0.5, tall * 0.4, 0, 0, Math.PI);
+                        ctx2.fill();
                     }
-                    // Bottom teeth
-                    for(let i=-20; i<=20; i+=10) {
-                        ctx.moveTo(i, 10);
-                        ctx.lineTo(i+5, -5);
-                        ctx.lineTo(i+10, 10);
+                } else if (ch.mouth === 'spiky') {
+                    ctx2.fillStyle = ch.lip;
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, wide + size * 0.12, tall + size * 0.1, 0, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = ch.inner;
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, wide, Math.max(size * 0.07, tall), 0, 0, 6.29); ctx2.fill();
+                    if (open01 > 0.3) {
+                        ctx2.fillStyle = '#fff';
+                        ctx2.beginPath();
+                        var step = Math.max(8, wide / 4);
+                        for (var tx = -wide * 0.8; tx <= wide * 0.8; tx += step) {
+                            ctx2.moveTo(tx, -tall * 0.8);
+                            ctx2.lineTo(tx + step / 2, tall * 0.2);
+                            ctx2.lineTo(tx + step, -tall * 0.8);
+                            ctx2.moveTo(tx, tall * 0.8);
+                            ctx2.lineTo(tx + step / 2, -tall * 0.2);
+                            ctx2.lineTo(tx + step, tall * 0.8);
+                        }
+                        ctx2.fill();
                     }
-                    ctx.fill();
+                } else if (ch.mouth === 'jaw') {
+                    var sep = size * (0.1 + open01 * 0.42);
+                    ctx2.fillStyle = '#9aa7bd';
+                    ctx2.fillRect(-size * 0.42, -sep - size * 0.14, size * 0.84, size * 0.14);
+                    ctx2.fillRect(-size * 0.42, sep, size * 0.84, size * 0.14);
+                    ctx2.strokeStyle = '#67748c'; ctx2.lineWidth = 3;
+                    ctx2.beginPath();
+                    ctx2.moveTo(-size * 0.34, -sep); ctx2.lineTo(-size * 0.34, sep);
+                    ctx2.moveTo(size * 0.34, -sep); ctx2.lineTo(size * 0.34, sep);
+                    ctx2.stroke();
+                    if (open01 > 0.35) {
+                        ctx2.fillStyle = 'rgba(0,212,255,0.75)';
+                        ctx2.beginPath(); ctx2.arc(0, 0, size * 0.14 + Math.sin(Date.now() / 60) * 2, 0, 6.29); ctx2.fill();
+                    }
+                } else if (ch.mouth === 'oooh') {
+                    var oh = size * (0.14 + open01 * 0.5);
+                    ctx2.fillStyle = 'rgba(214,224,255,0.9)';
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, size * 0.34, oh, 0, 0, 6.29); ctx2.fill();
+                    ctx2.fillStyle = ch.inner;
+                    ctx2.beginPath(); ctx2.ellipse(0, 0, size * 0.26, Math.max(size * 0.05, oh * 0.72), 0, 0, 6.29); ctx2.fill();
+                } else if (ch.mouth === 'rainbow') {
+                    var bands = 6;
+                    var rad = size * (0.3 + open01 * 0.5);
+                    for (var b = bands - 1; b >= 0; b--) {
+                        ctx2.strokeStyle = 'hsl(' + ((Date.now() / 18 + b * 42) % 360) + ',85%,64%)';
+                        ctx2.lineWidth = size * 0.09;
+                        ctx2.beginPath();
+                        ctx2.arc(0, size * 0.12, rad * (0.4 + b * 0.14), Math.PI * 1.05, Math.PI * 1.95);
+                        ctx2.stroke();
+                    }
+                    ctx2.fillStyle = ch.inner;
+                    ctx2.beginPath(); ctx2.ellipse(0, size * 0.12, rad * 0.36, Math.max(size * 0.05, rad * 0.3 * open01), 0, 0, 6.29); ctx2.fill();
                 }
+                ctx2.restore();
+            }
 
-            } else if (currentMode === 'robot') {
-                // Robot Eyes (Glowing Rectangles)
-                drawRobotEye(iMCP, angle);
-                drawRobotEye(mMCP, angle);
+            function drawAccessory(ctx2, ch, mx, my, ang, size, top) {
+                ctx2.save();
+                ctx2.translate(mx, my);
+                ctx2.rotate(ang);
+                if (ch.acc === 'horns') {
+                    ctx2.fillStyle = '#e05656';
+                    [[-1, -0.5], [1, 0.5]].forEach(function (s) {
+                        ctx2.save();
+                        ctx2.translate(s[0] * size * 0.55, -size * 0.72);
+                        ctx2.rotate(s[1]);
+                        ctx2.beginPath();
+                        ctx2.moveTo(-size * 0.1, 0);
+                        ctx2.quadraticCurveTo(s[0] * size * 0.28, -size * 0.3, 0, -size * 0.52);
+                        ctx2.quadraticCurveTo(s[0] * size * 0.1, -size * 0.22, size * 0.1, 0);
+                        ctx2.fill();
+                        ctx2.restore();
+                    });
+                } else if (ch.acc === 'antenna') {
+                    ctx2.strokeStyle = '#8a97ad'; ctx2.lineWidth = 3;
+                    ctx2.beginPath(); ctx2.moveTo(0, -size * 0.6); ctx2.lineTo(0, -size * 1.05); ctx2.stroke();
+                    ctx2.fillStyle = (Date.now() / 300 | 0) % 2 ? '#00d4ff' : '#0077aa';
+                    ctx2.beginPath(); ctx2.arc(0, -size * 1.1, size * 0.09, 0, 6.29); ctx2.fill();
+                } else if (ch.acc === 'horn') {
+                    var grad = ctx2.createLinearGradient(0, -size * 1.1, 0, -size * 0.55);
+                    grad.addColorStop(0, '#fff3c4');
+                    grad.addColorStop(1, '#ffb84d');
+                    ctx2.fillStyle = grad;
+                    ctx2.beginPath();
+                    ctx2.moveTo(-size * 0.13, -size * 0.55);
+                    ctx2.quadraticCurveTo(0, -size * 1.25, size * 0.13, -size * 0.55);
+                    ctx2.fill();
+                }
+                ctx2.restore();
+                void top;
+            }
 
-                // Mechanical Jaw
-                ctx.translate(mouthCenter.x, mouthCenter.y);
-                ctx.rotate(angle);
+            function renderPuppet(p, ch, w, h) {
+                var ang = p.angle;
+                var eyeOff = { x: Math.cos(ang + Math.PI / 2) * p.scale * 0.34, y: Math.sin(ang + Math.PI / 2) * p.scale * 0.34 - Math.sin(ang) * p.scale * 0.1 };
+                var exL = p.x + eyeOff.x, eyL = p.y + eyeOff.y;
+                var exR = p.x - eyeOff.x, eyR = p.y - eyeOff.y;
+                var er = p.scale * 0.21;
 
-                // Metal plates
-                ctx.fillStyle = '#777';
-                ctx.fillRect(-30, -25, 60, 10); // Top jaw
-                ctx.fillRect(-30, 15, 60, 10);  // Bottom jaw
+                if (ch.id === 'ghost') ctx.globalAlpha = 0.88;
 
-                // Connectors
-                ctx.strokeStyle = '#555';
-                ctx.lineWidth = 4;
-                if (isOpen) {
-                    ctx.beginPath();
-                    ctx.moveTo(-25, -15); ctx.lineTo(-25, 15);
-                    ctx.moveTo(25, -15); ctx.lineTo(25, 15);
-                    ctx.stroke();
-                    
-                    // Laser in mouth?
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 10, 0, Math.PI*2);
-                    ctx.fill();
+                drawEye(ctx, ch.eyeStyle, exL, eyL, er, ang, p);
+                drawEye(ctx, ch.eyeStyle, exR, eyR, er, ang, p);
+                if (ch.id === 'monster') {
+                    drawEye(ctx, 'slit', p.x, p.y - p.scale * 0.34, er * 0.9, ang, p);
+                }
+                drawMouth(ctx, ch, p.x, p.y + p.scale * 0.06, ang, p.open, p.scale);
+                if (ch.acc) drawAccessory(ctx, ch, p.x, p.y, ang, p.scale, true);
+
+                if (ch.id === 'ghost') {
+                    ctx.globalAlpha = 1;
                 }
             }
 
-            ctx.restore();
-        }
-
-        function drawGooglyEye(pos, size, angle) {
-            ctx.save();
-            ctx.translate(pos.x, pos.y);
-            ctx.rotate(angle);
-            
-            // White
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(0, 0, size, 0, Math.PI*2);
-            ctx.fill();
-            ctx.strokeStyle = '#ddd';
-            ctx.stroke();
-
-            // Pupil (moves with gravity/random)
-            const pupilOffset = Math.sin(Date.now() / 500) * 5;
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            if (blinkState > 0.5) {
-                // Blink
-                ctx.moveTo(-size, 0);
-                ctx.lineTo(size, 0);
-                ctx.stroke();
-            } else {
-                ctx.arc(pupilOffset, 5, size/3, 0, Math.PI*2);
-                ctx.fill();
+            function drawParticles(dt) {
+                for (var i = particles.length - 1; i >= 0; i--) {
+                    var pt = particles[i];
+                    pt.life -= dt;
+                    if (pt.life <= 0) { particles.splice(i, 1); continue; }
+                    pt.x += pt.vx * dt * 60;
+                    pt.y += pt.vy * dt * 60;
+                    pt.vy += 0.05;
+                    ctx.globalAlpha = clamp(pt.life / pt.m, 0, 1);
+                    ctx.fillStyle = pt.color;
+                    if (pt.star) {
+                        ctx.save();
+                        ctx.translate(pt.x, pt.y);
+                        ctx.rotate(pt.life * 6);
+                        ctx.fillRect(-pt.size / 2, -pt.size / 6, pt.size, pt.size / 3);
+                        ctx.fillRect(-pt.size / 6, -pt.size / 2, pt.size / 3, pt.size);
+                        ctx.restore();
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, pt.size / 2, 0, 6.29);
+                        ctx.fill();
+                    }
+                }
+                ctx.globalAlpha = 1;
             }
-            
-            ctx.restore();
-        }
 
-        function drawMonsterEye(pos, size, angle) {
-            ctx.save();
-            ctx.translate(pos.x, pos.y);
-            ctx.rotate(angle);
-            
-            // Yellow Sclera
-            ctx.fillStyle = '#ffeb3b';
-            ctx.beginPath();
-            ctx.arc(0, 0, size, 0, Math.PI*2);
-            ctx.fill();
-            
-            // Slit Pupil
-            ctx.fillStyle = '#d50000';
-            ctx.beginPath();
-            ctx.ellipse(0, 0, size/4, size/1.5, 0, 0, Math.PI*2);
-            ctx.fill();
+            function anchorParticles() {}
 
-            ctx.restore();
-        }
+            var touchActive = false;
+            function bindTouch() {
+                canvas.addEventListener('pointerdown', function (ev) {
+                    ev.preventDefault();
+                    var rect = canvas.getBoundingClientRect();
+                    if (rect.width <= 0) return;
+                    var x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+                    var y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+                    touchActive = true;
+                    touchPuppet.handIdx = -1;
+                    touchPuppet.hasTarget = true;
+                    touchPuppet.x = x; touchPuppet.y = y;
+                    touchPuppet.prevX = x; touchPuppet.prevY = y;
+                    touchPuppet.open = 0.9;
+                    touchPuppet.scale = Math.min(canvas.width, canvas.height) * 0.11;
+                    touchPuppet.lastBlip = 0;
+                    sfxPop();
+                });
+                canvas.addEventListener('pointermove', function (ev) {
+                    if (!touchActive || appState.trackingLive) return;
+                    var rect = canvas.getBoundingClientRect();
+                    var x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+                    var y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+                    touchPuppet.eyeVX = clamp((x - touchPuppet.x) * 0.3, -12, 12);
+                    touchPuppet.x = x; touchPuppet.y = y;
+                });
+                var release = function () {
+                    if (touchActive) { touchActive = false; touchPuppet.open = 0; }
+                };
+                canvas.addEventListener('pointerup', release);
+                canvas.addEventListener('pointercancel', release);
+            }
 
-        function drawRobotEye(pos, angle) {
-            ctx.save();
-            ctx.translate(pos.x, pos.y);
-            ctx.rotate(angle);
-            
-            // Glow
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#00d4ff';
-            
-            ctx.fillStyle = '#00d4ff';
-            ctx.fillRect(-15, -10, 30, 20);
-            
-            ctx.shadowBlur = 0;
-            ctx.restore();
-        }
+            function draw(now, dt) {
+                if (canvas.width <= 0) return;
+                lastDrawnPuppets = 0;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (appState.cameraStarted && video.readyState === 4) {
+                    ctx.save();
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                }
 
-        loadScripts();
+                var res = window.HandTracker && window.HandTracker.results;
+                var hands = (appState.trackingLive && res && res.multiHandLandmarks) ? res.multiHandLandmarks : null;
+
+                if (hands && hands.length) {
+                    for (var i = 0; i < hands.length && i < 2; i++) {
+                        var p = puppets[i];
+                        updatePuppetFromLandmarks(p, hands[i], canvas.width, canvas.height);
+                        var ch = charFor(i);
+                        speakTick(p, ch, now);
+                        renderPuppet(p, ch, canvas.width, canvas.height);
+                        anchorParticles(p, ch);
+                        lastDrawnPuppets++;
+                    }
+                } else if (touchPuppet.hasTarget) {
+                    var tc = charFor(0);
+                    if (touchPuppet.open > 0.35) speakTick(touchPuppet, tc, now);
+                    renderPuppet(touchPuppet, tc, canvas.width, canvas.height);
+                    anchorParticles(touchPuppet, tc);
+                    lastDrawnPuppets = 1;
+                }
+
+                drawParticles(dt);
+
+                blinkNext -= dt;
+                if (blinkNext <= 0) { blinkT = 0.14; blinkNext = rnd(2.2, 5.5); }
+                if (blinkT > 0) blinkT -= dt;
+            }
+
+            var loopsRunning = false;
+            var lastInfer = 0;
+            var inferFailures = 0;
+            var lastFrame = performance.now();
+            function startLoops() {
+                if (loopsRunning) return;
+                loopsRunning = true;
+                requestAnimationFrame(mainLoop);
+            }
+            function shouldInfer(now) {
+                if (!appState.trackingLive || appState.cameraSkipped || !appState.cameraStarted) return false;
+                if (video.readyState !== 4) return false;
+                return now - lastInfer >= 42;
+            }
+            function doInference(now) {
+                lastInfer = now;
+                var ht = window.HandTracker;
+                if (!ht || !ht.isReady) return;
+                try {
+                    var r = ht.detect(video);
+                    if (r && typeof r.then === 'function') {
+                        r.then(function () { inferFailures = 0; })
+                         .catch(function (e) { handleInferError(e); });
+                    }
+                } catch (e) { handleInferError(e); }
+            }
+            function handleInferError(e) {
+                inferFailures++;
+                console.warn('inference error', e);
+                if (inferFailures > 10) {
+                    appState.trackingLive = false;
+                    appState.trackingDesired = false;
+                    updateChip();
+                    toast('Hand tracking stopped — tap mode on.');
+                    inferFailures = 0;
+                }
+            }
+            function mainLoop(now) {
+                requestAnimationFrame(mainLoop);
+                var dt = clamp((now - lastFrame) / 1000, 0.001, 0.06);
+                lastFrame = now;
+                draw(now, dt);
+                if (!document.hidden && shouldInfer(now)) doInference(now);
+            }
+
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden) { ensureAudio(); lastFrame = performance.now(); }
+            });
+
+            var savedChar = 'sock';
+            try { savedChar = localStorage.getItem('vp_char') || 'sock'; } catch (e) {}
+            var charIndex = Math.max(0, CHARS.findIndex(function (c) { return c.id === savedChar; }));
+
+            function setChar(idx) {
+                charIndex = clamp(idx, 0, CHARS.length - 1);
+                try { localStorage.setItem('vp_char', CHARS[charIndex].id); } catch (e) {}
+                Array.prototype.forEach.call(document.querySelectorAll('.char-btn'), function (b, bi) {
+                    b.classList.toggle('active', bi === charIndex);
+                });
+                sfxBoing();
+                toast(CHARS[charIndex].name + ' takes the stage!');
+            }
+
+            function buildCharRow() {
+                var row = $('charRow');
+                row.innerHTML = '';
+                CHARS.forEach(function (c, idx) {
+                    var b = document.createElement('button');
+                    b.className = 'char-btn' + (idx === charIndex ? ' active' : '');
+                    b.innerHTML = '<span class="cdot" style="background:' + c.dot + ';color:' + c.dot + '"></span>' + c.name;
+                    b.addEventListener('click', function () { ensureAudio(); setChar(idx); });
+                    row.appendChild(b);
+                });
+            }
+
+            function takePhoto() {
+                try {
+                    var url = canvas.toDataURL('image/png');
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'puppeteer-' + Date.now() + '.png';
+                    (document.body || document.head).appendChild(a);
+                    a.click();
+                    setTimeout(function () { if (a.parentElement) a.parentElement.removeChild(a); }, 300);
+                    sfxShutter();
+                    toast('Photo saved!');
+                } catch (e) {
+                    toast('Photo not available here');
+                }
+            }
+
+            $('photoBtn').addEventListener('click', function () { ensureAudio(); takePhoto(); });
+            $('sfxBtn').addEventListener('click', function () {
+                ensureAudio();
+                appState.sfxOn = !appState.sfxOn;
+                if (sfxBus) sfxBus.gain.value = appState.sfxOn ? 0.9 : 0;
+                $('sfxBtn').classList.toggle('sfx-off', !appState.sfxOn);
+                try { localStorage.setItem('vp_sfx_off', appState.sfxOn ? '0' : '1'); } catch (e) {}
+                if (appState.sfxOn) tone(500, 0.06, 'square', 0.06);
+            });
+
+            $('startBtn').addEventListener('click', function () { beginSession(true); });
+            $('skipCam').addEventListener('click', function () { beginSession(false); });
+            $('cam-retry').addEventListener('click', function () {
+                $('cam-overlay').classList.remove('open');
+                startCamera();
+            });
+            $('cam-tapmode').addEventListener('click', function () {
+                $('cam-overlay').classList.remove('open');
+                appState.trackingDesired = false;
+                appState.trackingLive = false;
+                ensureCanvasSize(1280, 720);
+                updateChip();
+                startLoops();
+            });
+            $('status-chip').addEventListener('click', function () {
+                if (appState.trackerReady) {
+                    appState.trackingDesired = !appState.trackingDesired;
+                    appState.trackingLive = appState.trackingDesired;
+                    updateChip();
+                    toast(appState.trackingDesired ? 'Hand tracking on' : 'Hand tracking off \u2014 tap mode');
+                } else if (appState.loaderDone) {
+                    toast('Retrying hand tracker\u2026');
+                    retryLoad(false);
+                }
+            });
+
+            document.addEventListener('pointerdown', function () { ensureAudio(); }, { once: true });
+
+            var hintFaded = false;
+            function fadeHintLater() {
+                if (hintFaded) return;
+                hintFaded = true;
+                setTimeout(function () { $('hint').classList.add('fade'); }, 9000);
+            }
+
+            buildCharRow();
+            bindTouch();
+            updateChip();
+            startLoading();
+            requestAnimationFrame(mainLoop);
+            setInterval(function () { ambientHint(); }, 26000);
+            var hintsShown = 0;
+            function ambientHint() {
+                if (hintsShown++ > 4) return;
+                if (!document.hidden) sayHint();
+            }
+            function sayHint() {
+                var el = $('hint');
+                el.classList.remove('fade');
+                el.textContent = pick([
+                    'Try both hands \u2014 it becomes a duet!',
+                    'Switch characters below the stage.',
+                    'Snap a photo of your best puppet moment.',
+                    'The googly eyes follow your speed!'
+                ]);
+                setTimeout(function () { el.classList.add('fade'); }, 5200);
+            }
+
+            window.__vpDebug = {
+                get state() { return appState; },
+                get lastDrawnPuppets() { return lastDrawnPuppets; },
+                get charIndex() { return charIndex; },
+                CHARS: CHARS,
+                computeMouthOpen: mouthOpenFromRatio,
+                puppets: puppets,
+                touchPuppet: touchPuppet,
+                setChar: setChar,
+                takePhoto: takePhoto,
+                retryLoad: retryLoad,
+                startLoading: startLoading,
+                startCamera: startCamera,
+                beginSession: beginSession,
+                setScriptLoader: function (fn) { customScriptLoader = fn; },
+                MEDIAPIPE_URLS: MEDIAPIPE_URLS,
+                TRACKER_URLS: TRACKER_URLS,
+                LOAD_BUDGET_MS: LOAD_BUDGET_MS
+            };
+        })();
     </script>
 </body>
-<script src="top_buttons.js"></script>
 </html>

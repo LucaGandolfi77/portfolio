@@ -210,10 +210,11 @@
         <div class="instructions">
             <strong data-i18n="games.quantum.rulesTitle">Rules:</strong>
             <ul style="padding-left: 20px; margin: 5px 0;">
-                <li data-i18n="games.quantum.rule1"><strong>Quantum Move:</strong> Select 2 cells to place entangled marks.</li>
-                <li data-i18n="games.quantum.rule2"><strong>Classic Move:</strong> Select 1 cell to place a permanent mark.</li>
-                <li data-i18n="games.quantum.rule3"><strong>Collapse:</strong> When a cycle is formed (e.g. A-B, B-C, C-A), the board collapses into a single state randomly.</li>
-                <li data-i18n="games.quantum.rule4"><strong>Win:</strong> Get 3 permanent marks in a row.</li>
+                <li data-i18n="games.quantum.rule1"><strong>Quantum Move:</strong> Select 2 distinct empty cells to place entangled marks. These marks exist in superposition until collapse.</li>
+                <li data-i18n="games.quantum.rule2"><strong>Classic Move:</strong> Select 1 cell to place a permanent classical mark. Cannot place on cells with quantum marks.</li>
+                <li data-i18n="games.quantum.rule3"><strong>Collapse:</strong> When a cycle is formed (closed loop of entangled moves), the board randomly collapses into one of two possible classical states.</li>
+                <li data-i18n="games.quantum.rule4"><strong>Win:</strong> Get 3 permanent classical marks in a row (rows, columns, or diagonals). Quantum marks do NOT count toward winning.</li>
+                <li data-i18n="games.quantum.rule5"><strong>Entanglement:</strong> Quantum marks are connected - they must collapse together as a unit. Each move affects the entire entangled component.</li>
             </ul>
         </div>
     </div>
@@ -502,29 +503,43 @@
         }
 
         function collapseCycle(cycleMoves) {
-            // Randomly choose one of the two possible collapse states for the cycle
-            // A cycle is a sequence of moves connecting cells.
-            // Actually, simpler approach:
-            // Pick the first move in the cycle. Randomly decide which of its 2 cells it collapses into.
-            // Then propagate this constraint to all other moves in the connected component (entanglement).
+            // According to Wikipedia rules, when a cycle is formed, the board collapses
+            // into one of two possible classical states randomly.
             
             // 1. Identify all moves in the connected component of the cycle
             // (Because collapsing one part of a tangle collapses the whole tangle)
             const activeMoves = quantumMoves.filter(m => !m.collapsed);
             const componentMoves = getConnectedComponent(cycleMoves[0], activeMoves);
 
-            // 2. Randomly pick a collapse configuration
-            // We can simulate this by picking the first move, picking a target cell, and propagating.
-            // If a conflict arises (impossible configuration), we pick the other branch.
-            // But in QTTT, cycles always have 2 valid solutions.
+            // 2. For a cycle, there are exactly 2 valid collapse solutions
+            // We need to randomly choose one and propagate constraints
             
-            // Let's try to resolve the cycle first.
-            // Pick a random move from the cycle
-            const seedMove = cycleMoves[0];
+            // Find the cycle within the component (could be the whole component)
+            const cycleInComponent = componentMoves.filter(m => cycleMoves.includes(m));
+            
+            // Pick a random move from the cycle to start the resolution
+            const seedMove = cycleInComponent[Math.floor(Math.random() * cycleInComponent.length)];
+            
+            // Randomly choose which cell this move collapses to
             const targetCell = Math.random() < 0.5 ? seedMove.cells[0] : seedMove.cells[1];
 
-            // Apply collapse
-            resolveEntanglement(seedMove, targetCell, activeMoves);
+            // Apply collapse with proper constraint propagation
+            resolveEntanglement(seedMove, targetCell, componentMoves);
+            
+            // Verify that all moves in the component have been collapsed
+            const stillActive = componentMoves.filter(m => m.collapsed === false);
+            if (stillActive.length > 0) {
+                console.error("Error: Some moves in the component were not collapsed");
+                // Force collapse of remaining moves (should not happen in valid cycles)
+                stillActive.forEach(m => {
+                    m.collapsed = true;
+                    // Pick a random cell for this move
+                    const randomCell = Math.random() < 0.5 ? m.cells[0] : m.cells[1];
+                    boardState[randomCell] = m.player;
+                    cells[randomCell].classList.add('collapsing');
+                    setTimeout(() => cells[randomCell].classList.remove('collapsing'), 500);
+                });
+            }
         }
 
         function getConnectedComponent(startMove, allMoves) {
@@ -552,14 +567,14 @@
             const queue = [{ move: seedMove, cell: targetCell }];
             solution[seedMove.id] = targetCell;
 
-            // Propagate
-            // If Move M collapses to Cell C, then any other Move M' sharing Cell C CANNOT collapse to C.
-            // Since M' has only 2 cells, it MUST collapse to the other one.
+            // Propagate constraints through the connected component
+            // If Move M collapses to Cell C, then any other Move M' sharing Cell C
+            // MUST collapse to its other cell (since each move has exactly 2 cells)
             
             // We need to process the whole connected component
             const component = getConnectedComponent(seedMove, allMoves);
             
-            // Simple propagation loop
+            // Constraint propagation loop
             let changed = true;
             while(changed) {
                 changed = false;
@@ -580,10 +595,10 @@
                         solution[m.id] = c1;
                         changed = true;
                     } else if (taken1 && taken2) {
-                        // Conflict? In a simple cycle this shouldn't happen if valid.
-                        // But if it does, it means the random choice was invalid for the whole graph?
-                        // In QTTT, a cycle implies a choice.
-                        console.warn("Conflict in collapse");
+                        // This should not happen in a valid cycle
+                        // If it does, we have an invalid configuration
+                        console.error("Invalid entanglement configuration - conflict detected");
+                        return;
                     }
                 }
             }
@@ -598,13 +613,9 @@
                     cells[cellIdx].classList.add('collapsing');
                     setTimeout(() => cells[cellIdx].classList.remove('collapsing'), 500);
                 } else {
-                    // Move didn't get a spot (shouldn't happen in perfect cycle, but possible in complex tangles?)
-                    // In QTTT, every move in the cycle becomes real.
-                    // Moves branching off the cycle might not?
-                    // Actually, if a move is not forced, it remains quantum?
-                    // Standard rule: Only the cycle collapses.
-                    // But we are simplifying: "Decays randomly".
-                    // Let's just collapse what we can.
+                    // This should not happen in a proper cycle
+                    // If a move in the component is not resolved, it's an error
+                    console.error("Move in component not resolved during collapse");
                 }
             }
         }
