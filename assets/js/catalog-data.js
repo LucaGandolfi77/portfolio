@@ -21,7 +21,6 @@
 
   const projectExtras = [
     ['audio-editor-pwa-wrapper', 'Audio Editor PWA', 'Standalone launcher for the browser audio editor.', 'projects/audio-editor-pwa.html', '◉', 'audio', ['Audio', 'PWA']],
-    ['audio-editor-pwa', 'Audio Editor PWA App', 'Offline-oriented waveform and audio editing workspace.', 'projects/audio-editor-pwa/index.html', '◉', 'audio', ['Audio', 'PWA']],
     ['beer', 'Beer Explorer', 'A playful browser experiment about beers and tasting notes.', 'projects/beer.html', '🍺', 'creative', ['Creative']],
     ['due-lumi-wrapper', 'I Due Lumi', 'Launcher for the pixel adventure game.', 'projects/due-lumi.html', '☼', 'games', ['RPG', 'Launcher']],
     ['due-lumi', 'I Due Lumi App', 'A compact pixel adventure with story, combat, and exploration.', 'projects/due-lumi/index.html', '☼', 'games', ['RPG', 'Canvas']],

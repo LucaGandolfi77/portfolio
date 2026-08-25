@@ -96,14 +96,25 @@ if (!document.getElementById('site-top-bar')) {
     });
     langSelect.addEventListener('change', () => setLang(langSelect.value));
     async function loadTranslations(lang) {
-      // Try current folder, then parent folder (useful for pages inside /games/), then try two levels up,
-      // then fall back to site root. Return true on success.
+      // Resolve i18n/ relative to the current page depth so the FIRST
+      // candidate is already correct — no 404 noise on Live Server,
+      // GitHub Pages subpaths, or file:// previews. Extra candidates are
+      // fallbacks for unusual hosting layouts.
+      let up;
+      const p = location.pathname || '/';
+      if (p.endsWith('/')) {
+        up = './';
+      } else {
+        const segs = p.split('/').filter(Boolean);
+        const dirs = Math.max(0, segs.length - 1);
+        up = dirs === 0 ? './' : '../'.repeat(dirs);
+      }
       const candidates = [
+        `${up}i18n/${lang}.json`,
         `./i18n/${lang}.json`,
         `../i18n/${lang}.json`,
-        `../../i18n/${lang}.json`,
-        `/portfolio/i18n/${lang}.json`,
-        `/i18n/${lang}.json`
+        `/i18n/${lang}.json`,
+        `/portfolio/i18n/${lang}.json`
       ];
 
       for (const path of candidates) {

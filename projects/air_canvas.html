@@ -97,12 +97,34 @@
             font-size: 14px;
             pointer-events: none;
         }
+        #load-error {
+            margin-top: 18px;
+            color: #ff5f7a;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.5;
+        }
+        .retry-btn {
+            margin-top: 14px;
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 10px 26px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <div id="loader-overlay">
         <div class="loader-text">Loading AI Libraries... <span id="time-left"></span></div>
         <div class="progress-container"><div id="progress-bar"></div></div>
+        <div id="load-error" class="hidden">Unable to load AI libraries.<br>Check your connection and retry.</div>
+        <button id="retry-btn" class="retry-btn hidden" onclick="startLoading()">Retry</button>
     </div>
     
     <div id="toolbar">
@@ -159,53 +181,127 @@
         }
 
         // Load Scripts with Progress
-        async function loadScripts() {
-            const scripts = [
-                'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs', 
-                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
-                'assets/js/hand_tracker.js'
-            ];
-            
-            const progressBar = document.getElementById('progress-bar');
-            const timeLeft = document.getElementById('time-left');
-            let loaded = 0;
-            
-            for (let i = 0; i < scripts.length; i++) {
-                await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('GET', scripts[i]);
-                    xhr.onprogress = (e) => {
-                        if (e.lengthComputable) {
-                            const percent = ((loaded + (e.loaded / e.total)) / scripts.length) * 100;
-                            progressBar.style.width = percent + '%';
-                            timeLeft.textContent = Math.round(100 - percent) + '% left';
-                        }
-                    };
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            const script = document.createElement('script');
-                            script.text = xhr.responseText;
-                            document.body.appendChild(script);
-                            loaded++;
-                            progressBar.style.width = (loaded / scripts.length * 100) + '%';
-                            resolve();
-                        } else {
-                            reject();
-                        }
-                    };
-                    xhr.onerror = reject;
-                    xhr.send();
-                });
+        const progressBar = document.getElementById('progress-bar');
+        const timeLeftEl = document.getElementById('time-left');
+        const errBox = document.getElementById('load-error');
+        const retryBtn = document.getElementById('retry-btn');
+
+        function insertScript(url, timeoutMs) {
+            return new Promise((resolve, reject) => {
+                let done = false;
+                const s = document.createElement('script');
+                s.src = url;
+                s.crossOrigin = 'anonymous';
+                const timer = setTimeout(() => {
+                    if (done) return;
+                    done = true;
+                    reject(new Error('timeout: ' + url));
+                }, timeoutMs || 12000);
+                s.onload = () => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    resolve();
+                };
+                s.onerror = () => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    reject(new Error('network error: ' + url));
+                };
+                (document.body || document.head).appendChild(s);
+            });
+        }
+
+        async function loadFirst(urls, perTimeout) {
+            let lastErr = new Error('no source');
+            for (const u of urls) {
+                try {
+                    console.log('[loader] trying ' + u);
+                    await insertScript(u, perTimeout);
+                    return;
+                } catch (e) {
+                    lastErr = e;
+                }
             }
-            
-            // Wait a bit for evaluation
-            setTimeout(() => {
-                document.getElementById('loader-overlay').style.opacity = 0;
+            throw lastErr;
+        }
+
+        function withTimeout(promise, ms, tag) {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error('timeout: ' + tag)), ms);
+                promise.then(
+                    (v) => { clearTimeout(timer); resolve(v); },
+                    (e) => { clearTimeout(timer); reject(e); }
+                );
+            });
+        }
+
+        const MEDIAPIPE_URLS = [
+            'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+            'https://unpkg.com/@mediapipe/hands/hands.js'
+        ];
+        const TRACKER_URLS = [
+            '../assets/js/hand_tracker.js',
+            '/assets/js/hand_tracker.js'
+        ];
+        const LOAD_BUDGET_MS = 25000;
+
+        function setProgress(v) {
+            progressBar.style.width = Math.round(v * 100) + '%';
+            timeLeftEl.textContent = v >= 1 ? '' : Math.round(100 - v * 100) + '% left';
+        }
+
+        function showLoadError(err) {
+            timeLeftEl.textContent = '';
+            errBox.classList.remove('hidden');
+            retryBtn.classList.remove('hidden');
+            console.error('[loader] failed:', err && err.message || String(err));
+        }
+
+        let loading = false;
+        async function startLoading() {
+            if (loading) return;
+            loading = true;
+
+            errBox.classList.add('hidden');
+            retryBtn.classList.add('hidden');
+            setProgress(0);
+
+            let failed = false;
+            const budget = setTimeout(() => { failed = true; }, LOAD_BUDGET_MS);
+
+            try {
+                setProgress(0.05);
+                await loadFirst(MEDIAPIPE_URLS, 9000);
+                if (!window.Hands) throw new Error('Hands library missing after load');
+                setProgress(0.3);
+
+                timeLeftEl.textContent = 'Loading tracker\u2026';
+                await loadFirst(TRACKER_URLS, 9000);
+                if (!window.HandTracker) throw new Error('HandTracker missing after load');
+                setProgress(0.6);
+
+                timeLeftEl.textContent = 'Initializing AI model\u2026';
+                await withTimeout(window.HandTracker.load(), 14000, 'model init');
+
+                if (failed) throw new Error('timeout: overall budget');
+                clearTimeout(budget);
+                setProgress(1);
+
                 setTimeout(() => {
-                    document.getElementById('loader-overlay').style.display = 'none';
-                    initHandTracker();
-                }, 500);
-            }, 500);
+                    document.getElementById('loader-overlay').style.opacity = 0;
+                    setTimeout(() => {
+                        document.getElementById('loader-overlay').style.display = 'none';
+                        initHandTracker();
+                    }, 500);
+                }, 300);
+            } catch (err) {
+                clearTimeout(budget);
+                showLoadError(err);
+            } finally {
+                loading = false;
+            }
         }
 
         // Initialize Camera
@@ -371,7 +467,7 @@
         }
 
         // Start
-        loadScripts();
+        startLoading();
         initCamera();
     </script>
 </body>

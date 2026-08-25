@@ -120,7 +120,7 @@ function updateControl(poses) {
     if (p[wr].visibility < 0.4 || p[sh].visibility < 0.4) continue;
     arms.push({
       up: clamp((my(sh) - my(wr)) * 2.6, -1, 1),
-      lat: clamp((mx(wr) - mx(sh)) * 3.0, -1, 1),
+      lat: clamp((mx(sh) - mx(wr)) * 3.0, -1, 1),
       x: mx(wr),
       y: my(wr),
     });
@@ -137,12 +137,12 @@ function updateControl(poses) {
   const yawT = (opts.invYaw ? -1 : 1) * lat / arms.length;
   ctrl.yaw = smooth(ctrl.yaw, yawT, 5, lastDt);
 
-  /* roll: braccio a SINISTRA nello schermo (specchiato) più alto ->
-     inclinazione a SINISTRA (roll<0 = ala sinistra giù = bank a sinistra).
+  /* roll: braccio abbassato -> ala corrispondente giù e virata verso
+     quello stesso lato (roll>0 = ala destra giù = bank a destra).
      mx() usa lo stesso specchio del preview, quindi i gesti corrispondono
      1:1 a ciò che si vede nella videocamera interna. */
   if (arms.length === 2) {
-    const r = clamp((arms[0].y - arms[1].y) * 3.4, -1, 1);
+    const r = clamp((arms[1].y - arms[0].y) * 3.4, -1, 1);
     const rollT = (opts.invRoll ? -1 : 1) * r;
     ctrl.roll = smooth(ctrl.roll, rollT, 6, lastDt);
   } else {
@@ -728,11 +728,11 @@ function updateBird(dt) {
   const targetRoll = ctrl.roll * 0.9 * (ctrl.dive ? 0.35 : 1);
   bird.roll += (targetRoll - bird.roll) * Math.min(1, 5 * dt);
 
-  /* yaw: bank-to-turn (roll<0 = inclinazione a sinistra -> gira a
-     sinistra) + input diretto (braccia spostate a destra NELLO SPECCHIO
-     della videocamera -> gira a destra). Mappatura verificata: ali piegate
-     o spostate a sinistra come appaiono nel preview frontale -> l'uccello
-     vira a sinistra sullo schermo (mx() specchia X esattamente come il
+  /* yaw: bank-to-turn (roll>0 = ala destra giù -> gira a destra) +
+     input diretto (braccia spostate a destra NELLO SPECCHIO della
+     videocamera -> gira a destra). Mappatura verificata: ali piegate o
+     spostate a destra come appaiono nel preview frontale -> l'uccello
+     vira a destra sullo schermo (mx() specchia X esattamente come il
      preview, quindi gesto e risultato coincidono sempre). */
   const yawRate = -(bird.roll * 1.35 + ctrl.yaw * 1.7);
   bird.yaw += yawRate * dt;

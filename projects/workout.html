@@ -2,451 +2,1064 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bodyweight Workout Timer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Pulse — a modern bodyweight circuit timer. No equipment, no gym: pick a circuit, hit start, and let the timer drive your workout. Works on iPhone and desktop.">
+    <meta name="theme-color" content="#0b1026">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- iOS / PWA niceties -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pulse">
+    <link rel="manifest" href="../manifest.json">
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%AA%3C/text%3E%3C/svg%3E">
+
+    <title data-i18n="workout.page.title">Bodyweight Circuit Timer</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- State-of-the-art confetti (tiny, CDN, SRI-pinned) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" integrity="sha384-sPwMflxqfAN+Q5mvlkLmHiX3PORGbZSXHiSGPTXT9VHCD/AB+b+r+vJWsqprv+7k" crossorigin="anonymous"></script>
+
     <style>
         :root {
-            --bg: #0f1724;
-            --card: #1a2a3a;
-            --accent: #00d4ff;
-            --text: #e6f1ff;
-            --text-dim: #a0c0e0;
-            --success: #2ecc71;
-            --warning: #f1c40f;
-            --danger: #e74c3c;
+            color-scheme: dark;
+            --bg0: #05060f;
+            --bg1: #0b1026;
+            --card: rgba(255, 255, 255, 0.055);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text: #eaf2ff;
+            --text-dim: #93a4c3;
+            --cyan: #22d3ee;
+            --violet: #a78bfa;
+            --fuchsia: #e879f9;
+            --work: #34d399;
+            --rest: #fbbf24;
+            --complete: #f472b6;
+            --phase: #22d3ee;
+            --phase-glow: rgba(34, 211, 238, 0.55);
+            --radius: 22px;
+            --bar-h: 36px;
+            --font-display: 'Space Grotesk', 'Inter', sans-serif;
+            --font-body: 'Inter', system-ui, -apple-system, sans-serif;
         }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; }
         body {
-            background-color: var(--bg);
+            min-height: 100dvh;
+            background: var(--bg0);
             color: var(--text);
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
+            font-family: var(--font-body);
+            overscroll-behavior-y: none;
+            -webkit-font-smoothing: antialiased;
         }
-        .container {
-            max-width: 800px;
+        button { font-family: inherit; }
+
+        /* ---------- animated aurora backdrop ---------- */
+        .aurora {
+            position: fixed; inset: 0; z-index: -1; overflow: hidden;
+            background: linear-gradient(160deg, var(--bg0), var(--bg1) 58%, #140b30);
+        }
+        .aurora::before, .aurora::after {
+            content: ""; position: absolute; width: 75vmax; height: 75vmax;
+            border-radius: 50%; filter: blur(90px); opacity: .5; will-change: transform;
+        }
+        .aurora::before {
+            background: radial-gradient(circle at 30% 30%, rgba(34, 211, 238, .38), transparent 62%);
+            animation: drift1 26s ease-in-out infinite alternate;
+        }
+        .aurora::after {
+            background: radial-gradient(circle at 72% 70%, rgba(167, 139, 250, .42), transparent 62%);
+            animation: drift2 34s ease-in-out infinite alternate;
+        }
+        @keyframes drift1 { from { transform: translate(-12%, -8%) scale(1); } to { transform: translate(10%, 14%) scale(1.18); } }
+        @keyframes drift2 { from { transform: translate(9%, 11%) scale(1.12); } to { transform: translate(-11%, -7%) scale(1); } }
+        @media (prefers-reduced-motion: reduce) {
+            .aurora::before, .aurora::after { animation: none; }
+        }
+
+        /* ---------- layout ---------- */
+        .shell {
+            max-width: 1120px;
             margin: 0 auto;
-            padding: 20px;
+            padding: calc(28px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom));
             width: 100%;
-            box-sizing: border-box;
         }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        .masthead {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; flex-wrap: wrap; margin-bottom: 22px;
         }
-        .back-btn {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .brand-mark {
+            width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center;
+            font-size: 26px; border-radius: 16px;
+            background: linear-gradient(135deg, rgba(34,211,238,.25), rgba(232,121,249,.25));
+            border: 1px solid var(--card-border);
+            box-shadow: 0 0 30px rgba(34, 211, 238, .25);
         }
-        
-        /* Categories */
-        .categories {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-            scrollbar-width: none;
+        .brand h1 {
+            margin: 0; font-family: var(--font-display); font-size: clamp(20px, 4.5vw, 28px);
+            font-weight: 700; letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #67e8f9, #c4b5fd 60%, #f0abfc);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
         }
-        .cat-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text-dim);
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
+        .tagline { margin: 3px 0 0; color: var(--text-dim); font-size: 13.5px; }
+
+        .toggles { display: flex; gap: 8px; }
+        .toggle {
+            display: flex; align-items: center; gap: 7px;
+            padding: 9px 14px; border-radius: 999px; cursor: pointer;
+            background: rgba(255,255,255,.05); border: 1px solid var(--card-border);
+            color: var(--text-dim); font-size: 13px; font-weight: 600;
+            min-height: 44px; transition: all .2s ease; touch-action: manipulation;
         }
-        .cat-btn.active {
-            background: var(--accent);
-            color: #000;
-            border-color: var(--accent);
-            font-weight: bold;
+        .toggle.is-on {
+            background: rgba(34, 211, 238, .16); border-color: rgba(34, 211, 238, .55);
+            color: var(--text); box-shadow: 0 0 18px rgba(34, 211, 238, .22);
         }
 
-        /* Exercise List */
-        .exercise-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 40px;
+        /* ---------- category chips ---------- */
+        .chips {
+            display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 14px;
+            margin-bottom: 18px; scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
         }
-        .exercise-card {
+        .chips::-webkit-scrollbar { display: none; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+            background: rgba(255,255,255,.05); border: 1px solid var(--card-border);
+            color: var(--text-dim); font-size: 13.5px; font-weight: 600;
+            min-height: 44px; transition: all .2s ease; touch-action: manipulation;
+        }
+        .chip.is-active {
+            background: linear-gradient(135deg, rgba(34,211,238,.28), rgba(167,139,250,.28));
+            border-color: rgba(34, 211, 238, .7); color: #fff;
+            box-shadow: 0 4px 22px rgba(34, 211, 238, .28);
+        }
+        .chip:disabled { opacity: .45; cursor: not-allowed; }
+
+        /* ---------- panels ---------- */
+        .grid {
+            display: grid; gap: 18px;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 920px) {
+            .grid { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); align-items: start; }
+        }
+        .panel {
             background: var(--card);
-            padding: 15px;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.05);
-            cursor: pointer;
-            transition: transform 0.2s;
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(20px) saturate(140%);
+            -webkit-backdrop-filter: blur(20px) saturate(140%);
+            box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+            padding: 20px;
         }
-        .exercise-card:hover {
-            transform: translateY(-3px);
-            border-color: var(--accent);
+        .panel-head {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
         }
-        .ex-name { font-weight: bold; margin-bottom: 5px; }
-        .ex-muscle { font-size: 0.8rem; color: var(--text-dim); }
+        .panel-head h2 { margin: 0; font-family: var(--font-display); font-size: 17px; letter-spacing: .02em; }
+        .count-pill {
+            font-size: 12px; font-weight: 700; color: var(--text);
+            background: rgba(255,255,255,.08); border: 1px solid var(--card-border);
+            padding: 4px 11px; border-radius: 999px;
+        }
 
-        /* Timer Section */
-        .timer-section {
-            background: rgba(0,0,0,0.3);
-            border-radius: 20px;
-            padding: 30px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            display: none; /* Hidden by default */
+        /* ---------- exercise list ---------- */
+        .exercise-list {
+            display: grid; grid-template-columns: 1fr; gap: 10px;
+            max-height: none; overflow: visible;
         }
-        .timer-section.active { display: block; }
-        
-        .timer-display {
-            font-size: 80px;
-            font-weight: 800;
-            font-variant-numeric: tabular-nums;
-            margin: 20px 0;
-            color: var(--accent);
+        @media (min-width: 920px) {
+            .exercise-list {
+                max-height: min(58vh, 540px); overflow-y: auto; padding-right: 6px;
+                scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+            }
         }
-        .timer-state {
-            font-size: 24px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: bold;
+        .ex-card {
+            position: relative; display: flex; align-items: center; gap: 13px;
+            padding: 12px 14px; border-radius: 16px; cursor: pointer;
+            background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, opacity .18s ease;
+            touch-action: manipulation; user-select: none;
         }
-        .state-work { color: var(--success); }
-        .state-rest { color: var(--warning); }
-        
+        .ex-card:hover { transform: translateY(-2px); border-color: rgba(34, 211, 238, .5); }
+        .ex-card:active { transform: scale(.985); }
+        .ex-icon {
+            width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center;
+            font-size: 21px; border-radius: 13px;
+            background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
+        }
+        .ex-info { min-width: 0; flex: 1; }
+        .ex-name { font-weight: 700; font-size: 14.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ex-muscle { font-size: 11.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+        .ex-card.is-current {
+            border-color: var(--phase);
+            box-shadow: 0 0 0 1px var(--phase), 0 10px 34px var(--phase-glow);
+            background: rgba(255,255,255,.07);
+            transform: translateY(-1px);
+        }
+        .ex-card.is-done { opacity: .48; }
+        .ex-check {
+            position: absolute; top: -7px; right: -7px; width: 24px; height: 24px;
+            display: grid; place-items: center; border-radius: 50%;
+            background: linear-gradient(135deg, var(--work), #059669); color: #04110a;
+            font-size: 13px; font-weight: 800; box-shadow: 0 4px 14px rgba(52, 211, 153, .5);
+            transform: scale(0); transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+        }
+        .ex-card.is-done .ex-check { transform: scale(1); }
+        .ex-play {
+            position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+            color: var(--phase); font-size: 13px; opacity: 0; transition: opacity .2s;
+        }
+        .ex-card.is-current .ex-play { opacity: 1; }
+
+        /* ---------- timer panel ---------- */
+        .timer-panel { position: relative; overflow: hidden; }
+        .timer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+        .phase-badge {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 800;
+            letter-spacing: .14em; text-transform: uppercase; color: #04100c;
+            background: var(--phase); box-shadow: 0 0 22px var(--phase-glow);
+            transition: background .3s ease, box-shadow .3s ease;
+        }
+        .phase-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(0,0,0,.55); animation: blink 1.2s ease-in-out infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+        .ex-title { margin: 10px 0 0; font-family: var(--font-display); font-size: clamp(20px, 5vw, 26px); font-weight: 700; letter-spacing: -.01em; }
+        .progress-meta { font-size: 12px; color: var(--text-dim); text-align: right; line-height: 1.5; white-space: nowrap; }
+
+        /* ring */
+        .ring-wrap { position: relative; width: min(78vw, 280px); margin: 8px auto 4px; }
+        .ring { width: 100%; height: auto; transform: rotate(-90deg); display: block; }
+        .ring-track { fill: none; stroke: rgba(255, 255, 255, .08); stroke-width: 13; }
+        .ring-fill {
+            fill: none; stroke: url(#ringGrad); stroke-width: 13; stroke-linecap: round;
+            stroke-dasharray: 741.42; stroke-dashoffset: 0;
+            transition: stroke-dashoffset .9s linear;
+            filter: drop-shadow(0 0 16px var(--phase-glow));
+        }
+        .ring-center {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 2px; text-align: center;
+        }
+        .time {
+            font-family: var(--font-display); font-weight: 700;
+            font-size: clamp(52px, 16vw, 72px); line-height: 1;
+            font-variant-numeric: tabular-nums; color: var(--phase);
+            text-shadow: 0 0 34px var(--phase-glow);
+            transition: color .3s ease, text-shadow .3s ease;
+            letter-spacing: -0.03em;
+        }
+        .time-label {
+            font-size: 12.5px; font-weight: 800; letter-spacing: .34em;
+            text-transform: uppercase; color: var(--text-dim); margin-top: 8px;
+        }
+
+        /* next strip */
+        .next-strip {
+            display: flex; align-items: center; justify-content: center; gap: 9px;
+            margin: 14px 0 4px; padding: 11px 14px; border-radius: 14px;
+            background: rgba(255,255,255,.045); border: 1px dashed rgba(255,255,255,.14);
+            font-size: 13.5px;
+        }
+        .next-label { color: var(--text-dim); font-weight: 600; }
+        .next-value { font-weight: 700; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* settings steppers */
+        .settings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 14px; }
+        .stepper { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .stepper-label { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
+        .stepper-ctl {
+            display: flex; align-items: center; gap: 2px;
+            background: rgba(255,255,255,.06); border: 1px solid var(--card-border);
+            border-radius: 14px; padding: 4px;
+        }
+        .step-btn {
+            width: 42px; height: 42px; border: none; border-radius: 11px; cursor: pointer;
+            background: rgba(255,255,255,.07); color: var(--text);
+            font-size: 20px; font-weight: 700; line-height: 1;
+            transition: background .15s ease, transform .1s ease; touch-action: manipulation;
+        }
+        .step-btn:active { transform: scale(.9); background: rgba(34, 211, 238, .25); }
+        .step-val {
+            width: 58px; text-align: center; border: none; background: transparent;
+            color: var(--text); font-family: var(--font-display); font-weight: 700;
+            font-size: 22px; padding: 6px 0; outline: none; appearance: none;
+            -webkit-appearance: none; -moz-appearance: textfield;
+        }
+
+        /* controls */
         .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
+            display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 10px;
+            position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
         }
         .btn {
-            padding: 12px 24px;
-            border-radius: 50px;
-            border: none;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: opacity 0.2s;
+            min-height: 54px; border: none; border-radius: 16px; cursor: pointer;
+            font-size: 15px; font-weight: 800; letter-spacing: .04em;
+            transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease, background .2s ease;
+            touch-action: manipulation; padding: 0 12px;
         }
-        .btn:active { opacity: 0.8; }
-        .btn-primary { background: var(--accent); color: #000; }
-        .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
-        .btn-skip { background: var(--warning); color: #000; }
-        
-        .settings {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 20px;
-            color: var(--text-dim);
+        .btn:active { transform: scale(.96); }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cyan), var(--violet) 65%, var(--fuchsia));
+            color: #071018;
+            box-shadow: 0 8px 30px rgba(34, 211, 238, .35), 0 4px 16px rgba(167, 139, 250, .3);
         }
-        .setting-group { display: flex; align-items: center; gap: 10px; }
-        input[type="number"] {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            padding: 5px;
-            border-radius: 5px;
-            width: 60px;
-            text-align: center;
+        .btn-primary:hover { box-shadow: 0 10px 40px rgba(34, 211, 238, .5), 0 4px 20px rgba(167, 139, 250, .4); }
+        .btn-ghost { background: rgba(255,255,255,.07); color: var(--text); border: 1px solid var(--card-border); }
+        .btn-ghost:hover { background: rgba(255,255,255,.12); }
+        .btn-skip { background: rgba(251, 191, 36, .14); color: var(--rest); border: 1px solid rgba(251, 191, 36, .4); }
+        .btn-skip:hover { background: rgba(251, 191, 36, .22); }
+
+        /* completion note */
+        .complete-note {
+            margin-top: 16px; padding: 18px; border-radius: 18px; text-align: center;
+            background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(232,121,249,.14));
+            border: 1px solid rgba(232, 121, 249, .4);
+            box-shadow: 0 0 40px rgba(232, 121, 249, .18);
+            animation: pop .45s cubic-bezier(.34, 1.56, .64, 1);
+        }
+        @keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .cn-title { font-family: var(--font-display); font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+        .cn-stats { color: var(--text-dim); font-size: 14px; margin-bottom: 16px; }
+
+        .hint {
+            text-align: center; color: var(--text-dim); font-size: 12px;
+            margin-top: 24px; opacity: .8;
+        }
+        .kbd {
+            display: inline-block; padding: 2px 7px; margin: 0 2px; border-radius: 6px;
+            border: 1px solid var(--card-border); background: rgba(255,255,255,.07);
+            font-family: var(--font-display); font-size: 11px; color: var(--text);
+        }
+        @media (hover: none), (pointer: coarse) {
+            .kbd-hints { display: none; }
         }
 
-        /* Progress Bar (linear) */
-        .progress-ring {
-            position: relative;
-            width: 320px;
-            height: 24px;
-            margin: 0 auto;
-        }
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 8px;
-            overflow: hidden;
-            margin-top: 12px;
-        }
-        .progress-fill {
-            height: 100%;
-            width: 100%;
-            background: var(--accent);
-            transform-origin: left center;
-            transition: width 0.2s linear;
-        }
-        .timer-overlay {
-            position: absolute;
-            top: -86px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            width: 100%;
+        /* phase-driven accents */
+        [data-phase="ready"]   { --phase: var(--cyan);    --phase-glow: rgba(34, 211, 238, .55); }
+        [data-phase="work"]    { --phase: var(--work);    --phase-glow: rgba(52, 211, 153, .55); }
+        [data-phase="rest"]    { --phase: var(--rest);    --phase-glow: rgba(251, 191, 36, .5); }
+        [data-phase="complete"]{ --phase: var(--complete);--phase-glow: rgba(244, 114, 182, .55); }
+
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
         }
     </style>
 </head>
 <body>
+    <div class="aurora" aria-hidden="true"></div>
 
-    <div class="container">
-        <header class="header">
-            <h1 style="margin:0; font-size:20px;">Bodyweight Timer ⏱️</h1>
+    <main class="shell" id="app" data-phase="ready">
+        <header class="masthead">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">⚡</div>
+                <div>
+                    <h1 data-i18n="workout.page.heading">Bodyweight Circuit Timer</h1>
+                    <p class="tagline" data-i18n="workout.page.tagline">No equipment. No gym. Just you.</p>
+                </div>
+            </div>
+            <div class="toggles">
+                <button class="toggle is-on" id="toggleSound" type="button" aria-pressed="true" title="Toggle sounds">
+                    <span aria-hidden="true">🔊</span><span data-i18n="workout.sound">Sound</span>
+                </button>
+                <button class="toggle" id="toggleVoice" type="button" aria-pressed="false" title="Toggle voice coach">
+                    <span aria-hidden="true">🗣️</span><span data-i18n="workout.voice">Voice</span>
+                </button>
+            </div>
         </header>
 
-        <div class="categories" id="categoryList">
-            <button class="cat-btn active" onclick="filterExercises('all')">All</button>
-            <button class="cat-btn" onclick="filterExercises('chest')">Chest</button>
-            <button class="cat-btn" onclick="filterExercises('legs')">Legs</button>
-            <button class="cat-btn" onclick="filterExercises('abs')">Abs</button>
-            <button class="cat-btn" onclick="filterExercises('back')">Back</button>
-            <button class="cat-btn" onclick="filterExercises('cardio')">Cardio</button>
-        </div>
+        <nav class="chips" id="chipRow" aria-label="Filter exercises">
+            <button class="chip is-active" data-category="all" type="button"><span class="chip-icon" aria-hidden="true">✨</span><span data-i18n="workout.categories.all">All</span></button>
+            <button class="chip" data-category="chest" type="button"><span class="chip-icon" aria-hidden="true">💪</span><span data-i18n="workout.categories.chest">Chest</span></button>
+            <button class="chip" data-category="legs" type="button"><span class="chip-icon" aria-hidden="true">🦵</span><span data-i18n="workout.categories.legs">Legs</span></button>
+            <button class="chip" data-category="abs" type="button"><span class="chip-icon" aria-hidden="true">🔥</span><span data-i18n="workout.categories.abs">Abs</span></button>
+            <button class="chip" data-category="back" type="button"><span class="chip-icon" aria-hidden="true">🧗</span><span data-i18n="workout.categories.back">Back</span></button>
+            <button class="chip" data-category="cardio" type="button"><span class="chip-icon" aria-hidden="true">❤️</span><span data-i18n="workout.categories.cardio">Cardio</span></button>
+        </nav>
 
-        <div class="exercise-list" id="exerciseList">
-            <!-- Injected via JS -->
-        </div>
-
-        <div class="timer-section" id="timerSection">
-            <h2 id="currentExerciseName">Select an Exercise</h2>
-            
-            <div class="settings">
-                <div class="setting-group">
-                    <label>Work (s)</label>
-                    <input type="number" id="workTimeInput" value="45">
+        <section class="grid">
+            <!-- Exercise library -->
+            <div class="panel list-panel">
+                <div class="panel-head">
+                    <h2 data-i18n="workout.circuit">Circuit</h2>
+                    <span class="count-pill" id="listCount">0</span>
                 </div>
-                <div class="setting-group">
-                    <label>Rest (s)</label>
-                    <input type="number" id="restTimeInput" value="15">
-                </div>
+                <div class="exercise-list" id="exerciseList" role="list"></div>
             </div>
 
-            <div class="progress-ring">
-                <div class="timer-overlay">
-                    <div class="timer-state" id="timerState">READY</div>
-                    <div class="timer-display" id="timerDisplay">00:00</div>
+            <!-- Timer console -->
+            <div class="panel timer-panel">
+                <div class="timer-head">
+                    <div>
+                        <div class="phase-badge"><span class="dot" aria-hidden="true"></span><span id="phaseLabel" data-i18n="workout.state.ready">Ready</span></div>
+                        <h2 class="ex-title" id="currentName">—</h2>
+                    </div>
+                    <div class="progress-meta" id="progressMeta" aria-live="polite">—</div>
                 </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-            </div>
 
-            <div class="controls">
-                <button class="btn btn-primary" id="btnStart" onclick="toggleTimer()">START</button>
-                <button class="btn btn-secondary" onclick="resetTimer()">RESET</button>
-                <button class="btn btn-skip" id="btnSkip" onclick="skipRest()" style="display:none;">SKIP REST</button>
+                <div class="ring-wrap">
+                    <svg class="ring" viewBox="0 0 260 260" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#22d3ee"/>
+                                <stop offset="55%" stop-color="#a78bfa"/>
+                                <stop offset="100%" stop-color="#e879f9"/>
+                            </linearGradient>
+                        </defs>
+                        <circle class="ring-track" cx="130" cy="130" r="118"/>
+                        <circle class="ring-fill" id="ringFill" cx="130" cy="130" r="118"/>
+                    </svg>
+                    <div class="ring-center">
+                        <div class="time" id="timerDisplay" role="timer" aria-live="off">00:00</div>
+                        <div class="time-label" id="timeLabel">GET READY</div>
+                    </div>
+                </div>
+
+                <div class="next-strip">
+                    <span class="next-label" data-i18n="workout.next">Next up</span>
+                    <span class="next-value" id="nextValue">—</span>
+                </div>
+
+                <div class="settings">
+                    <div class="stepper">
+                        <span class="stepper-label" data-i18n="workout.settings.work">Work</span>
+                        <div class="stepper-ctl">
+                            <button class="step-btn" data-key="work" data-delta="-5" type="button" aria-label="Decrease work time">−</button>
+                            <input id="workInput" class="step-val" type="text" inputmode="numeric" pattern="[0-9]*" readonly value="45" aria-label="Work seconds">
+                            <button class="step-btn" data-key="work" data-delta="5" type="button" aria-label="Increase work time">+</button>
+                        </div>
+                    </div>
+                    <div class="stepper">
+                        <span class="stepper-label" data-i18n="workout.settings.rest">Rest</span>
+                        <div class="stepper-ctl">
+                            <button class="step-btn" data-key="rest" data-delta="-5" type="button" aria-label="Decrease rest time">−</button>
+                            <input id="restInput" class="step-val" type="text" inputmode="numeric" pattern="[0-9]*" readonly value="15" aria-label="Rest seconds">
+                            <button class="step-btn" data-key="rest" data-delta="5" type="button" aria-label="Increase rest time">+</button>
+                        </div>
+                    </div>
+                    <div class="stepper">
+                        <span class="stepper-label" data-i18n="workout.settings.rounds">Rounds</span>
+                        <div class="stepper-ctl">
+                            <button class="step-btn" data-key="rounds" data-delta="-1" type="button" aria-label="Decrease rounds">−</button>
+                            <input id="roundsInput" class="step-val" type="text" inputmode="numeric" pattern="[0-9]*" readonly value="1" aria-label="Rounds">
+                            <button class="step-btn" data-key="rounds" data-delta="1" type="button" aria-label="Increase rounds">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls" id="controls">
+                    <button class="btn btn-skip" id="btnSkip" type="button" data-i18n="workout.controls.skip">Skip</button>
+                    <button class="btn btn-primary" id="btnStart" type="button">Start</button>
+                    <button class="btn btn-ghost" id="btnReset" type="button" data-i18n="workout.controls.reset">Reset</button>
+                </div>
+
+                <div class="complete-note" id="completeNote" hidden>
+                    <div class="cn-title">🎉 <span data-i18n="workout.done">Workout complete!</span></div>
+                    <div class="cn-stats" id="cnStats"></div>
+                    <button class="btn btn-primary" id="btnAgain" type="button" style="min-width:180px">↻ <span data-i18n="workout.again">Do it again</span></button>
+                </div>
             </div>
-        </div>
-    </div>
+        </section>
+
+        <footer class="hint">
+            <span class="kbd-hints"><span class="kbd">Space</span> start / pause · <span class="kbd">R</span> reset · <span class="kbd">S</span> skip · <span class="kbd">←</span><span class="kbd">→</span> change exercise · </span>
+            <span data-i18n="workout.hint">Train smart. Push hard. 💥</span>
+        </footer>
+    </main>
 
     <script>
-        const exercises = [
-            { name: "Push-ups", category: "chest" },
-            { name: "Wide Push-ups", category: "chest" },
-            { name: "Diamond Push-ups", category: "chest" },
-            { name: "Squats", category: "legs" },
-            { name: "Lunges", category: "legs" },
-            { name: "Calf Raises", category: "legs" },
-            { name: "Wall Sit", category: "legs" },
-            { name: "Plank", category: "abs" },
-            { name: "Crunches", category: "abs" },
-            { name: "Leg Raises", category: "abs" },
-            { name: "Russian Twist", category: "abs" },
-            { name: "Superman", category: "back" },
-            { name: "Glute Bridge", category: "back" },
-            { name: "Jumping Jacks", category: "cardio" },
-            { name: "Burpees", category: "cardio" },
-            { name: "Mountain Climbers", category: "cardio" }
-        ];
+    'use strict';
+    /* ============================================================
+       Pulse — Bodyweight Circuit Timer
+       Modern timer: drift-free countdown (performance.now), Web
+       Audio cues, speech voice coach, haptics, screen Wake Lock,
+       MediaSession, confetti. No build step → works on GitHub Pages
+       and iPhone Safari.
+       ============================================================ */
 
-        const exerciseList = document.getElementById('exerciseList');
-        const timerSection = document.getElementById('timerSection');
-        const currentExerciseName = document.getElementById('currentExerciseName');
-        const timerDisplay = document.getElementById('timerDisplay');
-        const timerState = document.getElementById('timerState');
-        const progressFill = document.getElementById('progressFill');
-        const btnStart = document.getElementById('btnStart');
-        const btnSkip = document.getElementById('btnSkip');
-        
-        let timerInterval;
-        let timeLeft;
-        let totalTime;
-        let isRunning = false;
-        let isResting = false;
+    /* ---------- i18n (filled in by top_buttons.js, read lazily) ---------- */
+    const FALLBACK = {
+        'page.title': 'Bodyweight Circuit Timer',
+        'page.heading': 'Bodyweight Circuit Timer',
+        'page.tagline': 'No equipment. No gym. Just you.',
+        'categories.all': 'All', 'categories.chest': 'Chest', 'categories.legs': 'Legs',
+        'categories.abs': 'Abs', 'categories.back': 'Back', 'categories.cardio': 'Cardio',
+        'state.ready': 'Ready', 'state.work': 'Work', 'state.rest': 'Rest', 'state.complete': 'Complete',
+        'controls.start': 'Start', 'controls.pause': 'Pause', 'controls.resume': 'Resume',
+        'controls.reset': 'Reset', 'controls.skip': 'Skip',
+        'settings.work': 'Work', 'settings.rest': 'Rest', 'settings.rounds': 'Rounds',
+        'circuit': 'Circuit', 'next': 'Next up',
+        'progress': 'Exercise {current} of {total}',
+        'roundProgress': 'Round {current} of {total}',
+        'done': 'Workout complete!',
+        'summary': '{exercises} exercises × {rounds} rounds',
+        'again': 'Do it again',
+        'sound': 'Sound', 'voice': 'Voice',
+        'hint': 'Train smart. Push hard. 💥',
+        'getReady': 'Get ready', 'go': 'Go', 'breathe': 'Breathe', 'finished': 'Finished!'
+    };
+    function t(key, vars) {
+        let v = null;
+        try {
+            v = (window.translations && window.translations.workout) || null;
+            for (const p of key.split('.')) v = v && v[p];
+        } catch (e) { v = null; }
+        if (v === null || v === undefined || v === '') {
+            const fbKey = key.startsWith('workout.') ? key.slice(8) : key;
+            v = FALLBACK[fbKey] || key;
+        }
+        if (vars) {
+            for (const [k, val] of Object.entries(vars)) {
+                v = String(v).split('{' + k + '}').join(String(val));
+            }
+        }
+        return v;
+    }
 
-        // visible exercises (current filtered list) and index
-        let visibleExercises = [];
-        let currentIndex = null;
+    /* ---------- data ---------- */
+    const EXERCISES = [
+        { name: 'Push-ups',            cat: 'chest',  icon: '💪' },
+        { name: 'Wide Push-ups',       cat: 'chest',  icon: '🙌' },
+        { name: 'Diamond Push-ups',    cat: 'chest',  icon: '💎' },
+        { name: 'Pike Push-ups',       cat: 'chest',  icon: '🔺' },
+        { name: 'Squats',              cat: 'legs',   icon: '🦵' },
+        { name: 'Squat Jacks',         cat: 'legs',   icon: '🤸' },
+        { name: 'Lunges',              cat: 'legs',   icon: '🚶' },
+        { name: 'Calf Raises',         cat: 'legs',   icon: '🦶' },
+        { name: 'Wall Sit',            cat: 'legs',   icon: '🧱' },
+        { name: 'Plank',               cat: 'abs',    icon: '🧘' },
+        { name: 'Crunches',            cat: 'abs',    icon: '💫' },
+        { name: 'Bicycle Crunches',    cat: 'abs',    icon: '🚲' },
+        { name: 'Leg Raises',          cat: 'abs',    icon: '🎯' },
+        { name: 'Flutter Kicks',       cat: 'abs',    icon: '👟' },
+        { name: 'Russian Twist',       cat: 'abs',    icon: '🔄' },
+        { name: 'Superman',            cat: 'back',   icon: '🦸' },
+        { name: 'Glute Bridge',        cat: 'back',   icon: '🌉' },
+        { name: 'Inchworm',            cat: 'back',   icon: '🐛' },
+        { name: 'Jumping Jacks',       cat: 'cardio', icon: '⭐' },
+        { name: 'Burpees',             cat: 'cardio', icon: '💥' },
+        { name: 'Mountain Climbers',   cat: 'cardio', icon: '⛰️' },
+        { name: 'High Knees',          cat: 'cardio', icon: '🏃' }
+    ];
+    const VOICE_LANG = { en: 'en-US', it: 'it-IT', fr: 'fr-FR', es: 'es-ES', de: 'de-DE',
+        ja: 'ja-JP', ru: 'ru-RU', sv: 'sv-SE', ar: 'ar-SA', he: 'he-IL', zh: 'zh-CN' };
 
-        function filterExercises(category) {
-            // Update buttons
-            document.querySelectorAll('.cat-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent.toLowerCase() === category || (category === 'all' && btn.textContent === 'All')) {
-                    btn.classList.add('active');
-                }
+    /* ---------- DOM ---------- */
+    const $ = (id) => document.getElementById(id);
+    const app        = $('app');
+    const chipRow    = $('chipRow');
+    const listEl     = $('exerciseList');
+    const listCount  = $('listCount');
+    const currentName= $('currentName');
+    const phaseLabel = $('phaseLabel');
+    const timeLabel  = $('timeLabel');
+    const timerDisp  = $('timerDisplay');
+    const ringFill   = $('ringFill');
+    const progressMeta = $('progressMeta');
+    const nextValue  = $('nextValue');
+    const btnStart   = $('btnStart');
+    const btnSkip    = $('btnSkip');
+    const btnReset   = $('btnReset');
+    const btnAgain   = $('btnAgain');
+    const completeNote = $('completeNote');
+    const controls   = $('controls');
+    const cnStats    = $('cnStats');
+    const workInput  = $('workInput');
+    const restInput  = $('restInput');
+    const roundsInput= $('roundsInput');
+    const toggleSound= $('toggleSound');
+    const toggleVoice= $('toggleVoice');
+
+    /* ---------- state ---------- */
+    const RING_C = 741.42; // 2 * PI * 118
+    const S = {
+        phase: 'ready',        // ready | work | rest | complete
+        running: false,
+        list: [],              // filtered exercises (the circuit)
+        pos: 0,                // current exercise index in list
+        round: 1,
+        work: 45, rest: 15, rounds: 1,
+        endTime: 0, remain: 0, phaseTotal: 1,
+        done: new Set(),       // names completed in the current round
+        wakeLock: null,
+        audio: null,
+        settings: { sound: true, voice: false }
+    };
+    let tickId = null;
+    let lastShown = null;
+
+    /* ---------- persistence ---------- */
+    const LS_KEY = 'workout.settings.v1';
+    function loadSettings() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+            S.work    = clampInt(raw.work, 1, 999, 45);
+            S.rest    = clampInt(raw.rest, 0, 999, 15);
+            S.rounds  = clampInt(raw.rounds, 1, 20, 1);
+            S.settings.sound = raw.sound !== false;
+            S.settings.voice = raw.voice === true;
+        } catch (e) { /* keep defaults */ }
+        workInput.value = S.work;
+        restInput.value = S.rest;
+        roundsInput.value = S.rounds;
+        toggleSound.classList.toggle('is-on', S.settings.sound);
+        toggleSound.setAttribute('aria-pressed', String(S.settings.sound));
+        toggleVoice.classList.toggle('is-on', S.settings.voice);
+        toggleVoice.setAttribute('aria-pressed', String(S.settings.voice));
+    }
+    function saveSettings() {
+        try {
+            localStorage.setItem(LS_KEY, JSON.stringify({
+                work: S.work, rest: S.rest, rounds: S.rounds,
+                sound: S.settings.sound, voice: S.settings.voice
+            }));
+        } catch (e) { /* storage unavailable (private mode) */ }
+    }
+    function clampInt(v, min, max, dflt) {
+        v = parseInt(v, 10);
+        if (isNaN(v)) return dflt;
+        return Math.min(max, Math.max(min, v));
+    }
+
+    /* ---------- audio ---------- */
+    function ensureAudio() {
+        if (!S.settings.sound) return;
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!S.audio && AC) S.audio = new AC();
+            if (S.audio && S.audio.state === 'suspended') S.audio.resume();
+        } catch (e) { /* no Web Audio */ }
+    }
+    function beep(freq, dur, delay, type, vol) {
+        if (!S.settings.sound || !S.audio) return;
+        try {
+            const t0 = S.audio.currentTime + (delay || 0);
+            const o = S.audio.createOscillator();
+            const g = S.audio.createGain();
+            o.type = type || 'sine'; o.frequency.value = freq;
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            o.connect(g); g.connect(S.audio.destination);
+            o.start(t0); o.stop(t0 + dur + 0.06);
+        } catch (e) { /* ignore */ }
+    }
+    const sndWork   = () => { beep(660, .15, 0); beep(880, .15, .18); };
+    const sndRest   = () => { beep(440, .12, 0); beep(440, .12, .16); };
+    const sndDone   = () => { [523, 659, 784, 1047].forEach((f, i) => beep(f, .22, i * .14)); };
+    const sndTick   = () => beep(880, .06, 0, 'square', .07);
+    function buzz(pattern) {
+        try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+    }
+
+    /* ---------- voice coach ---------- */
+    function say(text) {
+        if (!S.settings.voice) return;
+        try {
+            if (!('speechSynthesis' in window)) return;
+            const u = new SpeechSynthesisUtterance(text);
+            const lang = (localStorage.getItem('site_lang') || 'en');
+            u.lang = VOICE_LANG[lang] || lang;
+            u.rate = 1.02; u.pitch = 1.05;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(u);
+        } catch (e) { /* ignore */ }
+    }
+
+    /* ---------- wake lock (keep screen on) ---------- */
+    async function wakeLockOn() {
+        if (!('wakeLock' in navigator) || S.wakeLock) return;
+        try {
+            S.wakeLock = await navigator.wakeLock.request('screen');
+            S.wakeLock.addEventListener('release', () => { S.wakeLock = null; });
+        } catch (e) { /* unsupported/denied */ }
+    }
+    function wakeLockOff() {
+        if (S.wakeLock) { try { S.wakeLock.release(); } catch (e) {} S.wakeLock = null; }
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && S.running) wakeLockOn();
+    });
+
+    /* ---------- media session (lock screen / desktop keys) ---------- */
+    function setMediaSession(name) {
+        if (!('mediaSession' in navigator)) return;
+        try {
+            const icon = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#0b1026"/><text y=".82em" x="50" text-anchor="middle" font-size="64">💪</text></svg>');
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: name || 'Pulse',
+                artist: t('workout.page.title'),
+                artwork: [{ src: icon, sizes: '100x100', type: 'image/svg+xml' }]
             });
+            navigator.mediaSession.setActionHandler('play', () => { if (!S.running) toggle(); });
+            navigator.mediaSession.setActionHandler('pause', () => { if (S.running) toggle(); });
+        } catch (e) { /* ignore */ }
+    }
 
-            exerciseList.innerHTML = '';
-            const filtered = category === 'all' ? exercises : exercises.filter(e => e.category === category);
-            visibleExercises = filtered;
-            
-            filtered.forEach(ex => {
-                const card = document.createElement('div');
-                card.className = 'exercise-card';
-                card.innerHTML = `
-                    <div class="ex-name">${ex.name}</div>
-                    <div class="ex-muscle">${ex.category.toUpperCase()}</div>
-                `;
-                card.onclick = () => selectExercise(ex.name);
-                exerciseList.appendChild(card);
-            });
+    /* ---------- confetti ---------- */
+    function celebrate() {
+        if (!window.confetti) return;
+        try {
+            const colors = ['#22d3ee', '#a78bfa', '#e879f9', '#fbbf24', '#34d399'];
+            window.confetti({ particleCount: 110, spread: 75, origin: { y: .6 }, colors, zIndex: 10000 });
+            setTimeout(() => window.confetti({ particleCount: 60, angle: 60, spread: 60, origin: { x: 0, y: .7 }, colors, zIndex: 10000 }), 220);
+            setTimeout(() => window.confetti({ particleCount: 60, angle: 120, spread: 60, origin: { x: 1, y: .7 }, colors, zIndex: 10000 }), 380);
+        } catch (e) { /* ignore */ }
+    }
+
+    /* ---------- rendering ---------- */
+    function formatTime(sec) {
+        sec = Math.max(0, Math.ceil(sec));
+        const m = Math.floor(sec / 60), s = sec % 60;
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    function setRing(p) {
+        p = Math.max(0, Math.min(1, p));
+        ringFill.style.strokeDashoffset = (RING_C * (1 - p)).toFixed(1);
+    }
+    function setPhase(phase) {
+        S.phase = phase;
+        app.dataset.phase = phase;
+        const stateKey = phase === 'ready' ? 'state.ready' : phase === 'work' ? 'state.work'
+            : phase === 'rest' ? 'state.rest' : 'state.complete';
+        phaseLabel.textContent = t(stateKey);
+        const labelKey = phase === 'ready' ? 'getReady' : phase === 'work' ? 'go'
+            : phase === 'rest' ? 'breathe' : 'finished';
+        timeLabel.textContent = t(labelKey).toUpperCase();
+    }
+    function currentEx() { return S.list[S.pos] || null; }
+    function nextEx() { return S.list[S.pos + 1] || null; }
+
+    function renderTime() {
+        const show = S.phase === 'ready' ? 0 : S.remain;
+        const txt = formatTime(show);
+        if (txt !== lastShown) {
+            lastShown = txt;
+            timerDisp.textContent = txt;
+            if (S.running && S.phase === 'work' && S.remain <= 3 && S.remain >= 1) sndTick();
         }
-
-        function selectExercise(name) {
-            currentExerciseName.textContent = name;
-            timerSection.classList.add('active');
-            timerSection.scrollIntoView({ behavior: 'smooth' });
-            // set currentIndex based on visibleExercises
-            const idx = visibleExercises.findIndex(e => e.name === name);
-            currentIndex = idx >= 0 ? idx : null;
-            resetTimer();
+        setRing(S.phase === 'ready' ? 1 : (S.phaseTotal ? S.remain / S.phaseTotal : 0));
+    }
+    function renderMeta() {
+        if (S.list.length === 0) { progressMeta.textContent = '—'; return; }
+        let s = t('workout.progress', { current: S.pos + 1, total: S.list.length });
+        if (S.rounds > 1) s += ' · ' + t('workout.roundProgress', { current: S.round, total: S.rounds });
+        progressMeta.textContent = s;
+    }
+    function renderNext() {
+        const n = nextEx();
+        nextValue.textContent = n ? n.icon + ' ' + n.name : (S.phase === 'complete' ? '🎉' : '—');
+    }
+    function renderControls() {
+        if (S.phase === 'complete') return;
+        if (!S.running) {
+            btnStart.textContent = (S.phase === 'work' || S.phase === 'rest') ? t('controls.resume') : t('controls.start');
+        } else {
+            btnStart.textContent = t('controls.pause');
         }
-
-        function setProgress(percent) {
-            percent = Math.max(0, Math.min(100, percent));
-            progressFill.style.width = percent + '%';
+    }
+    function renderCards() {
+        for (const ex of S.list) {
+            const card = cards.get(ex.name);
+            if (!card) continue;
+            const isCurrent = (ex.name === currentEx().name);
+            const isDone = S.done.has(ex.name);
+            card.classList.toggle('is-current', isCurrent);
+            card.classList.toggle('is-done', isDone);
         }
+    }
+    function renderAll() {
+        renderTime(); renderMeta(); renderNext(); renderControls(); renderCards();
+    }
 
-        function formatTime(seconds) {
-            const m = Math.floor(seconds / 60);
-            const s = seconds % 60;
-            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    /* ---------- exercise library ---------- */
+    const cards = new Map();
+    function buildList() {
+        listEl.innerHTML = '';
+        cards.clear();
+        listCount.textContent = S.list.length;
+        S.list.forEach((ex, i) => {
+            const card = document.createElement('div');
+            card.className = 'ex-card';
+            card.setAttribute('role', 'listitem');
+            card.innerHTML =
+                '<div class="ex-icon" aria-hidden="true">' + ex.icon + '</div>' +
+                '<div class="ex-info"><div class="ex-name">' + ex.name + '</div>' +
+                '<div class="ex-muscle">' + ex.cat.toUpperCase() + '</div></div>' +
+                '<span class="ex-check" aria-hidden="true">✓</span>' +
+                '<span class="ex-play" aria-hidden="true">▶</span>';
+            card.addEventListener('click', () => selectExercise(i));
+            cards.set(ex.name, card);
+            listEl.appendChild(card);
+        });
+        if (S.list.length) {
+            if (S.pos >= S.list.length) S.pos = 0;
+            S.round = 1; S.done.clear();
+            setCurrentExercise();
+        } else {
+            currentName.textContent = '—';
+            nextValue.textContent = '—';
         }
+    }
+    function filterExercises(cat) {
+        if (S.running) return; // keep the circuit stable mid-workout
+        chipRow.querySelectorAll('.chip').forEach(c => {
+            c.classList.toggle('is-active', c.dataset.category === cat);
+        });
+        S.list = cat === 'all' ? EXERCISES.slice() : EXERCISES.filter(e => e.cat === cat);
+        S.pos = 0;
+        buildList();
+        resetTimer();
+    }
+    function selectExercise(i) {
+        if (S.running || !S.list[i]) return;
+        S.pos = i;
+        S.round = 1; S.done.clear();
+        setCurrentExercise();
+        resetTimer();
+        const card = cards.get(S.list[i].name);
+        if (card && card.scrollIntoView && window.matchMedia('(min-width: 920px)').matches) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (window.matchMedia('(max-width: 919px)').matches) {
+            document.querySelector('.timer-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+    function setCurrentExercise() {
+        const ex = currentEx();
+        currentName.textContent = ex ? ex.name : '—';
+        setMediaSession(ex ? ex.name : null);
+        renderCards(); renderMeta(); renderNext();
+    }
 
-        function toggleTimer() {
-            if (isRunning) {
-                pauseTimer();
+    /* ---------- timer engine (drift-free) ---------- */
+    function startPhase(phase) {
+        const secs = phase === 'rest' ? S.rest : S.work;
+        S.phaseTotal = Math.max(1, secs);
+        S.remain = S.phaseTotal;
+        S.endTime = performance.now() + S.remain * 1000;
+        lastShown = null;
+        setPhase(phase);
+        renderTime();
+        renderControls();
+        if (S.running) {
+            clearInterval(tickId);
+            tickId = setInterval(tick, 200);
+        }
+    }
+    function tick() {
+        if (!S.running) return;
+        const rem = Math.max(0, Math.ceil((S.endTime - performance.now()) / 1000));
+        if (rem !== S.remain) {
+            S.remain = rem;
+            renderTime();
+        }
+        if (rem <= 0) endPhase();
+    }
+    function toggle() {
+        if (S.phase === 'complete') return;
+        if (S.running) { pause(); }
+        else {
+            ensureAudio();
+            if (S.phase === 'ready') {
+                S.running = true;
+                startPhase('work');
+                const ex = currentEx();
+                sndWork(); buzz(80);
+                say((ex ? ex.name + '. ' : '') + t('state.work'));
             } else {
-                startTimer();
+                S.running = true;
+                S.endTime = performance.now() + S.remain * 1000;
+                clearInterval(tickId);
+                tickId = setInterval(tick, 200);
+                renderControls();
             }
+            wakeLockOn();
         }
-
-        function startTimer() {
-            if (!timeLeft) {
-                // Initial start
-                startWorkPhase();
+    }
+    function pause() {
+        if (!S.running) return;
+        S.running = false;
+        clearInterval(tickId);
+        S.remain = Math.max(0, Math.ceil((S.endTime - performance.now()) / 1000));
+        renderTime();
+        renderControls();
+        wakeLockOff();
+    }
+    function endPhase() {
+        if (S.phase === 'work') onWorkEnd();
+        else if (S.phase === 'rest') onRestEnd();
+    }
+    function hasNextTarget() {
+        if (S.pos + 1 < S.list.length) return true;
+        return S.round < S.rounds;
+    }
+    function onWorkEnd() {
+        const ex = currentEx();
+        if (ex) S.done.add(ex.name);
+        renderCards();
+        if (hasNextTarget()) {
+            if (S.rest > 0) {
+                S.running = true; // stays true unless paused
+                startPhase('rest');
+                sndRest(); buzz([40, 40, 40]);
+                say(t('state.rest') + '. ' + S.rest);
+            } else {
+                advance();
             }
-            
-            isRunning = true;
-            btnStart.textContent = "PAUSE";
-            
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                updateDisplay();
-
-                if (timeLeft <= 0) {
-                    if (isResting) {
-                        // after rest, move to next exercise
-                        advanceToNextExercise();
-                    } else {
-                        startRestPhase();
-                    }
-                }
-            }, 1000);
+        } else {
+            finish();
         }
-
-        function pauseTimer() {
-            isRunning = false;
-            btnStart.textContent = "RESUME";
-            clearInterval(timerInterval);
+    }
+    function onRestEnd() {
+        advance();
+    }
+    function advance() {
+        if (S.pos + 1 < S.list.length) {
+            S.pos++;
+        } else if (S.round < S.rounds) {
+            S.round++;
+            S.pos = 0;
+            S.done.clear();
         }
+        setCurrentExercise();
+        S.running = true;
+        startPhase('work');
+        sndWork(); buzz(80);
+        const ex = currentEx();
+        say(ex ? ex.name + '. ' + t('state.work') : t('state.work'));
+    }
+    function skip() {
+        if (!S.running) return;
+        if (S.phase === 'rest') onRestEnd();
+        else if (S.phase === 'work') onWorkEnd();
+    }
+    function finish() {
+        S.running = false;
+        clearInterval(tickId);
+        S.remain = 0;
+        setPhase('complete');
+        renderTime(); renderMeta(); renderNext();
+        controls.hidden = true;
+        completeNote.hidden = false;
+        cnStats.textContent = t('workout.summary', { exercises: S.list.length, rounds: S.rounds });
+        sndDone(); buzz([120, 60, 120]);
+        say(t('workout.done'));
+        wakeLockOff();
+        celebrate();
+    }
+    function resetTimer() {
+        S.running = false;
+        clearInterval(tickId);
+        S.remain = 0;
+        lastShown = null;
+        controls.hidden = false;
+        completeNote.hidden = true;
+        S.done.clear();
+        setPhase('ready');
+        renderAll();
+        wakeLockOff();
+    }
 
-        function resetTimer() {
-            pauseTimer();
-            timeLeft = null;
-            isResting = false;
-            timerState.textContent = "READY";
-            timerState.className = "timer-state";
-            timerDisplay.textContent = "00:00";
-            btnStart.textContent = "START";
-            btnSkip.style.display = "none";
-            setProgress(100);
-            progressFill.style.background = "var(--accent)";
+    /* ---------- steppers ---------- */
+    function stepper(key, delta) {
+        if (S.running) return;
+        if (key === 'work')  S.work   = clampInt(S.work + delta, 1, 999, 45);
+        if (key === 'rest')  S.rest   = clampInt(S.rest + delta, 0, 999, 15);
+        if (key === 'rounds')S.rounds = clampInt(S.rounds + delta, 1, 20, 1);
+        workInput.value = S.work;
+        restInput.value = S.rest;
+        roundsInput.value = S.rounds;
+        saveSettings();
+        // if a phase is armed but not running, refresh the countdown target
+        if (!S.running && (S.phase === 'work' || S.phase === 'rest')) {
+            S.phaseTotal = Math.max(1, S.phase === 'rest' ? S.rest : S.work);
+            if (S.remain > S.phaseTotal) S.remain = S.phaseTotal;
+            renderTime();
         }
+    }
 
-        function startWorkPhase() {
-            isResting = false;
-            totalTime = parseInt(document.getElementById('workTimeInput').value);
-            timeLeft = totalTime;
-            
-            timerState.textContent = "WORK";
-            timerState.className = "timer-state state-work";
-            progressFill.style.background = "var(--success)";
-            btnSkip.style.display = "none";
-            
-            // Play sound?
-            updateDisplay();
+    /* ---------- events ---------- */
+    document.querySelectorAll('.step-btn').forEach(b => {
+        b.addEventListener('click', () => stepper(b.dataset.key, parseInt(b.dataset.delta, 10)));
+    });
+    chipRow.querySelectorAll('.chip').forEach(c => {
+        c.addEventListener('click', () => filterExercises(c.dataset.category));
+    });
+    btnStart.addEventListener('click', toggle);
+    btnReset.addEventListener('click', resetTimer);
+    btnSkip.addEventListener('click', skip);
+    btnAgain.addEventListener('click', () => {
+        S.round = 1; S.pos = 0; S.done.clear();
+        setCurrentExercise();
+        resetTimer();
+        toggle();
+    });
+    toggleSound.addEventListener('click', () => {
+        S.settings.sound = !S.settings.sound;
+        toggleSound.classList.toggle('is-on', S.settings.sound);
+        toggleSound.setAttribute('aria-pressed', String(S.settings.sound));
+        if (S.settings.sound) { ensureAudio(); beep(660, .1, 0); }
+        saveSettings();
+    });
+    toggleVoice.addEventListener('click', () => {
+        S.settings.voice = !S.settings.voice;
+        toggleVoice.classList.toggle('is-on', S.settings.voice);
+        toggleVoice.setAttribute('aria-pressed', String(S.settings.voice));
+        saveSettings();
+        if (S.settings.voice) say(t('state.ready'));
+    });
+
+    // Desktop keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'select' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
+        switch (e.code) {
+            case 'Space': e.preventDefault(); toggle(); break;
+            case 'KeyR': resetTimer(); break;
+            case 'KeyS': skip(); break;
+            case 'ArrowRight': if (!S.running && S.list.length) selectExercise(Math.min(S.pos + 1, S.list.length - 1)); break;
+            case 'ArrowLeft':  if (!S.running && S.list.length) selectExercise(Math.max(S.pos - 1, 0)); break;
         }
+    });
 
-        function startRestPhase() {
-            isResting = true;
-            totalTime = parseInt(document.getElementById('restTimeInput').value);
-            timeLeft = totalTime;
-            
-            timerState.textContent = "REST";
-            timerState.className = "timer-state state-rest";
-            progressFill.style.background = "var(--warning)";
-            btnSkip.style.display = "inline-block";
-            
-            updateDisplay();
+    // Announce phase changes to screen readers
+    const announce = document.createElement('div');
+    announce.className = 'sr-only';
+    announce.setAttribute('aria-live', 'assertive');
+    document.body.appendChild(announce);
+    const originalSetPhase = setPhase;
+    setPhase = function (phase) {
+        originalSetPhase(phase);
+        const ex = currentEx();
+        if (phase === 'work') announce.textContent = t('state.work') + ' — ' + (ex ? ex.name : '');
+        else if (phase === 'rest') announce.textContent = t('state.rest');
+        else if (phase === 'complete') announce.textContent = t('workout.done');
+    };
+
+    /* ---------- init ---------- */
+    loadSettings();
+    filterExercises('all');
+    resetTimer();
+
+    // Re-render dynamic labels as soon as top_buttons.js finishes loading
+    // translations (or when the user switches language mid-session).
+    let translationsRef = window.translations;
+    setInterval(() => {
+        if (window.translations !== translationsRef) {
+            translationsRef = window.translations;
+            renderAll();
         }
-
-        function skipRest() {
-            if (isResting) {
-                startWorkPhase();
-            }
-        }
-
-        function advanceToNextExercise() {
-            if (!visibleExercises || visibleExercises.length === 0) return;
-            const nextIndex = (currentIndex === null) ? 0 : (currentIndex + 1);
-            // If we've reached the end, stop instead of wrapping
-            if (nextIndex >= visibleExercises.length) {
-                pauseTimer();
-                timerState.textContent = "COMPLETE";
-                timerState.className = "timer-state";
-                setProgress(0);
-                return;
-            }
-            const nextName = visibleExercises[nextIndex].name;
-            const wasRunning = isRunning;
-            // selectExercise resets timer and sets currentIndex
-            selectExercise(nextName);
-            // if timer was running, restart it for next exercise
-            if (wasRunning) {
-                startTimer();
-            }
-        }
-
-        function updateDisplay() {
-            timerDisplay.textContent = formatTime(timeLeft);
-            const percent = (timeLeft / totalTime) * 100;
-            setProgress(percent);
-        }
-
-        // Init
-        filterExercises('all');
-        setProgress(100);
-
+    }, 300);
     </script>
 </body>
 <script src="top_buttons.js"></script>
