@@ -1,0 +1,127 @@
+import { useCallback, useRef } from 'react'
+import { Upload } from 'lucide-react'
+import { useLayerStore } from '../store/layerStore'
+import { getDesktop, dataUrlToFile } from '../desktop'
+
+async function convertHeicToFile(file: File): Promise<File> {
+  const { heicTo, isHeic } = await import('heic-to')
+  if (!(await isHeic(file))) return file
+
+  const jpegBlob = await heicTo({
+    blob: file,
+    type: 'image/jpeg',
+    quality: 0.85,
+  })
+
+  const name = file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg')
+  return new File([jpegBlob], name, { type: 'image/jpeg' })
+}
+
+export function ImageUploader() {
+  const { addLayer, setCanvasSize, setProcessing } = useLayerStore()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const processFile = useCallback(
+    async (rawFile: File) => {
+      if (!rawFile.type.startsWith('image/') && !/\.(heic|heif)$/i.test(rawFile.name)) return
+
+      const isHeicFile = /\.(heic|heif)$/i.test(rawFile.name) || rawFile.type === 'image/heic' || rawFile.type === 'image/heif'
+
+      let file = rawFile
+      if (isHeicFile) {
+        setProcessing(true, 'Conversione HEIC → JPEG...')
+        try {
+          file = await convertHeicToFile(rawFile)
+        } catch (err) {
+          console.error('HEIC conversion failed:', err)
+          setProcessing(false)
+          alert('Conversione HEIC fallita. Riprova con un altro file.')
+          return
+        }
+        setProcessing(false)
+      }
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        let w = img.width
+        let h = img.height
+        if (w > 2000 || h > 2000) {
+          const scale = 2000 / Math.max(w, h)
+          w = Math.round(w * scale)
+          h = Math.round(h * scale)
+        }
+        // Only resize the canvas on the first upload
+        const { layers } = useLayerStore.getState()
+        if (layers.length === 0) setCanvasSize({ width: w, height: h })
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
+        addLayer(canvas, file.name.replace(/\.[^.]+$/, ''))
+        URL.revokeObjectURL(url)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        alert('Impossibile aprire il file. Il formato potrebbe non essere supportato.')
+      }
+      img.src = url
+    },
+    [addLayer, setCanvasSize, setProcessing]
+  )
+
+  const handleFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return
+      await processFile(files[0])
+    },
+    [processFile]
+  )
+
+  const handleClick = useCallback(() => {
+    const desktop = getDesktop()
+    if (desktop) {
+      void desktop.openImage().then(res => {
+        if (!res.canceled && res.dataUrl) {
+          void processFile(dataUrlToFile(res.dataUrl, res.name || 'immagine.png'))
+        }
+      })
+      return
+    }
+    inputRef.current?.click()
+  }, [processFile])
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      handleFiles(e.dataTransfer.files)
+    },
+    [handleFiles]
+  )
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  return (
+    <div
+      className="image-uploader"
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onClick={handleClick}
+    >
+      <Upload size={48} strokeWidth={1} />
+      <p>Trascina un'immagine qui</p>
+      <p className="uploader-hint">JPG, PNG, HEIC, HEIF — oppure clicca per sfogliare</p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
+        hidden
+        onChange={e => handleFiles(e.target.files)}
+      />
+    </div>
+  )
+}
