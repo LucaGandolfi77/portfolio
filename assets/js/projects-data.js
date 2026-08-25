@@ -402,9 +402,18 @@ const PROJECTS_DATA = [
     "id": "ai-colorizer",
     "title": "AI Colorizer",
     "description": "Colorize B&W photos using Deep Learning.",
-    "href": "projects/coloring.html",
+    "href": "projects/ai_colorizer.html",
     "emoji": "🎨",
     "badge": "AI",
+    "badgeColor": "#00d4ff"
+  },
+    {
+    "id": "coloring-book",
+    "title": "Coloring Book",
+    "description": "Interactive coloring book with various designs.",
+    "href": "projects/coloring.html",
+    "emoji": "🎨",
+    "badge": "Fun",
     "badgeColor": "#00d4ff"
   },
   {

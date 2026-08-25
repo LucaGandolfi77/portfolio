@@ -8,6 +8,11 @@
 
   function getRoot() { return document.querySelector('[data-catalog]'); }
   function getItems() { return catalog[getRoot()?.dataset.catalog] || []; }
+  function resolveHref(item) {
+    const rootEl = getRoot();
+    const siteRoot = rootEl?.dataset.siteRoot || '';
+    return `${siteRoot}${item.href}`;
+  }
   function favoriteKey(item) { return `portfolio.favorite.${item.type}.${item.id}`; }
   function isFavorite(item) { try { return localStorage.getItem(favoriteKey(item)) === '1'; } catch (e) { return false; } }
   function setFavorite(item, value) { try { localStorage.setItem(favoriteKey(item), value ? '1' : '0'); } catch (e) {} }
@@ -22,7 +27,7 @@
   function card(item, index) {
     const favorite = isFavorite(item);
     const badges = (item.badges || []).slice(0, 3).map((badge) => `<span class="catalog-badge">${escapeHtml(badge)}</span>`).join('');
-    return `<a class="catalog-card ${favorite ? 'is-favorite' : ''}" href="${escapeHtml(item.href)}" data-card-id="${escapeHtml(item.id)}">
+    return `<a class="catalog-card ${favorite ? 'is-favorite' : ''}" href="${escapeHtml(resolveHref(item))}" data-card-id="${escapeHtml(item.id)}">
       <div class="catalog-card__header"><span class="catalog-card__icon" aria-hidden="true">${escapeHtml(item.icon || '◈')}</span><span class="catalog-card__index">${String(index + 1).padStart(2, '0')}</span></div>
       <h3 class="catalog-card__title">${escapeHtml(item.title)}</h3>
       <p class="catalog-card__description">${escapeHtml(item.description)}</p>

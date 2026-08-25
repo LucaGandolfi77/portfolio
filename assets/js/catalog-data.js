@@ -9,7 +9,7 @@
     Creative: 'creative', Music: 'audio', Accessibility: 'accessibility', Tool: 'tools'
   };
 
-  const projects = (typeof PROJECTS_DATA === 'undefined' ? [] : PROJECTS_DATA).map((project) => ({
+  const baseProjects = (typeof PROJECTS_DATA === 'undefined' ? [] : PROJECTS_DATA).map((project) => ({
     ...project,
     type: 'project',
     category: categoryByBadge[project.badge] || 'engineering',
@@ -18,6 +18,33 @@
     requirements: /camera|face|ar|tracker|kinect/i.test(`${project.title} ${project.description}`) ? ['camera'] : [],
     status: 'live'
   }));
+
+  const projectExtras = [
+    ['audio-editor-pwa-wrapper', 'Audio Editor PWA', 'Standalone launcher for the browser audio editor.', 'projects/audio-editor-pwa.html', '◉', 'audio', ['Audio', 'PWA']],
+    ['audio-editor-pwa', 'Audio Editor PWA App', 'Offline-oriented waveform and audio editing workspace.', 'projects/audio-editor-pwa/index.html', '◉', 'audio', ['Audio', 'PWA']],
+    ['beer', 'Beer Explorer', 'A playful browser experiment about beers and tasting notes.', 'projects/beer.html', '🍺', 'creative', ['Creative']],
+    ['due-lumi-wrapper', 'I Due Lumi', 'Launcher for the pixel adventure game.', 'projects/due-lumi.html', '☼', 'games', ['RPG', 'Launcher']],
+    ['due-lumi', 'I Due Lumi App', 'A compact pixel adventure with story, combat, and exploration.', 'projects/due-lumi/index.html', '☼', 'games', ['RPG', 'Canvas']],
+    ['engineer-quiz', 'Engineer Quiz', 'A technical quiz for curious builders.', 'projects/quizzes/engineer_quiz.html', '?', 'quiz', ['Quiz']],
+    ['luca-quiz', 'Luca Quiz', 'A personal interactive quiz.', 'projects/quizzes/luca_quiz.html', '?', 'quiz', ['Quiz']],
+    ['quiz-01', 'Quiz 01', 'Short general knowledge quiz.', 'projects/quizzes/quiz01.html', '?', 'quiz', ['Quiz']],
+    ['quiz-02', 'Quiz 02', 'Another quick browser quiz.', 'projects/quizzes/quiz02.html', '?', 'quiz', ['Quiz']],
+    ['fast-food-quiz', 'Fast Food Quiz', 'Test your fast-food knowledge.', 'projects/quizzes/quiz_fastfood.html', '🍔', 'quiz', ['Quiz']],
+    ['taylor-swift-quiz', 'Taylor Swift Quiz', 'A themed music knowledge quiz.', 'projects/quizzes/taylor_swift_quiz.html', '♪', 'quiz', ['Quiz', 'Music']],
+    ['rave-wrapper', 'RAVE', 'Launcher for the camera shader visualizer.', 'projects/rave.html', '✦', 'creative', ['WebGL', 'Camera']],
+    ['rave', 'RAVE App', 'Live camera visuals, shaders, voice controls, and recording.', 'projects/rave/index.html', '✦', 'creative', ['WebGL', 'Camera']],
+    ['shhh-reader-wrapper', 'Shhh Reader', 'Launcher for the quiet reading experience.', 'projects/shhh-reader.html', '◌', 'accessibility', ['Reader', 'PWA']],
+    ['shhh-reader', 'Shhh Reader App', 'A focused reading interface designed for calm browsing.', 'projects/shhh-reader/index.html', '◌', 'accessibility', ['Reader', 'PWA']],
+    ['smile-detection-wrapper', 'Smile Detection', 'Launcher for browser-based smile analysis.', 'projects/smile_detection.html', '☺', 'computer-vision', ['AI', 'Camera']],
+    ['smile-detection', 'Smile Detection App', 'Analyze a smile locally with camera-based vision.', 'projects/smile_detection/index.html', '☺', 'computer-vision', ['AI', 'Camera']],
+    ['text-image-researcher', 'Text Image Researcher', 'Explore and analyze text inside images.', 'projects/text_image_researcher.html', '▤', 'ai', ['AI', 'Images']],
+    ['vola', 'Vola! 3D', 'Camera-controlled 3D flying PWA.', 'projects/vola-pwa/index.html', '✈', 'computer-vision', ['3D', 'Camera', 'PWA']]
+  ].map(([id, title, description, href, icon, category, badges]) => ({
+    id, title, description, href, icon, category, badges, technologies: badges,
+    featured: false, status: 'live', type: 'project', requirements: badges.includes('Camera') ? ['camera'] : []
+  }));
+
+  const projects = baseProjects.concat(projectExtras);
 
   const games = [
     ['quotesmith', 'QuoteSmith', 'Bilingual quote quiz with 14 categories and offline scores.', 'games/quotesmith/', 'Q', 'quiz', ['Offline', 'PWA', 'iPhone'], true],
@@ -77,6 +104,22 @@
     ['friends-tycoon', 'Friends Tycoon', 'A social management game experiment.', 'games/friends-tycoon.html', '♙', 'simulation', ['Simulation'], false],
     ['orto-magico', 'Orto Magico', 'A playful garden and growing game.', 'games/orto-magico/index.html', '✿', 'simulation', ['PWA'], false],
     ['pokopia-clone', 'Pokopia Clone', 'A browser world-building experiment.', 'games/pokopia-clone/index.html', '⌂', 'simulation', ['Canvas'], false]
+    ,['3d-game', '3D Game', 'A browser-based 3D game experiment.', 'games/3dgame.html', '◇', 'arcade', ['3D'] , false]
+    ,['airhockey-classic', 'Air Hockey Classic', 'A classic air hockey game entry point.', 'games/airhockey.html', '🏒', 'multiplayer', ['Touch', 'Multiplayer'], false]
+    ,['animal-crossing', 'Animal Crossing Experiment', 'A playful life-simulation experiment.', 'games/animal_crossing.html', '🌿', 'simulation', ['Simulation'], false]
+    ,['city-sim', 'City Sim', 'Build and observe a small city simulation.', 'games/city_sim.html', '▦', 'simulation', ['Simulation'], false]
+    ,['coop-game-wrapper', 'Slips & Catastrophes Launcher', 'Launcher page for the cooperative narrative game.', 'games/coop-game.html', '✦', 'multiplayer', ['Co-op', 'Launcher'], false]
+    ,['echoes-wrapper', 'Echoes of the Last Dawn Launcher', 'Launcher page for the low-poly story game.', 'games/echoes-of-the-last-dawn.html', '☼', 'story', ['Three.js', 'Launcher'], false]
+    ,['friends-tycoon-app', 'Friends Tycoon App', 'Social management game application entry point.', 'games/friends-tycoon/index.html', '♙', 'simulation', ['Simulation'], false]
+    ,['orto-magico-wrapper', 'Orto Magico Launcher', 'Launcher page for the garden game.', 'games/orto-magico.html', '✿', 'simulation', ['PWA', 'Launcher'], false]
+    ,['pinball-game', 'Space Cadet Pinball Game', 'Direct game entry point for the pinball table.', 'games/pinball.html', '🚀', 'arcade', ['Retro'], false]
+    ,['pokedex-game', 'Pokédex Game', 'Direct games-folder Pokédex entry point.', 'games/pokedex.html', '●', 'quiz', ['Database'], false]
+    ,['pokemon-game', 'Pokémon Game', 'Direct games-folder Pokémon entry point.', 'games/pokemon.html', '⚡', 'story', ['Adventure'], false]
+    ,['pokopia-wrapper', 'Pokopia Clone Launcher', 'Launcher page for the world-building game.', 'games/pokopia-clone.html', '⌂', 'simulation', ['Canvas', 'Launcher'], false]
+    ,['referendum-game', 'Referendum Game', 'A multiplayer referendum and mini-game experiment.', 'games/referendum-game/index.html', '◉', 'multiplayer', ['PeerJS', 'PWA'], false]
+    ,['slot-machine', 'Slot Machine', 'Spin and test your luck.', 'games/slot.html', '🎰', 'arcade', ['Casual'], false]
+    ,['watermelon', 'Watermelon Game', 'A physics-inspired fruit merging game.', 'games/watermelon.html', '🍉', 'puzzle', ['Physics'], false]
+    ,['webgl-diagnostics', 'WebGL Diagnostics', 'Inspect browser graphics capabilities.', 'games/webgl_diagnostics.html', '▣', 'tools', ['WebGL', 'Diagnostics'], false]
   ].map(([id,title,description,href,icon,category,badges,featured]) => ({ id, title, description, href, icon, category, badges, technologies: badges, featured, status: 'live', type: 'game', requirements: badges.includes('Camera') ? ['camera'] : [] }));
 
   root.PORTFOLIO_CATALOG = { projects, games, categories: ['ai', 'audio', 'accessibility', 'computer-vision', 'creative', 'data', 'engineering', 'games', 'simulation', 'tools', 'quiz', 'arcade', 'multiplayer', 'cards', 'party', 'strategy', 'puzzle', 'story'] };
