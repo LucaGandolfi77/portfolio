@@ -2,105 +2,874 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python Wrapper</title>
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#14161a">
+    <title>Python Environment</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
     <style>
-        body { margin: 0; background: #1e1e1e; color: #fff; font-family: 'Courier New', monospace; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-        #terminal { flex: 1; background: #000; padding: 10px; overflow-y: auto; border-radius: 5px; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }
-        .input-line { display: flex; margin-top: 10px; }
-        .prompt { color: #0f0; margin-right: 10px; }
-        #cmdInput { flex: 1; background: transparent; border: none; color: #fff; font-family: inherit; font-size: inherit; outline: none; }
-        .output { color: #ccc; margin-bottom: 5px; }
-        .error { color: #f55; margin-bottom: 5px; }
-        .loading { color: #aaa; font-style: italic; }
-        h1 { margin-top: 0; margin-bottom: 10px; font-size: 1.5rem; }
-        p { margin-top: 0; color: #aaa; margin-bottom: 20px; font-size: 0.9rem; }
-        .nav-back { display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none; }
-        .nav-back:hover { text-decoration: underline; }
+        :root {
+            --bg: #14161a;
+            --panel: #0b0c0f;
+            --border: #2a2e37;
+            --txt: #d8dee9;
+            --dim: #7f8899;
+            --accent: #4fc3f7;
+            --green: #66dd88;
+            --red: #ff6b6b;
+            --amber: #ffc94d;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--txt);
+            font-family: var(--mono);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 14px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            border-bottom: 1px solid var(--border);
+            background: rgba(11,12,15,.85);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+        }
+        .nav-back {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 700;
+            padding: 6px 8px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+        .nav-back:active { background: rgba(79,195,247,.15); }
+        .title {
+            font-size: .95rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .badge {
+            font-size: .58rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--amber);
+            border: 1px solid rgba(255,201,77,.45);
+            padding: 2px 7px;
+            border-radius: 999px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: .68rem;
+            color: var(--dim);
+            min-width: 0;
+        }
+        #dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--amber);
+            flex: none;
+            transition: background .3s;
+        }
+        #dot.ready { background: var(--green); }
+        #dot.error { background: var(--red); }
+        #dot.busy { animation: blink 1s infinite alternate; background: var(--accent); }
+        @keyframes blink { from { opacity: .35 } to { opacity: 1 } }
+        #py-status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            max-width: 1000px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 10px 12px calc(8px + env(safe-area-inset-bottom));
+        }
+        #terminal {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            word-break: break-word;
+            scrollbar-width: thin;
+            scrollbar-color: #333 transparent;
+        }
+        #terminal::-webkit-scrollbar { width: 8px; }
+        #terminal::-webkit-scrollbar-thumb { background: #33383f; border-radius: 4px; }
+        .ln { white-space: pre-wrap; }
+        .sys { color: var(--dim); font-style: italic; }
+        .out { color: var(--txt); }
+        .err { color: var(--red); }
+        .ok { color: var(--green); }
+        .warn { color: var(--amber); }
+        .echo { color: #fff; margin-top: 2px; }
+        .echo .pp { color: var(--accent); font-weight: 700; }
+        .echo.cont .pp { color: var(--amber); }
+        .banner { color: #0b0c0f; background: rgba(79,195,247,.16); border-left: 3px solid var(--accent); padding: 6px 9px; margin: 6px 0; border-radius: 0 6px 6px 0; }
+        img.plot {
+            display: block;
+            max-width: 100%;
+            background: #fff;
+            border-radius: 8px;
+            padding: 6px;
+            margin: 8px 0;
+            box-shadow: 0 3px 10px rgba(0,0,0,.4);
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 8px;
+        }
+        .input-line:focus-within { border-color: rgba(79,195,247,.55); box-shadow: 0 0 0 3px rgba(79,195,247,.08); }
+        .prompt {
+            color: var(--green);
+            font-weight: 700;
+            padding-left: 4px;
+            flex: none;
+            min-width: 34px;
+            transition: color .2s;
+        }
+        .prompt.cont { color: var(--amber); }
+        #cmdInput {
+            flex: 1;
+            min-width: 0;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--txt);
+            font-family: inherit;
+            font-size: 16px;
+            caret-color: var(--accent);
+        }
+        #cmdInput::placeholder { color: #565e6d; }
+        #cmdInput:disabled { opacity: .5; }
+        #runBtn {
+            flex: none;
+            width: 38px; height: 34px;
+            border-radius: 8px;
+            border: 1px solid rgba(102,221,136,.4);
+            background: rgba(102,221,136,.12);
+            color: var(--green);
+            font-size: 15px;
+            cursor: pointer;
+            touch-action: manipulation;
+            font-family: inherit;
+        }
+        #runBtn:active:not(:disabled) { transform: scale(.93); }
+        #runBtn:disabled { opacity: .35; cursor: wait; }
+        .hint {
+            text-align: center;
+            color: var(--dim);
+            font-size: .64rem;
+            letter-spacing: .4px;
+            margin-top: 6px;
+            user-select: none;
+        }
+        .hint b { color: #aab3c2; font-weight: 700; }
+        @media (max-width: 520px) {
+            .topbar { padding-inline: 10px; }
+            .title { font-size: .85rem; letter-spacing: 1px; }
+            .badge { display: none; }
+            .wrap { padding-inline: 8px; }
+            #terminal { font-size: 12px; padding: 10px; }
+            .hint { display: none; }
+        }
     </style>
 </head>
 <body>
-    <a href="../../index.html" class="nav-back">← Back to Portfolio</a>
-    <h1>Python Wrapper & CLI</h1>
-    <p>Run Python code and install lightweight packages (micropip) directly in your browser. <br>Use <code>import micropip</code> then <code>await micropip.install('package')</code> to install libraries.</p>
-    <div id="terminal">
-        <div class="loading">Loading Python Environment... Please wait.</div>
-    </div>
-    <div class="input-line">
-        <span class="prompt">>>></span>
-        <input type="text" id="cmdInput" disabled autocomplete="off" spellcheck="false" placeholder="Initializing...">
-    </div>
+    <header class="topbar">
+        <a href="../../index.html" class="nav-back">&#8592; Portfolio</a>
+        <div class="title">PYTHON ENV <span class="badge">WASM</span></div>
+        <div class="status"><span id="dot"></span><span id="py-status">booting…</span></div>
+    </header>
+
+    <main class="wrap">
+        <div id="terminal" role="log" aria-live="polite">
+            <div class="ln sys">⏳ Downloading Python runtime (~10 MB, cached by browser)…</div>
+        </div>
+        <div class="input-line">
+            <span class="prompt" id="prompt">&gt;&gt;&gt;</span>
+            <input type="text" id="cmdInput" autocomplete="off" autocapitalize="off"
+                   spellcheck="false" aria-label="Python command line" disabled
+                   placeholder="Loading runtime…">
+            <button id="runBtn" aria-label="Run" disabled>⏎</button>
+        </div>
+        <div class="hint"><b>Enter</b> run · <b>↑↓</b> history · <b>Esc</b> cancel block · <b>Ctrl+L</b> clear · <b>pip install numpy</b></div>
+    </main>
 
     <script>
-        let pyodide = null;
-        const terminal = document.getElementById('terminal');
-        const cmdInput = document.getElementById('cmdInput');
-        const loadingMsg = document.querySelector('.loading');
+        (function () {
+            'use strict';
 
-        function addToTerminal(text, type = 'output') {
-            const div = document.createElement('div');
-            div.className = type;
-            div.textContent = text;
-            terminal.appendChild(div);
-            terminal.scrollTop = terminal.scrollHeight;
-        }
+            const terminal = document.getElementById('terminal');
+            const cmdInput = document.getElementById('cmdInput');
+            const promptEl = document.getElementById('prompt');
+            const runBtn = document.getElementById('runBtn');
+            const statusEl = document.getElementById('py-status');
+            const dotEl = document.getElementById('dot');
 
-        async function initPyodide() {
-            try {
-                pyodide = await loadPyodide();
-                await pyodide.loadPackage("micropip");
-                loadingMsg.textContent = "Python 3.11 Ready! (micropip available)";
-                addToTerminal("Welcome to Pyodide! WebAssembly Python environment.", 'output');
-                addToTerminal("Type 'help()' for help, or install packages with:", 'output');
-                addToTerminal("import micropip", 'output');
-                addToTerminal("await micropip.install('package_name')", 'output');
-                addToTerminal("---------------------------------------------------", 'output');
-                cmdInput.disabled = false;
-                cmdInput.placeholder = "Type python code here...";
-                cmdInput.focus();
-            } catch (err) {
-                loadingMsg.textContent = "Failed to load Python environment.";
-                addToTerminal(err.message, 'error');
+            let pyodide = null;
+            let ready = false;
+            let busy = false;
+            let buffer = [];
+            let history = [];
+            let histIdx = -1;
+            let restorePending = false;
+            let pyIsComplete = null;
+            let pyFlushFigures = null;
+            let idleStatus = '';
+
+            const HIST_KEY = 'py_hist';
+            const PKG_KEY = 'pkgs_user';
+
+            function addLine(text, cls) {
+                const div = document.createElement('div');
+                div.className = 'ln ' + (cls || 'out');
+                div.textContent = text;
+                terminal.appendChild(div);
+                terminal.scrollTop = terminal.scrollHeight;
+                return div;
             }
-        }
+            function addEcho(text, cont) {
+                const div = document.createElement('div');
+                div.className = 'ln echo' + (cont ? ' cont' : '');
+                const pp = document.createElement('span');
+                pp.className = 'pp';
+                pp.textContent = cont ? '... ' : '>>> ';
+                div.appendChild(pp);
+                div.appendChild(document.createTextNode(text));
+                terminal.appendChild(div);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            function addPlot(b64) {
+                const img = document.createElement('img');
+                img.className = 'plot';
+                img.alt = 'matplotlib figure';
+                img.src = 'data:image/png;base64,' + b64;
+                terminal.appendChild(img);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            function clearTerminal() {
+                while (terminal.firstChild) terminal.removeChild(terminal.firstChild);
+            }
 
-        async function runPython(code) {
-            try {
-                // Determine if we should print result (like REPL)
-                let result = await pyodide.runPythonAsync(code);
-                if (result !== undefined) {
-                    addToTerminal(result.toString());
+            function setStatus(txt, mode) {
+                statusEl.textContent = txt;
+                dotEl.className = mode || '';
+            }
+
+            function lsGet(k, d) {
+                try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; }
+            }
+            function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+            function loadHistory() {
+                try { history = JSON.parse(lsGet(HIST_KEY, '[]')) || []; } catch (e) { history = []; }
+                if (!Array.isArray(history)) history = [];
+            }
+            function pushHistory(cmd) {
+                if (!cmd.trim()) return;
+                if (history[history.length - 1] === cmd) return;
+                history.push(cmd);
+                if (history.length > 200) history.shift();
+                lsSet(HIST_KEY, JSON.stringify(history));
+            }
+
+            function normalizeName(n) {
+                return String(n).trim().toLowerCase().replace(/_/g, '-');
+            }
+            function getPersistedPkgs() {
+                try {
+                    const arr = JSON.parse(lsGet(PKG_KEY, '[]'));
+                    return Array.isArray(arr) ? arr : [];
+                } catch (e) { return []; }
+            }
+            function persistMerge(specs) {
+                const cur = getPersistedPkgs();
+                const seen = {};
+                cur.forEach(s => { seen[normalizeName(parsePkgSpec(s).name)] = true; });
+                specs.forEach(s => {
+                    const k = normalizeName(parsePkgSpec(s).name);
+                    if (!seen[k]) { seen[k] = true; cur.push(s); }
+                });
+                lsSet(PKG_KEY, JSON.stringify(cur));
+            }
+            function persistRemove(names) {
+                const kill = {};
+                names.forEach(n => { kill[normalizeName(n)] = true; });
+                const cur = getPersistedPkgs().filter(s => !kill[normalizeName(parsePkgSpec(s).name)]);
+                lsSet(PKG_KEY, JSON.stringify(cur));
+            }
+
+            function splitArgs(s) {
+                const out = [];
+                let cur = '', q = null;
+                for (const ch of s) {
+                    if (q) {
+                        if (ch === q) q = null; else cur += ch;
+                    } else if (ch === '"' || ch === "'") {
+                        q = ch;
+                    } else if (/\s/.test(ch)) {
+                        if (cur) { out.push(cur); cur = ''; }
+                    } else {
+                        cur += ch;
+                    }
                 }
-            } catch (err) {
-                addToTerminal(err.message, 'error');
+                if (cur) out.push(cur);
+                return out;
             }
-        }
 
-        cmdInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const command = cmdInput.value;
-                if (!command) return;
-                
-                // Echo command
-                const echo = document.createElement('div');
-                echo.textContent = '>>> ' + command;
-                echo.style.color = '#fff';
-                echo.style.marginTop = '5px';
-                terminal.appendChild(echo);
-                
-                cmdInput.value = '';
-                
-                await runPython(command);
+            function parsePkgSpec(arg) {
+                const m = String(arg).trim().match(/^([A-Za-z0-9][A-Za-z0-9._-]*)(\s*(?:==|>=|<=|~=|!=|>|<)\s*[^\s,;]+)?/);
+                if (!m) return { name: String(arg).trim(), spec: String(arg).trim() };
+                return { name: m[1], spec: m[1] + (m[2] ? m[2].replace(/\s+/g, '') : '') };
             }
-        });
 
-        initPyodide();
-        
-        // Expose python wrapper to window for easier external js calls if needed
-        window.runPythonCommand = async (cmd) => {
-            await runPython(cmd);
-        }
+            function planInstall(args) {
+                const specs = [];
+                let quiet = false;
+                for (const a of args) {
+                    if (/^-(q|-quiet)$/.test(a)) quiet = true;
+                    else if (/^-(U|-upgrade|--pre|-pre)$/.test(a)) continue;
+                    else if (/^-/.test(a)) continue;
+                    else {
+                        const p = parsePkgSpec(a);
+                        if (p.name) specs.push(p);
+                    }
+                }
+                return { quiet, specs };
+            }
+
+            function planUninstall(args) {
+                const names = [];
+                for (const a of args) {
+                    if (/^-(y|-yes)$/.test(a)) continue;
+                    if (/^-/.test(a)) continue;
+                    names.push(parsePkgSpec(a).name);
+                }
+                return names;
+            }
+
+            function classifyLine(raw, pending) {
+                const t = raw.trim();
+                if (!t) return { kind: 'empty' };
+                if (t === 'pip' || t === 'pip3') return { kind: 'pip', args: [] };
+                if (/^(pip3?)\s+/.test(t)) return { kind: 'pip', args: splitArgs(t.replace(/^pip3?\s+/, '')) };
+                if (/^%pip\s+/.test(t)) return { kind: 'pip', args: splitArgs(t.replace(/^%pip\s+/, '')) };
+                if (t === '%pip') return { kind: 'pip', args: [] };
+                if (t === 'help' || t === '?') return { kind: 'help' };
+                if (t === 'clear' || t === 'cls') return { kind: 'clear' };
+                if (t === 'python' ) return { kind: 'pythoninfo' };
+                if (/^python\s+-V/.test(t) || /^python\s+--version/.test(t)) return { kind: 'pythoninfo' };
+                if (pending && ['restore', 'skip', 'y', 'yes', 'n', 'no', 'si', 'sì'].includes(t.toLowerCase()))
+                    return { kind: 'answer', word: t.toLowerCase() };
+                return { kind: 'python' };
+            }
+
+            const HELP_LINES = [
+                'Python ' + 'REPL on WebAssembly — quick reference:',
+                '',
+                '  pip install numpy pandas requests==2.31.0   install packages (pure-Python',
+                '           wheels from PyPI + all Pyodide-built binaries)',
+                '  pip uninstall numpy          remove a package',
+                '  pip list | freeze | show X   inspect environment',
+                '  %pip install X               Jupyter-style alias',
+                '  python -V                    interpreter version',
+                '  clear  (or Ctrl+L)           wipe screen',
+                '  restore | skip               answer the package-restore banner',
+                '',
+                'Tips:',
+                '  • print() streams live; multi-line blocks run when complete (Esc cancels)',
+                '  • matplotlib figures render inline automatically',
+                '  • top-level await works: await micropip.install("rich")',
+                '  • very long loops cannot be interrupted — reload the page'
+            ];
+
+            async function pyCountPackages() {
+                try {
+                    return await pyodide.runPythonAsync(
+                        'len([d for d in __import__("importlib.metadata", fromlist=["distributions"]).distributions()])'
+                    );
+                } catch (e) { return '?'; }
+            }
+            async function refreshStatus() {
+                if (!ready) return;
+                const n = await pyCountPackages();
+                idleStatus = 'Py ' + (pyodide.pyVersion || '') + ' · ' + n + ' pkgs';
+                setStatus(idleStatus, 'ready');
+            }
+
+            async function pyInstalledRows() {
+                return await pyodide.runPythonAsync(
+                    '(lambda m=[__import__("importlib.metadata",fromlist=["distributions"])]: '
+                    + 'sorted([(d.metadata["Name"], d.version) for d in m.distributions()]))()'
+                );
+            }
+            function fmtVerMap(pyMap) {
+                const out = {};
+                try {
+                    if (pyMap && typeof pyMap.entries === 'function') {
+                        const it = pyMap.entries();
+                        while (true) {
+                            const n = it.next();
+                            if (n.done) break;
+                            out[normalizeName(n.value[0])] = n.value[1];
+                        }
+                    } else if (pyMap && typeof pyMap === 'object') {
+                        Object.keys(pyMap).forEach(k => { out[normalizeName(k)] = pyMap[k]; });
+                    }
+                } catch (e) {}
+                return out;
+            }
+
+            async function pipInstall(args) {
+                const plan = planInstall(args);
+                if (!plan.specs.length) {
+                    addLine('Usage: pip install <package> [package2==version ...] [-q]', 'warn');
+                    return;
+                }
+                const wanted = plan.specs.map(p => p.spec);
+                if (!plan.quiet) plan.specs.forEach(p => addLine('Collecting ' + p.spec, 'sys'));
+                setStatus('installing ' + plan.specs.map(p => p.name).join(', '), 'busy');
+                try {
+                    const micropip = pyodide.pyimport('micropip');
+                    await micropip.install(wanted, { keep_going: true });
+                    const verMap = fmtVerMap(await pyodide.runPythonAsync(
+                        '{d.metadata["Name"].lower(): d.version for d in __import__("importlib.metadata",fromlist=["distributions"]).distributions()}'
+                    ));
+                    const done = plan.specs.map(p => p.name + '-' + (verMap[normalizeName(p.name)] || '?'));
+                    addLine('Successfully installed ' + done.join(' '), 'ok');
+                    persistMerge(plan.specs.map(p => p.spec));
+                    if (plan.specs.some(p => normalizeName(p.name) === 'matplotlib'))
+                        addLine('matplotlib ready — figures will render inline.', 'sys');
+                } catch (err) {
+                    const msg = String(err.message || err);
+                    const wantedNames = plan.specs.map(p => p.name).join(', ');
+                    if (/No matching distribution|PackageNotFoundError/i.test(msg))
+                        addLine("ERROR: No matching distribution found for: " + wantedNames + ".\n       Only pure-Python wheels from PyPI and Pyodide pre-built binaries are supported.", 'err');
+                    else
+                        addLine('ERROR: ' + msg, 'err');
+                }
+                await refreshStatus();
+            }
+
+            async function pipUninstall(args) {
+                const names = planUninstall(args);
+                if (!names.length) {
+                    addLine('Usage: pip uninstall <package> [-y]', 'warn');
+                    return;
+                }
+                let micropipHasUninstall = false;
+                try { micropipHasUninstall = typeof pyodide.pyimport('micropip').uninstall === 'function'; } catch (e) {}
+                const removed = [], failed = [];
+                for (const n of names) {
+                    try {
+                        if (micropipHasUninstall) {
+                            await pyodide.pyimport('micropip').uninstall(normalizeName(n));
+                            removed.push(n);
+                        } else {
+                            failed.push(n);
+                        }
+                    } catch (err) {
+                        failed.push(n);
+                    }
+                }
+                if (removed.length) {
+                    addLine('Successfully uninstalled ' + removed.join(' '), 'ok');
+                    persistRemove(removed);
+                }
+                failed.forEach(n => addLine("WARNING: Skipping '" + n + "' (not installed, or cannot be removed in this sandbox).", 'warn'));
+                await refreshStatus();
+            }
+
+            async function pipList() {
+                try {
+                    const rows = await pyInstalledRows();
+                    const list = [];
+                    const it = rows[Symbol.iterator] ? rows[Symbol.iterator]() : null;
+                    if (it) {
+                        while (true) {
+                            const n = it.next();
+                            if (n.done) break;
+                            const tup = n.value;
+                            let a = '', b = '';
+                            try { a = tup.get ? tup.get(0) : tup[0]; b = tup.get ? tup.get(1) : tup[1]; } catch (e) {}
+                            if (a) list.push([String(a), String(b)]);
+                            try { if (tup && tup.destroy) tup.destroy(); } catch (e) {}
+                        }
+                    }
+                    list.sort((x, y) => x[0].toLowerCase().localeCompare(y[0].toLowerCase()));
+                    addLine('Package              Version', 'sys');
+                    addLine('-------------------- -------', 'sys');
+                    const w = Math.max(20, ...list.map(r => r[0].length + 1));
+                    list.forEach(r => addLine(r[0].padEnd(w) + r[1]));
+                    addLine('(' + list.length + ' packages)', 'sys');
+                } catch (err) {
+                    addLine('ERROR: ' + (err.message || err), 'err');
+                }
+            }
+
+            async function pipFreeze() {
+                try {
+                    const rows = await pyInstalledRows();
+                    const list = [];
+                    const it = rows[Symbol.iterator] ? rows[Symbol.iterator]() : null;
+                    if (it) {
+                        while (true) {
+                            const n = it.next();
+                            if (n.done) break;
+                            const tup = n.value;
+                            let a = '', b = '';
+                            try { a = tup.get ? tup.get(0) : tup[0]; b = tup.get ? tup.get(1) : tup[1]; } catch (e) {}
+                            if (a) list.push([String(a), String(b)]);
+                            try { if (tup && tup.destroy) tup.destroy(); } catch (e) {}
+                        }
+                    }
+                    list.sort((x, y) => x[0].toLowerCase().localeCompare(y[0].toLowerCase()));
+                    list.forEach(r => addLine(r[0] + '==' + r[1]));
+                } catch (err) {
+                    addLine('ERROR: ' + (err.message || err), 'err');
+                }
+            }
+
+            async function pipShow(name) {
+                if (!name) {
+                    addLine('Usage: pip show <package>', 'warn');
+                    return;
+                }
+                try {
+                    const info = await pyodide.runPythonAsync(
+                        '(lambda n=' + JSON.stringify(normalizeName(name)) + ', m=__import__("importlib.metadata",fromlist=["distributions"]): '
+                        + 'next(({ "Name": d.metadata["Name"], "Version": d.version, "Summary": (d.metadata["Summary"] or "").strip(), "Home-page": (d.metadata["Home-page"] or "-"), "Requires": ", ".join((d.requires or []))[:300] or "-" }) for d in m.distributions() if d.metadata["Name"].lower()==n), None))()'
+                    );
+                    if (!info || info === undefined) {
+                        addLine("WARNING: Package(s) not found: " + name, 'warn');
+                        return;
+                    }
+                    const keys = ['Name', 'Version', 'Summary', 'Home-page', 'Requires'];
+                    for (const k of keys) {
+                        let v = '';
+                        try { v = String(info.get ? info.get(k) : info[k]); } catch (e) { try { v = String(info[k]); } catch (e2) {} }
+                        addLine(k.padEnd(11) + ': ' + v);
+                    }
+                    try { if (info.destroy) info.destroy(); } catch (e) {}
+                } catch (err) {
+                    addLine('WARNING: Package(s) not found: ' + name, 'warn');
+                }
+            }
+
+            async function handlePip(args) {
+                if (!args.length) {
+                    addLine('Usage:\n  pip install <pkgs...>\n  pip uninstall <pkgs...>\n  pip list\n  pip freeze\n  pip show <pkg>', 'sys');
+                    return;
+                }
+                const cmd = args[0].toLowerCase();
+                const rest = args.slice(1);
+                switch (cmd) {
+                    case 'install': await pipInstall(rest); break;
+                    case 'uninstall': case 'remove': await pipUninstall(rest); break;
+                    case 'list': await pipList(); break;
+                    case 'freeze': await pipFreeze(); break;
+                    case 'show': await pipShow(rest[0]); break;
+                    case 'help': HELP_LINES.forEach(l => addLine(l, 'sys')); break;
+                    case 'restore': restoreSaved(true); break;
+                    default:
+                        addLine("Unknown pip command '" + args[0] + "'. Try: install | uninstall | list | freeze | show", 'warn');
+                }
+            }
+
+            function offerRestore() {
+                const saved = getPersistedPkgs();
+                if (!saved.length) return;
+                restorePending = true;
+                addLine('', 'sys');
+                const b1 = addLine('📦 Found ' + saved.length + ' previously installed package(s): ' + saved.join(', '), 'banner');
+                addLine("   Type 'restore' to reinstall them now, or 'skip' to continue without.", 'banner');
+            }
+
+            async function restoreSaved(explicit) {
+                const saved = getPersistedPkgs();
+                if (!saved.length) {
+                    addLine('Nothing to restore — no saved packages.', 'sys');
+                    restorePending = false;
+                    return;
+                }
+                if (!explicit && !restorePending) {
+                    addLine("Nothing to restore. Use: pip install <pkg>", 'sys');
+                    return;
+                }
+                restorePending = false;
+                addLine('Restoring ' + saved.length + ' package(s)…', 'sys');
+                await pipInstall(saved);
+            }
+
+            function setPrompt(cont) {
+                promptEl.textContent = cont ? '...' : '>>>';
+                promptEl.classList.toggle('cont', !!cont);
+            }
+            function setBusy(v) {
+                busy = v;
+                cmdInput.disabled = v || !ready;
+                runBtn.disabled = v || !ready;
+                if (!ready) return;
+                if (v) setStatus('working…', 'busy');
+                else setStatus(idleStatus || 'ready', 'ready');
+            }
+
+            async function runPythonCode(code) {
+                try {
+                    const result = await pyodide.runPythonAsync(code);
+                    if (result !== undefined && result !== null) {
+                        let txt;
+                        try { txt = result.toString(); } catch (e) { txt = String(result); }
+                        if (typeof result.destroy === 'function') { try { result.destroy(); } catch (e) {} }
+                        addLine(txt, 'out');
+                    }
+                    if (pyFlushFigures) {
+                        const figs = await pyFlushFigures();
+                        if (figs && figs.length) figs.forEach(addPlot);
+                    }
+                } catch (err) {
+                    addLine(String(err.message || err), 'err');
+                }
+            }
+
+            async function submitLine(text) {
+                const lines = String(text).replace(/\r/g, '').split('\n');
+                for (const l of lines) await submitSingle(l);
+            }
+
+            async function submitSingle(line) {
+                if (busy) return;
+                if (!buffer.length) addEcho(line, false);
+
+                if (!buffer.length) {
+                    const c = classifyLine(line, restorePending);
+                    switch (c.kind) {
+                        case 'empty':
+                            return;
+                        case 'clear':
+                            clearTerminal();
+                            return;
+                        case 'help':
+                            HELP_LINES.forEach(l => addLine(l, 'sys'));
+                            return;
+                        case 'pythoninfo':
+                            try {
+                                const v = await pyodide.runPythonAsync('__import__("sys").version.split()[0]');
+                                addLine('Python ' + v + ' — Pyodide ' + pyodide.version + ' (WebAssembly)', 'out');
+                            } catch (e) { addLine('Python (Pyodide ' + pyodide.version + ')', 'out'); }
+                            return;
+                        case 'pip':
+                            setBusy(true);
+                            pushHistory(line);
+                            try { await handlePip(c.args); } finally { setBusy(false); }
+                            return;
+                        case 'answer': {
+                            const w = c.word;
+                            if (w === 'restore' || w === 'y' || w === 'yes' || w === 'si' || w === 'sì') {
+                                setBusy(true);
+                                pushHistory(line);
+                                try { await restoreSaved(true); } finally { setBusy(false); }
+                            } else {
+                                restorePending = false;
+                                addLine("OK — skipped. Your saved package list is kept; run 'restore' anytime.", 'sys');
+                            }
+                            return;
+                        }
+                        default:
+                            break;
+                    }
+                }
+
+                buffer.push(line);
+                if (buffer.length > 1) addEcho(line, true);
+                const joined = buffer.join('\n');
+
+                let complete = true;
+                try {
+                    complete = pyIsComplete ? !!pyIsComplete(joined) : true;
+                } catch (e) { complete = true; }
+
+                if (!complete) {
+                    setPrompt(true);
+                    return;
+                }
+
+                const code = joined;
+                buffer = [];
+                setPrompt(false);
+                pushHistory(code);
+                setBusy(true);
+                try {
+                    await runPythonCode(code);
+                } finally {
+                    setBusy(false);
+                    cmdInput.focus();
+                }
+            }
+
+            function initInputHandlers() {
+                cmdInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = cmdInput.value;
+                        cmdInput.value = '';
+                        if (val.trim()) histIdx = -1;
+                        submitLine(val);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (buffer.length) return;
+                        if (!history.length) return;
+                        if (histIdx === -1) histIdx = history.length;
+                        histIdx = Math.max(0, histIdx - 1);
+                        cmdInput.value = history[histIdx] || '';
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (buffer.length) return;
+                        if (histIdx === -1) return;
+                        histIdx++;
+                        if (histIdx >= history.length) { histIdx = -1; cmdInput.value = ''; }
+                        else cmdInput.value = history[histIdx];
+                    } else if (e.key === 'Escape') {
+                        if (buffer.length) {
+                            buffer = [];
+                            setPrompt(false);
+                            addLine('(block cancelled)', 'sys');
+                            cmdInput.value = '';
+                        }
+                    } else if (e.key === 'l' && e.ctrlKey) {
+                        e.preventDefault();
+                        clearTerminal();
+                    }
+                });
+                runBtn.addEventListener('click', () => {
+                    const val = cmdInput.value;
+                    cmdInput.value = '';
+                    submitLine(val);
+                });
+            }
+
+            const BOOT_PY = [
+                'import codeop, io, base64, sys',
+                'def _py_repl_complete(code):',
+                '    try:',
+                '        return codeop.compile_command(code, "<stdin>", "exec") is not None',
+                '    except Exception:',
+                '        return True',
+                'def _py_flush_figures():',
+                '    try:',
+                '        import matplotlib.pyplot as plt',
+                '        nums = plt.get_fignums()',
+                '        if not nums:',
+                '            return []',
+                '        outs = []',
+                '        for num in nums:',
+                '            buf = io.BytesIO()',
+                '            plt.figure(num).savefig(buf, format="png", dpi=110, bbox_inches="tight")',
+                '            outs.append(base64.b64encode(buf.getvalue()).decode())',
+                '        plt.close("all")',
+                '        return outs',
+                '    except Exception:',
+                '        return []'
+            ].join('\n');
+
+            async function initPyodide() {
+                const t0 = performance.now();
+                setStatus('downloading…', 'busy');
+                try {
+                    pyodide = await loadPyodide();
+                    setStatus('loading micropip…', 'busy');
+                    await pyodide.loadPackage('micropip');
+                    pyodide.setStdout({ batched: (s) => addLine(s, 'out') });
+                    pyodide.setStderr({ batched: (s) => addLine(s, 'err') });
+                    pyodide.runPython(BOOT_PY);
+                    pyIsComplete = pyodide.globals.get('_py_repl_complete');
+                    pyFlushFigures = pyodide.globals.get('_py_flush_figures');
+                    const pyVer = await pyodide.runPythonAsync('__import__("sys").version.split()[0]');
+                    pyodide.pyVersion = pyVer;
+                    ready = true;
+                    setBusy(false);
+                    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+                    clearTerminal();
+                    addLine('Welcome to Python ' + pyVer + ' on WebAssembly (Pyodide v' + pyodide.version + ') — ready in ' + secs + 's', 'ok');
+                    addLine('', 'out');
+                    addLine('  • Run Python directly, or manage packages:', 'out');
+                    addLine('      pip install numpy pandas matplotlib rich', 'out');
+                    addLine('      pip list | freeze | show numpy | uninstall X', 'out');
+                    addLine('  • help  → full reference        print() streams live', 'out');
+                    addLine('', 'out');
+                    await refreshStatus();
+                    offerRestore();
+                    cmdInput.disabled = false;
+                    runBtn.disabled = false;
+                    cmdInput.placeholder = '>>> python here… or pip install <pkg>';
+                    cmdInput.focus();
+                } catch (err) {
+                    setStatus('failed', 'error');
+                    addLine('Failed to initialize the Python runtime.', 'err');
+                    addLine(String(err.message || err), 'err');
+                    const retry = document.createElement('button');
+                    retry.textContent = '↻ Retry';
+                    retry.style.cssText = 'margin-top:8px;padding:8px 18px;border-radius:8px;border:1px solid #4fc3f7;background:rgba(79,195,247,.12);color:#4fc3f7;font-family:inherit;font-weight:700;cursor:pointer;';
+                    retry.addEventListener('click', () => {
+                        retry.remove();
+                        addLine('Retrying…', 'sys');
+                        initPyodide();
+                    });
+                    terminal.appendChild(retry);
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            }
+
+            window.__pyEnvTest = {
+                splitArgs,
+                parsePkgSpec,
+                planInstall,
+                planUninstall,
+                classifyLine,
+                normalizeName,
+                getPersistedPkgs,
+                persistMerge,
+                persistRemove
+            };
+            window.runPythonCommand = async (cmd) => {
+                if (!ready) throw new Error('Runtime not ready yet');
+                await submitLine(String(cmd));
+            };
+
+            loadHistory();
+            initInputHandlers();
+            initPyodide();
+        })();
     </script>
 </body>
 </html>

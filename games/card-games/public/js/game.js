@@ -21,7 +21,8 @@ function renderGame(state) {
     case 'memory': renderMemory(state); break;
     case 'monopolydeal': renderMonopolyDeal(state); break;
     case 'odin': renderOdin(state); break;
-    default: renderScopa(state);
+    default:
+      console.warn('gameType mancante/sconosciuto:', state.gameType, '— update ignorato');
   }
 }
 

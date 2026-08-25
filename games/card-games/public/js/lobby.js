@@ -116,7 +116,10 @@ async function bindLocalSocket(nickname) {
   window.LocalCG.boot((err, cg) => {
     if (err) {
       console.error(err);
-      $('login-error').textContent = 'Errore caricamento giochi: ' + err.message;
+      const hint = location.protocol === 'file:'
+        ? ' — apri il gioco via HTTP ("npm start") o rigenera il bundle ("npm run build:local")'
+        : '';
+      $('login-error').textContent = 'Errore caricamento giochi: ' + err.message + hint;
       show('login');
       return;
     }

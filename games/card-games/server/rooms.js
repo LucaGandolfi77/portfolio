@@ -7,6 +7,13 @@ const VALID_DIFFICULTIES = ['easy', 'medium', 'hard'];
 const DIFFICULTY_LABELS = { easy: 'Facile', medium: 'Medio', hard: 'Difficile' };
 const BOT_DIFFICULTIES = { easy: 0.25, medium: 0.65, hard: 1.0 };
 
+// Stato pubblico + gameType: il client lo usa per scegliere il renderer corretto
+function publicStateOf(game, gameState, pid) {
+  const st = game.getPublicState(gameState, pid);
+  st.gameType = (game.meta ? game.meta.id : game.id);
+  return st;
+}
+
 function generateCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -180,7 +187,7 @@ function startTurnTimer(room, io) {
 
     const state = {};
     for (const p of room.gameState.playerOrder) {
-      state[p] = room.game.getPublicState(room.gameState, p);
+      state[p] = publicStateOf(room.game, room.gameState, p);
     }
     for (const p of room.gameState.playerOrder) {
       io.to(p).emit('gameUpdate', state[p]);
@@ -238,7 +245,7 @@ function scheduleBotAction(room, io) {
         maybeAdvanceRound(room);
         const state = {};
         for (const p of room.gameState.playerOrder) {
-          state[p] = room.game.getPublicState(room.gameState, p);
+          state[p] = publicStateOf(room.game, room.gameState, p);
         }
         for (const p of room.gameState.playerOrder) {
           io.to(p).emit('gameUpdate', state[p]);
@@ -270,7 +277,7 @@ function scheduleBotAction(room, io) {
 
     const state = {};
     for (const p of room.gameState.playerOrder) {
-      state[p] = room.game.getPublicState(room.gameState, p);
+      state[p] = publicStateOf(room.game, room.gameState, p);
     }
     for (const p of room.gameState.playerOrder) {
       io.to(p).emit('gameUpdate', state[p]);

@@ -60,6 +60,21 @@
 
   function bootBrowser(cb) {
     var rt = makeRuntime();
+    var bundled = root.__LOCALCG_BUNDLE__;
+    if (bundled) {
+      var missing = [];
+      FILES.forEach(function (f) {
+        if (typeof bundled[f] === "string") rt.define(f, bundled[f]);
+        else missing.push(f);
+      });
+      if (missing.length) {
+        cb(new Error("file mancanti nel bundle (rilancia npm run build:local): " + missing.join(", ")));
+        return;
+      }
+      if (rawSetTimeout) rawSetTimeout(function () { cb(null, rt); }, 0);
+      else cb(null, rt);
+      return;
+    }
     var pending = FILES.length;
     var failed = false;
     FILES.forEach(function (f) {

@@ -7,7 +7,11 @@ Piattaforma multiplayer per giocare a giochi di carte classici dal browser, self
 **🎮 Statica / GitHub Pages (vs Bot)** — apri `public/index.html` da qualsiasi hosting statico:
 la lobby rileva l'assenza del server e carica `LocalCG` (`public/js/local-server.js`),
 che esegue la logica di gioco direttamente nel browser. Aggiungi bot con difficoltà
-Facile/Medio/Difficile e gioca. Nessuna installazione richiesta.
+Facile/Medio/Difficile e gioca. Nessuna installazione richiesta. Funziona anche aprendo
+`index.html` con doppio click (`file://`) grazie al bundle `public/js/local-bundle.js`.
+
+> Se modifichi la logica in `server/`, rigenera il bundle con `npm run build:local`
+> e committa il file aggiornato.
 
 **📡 Multiplayer LAN (Node.js)** — avvia il server e gioca anche tra dispositivi diversi:
 
@@ -46,7 +50,8 @@ Il server si avvia su `http://localhost:3000`. Altri dispositivi nella stessa re
 ## Comandi
 
 - `npm start` — avvia il server
-- `npm test` — esegue i test
+- `npm run build:local` — rigenera il bundle statico `public/js/local-bundle.js`
+- `npm test` — esegui i test
 - `node --test server/**/*.test.js` — test specifici
 
 ## Tech
