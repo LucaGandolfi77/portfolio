@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>SHHH – Leggi in silenzio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none;z-index:10;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#title{color:#e94560;font-size:clamp(32px,12vw,80px);text-align:center;text-shadow:0 0 30px rgba(233,69,96,.5),0 0 60px rgba(233,69,96,.2);letter-spacing:clamp(4px,2vw,16px);font-weight:700;opacity:0;animation:fadeIn 2s ease 1s forwards}
+#subtitle{color:#666;font-size:clamp(10px,2.5vw,14px);text-align:center;margin-top:12px;opacity:0;animation:fadeIn 2s ease 2s forwards;letter-spacing:2px}
+#apri{pointer-events:all;margin-top:40px;padding:12px 40px;border:1px solid #e94560;background:rgba(233,69,96,.08);color:#d0d0d0;font-size:clamp(12px,3vw,16px);cursor:pointer;transition:all .3s;opacity:0;animation:fadeIn 2s ease 3s forwards;font-family:inherit;letter-spacing:2px;border-radius:8px}
+#apri:hover{background:rgba(233,69,96,.2);box-shadow:0 0 24px rgba(233,69,96,.2)}
+#credit{position:fixed;bottom:16px;color:#333;font-size:10px;opacity:0;animation:fadeIn 2s ease 3.5s forwards;padding-bottom:env(safe-area-inset-bottom)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){#apri{padding:14px 32px}}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="title">SHHH</div>
+  <div id="subtitle">Leggi in silenzio. Il rumore punisce la lettura.</div>
+  <button id="apri" onclick="window.location.href='shhh-reader/index.html'">APRI</button>
+</div>
+<div id="credit">Silenzio è potere</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0a);
+scene.fog = new THREE.FogExp2(0x0a0a0a, 0.02);
+
+const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 200);
+camera.position.set(0, 1, 10);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 5;
+controls.maxDistance = 20;
+controls.maxPolarAngle = Math.PI * 0.75;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.2;
+
+/* lights */
+const amb = new THREE.AmbientLight(0x1a0a0a, 0.3);
+scene.add(amb);
+
+const accentLight = new THREE.PointLight(0xe94560, 2.5, 18, 1.5);
+accentLight.position.set(0, 2, 0);
+scene.add(accentLight);
+
+/* sound wave rings */
+const rings = [];
+for(let i = 0; i < 5; i++){
+  const geo = new THREE.RingGeometry(0.8 + i * 0.6, 0.82 + i * 0.6, 64);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xe94560, transparent: true, opacity: 0.3 - i * 0.05, side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(geo, mat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = -0.5;
+  scene.add(ring);
+  rings.push({ mesh: ring, base: 0.8 + i * 0.6, idx: i });
+}
+
+/* central sphere */
+const sphereGeo = new THREE.SphereGeometry(0.3, 24, 24);
+const sphereMat = new THREE.MeshStandardMaterial({
+  color: 0xe94560, emissive: 0xe94560, emissiveIntensity: 1.5,
+  roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.85
+});
+const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+sphere.position.y = 1;
+scene.add(sphere);
+
+/* glow sprite */
+function createGlowTexture(){
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64,64,0,64,64,64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.2, 'rgba(255,255,255,0.5)');
+  grad.addColorStop(0.5, 'rgba(233,69,96,0.15)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+const glowTex = createGlowTexture();
+const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xe94560, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+const glow = new THREE.Sprite(glowMat);
+glow.scale.set(5, 5, 1);
+sphere.add(glow);
+
+/* floating particles */
+const PARTICLES = 300;
+const pGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(PARTICLES * 3);
+const colors = new Float32Array(PARTICLES * 3);
+const pVelocities = new Float32Array(PARTICLES * 3);
+const pColors = [
+  [0.91, 0.27, 0.38],
+  [0.85, 0.2, 0.33],
+  [0.95, 0.4, 0.5],
+  [0.6, 0.15, 0.2],
+  [0.4, 0.1, 0.15],
+];
+for(let i=0; i<PARTICLES; i++){
+  positions[i*3] = (Math.random()-0.5) * 25;
+  positions[i*3+1] = (Math.random()-0.5) * 12;
+  positions[i*3+2] = (Math.random()-0.5) * 25;
+  const c = pColors[Math.floor(Math.random()*pColors.length)];
+  colors[i*3] = c[0];
+  colors[i*3+1] = c[1];
+  colors[i*3+2] = c[2];
+  pVelocities[i*3] = (Math.random()-0.5) * 0.002;
+  pVelocities[i*3+1] = (Math.random()-0.5) * 0.0015;
+  pVelocities[i*3+2] = (Math.random()-0.5) * 0.002;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+const pMat = new THREE.PointsMaterial({
+  size: 0.08, vertexColors: true, transparent: true, opacity: 0.6,
+  blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+});
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+/* touch attractor */
+const mouse = new THREE.Vector2(9999, 9999);
+let touchActive = false;
+function onPointerMove(e){
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+}
+function onPointerDown(){ touchActive = true; }
+function onPointerUp(){ touchActive = false; mouse.set(9999, 9999); }
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointerend', onPointerUp);
+
+/* post processing */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 1.2, 0.4, 0.15);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* resize */
+window.addEventListener('resize', ()=>{
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  composer.setSize(w, h);
+});
+
+/* animate */
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  /* sphere pulse */
+  const pulse = 0.9 + Math.sin(t * 2.5) * 0.15;
+  sphere.scale.setScalar(pulse);
+  sphere.position.y = 1 + Math.sin(t * 0.8) * 0.3;
+
+  /* light flicker */
+  accentLight.intensity = 2.5 + Math.sin(t * 3) * 0.4;
+
+  /* ring pulse */
+  rings.forEach((r, i) => {
+    const s = 1 + Math.sin(t * 1.5 + i * 0.8) * 0.15;
+    r.mesh.scale.set(s, s, 1);
+    r.mesh.material.opacity = (0.25 - i * 0.04) * (0.7 + Math.sin(t * 2 + i) * 0.3);
+  });
+
+  /* particle drift */
+  const pos = particles.geometry.attributes.position.array;
+  for(let i=0; i<PARTICLES; i++){
+    pos[i*3] += pVelocities[i*3];
+    pos[i*3+1] += pVelocities[i*3+1];
+    pos[i*3+2] += pVelocities[i*3+2];
+    if(pos[i*3] > 12.5) pos[i*3] = -12.5;
+    if(pos[i*3] < -12.5) pos[i*3] = 12.5;
+    if(pos[i*3+1] > 6) pos[i*3+1] = -6;
+    if(pos[i*3+1] < -6) pos[i*3+1] = 6;
+    if(pos[i*3+2] > 12.5) pos[i*3+2] = -12.5;
+    if(pos[i*3+2] < -12.5) pos[i*3+2] = 12.5;
+    if(touchActive){
+      const dx = (mouse.x * 8) - pos[i*3];
+      const dy = (mouse.y * 6) - pos[i*3+1];
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < 5){
+        const force = 0.0002 / (dist + 0.5);
+        pVelocities[i*3] += dx * force;
+        pVelocities[i*3+1] += dy * force;
+      }
+    }
+    pVelocities[i*3] *= 0.999;
+    pVelocities[i*3+1] *= 0.999;
+    pVelocities[i*3+2] *= 0.999;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+
+  controls.update();
+  composer.render();
+}
+animate();
+</script>
+</body>
+</html>

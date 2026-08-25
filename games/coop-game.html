@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Slips & Catastrophes">
+<meta name="theme-color" content="#ff6b4a">
+<title>Slips & Catastrophes</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0b0e17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none;z-index:10;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#title{color:#d4af5a;font-size:clamp(28px,10vw,72px);text-align:center;text-shadow:0 0 30px rgba(212,175,90,.5),0 0 60px rgba(212,175,90,.2);letter-spacing:clamp(4px,2vw,16px);font-weight:800;opacity:0;animation:fadeIn 2s ease 0.5s forwards}
+#sub{color:#888;font-size:clamp(9px,2.2vw,13px);text-align:center;margin-top:10px;opacity:0;animation:fadeIn 2s ease 1.5s forwards;letter-spacing:2px}
+#apri{pointer-events:all;margin-top:36px;padding:12px 40px;border:1px solid #d4af5a;background:rgba(212,175,90,.08);color:#d0d0d0;font-size:clamp(11px,2.8vw,15px);cursor:pointer;transition:all .3s;opacity:0;animation:fadeIn 2s ease 2.5s forwards;font-family:inherit;letter-spacing:2px;border-radius:8px}
+#apri:hover{background:rgba(212,175,90,.2);box-shadow:0 0 24px rgba(212,175,90,.2)}
+#credit{position:fixed;bottom:16px;color:#444;font-size:10px;opacity:0;animation:fadeIn 2s ease 3s forwards;padding-bottom:env(safe-area-inset-bottom)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){#apri{padding:14px 32px}}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="title">Slips & Catastrophes</div>
+  <div id="sub>A cooperative chronicle of a semi-legal biotech farmhouse</div>
+  <button id="apri" onclick="window.location.href='coop-game/index.html'">PLAY</button>
+</div>
+<div id="credit">A cooperative game of bureaucratic absurdity for 1-6 players</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e17);
+scene.fog = new THREE.FogExp2(0x0b0e17, 0.018);
+
+const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 200);
+camera.position.set(0, 3, 14);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 6;
+controls.maxDistance = 24;
+controls.maxPolarAngle = Math.PI * 0.75;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.12;
+
+const amb = new THREE.AmbientLight(0x1a1a2e, 0.4);
+scene.add(amb);
+
+const goldLight = new THREE.PointLight(0xd4af5a, 3, 20, 1.5);
+goldLight.position.set(0, 4, 0);
+scene.add(goldLight);
+
+const blueLight = new THREE.PointLight(0x6d8fd1, 2, 16, 1.5);
+blueLight.position.set(-3, 2, 2);
+scene.add(blueLight);
+
+const redLight = new THREE.PointLight(0xc14b3f, 1.5, 14, 1.5);
+redLight.position.set(3, 1, -2);
+scene.add(redLight);
+
+const tableGroup = new THREE.Group();
+scene.add(tableGroup);
+
+const tableTop = new THREE.Mesh(
+  new THREE.PlaneGeometry(6, 3, 20, 10),
+  new THREE.MeshStandardMaterial({
+    color: 0xdfc795,
+    roughness: 0.3,
+    metalness: 0.05
+  })
+);
+tableTop.rotation.x = -Math.PI / 2;
+tableTop.position.y = -0.5;
+tableTop.castShadow = true;
+tableGroup.add(tableTop);
+
+const tableLeg1 = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.15, 0.15, 2.5, 12),
+  new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.8 })
+);
+tableLeg1.position.set(-2.3, -1.25, 1.3);
+tableLeg1.castShadow = true;
+tableGroup.add(tableLeg1);
+
+const tableLeg2 = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.15, 0.15, 2.5, 12),
+  new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.8 })
+);
+tableLeg2.position.set(2.3, -1.25, 1.3);
+tableLeg2.castShadow = true;
+tableGroup.add(tableLeg2);
+
+const tableLeg3 = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.15, 0.15, 2.5, 12),
+  new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.8 })
+);
+tableLeg3.position.set(-2.3, -1.25, -1.3);
+tableLeg3.castShadow = true;
+tableGroup.add(tableLeg3);
+
+const tableLeg4 = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.15, 0.15, 2.5, 12),
+  new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.8 })
+);
+tableLeg4.position.set(2.3, -1.25, -1.3);
+tableLeg4.castShadow = true;
+tableGroup.add(tableLeg4);
+
+const docTexture = new THREE.CanvasTexture(createDocTexture());
+docTexture.wrapS = docTexture.wrapT = THREE.RepeatWrapping;
+
+const docMat = new THREE.MeshStandardMaterial({
+  map: docTexture,
+  roughness: 0.5,
+  metalness: 0.1
+});
+
+const documents = [];
+const docCount = 20;
+for (let i = 0; i < docCount; i++) {
+  const docW = 0.25 + Math.random() * 0.35;
+  const docH = 0.18 + Math.random() * 0.25;
+  const docGeo = new THREE.PlaneGeometry(docW, docH);
+  const doc = new THREE.Mesh(docGeo, docMat);
+  doc.position.set(
+    (Math.random() - 0.5) * 4,
+    Math.random() * 2.5,
+    (Math.random() - 0.5) * 3
+  );
+  doc.rotation.z = Math.random() * Math.PI * 2;
+  doc.rotation.x = Math.random() * 0.5;
+  doc.scale.setScalar(0.8 + Math.random() * 0.4);
+  doc.castShadow = true;
+  documents.push(doc);
+  tableGroup.add(doc);
+}
+
+function updateDocTextures() {
+  const now = Date.now() * 0.001;
+  for (let i = 0; i < documents.length; i++) {
+    const doc = documents[i];
+    const angle = now + i * 0.5;
+    doc.position.x = (Math.random() - 0.5) * 4;
+    doc.position.y = Math.random() * 2.5;
+    doc.position.z = (Math.random() - 0.5) * 3;
+    doc.rotation.z = angle * 0.3;
+    doc.rotation.x = Math.sin(angle * 0.7) * 0.2;
+  }
+  docTexture.needsUpdate = true;
+}
+
+const ringMat = new THREE.MeshStandardMaterial({
+  color: 0xf2d389,
+  roughness: 0.3,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.6
+});
+const ringGeo = new THREE.RingGeometry(0.5, 0.8, 32);
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.position.set(0, 0.5, 0);
+ring.rotation.x = Math.PI / 2;
+tableGroup.add(ring);
+
+const bellGeo = new THREE.ConeGeometry(0.3, 0.8, 12);
+const bellMat = new THREE.MeshStandardMaterial({
+  color: 0xd4af5a,
+  roughness: 0.4,
+  metalness: 0.3
+});
+const bell = new THREE.Mesh(bellGeo, bellMat);
+bell.position.set(0, 1.2, 0);
+bell.rotation.x = Math.PI / 2;
+bell.castShadow = true;
+tableGroup.add(bell);
+
+const emojis = ['📄','🖊️','☎️','📞','👔','💼','📊','🔔'];
+const emojiSprites = [];
+for (let i = 0; i < emojis.length; i++) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.font = '48px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emojis[i], 32, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.7 });
+  const sprite = new THREE.Sprite(mat);
+  const angle = (i / emojis.length) * Math.PI * 2;
+  const radius = 3.5 + Math.random() * 1.5;
+  sprite.position.set(Math.cos(angle) * radius, 0.8 + Math.random() * 0.5, Math.sin(angle) * radius);
+  sprite.scale.set(0.7, 0.7, 1);
+  scene.add(sprite);
+  emojiSprites.push({ sprite, angle, radius, speed: 0.1 + Math.random() * 0.08 });
+}
+
+function createDocTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff8f0';
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillStyle = '#2f1f27';
+  ctx.font = 'bold 32px Georgia';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const texts = ['MEMORANDUM', 'RECEIPT', 'NOTICE', 'SUBPOENA', 'DOCKET', 'AFFIDAVIT', 'PROTOCOL', 'VERDICT'];
+  for (let i = 0; i < 64; i++) {
+    const tx = i % 8;
+    const ty = Math.floor(i / 8);
+    ctx.save();
+    ctx.translate(tx * 32 + 16, ty * 32 + 16);
+    ctx.rotate(Math.random() * 0.3);
+    ctx.fillText(texts[Math.floor(Math.random() * texts.length)], 0, 0);
+    ctx.restore();
+  }
+  return canvas;
+}
+
+const PARTICLES = 300;
+const pGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(PARTICLES * 3);
+const colors = new Float32Array(PARTICLES * 3);
+for (let i = 0; i < PARTICLES; i++) {
+  positions[i*3] = (Math.random()-0.5) * 10;
+  positions[i*3+1] = (Math.random()-0.5) * 5;
+  positions[i*3+2] = (Math.random()-0.5) * 10;
+  const c = new THREE.Color().setHSL(0.08 + Math.random()*0.04, 0.3, 0.9 + Math.random()*0.1);
+  colors[i*3] = c.r;
+  colors[i*3+1] = c.g;
+  colors[i*3+2] = c.b;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+const pMat = new THREE.PointsMaterial({
+  size: 0.08, vertexColors: true, transparent: true, opacity: 0.5,
+  blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+});
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+const mouse = new THREE.Vector2(9999, 9999);
+let touchActive = false;
+function onPointerMove(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+}
+function onPointerDown() { touchActive = true; }
+function onPointerUp() { touchActive = false; mouse.set(9999, 9999); }
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('pointerleave', onPointerUp);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 1.5, 0.7, 0.15);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  composer.setSize(w, h);
+  updateDocTextures();
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  tableGroup.rotation.y = Math.sin(t * 0.08) * 0.05;
+  tableGroup.position.y = Math.sin(t * 0.3) * 0.05;
+
+  for (const e of emojiSprites) {
+    e.angle += e.speed * 0.02;
+    e.sprite.position.x = Math.cos(e.angle) * e.radius;
+    e.sprite.position.z = Math.sin(e.angle) * e.radius;
+    e.sprite.position.y = e.baseY + Math.sin(t * 0.5 + e.angle * 2) * 0.2;
+  }
+
+  updateDocTextures();
+
+  const pos = particles.geometry.attributes.position.array;
+  for (let i = 0; i < PARTICLES; i++) {
+    pos[i*3] += (Math.random()-0.5) * 0.001;
+    pos[i*3+1] += (Math.random()-0.5) * 0.001;
+    pos[i*3+2] += (Math.random()-0.5) * 0.001;
+    if (pos[i*3] > 5) pos[i*3] = -5;
+    if (pos[i*3] < -5) pos[i*3] = 5;
+    if (pos[i*3+1] > 2.5) pos[i*3+1] = -2.5;
+    if (pos[i*3+1] < -2.5) pos[i*3+1] = 2.5;
+    if (touchActive) {
+      const dx = (mouse.x * 4) - pos[i*3];
+      const dy = (mouse.y * 3) - pos[i*3+1];
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 3) {
+        const force = 0.0001 / (dist + 0.3);
+        pos[i*3] += dx * force;
+        pos[i*3+1] += dy * force;
+      }
+    }
+    pos[i*3] *= 0.9995;
+    pos[i*3+1] *= 0.9995;
+    pos[i*3+2] *= 0.9995;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+
+  controls.update();
+  composer.render();
+}
+animate();
+</script>
+</body>
+</html>

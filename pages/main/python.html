@@ -194,7 +194,58 @@
             user-select: none;
         }
         .hint b { color: #aab3c2; font-weight: 700; }
+        .cmdbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #10131a;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 6px 8px;
+            margin: 4px 0;
+        }
+        .cmdbox .cb-label {
+            flex: none;
+            min-width: 92px;
+            color: var(--dim);
+            font-size: .66rem;
+            letter-spacing: .4px;
+        }
+        .cmdbox code {
+            flex: 1;
+            min-width: 0;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: thin;
+            color: #edf1f7;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        .cb-copy {
+            flex: none;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .6px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(79,195,247,.45);
+            background: rgba(79,195,247,.10);
+            color: var(--accent);
+            cursor: pointer;
+            touch-action: manipulation;
+            font-family: inherit;
+        }
+        .cb-copy:active { transform: scale(.94); }
+        .cb-copy.done {
+            color: var(--green);
+            border-color: rgba(102,221,136,.55);
+            background: rgba(102,221,136,.12);
+        }
+        a.doclink { color: var(--accent); word-break: break-all; }
         @media (max-width: 520px) {
+            .cmdbox .cb-label { display: none; }
             .topbar { padding-inline: 10px; }
             .title { font-size: .85rem; letter-spacing: 1px; }
             .badge { display: none; }
@@ -353,6 +404,152 @@
                 return { name: m[1], spec: m[1] + (m[2] ? m[2].replace(/\s+/g, '') : '') };
             }
 
+            const OC_METHODS = {
+                curl: { label: 'script', cmd: 'curl -fsSL https://opencode.ai/install | bash' },
+                npm: { label: 'npm', cmd: 'npm install -g opencode-ai' },
+                brew: { label: 'homebrew', cmd: 'brew install anomalyco/tap/opencode' },
+                paru: { label: 'aur · arch', cmd: 'paru -S opencode-bin' },
+                pacman: { label: 'pacman · arch', cmd: 'sudo pacman -S opencode' },
+                choco: { label: 'choco', cmd: 'choco install opencode' },
+                scoop: { label: 'scoop', cmd: 'scoop install opencode' }
+            };
+            const OC_PLATFORM_ORDER = {
+                macos: ['brew', 'curl', 'npm'],
+                linux: ['curl', 'npm', 'brew', 'paru'],
+                windows: ['npm', 'choco', 'scoop'],
+                unknown: ['curl', 'npm']
+            };
+
+            function detectPlatform() {
+                const ua = navigator.userAgent || '';
+                if (/Macintosh|MacIntel/i.test(ua)) return 'macos';
+                if (/Windows/i.test(ua)) return 'windows';
+                if (/Linux|X11/i.test(ua) && !/Android/i.test(ua)) return 'linux';
+                return 'unknown';
+            }
+
+            function classifyOpenCode(raw) {
+                const s = String(raw || '').trim().replace(/\s+/g, ' ');
+                if (!s) return null;
+                if (/^opencode$/i.test(s)) return { method: 'info', exact: false };
+                if (/^(?:install[\s-]?opencode(?:\s+help)?|help[\s-]?opencode)$/i.test(s)) return { method: 'guide', exact: false };
+                if (/^(?:curl|wget)\s[^|]*https?:\/\/opencode\.ai\/install[^|]*\|\s*(?:ba)?sh(?:\s.*)?$/i.test(s)
+                    || /^bash\s*<\(\s*(?:curl|wget)\s[^)]*https?:\/\/opencode\.ai\/install[^)]*\)$/i.test(s))
+                    return { method: 'curl', exact: true };
+                let m = s.match(/^(npm|bun|pnpm|yarn)\s+(.+)$/i);
+                if (m) {
+                    let rest = m[2];
+                    if (/^yarn$/i.test(m[1])) rest = rest.replace(/^global\s+/i, '');
+                    const toks = rest.split(' ').filter(tk => !/^(?:install|i|add|--global|-g|-G|--silent|-s|--yes|-y)$/.test(tk));
+                    if (toks.length === 1 && /^opencode-ai(@\S+)?$/i.test(toks[0])) return { method: 'npm', exact: true };
+                    return null;
+                }
+                m = s.match(/^brew\s+(?:install|upgrade)\s+(?:(?:anomalyco|sst)\/tap\/)?opencode$/i);
+                if (m) return { method: 'brew', exact: true };
+                m = s.match(/^(?:sudo\s+)?pacman\s+(?:-S|--sync)\s+opencode(?:-bin)?$/i);
+                if (m) return { method: 'pacman', exact: true };
+                m = s.match(/^(?:sudo\s+)?paru\s+(?:-S|--sync|-Sa)\s+opencode(?:-bin)?$/i);
+                if (m) return { method: 'paru', exact: true };
+                m = s.match(/^choco\s+(?:install|upgrade)\s+opencode(?:\s+(?:-y|--yes|\/y))?$/i);
+                if (m) return { method: 'choco', exact: true };
+                m = s.match(/^scoop\s+(?:install|update)\s+opencode$/i);
+                if (m) return { method: 'scoop', exact: true };
+                m = s.match(/^mise\s+use\s+(?:-g\s+)?github:anomalyco\/opencode$/i);
+                if (m) return { method: 'guide', exact: true };
+                m = s.match(/^docker\s+run\s+(?:-{1,2}[\w-]+\s+)*ghcr\.io\/anomalyco\/opencode\S*$/i);
+                if (m) return { method: 'guide', exact: true };
+                return null;
+            }
+
+            async function copyText(txt) {
+                try {
+                    await navigator.clipboard.writeText(txt);
+                    return true;
+                } catch (e) {}
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = txt;
+                    ta.style.cssText = 'position:fixed;top:-9999px;opacity:0;';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    ta.remove();
+                    return ok;
+                } catch (e) { return false; }
+            }
+
+            function addCmdBox(id) {
+                const def = OC_METHODS[id];
+                if (!def) return;
+                const row = document.createElement('div');
+                row.className = 'ln cmdbox';
+                const lab = document.createElement('span');
+                lab.className = 'cb-label';
+                lab.textContent = def.label;
+                row.appendChild(lab);
+                const code = document.createElement('code');
+                code.textContent = def.cmd;
+                row.appendChild(code);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'cb-copy';
+                btn.textContent = 'copy';
+                btn.setAttribute('aria-label', 'Copy command: ' + def.label);
+                btn.addEventListener('click', async () => {
+                    const ok = await copyText(def.cmd);
+                    btn.classList.toggle('done', ok);
+                    btn.textContent = ok ? 'copied' : 'failed';
+                    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('done'); }, 1600);
+                });
+                row.appendChild(btn);
+                terminal.appendChild(row);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            function addLinkLine(text, url) {
+                const div = document.createElement('div');
+                div.className = 'ln sys oc-note';
+                div.appendChild(document.createTextNode(text));
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.className = 'doclink';
+                a.textContent = url.replace(/^https?:\/\//, '');
+                div.appendChild(a);
+                terminal.appendChild(div);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            async function showOpenCodeInstall(c) {
+                const plat = detectPlatform();
+                const platNames = { macos: 'macOS', linux: 'Linux', windows: 'Windows', unknown: 'this device' };
+                const order = OC_PLATFORM_ORDER[plat] || OC_PLATFORM_ORDER.unknown;
+                addLine('', 'out');
+                if (c.method === 'info') {
+                    addLine('OpenCode — open-source AI coding agent for the terminal.', 'sys');
+                    addLine("It's a native binary, so it can't run in this WASM sandbox.", 'sys');
+                    addLine('Fastest local install (' + platNames[plat] + '):', 'sys');
+                    addCmdBox(order[0]);
+                    addLinkLine('More install options: ', 'https://opencode.ai/docs#install');
+                    return;
+                }
+                addLine('OpenCode installs on your real machine — not inside this WebAssembly sandbox.', 'sys');
+                addLine('Detected platform: ' + platNames[plat], 'sys');
+                let ids = order.slice();
+                if (OC_METHODS[c.method]) {
+                    ids = [c.method].concat(ids.filter(x => x !== c.method));
+                    if (c.exact) addLine("✓ That's a valid OpenCode install command — ready to copy, plus alternatives:", 'ok');
+                } else if (c.exact) {
+                    addLine('✓ Valid OpenCode install method. Recommended for ' + platNames[plat] + ':', 'ok');
+                }
+                ids.forEach(id => addCmdBox(id));
+                if (plat === 'linux') addLine('Arch Linux stable repo also has it: sudo pacman -S opencode', 'sys');
+                if (plat === 'windows') addLinkLine('Tip: WSL gives the best experience — ', 'https://opencode.ai/docs/windows-wsl');
+                addLinkLine('Full install docs: ', 'https://opencode.ai/docs#install');
+            }
+
             function planInstall(args) {
                 const specs = [];
                 let quiet = false;
@@ -391,6 +588,8 @@
                 if (/^python\s+-V/.test(t) || /^python\s+--version/.test(t)) return { kind: 'pythoninfo' };
                 if (pending && ['restore', 'skip', 'y', 'yes', 'n', 'no', 'si', 'sì'].includes(t.toLowerCase()))
                     return { kind: 'answer', word: t.toLowerCase() };
+                const oc = classifyOpenCode(t);
+                if (oc) return { kind: 'opencode', method: oc.method, exact: !!oc.exact };
                 return { kind: 'python' };
             }
 
@@ -402,6 +601,7 @@
                 '  pip uninstall numpy          remove a package',
                 '  pip list | freeze | show X   inspect environment',
                 '  %pip install X               Jupyter-style alias',
+                '  install opencode             native CLI install commands (copy-paste)',
                 '  python -V                    interpreter version',
                 '  clear  (or Ctrl+L)           wipe screen',
                 '  restore | skip               answer the package-restore banner',
@@ -693,6 +893,11 @@
                             pushHistory(line);
                             try { await handlePip(c.args); } finally { setBusy(false); }
                             return;
+                        case 'opencode':
+                            setBusy(true);
+                            pushHistory(line);
+                            try { await showOpenCodeInstall(c); } finally { setBusy(false); }
+                            return;
                         case 'answer': {
                             const w = c.word;
                             if (w === 'restore' || w === 'y' || w === 'yes' || w === 'si' || w === 'sì') {
@@ -856,6 +1061,9 @@
                 planInstall,
                 planUninstall,
                 classifyLine,
+                classifyOpenCode,
+                detectPlatform,
+                OC_METHODS,
                 normalizeName,
                 getPersistedPkgs,
                 persistMerge,

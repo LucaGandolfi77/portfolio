@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dittopia">
+<meta name="theme-color" content="#1a1a2e">
+<title>Dittopia</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none;z-index:10;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#title{color:#1a1a2e;font-size:clamp(28px,10vw,72px);text-align:center;text-shadow:0 0 30px rgba(26,26,46,.5),0 0 60px rgba(26,26,46,.2);letter-spacing:clamp(4px,2vw,16px);font-weight:800;opacity:0;animation:fadeIn 2s ease 0.5s forwards}
+#sub{color:#888;font-size:clamp(9px,2.2vw,13px);text-align:center;margin-top:10px;opacity:0;animation:fadeIn 2s ease 1.5s forwards;letter-spacing:2px}
+#apri{pointer-events:all;margin-top:36px;padding:12px 40px;border:1px solid #1a1a2e;background:rgba(26,26,46,.08);color:#aaa;font-size:clamp(11px,2.8vw,15px);cursor:pointer;transition:all .3s;opacity:0;animation:fadeIn 2s ease 2.5s forwards;font-family:inherit;letter-spacing:2px;border-radius:8px}
+#apri:hover{background:rgba(26,26,46,.2);box-shadow:0 0 24px rgba(26,26,46,.2)}
+#credit{position:fixed;bottom:16px;color:#666;font-size:10px;opacity:0;animation:fadeIn 2s ease 3s forwards;padding-bottom:env(safe-area-inset-bottom)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){#apri{padding:14px 32px}}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="title">Dittopia</div>
+  <div id="sub">omaggio a Pokémon Pokopia</div>
+  <button id="apri" onclick="window.location.href='pokopia-clone/index.html'">GIOCA</button>
+</div>
+<div id="credit">Fan game non ufficiale: ricostruisci la Kanto come Ditto umano</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a1f);
+scene.fog = new THREE.FogExp2(0x0a0a1f, 0.02);
+
+const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 100);
+camera.position.set(0, 5, 15);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 8;
+controls.maxDistance = 25;
+controls.maxPolarAngle = Math.PI * 0.8;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.1;
+
+const amb = new THREE.AmbientLight(0x1a1d2e, 0.5);
+scene.add(amb);
+
+const sun = new THREE.PointLight(0xffd279, 1.5, 12);
+sun.position.set(0, 6, 0);
+scene.add(sun);
+
+const topLight = new THREE.DirectionalLight(0x6ab8ff, 0.8);
+topLight.position.set(5, 10, 7);
+scene.add(topLight);
+
+// Ground plane
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a28, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Grid on ground
+for (let i = -15; i <= 15; i++) {
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5, 30),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a52, opacity: 0.3, transparent: true })
+  );
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(i, 0.01, 0);
+  line.receiveShadow = true;
+  scene.add(line);
+  const line2 = new THREE.Mesh(
+    new THREE.PlaneGeometry(30, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a52, opacity: 0.3, transparent: true })
+  );
+  line2.rotation.x = -Math.PI / 2;
+  line2.position.set(0, 0.01, i);
+  line2.receiveShadow = true;
+  scene.add(line2);
+}
+
+// Trees
+const treeGeo = new THREE.CylinderGeometry(0.5, 1.5, 3, 8);
+const treeMat = new THREE.MeshStandardMaterial({ color: 0x2d2d44, roughness: 0.8 });
+for (let i = 0; i < 20; i++) {
+  const tree = new THREE.Mesh(treeGeo, treeMat);
+  tree.position.set(
+    (Math.random() - 0.5) * 20,
+    1.5,
+    (Math.random() - 0.5) * 20
+  );
+  tree.rotation.x = -Math.PI / 2;
+  tree.castShadow = true;
+  scene.add(tree);
+  
+  // Leaf canopy
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 0.7 })
+  );
+  leaves.position.copy(tree.position);
+  leaves.position.y = 2;
+  leaves.scale.set(1, 1.5, 1);
+  leaves.castShadow = true;
+  scene.add(leaves);
+}
+
+// Poké balls floating
+const ballGeo = new THREE.SphereGeometry(0.3, 16, 16);
+const ballMat = new THREE.MeshStandardMaterial({ color: 0x8b3a3a, metalness: 0.8 });
+for (let i = 0; i < 10; i++) {
+  const ball = new THREE.Mesh(ballGeo, ballMat);
+  ball.position.set(
+    (Math.random() - 0.5) * 15,
+    1 + Math.random() * 3,
+    (Math.random() - 0.5) * 15
+  );
+  ball.castShadow = true;
+  scene.add(ball);
+}
+
+// Player sprite (simplified as plane)
+const playerCanvas = document.createElement('canvas');
+playerCanvas.width = 32; playerCanvas.height = 32;
+const pc = playerCanvas.getContext('2d');
+pc.fillStyle = '#ffd23f';
+pc.beginPath(16, 32); pc.arc(16, 32, 16, Math.PI, 0, true); pc.fill();
+pc.fillStyle = '#1a1a2e';
+pc.beginPath(12, 20); pc.arc(12, 20, 6, 0, Math.PI * 2); pc.fill();
+pc.beginPath(20, 20); pc.arc(20, 20, 6, 0, Math.PI * 2); pc.fill();
+pc.fillStyle = '#6ab8ff';
+pc.fillRect(10, 10, 12, 6);
+pc.fillRect(22, 10, 10, 6);
+const playerTex = new THREE.CanvasTexture(playerCanvas);
+const playerMat = new THREE.MeshBasicMaterial({ map: playerTex, transparent: true });
+const player = new THREE.Mesh(new THREE.PlaneGeometry(1, 1.5), playerMat);
+player.position.set(0, 0.5, 0);
+player.rotation.x = -Math.PI / 2;
+scene.add(player);
+
+// Bloom post-processing
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 1.5, 0.7, 0.15);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  composer.setSize(w, h);
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Rotate trees slowly
+  scene.traverse((object) => {
+    if (object.isMesh && object.userData.isTree) {
+      object.rotation.y += 0.005;
+    }
+  });
+
+  sun.position.y = 3 + Math.sin(t * 0.3) * 1;
+  sun.intensity = 2 + Math.cos(t * 0.5) * 0.5;
+
+  controls.update();
+  composer.render();
+}
+animate();
+</script>
+</body>
+</html>

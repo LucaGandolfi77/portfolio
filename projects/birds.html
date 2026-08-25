@@ -1,246 +1,480 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width,initial-scale=1">
-	<title>Birds — generative flock</title>
+	<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+	<title>Birds — 3D Flock</title>
 	<style>
-		body { margin:0; background:#0b1220; color:#eaf6ff; font-family: Inter, system-ui, -apple-system, Roboto, Arial; overflow:hidden; }
-		canvas { display:block; width:100vw; height:100vh; }
-		.overlay { position:absolute; left:12px; top:12px; background:rgba(0,0,0,0.35); padding:8px 10px; border-radius:8px; }
-		.overlay input { width:80px }
-		.controls { position:absolute; right:12px; top:12px; background:rgba(0,0,0,0.35); padding:8px 10px; border-radius:8px; display:flex; flex-direction:column; gap:6px; }
-		.ctrl-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#eaf6ff; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem; }
-		.ctrl-btn:hover { background:rgba(255,255,255,0.2); }
-		.camera-info { font-size:0.7rem; color:#94a3b8; }
-		.flock-info { font-size:0.7rem; color:#94a3b8; margin-top:4px; }
+		*{margin:0;padding:0;box-sizing:border-box}
+		html,body{width:100%;height:100%;overflow:hidden;background:#080d16;font-family:Inter,system-ui,-apple-system,sans-serif;color:#c8dce8;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+		canvas{display:block;width:100vw;height:100vh;touch-action:none}
+		.panel{position:fixed;background:rgba(8,13,22,0.75);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;z-index:10;pointer-events:auto}
+		.panel-l{top:14px;left:14px;display:flex;flex-direction:column;gap:10px;min-width:170px}
+		.panel-r{top:14px;right:14px;display:flex;flex-direction:column;gap:8px}
+		.panel label{font-size:.72rem;color:#6b8299;display:flex;align-items:center;gap:8px;letter-spacing:.03em}
+		.panel .val{color:#36d6c3;font-weight:600;min-width:36px;text-align:right;font-size:.82rem}
+		input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none;margin-top:2px}
+		input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;background:#36d6c3;border-radius:50%;cursor:pointer;box-shadow:0 0 8px rgba(54,214,195,0.35)}
+		input[type=range]::-moz-range-thumb{width:22px;height:22px;background:#36d6c3;border:none;border-radius:50%;cursor:pointer}
+		.btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#c8dce8;padding:9px 13px;border-radius:9px;font-size:.78rem;cursor:pointer;touch-action:manipulation;min-height:40px;transition:background .15s,opacity .15s;letter-spacing:.02em}
+		.btn:hover,.btn:active{background:rgba(54,214,195,0.12);border-color:rgba(54,214,195,0.25)}
+		.btn.active{background:rgba(54,214,195,0.15);border-color:rgba(54,214,195,0.35);color:#36d6c3}
+		.info{font-size:.65rem;color:#4a6275;line-height:1.4}
+		#hint{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(8,13,22,0.7);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);padding:10px 22px;border-radius:22px;font-size:.8rem;color:#6b8299;pointer-events:none;transition:opacity .8s;z-index:10;white-space:nowrap;border:1px solid rgba(255,255,255,0.05)}
+		@media(max-width:480px){
+			.panel-l,.panel-r{top:auto;bottom:14px;padding:10px 12px;min-width:auto}
+			.panel-l{left:14px;right:14px;flex-direction:row;align-items:center;gap:10px}
+			.panel-l label{flex:1;white-space:nowrap}
+			.panel-l input[type=range]{flex:2}
+			.panel-r{left:14px;right:14px;flex-direction:row;flex-wrap:wrap;gap:6px;justify-content:center}
+			.btn{padding:8px 14px;font-size:.75rem;min-height:44px}
+			#hint{bottom:130px}
+		}
 	</style>
 </head>
 <body>
 	<canvas id="c"></canvas>
-	<div class="overlay">
-		<label>Boids: <input id="count" type="range" min="10" max="800" value="200"></label>
-		<button id="reset">Reset</button>
+	<div class="panel panel-l">
+		<label>Boids <span class="val" id="boidVal">300</span></label>
+		<input type="range" id="boidCount" min="10" max="2000" value="300">
+		<button class="btn" id="btnReset">↻ Reset</button>
 	</div>
-	<div class="controls">
-		<button class="ctrl-btn" id="camCenter">🎯 Center</button>
-		<button class="ctrl-btn" id="camZoomIn">🔍+</button>
-		<button class="ctrl-btn" id="camZoomOut">🔍-</button>
-		<button class="ctrl-btn" id="camToggle3D">🔄 3D</button>
-		<div class="camera-info" id="camInfo">Cam: 0,0</div>
-		<div class="flock-info" id="flockInfo">Flock: 200</div>
+	<div class="panel panel-r">
+		<button class="btn active" id="btnBloom">✦ Bloom</button>
+		<button class="btn" id="btnCamReset">⟳ Camera</button>
+		<div class="info" id="camInfo">0, 0, 0</div>
+		<div class="info" id="flockInfo">300 boids</div>
 	</div>
-	<script>
-		const canvas = document.getElementById('c');
-		const ctx = canvas.getContext('2d');
-		let camX = 0, camY = 0, camZoom = 1;
-		let is3D = false;
-		let boids = [];
-		
-		function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
-		addEventListener('resize', resize); resize();
+	<div id="hint">Tap to attract · Drag to orbit</div>
 
-		class Boid {
-			constructor(x, y, vx, vy, color){
-				this.x = x ?? Math.random()*canvas.width;
-				this.y = y ?? Math.random()*canvas.height;
-				this.vx = vx ?? (Math.random()-0.5)*2;
-				this.vy = vy ?? (Math.random()-0.5)*2;
-				this.color = color ?? `hsl(${Math.random()*360}, 70%, 60%)`;
-				this.size = 4 + Math.random()*2;
-			}
-			
-			update(boids){
-				let ax=0, ay=0; let neigh=0;
-				for(const b of boids){
-					const dx=b.x-this.x;
-					const dy=b.y-this.y;
-					const d=Math.hypot(dx,dy);
-					if(d>0 && d<80){
-						ax += dx/d * 0.02;
-						ay += dy/d * 0.02;
-						neigh++;
+	<script type="importmap">
+	{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+	</script>
+
+	<script type="module">
+	import * as THREE from 'three';
+	import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+	import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+	import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+	import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+	import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+
+	const BOUNDS = 180;
+	const SEP_DIST = 28;
+	const ALI_DIST = 55;
+	const COH_DIST = 55;
+	const SEP_W = 1.6;
+	const ALI_W = 1.0;
+	const COH_W = 0.004;
+	const MAX_SPD = 3.8;
+	const ATTRACT_R = 120;
+	const ATTRACT_STR = 90;
+	const ATTRACT_LIFE = 2.8;
+
+	const canvas = document.getElementById('c');
+	const renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: 'high-performance'});
+	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+	renderer.setSize(innerWidth, innerHeight);
+	renderer.toneMapping = THREE.ACESFilmicToneMapping;
+	renderer.toneMappingExposure = 1.1;
+
+	const scene = new THREE.Scene();
+	scene.fog = new THREE.FogExp2(0x080d16, 0.0025);
+
+	const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 1, 800);
+	camera.position.set(0, 50, 160);
+
+	const controls = new OrbitControls(camera, canvas);
+	controls.enableDamping = true;
+	controls.dampingFactor = 0.07;
+	controls.maxDistance = 450;
+	controls.minDistance = 15;
+	controls.target.set(0, 0, 0);
+	controls.maxPolarAngle = Math.PI * 0.88;
+	controls.minPolarAngle = Math.PI * 0.12;
+
+	const composer = new EffectComposer(renderer);
+	composer.addPass(new RenderPass(scene, camera));
+	const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.0, 0.5, 0.25);
+	composer.addPass(bloomPass);
+	composer.addPass(new OutputPass());
+
+	scene.add(new THREE.AmbientLight(0x3a5068, 1.2));
+	const sun = new THREE.DirectionalLight(0xc8dce8, 0.9);
+	sun.position.set(60, 100, 40);
+	scene.add(sun);
+	const rim = new THREE.DirectionalLight(0x36d6c3, 0.3);
+	rim.position.set(-40, -20, -60);
+	scene.add(rim);
+
+	{
+		const N = 5000;
+		const pos = new Float32Array(N * 3);
+		for (let i = 0; i < N; i++) {
+			const th = Math.random() * Math.PI * 2;
+			const ph = Math.acos(2 * Math.random() - 1);
+			const r = 300 + Math.random() * 200;
+			pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+			pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+			pos[i * 3 + 2] = r * Math.cos(ph);
+		}
+		const sg = new THREE.BufferGeometry();
+		sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+		scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
+			color: 0xffffff, size: 0.6, transparent: true, opacity: 0.45, sizeAttenuation: true, depthWrite: false
+		})));
+	}
+
+	function createBirdGeo() {
+		const v = new Float32Array([
+			 1.8,  0,    0,
+			-0.6,  0.18, 0,
+			-0.6, -0.18, 0,
+
+			-0.6,  0.18, 0,
+			-1.4,  0,    0,
+			-0.6, -0.18, 0,
+
+			-0.1,  0,    0,
+			 0.2,  0,    1.4,
+			-0.5,  0,    0.3,
+
+			-0.1,  0,    0,
+			-0.5,  0,   -0.3,
+			 0.2,  0,   -1.4,
+
+			 0.4,  0.08, 0,
+			 0.6,  0,    0,
+			 0.4, -0.08, 0,
+
+			-0.3,  0.12, 0,
+			-0.5,  0,    0,
+			-0.3, -0.12, 0,
+		]);
+		const g = new THREE.BufferGeometry();
+		g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+		g.computeVertexNormals();
+		return g;
+	}
+
+	const birdGeo = createBirdGeo();
+	const birdMat = new THREE.MeshStandardMaterial({
+		metalness: 0.15, roughness: 0.55,
+		emissive: new THREE.Color(0x0c2233), emissiveIntensity: 0.5,
+		flatShading: true
+	});
+
+	const MAX_INSTANCES = 2100;
+	const birdMesh = new THREE.InstancedMesh(birdGeo, birdMat, MAX_INSTANCES);
+	birdMesh.count = 0;
+	birdMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+	scene.add(birdMesh);
+
+	const _m4 = new THREE.Matrix4();
+	const _q = new THREE.Quaternion();
+	const _s = new THREE.Vector3();
+	const _fwd = new THREE.Vector3(0, 0, 1);
+	const _up = new THREE.Vector3(0, 1, 0);
+
+	const HUES = [165, 174, 182, 190, 198, 206];
+
+	class Boid {
+		constructor() {
+			this.x = (Math.random() - 0.5) * BOUNDS * 1.4;
+			this.y = (Math.random() - 0.5) * BOUNDS * 0.4;
+			this.z = (Math.random() - 0.5) * BOUNDS * 1.4;
+			this.vx = (Math.random() - 0.5) * 3;
+			this.vy = (Math.random() - 0.5) * 1.5;
+			this.vz = (Math.random() - 0.5) * 3;
+			const h = HUES[Math.floor(Math.random() * HUES.length)] + (Math.random() - 0.5) * 12;
+			const s = 55 + Math.random() * 20;
+			const l = 48 + Math.random() * 18;
+			this.color = new THREE.Color().setHSL(h / 360, s / 100, l / 100);
+		}
+	}
+
+	let boids = [];
+	const attractors = [];
+	const dummy = new THREE.Object3D();
+
+	class SpatialHash {
+		constructor(cs) { this.cs = cs; this.m = new Map(); }
+		clear() { this.m.clear(); }
+		key(x, y, z) {
+			return ((Math.floor(x / this.cs) * 73856093) ^ (Math.floor(y / this.cs) * 19349663) ^ (Math.floor(z / this.cs) * 83492791)) | 0;
+		}
+		insert(b) {
+			const k = this.key(b.x, b.y, b.z);
+			let cell = this.m.get(k);
+			if (!cell) { cell = []; this.m.set(k, cell); }
+			cell.push(b);
+		}
+		query(x, y, z, r) {
+			const res = [];
+			const cs = this.cs;
+			const cx = Math.floor(x / cs), cy = Math.floor(y / cs), cz = Math.floor(z / cs);
+			const rr = Math.ceil(r / cs);
+			for (let dx = -rr; dx <= rr; dx++) {
+				for (let dy = -rr; dy <= rr; dy++) {
+					for (let dz = -rr; dz <= rr; dz++) {
+						const k = ((cx + dx) * 73856093 ^ (cy + dy) * 19349663 ^ (cz + dz) * 83492791) | 0;
+						const cell = this.m.get(k);
+						if (cell) for (let i = 0; i < cell.length; i++) res.push(cell[i]);
 					}
 				}
-				if(neigh>0){
-					ax/=neigh; ay/=neigh;
-					this.vx += ax; this.vy += ay;
-				}
-				// limit speed
-				const speed = Math.hypot(this.vx,this.vy);
-				if(speed>3){ this.vx = (this.vx/speed)*3; this.vy = (this.vy/speed)*3; }
-				this.x+=this.vx; this.y+=this.vy;
-				// wrap
-				if(this.x<0) this.x+=canvas.width; if(this.x>canvas.width) this.x-=canvas.width;
-				if(this.y<0) this.y+=canvas.height; if(this.y>canvas.height) this.y-=canvas.height;
 			}
-			
-			draw(){
-				const angle = Math.atan2(this.vy,this.vx);
-				const scale = camZoom;
-				
-				if(is3D){
-					// 3D bird model with perspective
-					ctx.save();
-					ctx.translate((this.x - camX) * scale, (this.y - camY) * scale);
-					ctx.rotate(angle);
-					
-					// Body
-					ctx.fillStyle = this.color;
-					ctx.globalAlpha = 0.9;
-					ctx.beginPath();
-					ctx.ellipse(0, 0, this.size*1.5, this.size, 0, 0, Math.PI*2);
-					ctx.fill();
-					
-					// Wing (3D effect)
-					ctx.fillStyle = this.color;
-					ctx.globalAlpha = 0.7;
-					ctx.beginPath();
-					ctx.moveTo(0, 0);
-					ctx.bezierCurveTo(this.size*2, -this.size*1.5, this.size*2, this.size*1.5, 0, 0);
-					ctx.fill();
-					
-					// Head
-					ctx.fillStyle = '#fff';
-					ctx.beginPath();
-					ctx.arc(this.size*1.8, -this.size*0.3, this.size*0.5, 0, Math.PI*2);
-					ctx.fill();
-					
-					// Eye
-					ctx.fillStyle = '#000';
-					ctx.beginPath();
-					ctx.arc(this.size*2, -this.size*0.5, this.size*0.15, 0, Math.PI*2);
-					ctx.fill();
-					
-					ctx.restore();
-				}else{
-					// 2D bird
-					ctx.save();
-					ctx.translate((this.x - camX) * scale, (this.y - camY) * scale);
-					ctx.rotate(angle);
-					ctx.fillStyle = this.color;
-					ctx.globalAlpha = 0.9;
-					ctx.beginPath();
-					ctx.moveTo(0, 0);
-					ctx.lineTo(-this.size*1.5, -this.size);
-					ctx.lineTo(-this.size*1.5, this.size);
-					ctx.closePath();
-					ctx.fill();
-					ctx.restore();
+			return res;
+		}
+	}
+
+	const hash = new SpatialHash(35);
+
+	function updateBoids(dt) {
+		hash.clear();
+		for (let i = 0; i < boids.length; i++) hash.insert(boids[i]);
+
+		const sqSep = SEP_DIST * SEP_DIST;
+		const sqAli = ALI_DIST * ALI_DIST;
+		const sqCoh = COH_DIST * COH_DIST;
+
+		for (let i = 0; i < boids.length; i++) {
+			const b = boids[i];
+			let sx = 0, sy = 0, sz = 0, sn = 0;
+			let ax = 0, ay = 0, az = 0, an = 0;
+			let cx = 0, cy = 0, cz = 0, cn = 0;
+
+			const nb = hash.query(b.x, b.y, b.z, ALI_DIST);
+			for (let j = 0; j < nb.length; j++) {
+				const o = nb[j];
+				if (o === b) continue;
+				const dx = o.x - b.x, dy = o.y - b.y, dz = o.z - b.z;
+				const d2 = dx * dx + dy * dy + dz * dz;
+				if (d2 < sqSep && d2 > 0) {
+					const d = Math.sqrt(d2);
+					sx -= dx / d; sy -= dy / d; sz -= dz / d; sn++;
+				}
+				if (d2 < sqAli) { ax += o.vx; ay += o.vy; az += o.vz; an++; }
+				if (d2 < sqCoh) { cx += o.x; cy += o.y; cz += o.z; cn++; }
+			}
+
+			if (sn > 0) { b.vx += (sx / sn) * SEP_W; b.vy += (sy / sn) * SEP_W; b.vz += (sz / sn) * SEP_W; }
+			if (an > 0) { b.vx += ((ax / an) - b.vx) * ALI_W; b.vy += ((ay / an) - b.vy) * ALI_W; b.vz += ((az / an) - b.vz) * ALI_W; }
+			if (cn > 0) { b.vx += ((cx / cn) - b.x) * COH_W; b.vy += ((cy / cn) - b.y) * COH_W; b.vz += ((cz / cn) - b.z) * COH_W; }
+
+			for (let k = 0; k < attractors.length; k++) {
+				const at = attractors[k];
+				const dx = at.x - b.x, dy = at.y - b.y, dz = at.z - b.z;
+				const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+				if (d > 0.5 && d < at.radius) {
+					const f = at.strength / (1 + d * 0.04);
+					const sc = at.repel ? -1 : 1;
+					b.vx += (dx / d) * f * sc * dt;
+					b.vy += (dy / d) * f * sc * dt;
+					b.vz += (dz / d) * f * sc * dt;
 				}
 			}
+
+			const dist = Math.sqrt(b.x * b.x + b.y * b.y + b.z * b.z);
+			if (dist > BOUNDS * 0.6) {
+				const pull = (dist - BOUNDS * 0.6) * 0.004;
+				b.vx -= (b.x / dist) * pull;
+				b.vy -= (b.y / dist) * pull;
+				b.vz -= (b.z / dist) * pull;
+			}
+
+			b.vx += (Math.random() - 0.5) * 0.06;
+			b.vy += (Math.random() - 0.5) * 0.03;
+			b.vz += (Math.random() - 0.5) * 0.06;
+
+			const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz);
+			if (spd > MAX_SPD) { const sc = MAX_SPD / spd; b.vx *= sc; b.vy *= sc; b.vz *= sc; }
+			else if (spd < 1.0) { const sc = 1.0 / Math.max(spd, 0.01); b.vx *= sc; b.vy *= sc; b.vz *= sc; }
+
+			b.x += b.vx * dt;
+			b.y += b.vy * dt;
+			b.z += b.vz * dt;
+		}
+	}
+
+	function rebuildMesh() {
+		const n = boids.length;
+		birdMesh.count = n;
+		for (let i = 0; i < n; i++) birdMesh.setColorAt(i, boids[i].color);
+		if (birdMesh.instanceColor) birdMesh.instanceColor.needsUpdate = true;
+	}
+
+	function initFlock(n) {
+		boids.length = 0;
+		for (let i = 0; i < n; i++) boids.push(new Boid());
+		rebuildMesh();
+	}
+
+	function spawnAttractor(x, y, z, repel) {
+		const geo = new THREE.SphereGeometry(1.5, 14, 14);
+		const mat = new THREE.MeshBasicMaterial({
+			color: repel ? 0xff5566 : 0x36d6c3, transparent: true, opacity: 0.65, wireframe: true
+		});
+		const sphere = new THREE.Mesh(geo, mat);
+		sphere.position.set(x, y, z);
+		scene.add(sphere);
+
+		const ringGeo = new THREE.RingGeometry(2, 3.5, 28);
+		const ringMat = new THREE.MeshBasicMaterial({
+			color: repel ? 0xff5566 : 0x36d6c3, transparent: true, opacity: 0.3, side: THREE.DoubleSide
+		});
+		const ring = new THREE.Mesh(ringGeo, ringMat);
+		ring.position.set(x, y, z);
+		scene.add(ring);
+
+		attractors.push({x, y, z, radius: ATTRACT_R, strength: ATTRACT_STR, life: ATTRACT_LIFE, maxLife: ATTRACT_LIFE, repel, sphere, ring});
+	}
+
+	function updateAttractors(dt) {
+		for (let i = attractors.length - 1; i >= 0; i--) {
+			const a = attractors[i];
+			a.life -= dt;
+			if (a.life <= 0) {
+				scene.remove(a.sphere); scene.remove(a.ring);
+				a.sphere.geometry.dispose(); a.sphere.material.dispose();
+				a.ring.geometry.dispose(); a.ring.material.dispose();
+				attractors.splice(i, 1);
+			} else {
+				const t = a.life / a.maxLife;
+				a.sphere.material.opacity = t * 0.65;
+				a.sphere.scale.setScalar(1 + (1 - t) * 3);
+				a.ring.material.opacity = t * 0.3;
+				a.ring.scale.setScalar(1 + (1 - t) * 5);
+				a.ring.lookAt(camera.position);
+			}
+		}
+	}
+
+	let pDown = false, pDownTime = 0, pDownX = 0, pDownY = 0, pMoved = false;
+	const raycaster = new THREE.Raycaster();
+	const _ndc = new THREE.Vector2();
+	const _plane = new THREE.Plane();
+	const _hit = new THREE.Vector3();
+
+	canvas.addEventListener('pointerdown', e => {
+		if (e.button && e.button !== 0) return;
+		pDown = true; pDownTime = performance.now();
+		pDownX = e.clientX; pDownY = e.clientY; pMoved = false;
+	});
+
+	canvas.addEventListener('pointermove', e => {
+		if (!pDown) return;
+		const dx = e.clientX - pDownX, dy = e.clientY - pDownY;
+		if (dx * dx + dy * dy > 200) pMoved = true;
+	});
+
+	canvas.addEventListener('pointerup', e => {
+		if (!pDown) return;
+		pDown = false;
+		if (pMoved || performance.now() - pDownTime > 350) return;
+
+		const rect = canvas.getBoundingClientRect();
+		_ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+		raycaster.setFromCamera(_ndc, camera);
+
+		const center = new THREE.Vector3();
+		const n = Math.min(boids.length, 200);
+		if (n > 0) {
+			for (let i = 0; i < n; i++) { center.x += boids[i].x; center.y += boids[i].y; center.z += boids[i].z; }
+			center.divideScalar(n);
 		}
 
-		function make(n){
-			boids = [];
-			for(let i=0;i<n;i++){
-				boids.push(new Boid());
-			}
-			updateInfo();
+		const camDir = camera.position.clone().sub(center).normalize();
+		_plane.setFromNormalAndCoplanarPoint(camDir, center);
+
+		if (raycaster.ray.intersectPlane(_plane, _hit)) {
+			const repel = e.shiftKey || e.ctrlKey || e.metaKey;
+			spawnAttractor(_hit.x, _hit.y, _hit.z, repel);
 		}
-		
-		function updateInfo(){
-			document.getElementById('flockInfo').textContent = `Flock: ${boids.length}`;
-			document.getElementById('camInfo').textContent = `Cam: ${Math.round(camX)},${Math.round(camY)}`;
+	});
+
+	canvas.addEventListener('pointerleave', () => { pDown = false; });
+
+	const clock = new THREE.Clock();
+	let frameCount = 0;
+
+	function animate() {
+		requestAnimationFrame(animate);
+		const dt = Math.min(clock.getDelta(), 0.05);
+		const t = clock.getElapsedTime();
+
+		updateBoids(dt);
+		updateAttractors(dt);
+
+		const n = boids.length;
+		for (let i = 0; i < n; i++) {
+			const b = boids[i];
+			const spd = b.vx * b.vx + b.vy * b.vy + b.vz * b.vz;
+			if (spd > 0.0001) {
+				_s.set(b.vx, b.vy, b.vz).normalize();
+				_q.setFromUnitVectors(_fwd, _s);
+			}
+			const flap = 1 + Math.sin(t * 9 + i * 0.8) * 0.07;
+			dummy.position.set(b.x, b.y, b.z);
+			dummy.quaternion.copy(_q);
+			dummy.scale.set(1, flap, 1);
+			dummy.updateMatrix();
+			birdMesh.setMatrixAt(i, dummy.matrix);
 		}
-		
-		function frame(){
-			// Dark gradient background
-			const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-			grad.addColorStop(0, '#0b1220');
-			grad.addColorStop(1, '#1a2639');
-			ctx.fillStyle = grad;
-			ctx.fillRect(0,0,canvas.width,canvas.height);
-			
-			// Stars effect
-			ctx.fillStyle = 'rgba(255,255,255,0.1)';
-			for(let i=0;i<20;i++){
-				const x = (Math.random()*canvas.width) % canvas.width;
-				const y = (Math.random()*canvas.height) % canvas.height;
-				ctx.fillRect(x, y, 1, 1);
-			}
-			
-			for(const b of boids){
-				b.update(boids);
-				b.draw();
-			}
-			
-			requestAnimationFrame(frame);
+		birdMesh.instanceMatrix.needsUpdate = true;
+
+		controls.update();
+		composer.render();
+
+		if (frameCount++ % 30 === 0) {
+			document.getElementById('camInfo').textContent =
+				`${Math.round(camera.position.x)}, ${Math.round(camera.position.y)}, ${Math.round(camera.position.z)}`;
 		}
-		
-		// Controls
-		document.getElementById('count').addEventListener('input', (e)=> make(+e.target.value));
-		document.getElementById('reset').addEventListener('click', ()=> make(+document.getElementById('count').value));
-		
-		document.getElementById('camCenter').addEventListener('click', ()=>{
-			camX = canvas.width/2;
-			camY = canvas.height/2;
-		});
-		
-		document.getElementById('camZoomIn').addEventListener('click', ()=>{
-			camZoom = Math.min(3, camZoom + 0.2);
-		});
-		
-		document.getElementById('camZoomOut').addEventListener('click', ()=>{
-			camZoom = Math.max(0.3, camZoom - 0.2);
-		});
-		
-		document.getElementById('camToggle3D').addEventListener('click', ()=>{
-			is3D = !is3D;
-		});
-		
-		// Mouse drag for camera
-		let isDragging = false;
-		let dragStartX = 0, dragStartY = 0;
-		let camStartX = 0, camStartY = 0;
-		
-		canvas.addEventListener('mousedown', (e)=>{
-			isDragging = true;
-			dragStartX = e.clientX;
-			dragStartY = e.clientY;
-			camStartX = camX;
-			camStartY = camY;
-		});
-		
-		canvas.addEventListener('mousemove', (e)=>{
-			if(!isDragging) return;
-			const dx = e.clientX - dragStartX;
-			const dy = e.clientY - dragStartY;
-			camX = camStartX - dx;
-			camY = camStartY - dy;
-			updateInfo();
-		});
-		
-		canvas.addEventListener('mouseup', ()=>{ isDragging = false; });
-		canvas.addEventListener('mouseleave', ()=>{ isDragging = false; });
-		
-		// Touch support
-		canvas.addEventListener('touchstart', (e)=>{
-			if(e.touches.length === 1){
-				isDragging = true;
-				dragStartX = e.touches[0].clientX;
-				dragStartY = e.touches[0].clientY;
-				camStartX = camX;
-				camStartY = camY;
-			}
-		});
-		
-		canvas.addEventListener('touchmove', (e)=>{
-			if(!isDragging || e.touches.length !== 1) return;
-			e.preventDefault();
-			const dx = e.touches[0].clientX - dragStartX;
-			const dy = e.touches[0].clientY - dragStartY;
-			camX = camStartX - dx;
-			camY = camStartY - dy;
-			updateInfo();
-		});
-		
-		canvas.addEventListener('touchend', ()=>{ isDragging = false; });
-		
-		make(200);
-		frame();
+	}
+
+	function onResize() {
+		const w = innerWidth, h = innerHeight;
+		camera.aspect = w / h;
+		camera.updateProjectionMatrix();
+		renderer.setSize(w, h);
+		composer.setSize(w, h);
+	}
+	addEventListener('resize', onResize);
+
+	const slider = document.getElementById('boidCount');
+	const valLabel = document.getElementById('boidVal');
+	slider.addEventListener('input', () => {
+		const n = +slider.value;
+		valLabel.textContent = n;
+		initFlock(n);
+		document.getElementById('flockInfo').textContent = `${n} boids`;
+	});
+
+	document.getElementById('btnReset').addEventListener('click', () => {
+		const n = +slider.value;
+		initFlock(n);
+		document.getElementById('flockInfo').textContent = `${n} boids`;
+	});
+
+	document.getElementById('btnBloom').addEventListener('click', function () {
+		bloomPass.enabled = !bloomPass.enabled;
+		this.classList.toggle('active', bloomPass.enabled);
+	});
+
+	document.getElementById('btnCamReset').addEventListener('click', () => {
+		camera.position.set(0, 50, 160);
+		controls.target.set(0, 0, 0);
+		controls.update();
+	});
+
+	setTimeout(() => {
+		const h = document.getElementById('hint');
+		if (h) { h.style.opacity = '0'; setTimeout(() => h.remove(), 900); }
+	}, 4500);
+
+	initFlock(300);
+	document.getElementById('flockInfo').textContent = '300 boids';
+	animate();
 	</script>
+	<script src="top_buttons.js"></script>
 </body>
-<script src="top_buttons.js"></script>
 </html>
-

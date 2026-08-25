@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Orto Magico">
+<meta name="theme-color" content="#a87b4a">
+<title>Orto Magico</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0d0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none;z-index:10;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#title{color:#a87b4a;font-size:clamp(28px,10vw,72px);text-align:center;text-shadow:0 0 30px rgba(168,123,74,.5),0 0 60px rgba(168,123,74,.2);letter-spacing:clamp(4px,2vw,16px);font-weight:800;opacity:0;animation:fadeIn 2s ease 0.5s forwards}
+#sub{color:#888;font-size:clamp(9px,2.2vw,13px);text-align:center;margin-top:10px;opacity:0;animation:fadeIn 2s ease 1.5s forwards;letter-spacing:2px}
+#apri{pointer-events:all;margin-top:36px;padding:12px 40px;border:1px solid #a87b4a;background:rgba(168,123,74,.08);color:#c8a07e;font-size:clamp(11px,2.8vw,15px);cursor:pointer;transition:all .3s;opacity:0;animation:fadeIn 2s ease 2.5s forwards;font-family:inherit;letter-spacing:2px;border-radius:8px}
+#apri:hover{background:rgba(168,123,74,.2);box-shadow:0 0 24px rgba(168,123,74,.2)}
+#credit{position:fixed;bottom:16px;color:#666;font-size:10px;opacity:0;animation:fadeIn 2s ease 3s forwards;padding-bottom:env(safe-area-inset-bottom)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){#apri{padding:14px 32px}}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="title">Orto Magico</div>
+  <div id="sub">Coltiva, annaffia, raccogli</div>
+  <button id="apri" onclick="window.location.href='orto-magico/index.html'">GIOCA</button>
+</div>
+<div id="credit">Un gioco di giardinaggio per 1-6 player locali</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0d0f);
+scene.fog = new THREE.FogExp2(0x0a0d0f, 0.02);
+
+const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 200);
+camera.position.set(0, 5, 12);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 6;
+controls.maxDistance = 20;
+controls.maxPolarAngle = Math.PI * 0.8;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.1;
+
+const amb = new THREE.AmbientLight(0x1a1d2e, 0.5);
+scene.add(amb);
+
+const sun = new THREE.PointLight(0xfdd079, 2, 15);
+sun.position.set(0, 6, 0);
+scene.add(sun);
+
+const topLight = new THREE.PointLight(0x8892b0, 1, 10);
+topLight.position.set(0, 4, -3);
+scene.add(topLight);
+
+// Ground plane
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(50, 50),
+  new THREE.MeshStandardMaterial({ color: 0x2d3237, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Soil mounds
+for (let i = 0; i < 15; i++) {
+  const size = 1.5 + Math.random() * 2;
+  const mound = new THREE.Mesh(
+    new THREE.BoxGeometry(size, 0.3, size),
+    new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.8 })
+  );
+  mound.position.set(
+    (Math.random() - 0.5) * 20,
+    0.15,
+    (Math.random() - 0.5) * 20
+  );
+  mound.castShadow = true;
+  scene.add(mound);
+}
+
+// Plants (simplified 3D models as planes with emoji textures)
+const plantEmojis = ['🥬', '🍅', '🌻', '🥕', '🌹'];
+const plants = [];
+
+for (let i = 0; i < 20; i++) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.font = '48px Georgia';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(plantEmojis[Math.floor(Math.random() * plantEmojis.length)], 32, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
+  const plant = new THREE.Mesh(
+    new THREE.PlaneGeometry(1 + Math.random(), 1 + Math.random()),
+    mat
+  );
+  plant.position.set(
+    (Math.random() - 0.5) * 15,
+    0.5 + Math.random() * 2,
+    (Math.random() - 0.5) * 15
+  );
+  plant.rotation.z = Math.random() * Math.PI * 2;
+  plant.scale.setScalar(0.8 + Math.random() * 0.4);
+  plant.castShadow = true;
+  scene.add(plant);
+  plants.push(plant);
+}
+
+// Ring of flowers
+const flowerGeo = new THREE.CircleGeometry(0.5, 12);
+const flowerMat = new THREE.MeshStandardMaterial({ color: 0xff69b4, roughness: 0.3 });
+const flowerRing = new THREE.Group();
+scene.add(flowerRing);
+
+for (let i = 0; i < 12; i++) {
+  const flower = new THREE.Mesh(flowerGeo, flowerMat);
+  const angle = (i / 12) * Math.PI * 2;
+  flower.position.set(Math.cos(angle) * 3, 0.3, Math.sin(angle) * 3);
+  flower.rotation.x = Math.PI / 2;
+  flower.rotation.z = angle;
+  flowerRing.add(flower);
+}
+
+// Bloom post-processing
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 1.5, 0.7, 0.15);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  composer.setSize(w, h);
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Rotate plants slowly
+  plants.forEach((p, i) => {
+    p.rotation.y += 0.01;
+    p.rotation.x += 0.005;
+  });
+
+  flowerRing.rotation.y += 0.02;
+  sun.position.y = 3 + Math.sin(t * 0.5) * 1;
+  sun.intensity = 2 + Math.cos(t * 0.3) * 0.5;
+
+  controls.update();
+  composer.render();
+}
+animate();
+</script>
+</body>
+</html>
