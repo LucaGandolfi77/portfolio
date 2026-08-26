@@ -1164,6 +1164,47 @@ function toggleSection(containerId, btn) {
     }
 }
 
+// Copy value to clipboard (used by the Personal Information section).
+// Falls back to execCommand for older iOS webviews.
+function copyValue(btn) {
+    const value = btn.getAttribute('data-copy') || '';
+    if (!value) return;
+
+    const flash = () => {
+        btn.classList.add('copied');
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+        setTimeout(() => {
+            btn.innerHTML = original;
+            btn.classList.remove('copied');
+        }, 1500);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(flash).catch(() => legacyCopy(value, flash));
+    } else {
+        legacyCopy(value, flash);
+    }
+}
+
+function legacyCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        done();
+    } catch (err) {
+        console.error('Copy failed:', err);
+    }
+    document.body.removeChild(ta);
+}
+
 function autoCollapse(selector, threshold = 150) {
     const elements = document.querySelectorAll(selector);
     elements.forEach(el => {
