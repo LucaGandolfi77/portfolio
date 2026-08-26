@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="SINIBBIO AR — disegna mostri sul tavolo con la fotocamera, sconfiggili ripetendo le parole giuste al microfono. Piccoli patagarrri da schiacciare, e il terribile SINIBBIO REALE da battere con due parole unite.">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SINIBBIO AR — mostri sul tavolo, parole al microfono</title>
+<style>
+  :root{--bg:#0a0f1e;--ink:#eaf6ff;--muted:#9fb8d8;--accent:#7c5cff;--gold:#ffd54a;--danger:#ff5c7a;--good:#4ade80}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overscroll-behavior:none}
+  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#000}
+  #cv{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:crosshair}
+  .hidden{display:none !important}
+
+  #hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    padding:calc(env(safe-area-inset-top,0px)+8px) 10px;pointer-events:none}
+  #hud>*{pointer-events:auto}
+  .chip{background:rgba(8,14,30,.82);border:1px solid rgba(124,92,255,.5);border-radius:99px;padding:7px 13px;font-weight:800;font-size:13px;backdrop-filter:blur(6px)}
+  .chip b{color:var(--gold)}
+  .hbtn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:rgba(8,14,30,.85);color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+  .hbtn:active{transform:scale(.93)}
+  #hud .spacer{flex:1}
+
+  #intro{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px;
+    background:radial-gradient(120% 90% at 50% 0%,#241b4d 0%,#0a0f1e 70%)}
+  #intro h1{margin:0;font-size:clamp(44px,13vw,80px);font-weight:900;letter-spacing:.04em;line-height:.95;
+    background:linear-gradient(180deg,#fff 15%,#7c5cff 60%,#ffd54a);-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 8px 40px rgba(124,92,255,.4)}
+  #intro .sub{max-width:430px;color:var(--muted);font-size:14px;line-height:1.6;margin:0}
+  #intro .sub b{color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:16px 28px;border-radius:99px;border:none;cursor:pointer;font-weight:800;font-size:17px;font-family:inherit;
+    background:linear-gradient(92deg,#7c5cff,#ff5c7a);color:#fff;box-shadow:0 12px 34px rgba(124,92,255,.45)}
+  .btn:active{transform:scale(.96)}
+  .btn.ghost{background:rgba(255,255,255,.08);box-shadow:none;border:1px solid rgba(255,255,255,.18);color:#fff}
+  #intro .note{font-size:11px;color:#6b7f9e;max-width:400px;line-height:1.55}
+
+  /* overlay parole */
+  #wordOverlay{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:rgba(4,7,16,.55);backdrop-filter:blur(3px)}
+  #wordCard{width:100%;max-width:620px;background:rgba(8,14,30,.96);border:1px solid rgba(124,92,255,.4);border-radius:24px 24px 0 0;
+    padding:20px 16px calc(env(safe-area-inset-bottom,0px)+20px);text-align:center}
+  #wordCard h3{margin:0 0 6px;font-size:17px}
+  #wordCard .hint{color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.5}
+  .wopts{display:flex;flex-direction:column;gap:10px}
+  .wopt{width:100%;padding:16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em}
+  .wopt:hover{border-color:var(--accent)}
+  .wopt.wrong{border-color:var(--danger);animation:shake .4s}
+  .wopt.correct{border-color:var(--good);background:rgba(74,222,128,.16)}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+  #micPhase{display:none}
+  #micPhase .mic{font-size:54px;animation:pulse 1.1s infinite;margin:6px 0}
+  #micPhase .say{font-size:22px;font-weight:900;color:var(--gold)}
+  #micPhase .heard{font-size:13px;color:var(--muted);min-height:18px;margin-top:8px}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.7}}
+  .mini-row{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+  .mini{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;padding:11px 18px;border-radius:99px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+  .mini:active{transform:scale(.95)}
+  #toasts{position:fixed;top:calc(env(safe-area-inset-top,0px)+70px);left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(480px,92vw)}
+  .toast{background:rgba(8,14,30,.95);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:10px 16px;font-size:13.5px;line-height:1.45;animation:tin .25s}
+  .toast.t-good{border-color:var(--good)} .toast.t-bad{border-color:var(--danger)} .toast.t-gold{border-color:var(--gold)}
+  @keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="cv"></canvas>
+
+  <div id="hud" class="hidden">
+    <span class="chip">👾 <b id="score">0</b></span>
+    <span class="chip">💀 <b id="kills">0</b></span>
+    <span class="chip">🐸 <b id="patas">0</b></span>
+    <span class="chip" id="comboChip" style="display:none">🔥 <b id="comboVal">x1</b></span>
+    <span class="chip">🏆 <b id="best">0</b></span>
+    <div class="spacer"></div>
+    <button class="hbtn" id="btnCam" title="Cambia fotocamera">🔄</button>
+    <button class="hbtn" id="btnMute" title="Audio">🔊</button>
+  </div>
+
+  <div id="intro">
+    <h1 id="title" style="cursor:pointer" title="Clicca 5 volte…">SINIBBIO</h1>
+    <p class="sub">I mostri compaiono sul <b>tavolo</b> davanti a te. Inclina il telefono: restano lì, perché sono (quasi) veri.
+      Tocca un <b>SINIBBIO</b> → scegli la parola giusta → <b>ripetila al microfono</b> per distruggerlo.
+      I <b>patagarrri</b> bastano da schiacciare. E ogni tanto… arriva il <b>SINIBBIO REALE</b>: servono <b>due parole unite</b>.</p>
+    <button class="btn" id="btnStart">▶ Avvia fotocamera e gioca</button>
+    <button class="btn ghost" id="btnNoCam">🎧 Gioca senza fotocamera</button>
+    <p class="note" id="introNote">Servono permessi: fotocamera, microfono e (su iPhone) sensore di movimento.
+      Il riconoscimento vocale funziona su Chrome/Android; su Safari iPhone, al microfono si affianca il tasto "L'ho detta!".
+      Le parole sono inventate: sii generoso con te stesso.</p>
+  </div>
+
+  <div id="wordOverlay" class="hidden">
+    <div id="wordCard">
+      <h3 id="wTitle">SINIBBIO</h3>
+      <div class="hint" id="wHint"></div>
+      <div id="choicePhase">
+        <div class="wopts" id="wopts"></div>
+      </div>
+      <div id="micPhase">
+        <div class="mic">🎙️</div>
+        <div class="say" id="sayWord"></div>
+        <div class="heard" id="heardTxt"></div>
+        <div class="mini-row">
+          <button class="mini" id="btnRetryMic">🔁 Riprova</button>
+          <button class="mini" id="btnManual">✅ L'ho detta!</button>
+          <button class="mini" id="btnCancel">✕ Annulla</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+  <noscript><div style="position:fixed;inset:0;background:#0a0f1e;color:#ff5c7a;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:16px;z-index:99;">SINIBBIO richiede JavaScript. Anche i mostri richiedono JavaScript. I mostri sono esigenti.</div></noscript>
+
+<script>
+'use strict';
+/* =====================================================================
+   SINIBBIO AR — mostri sul tavolo, parole al microfono
+   Fotocamera frontale/posteriore · ancoraggio AR col giroscopio ·
+   verifica vocale (Web Speech API) · boss "REALE" a due parole.
+   ===================================================================== */
+
+/* ---------------- utils ---------------- */
+const $=id=>document.getElementById(id);
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const chance=p=>Math.random()<p;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ---------------- audio (WebAudio) ---------------- */
+const AU=(()=>{ let ac=null,on=true;
+  function ensure(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(ac&&ac.state==='suspended') ac.resume(); }
+  function tone(f0,f1,dur,type,vol){ if(!ac||!on)return; try{ const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain(); o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur); o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+.03);}catch(e){} }
+  function noise(dur,vol){ if(!ac||!on)return; try{ const t=ac.currentTime,len=Math.max(1,Math.floor(ac.sampleRate*dur)),buf=ac.createBuffer(1,len,ac.sampleRate),d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len); const src=ac.createBufferSource(); src.buffer=buf; const g=ac.createGain(); g.gain.value=vol; const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=800; src.connect(f); f.connect(g); g.connect(ac.destination); src.start(t);}catch(e){} }
+  return { ensure, pop(){tone(700,1400,.12,'sine',.25);}, kill(){noise(.5,.5);tone(300,40,.5,'sawtooth',.3);}, bigKill(){noise(.9,.7);tone(160,25,1,'sawtooth',.5);tone(80,20,1.2,'sine',.5);},
+    ok(){tone(523,523,.09,'triangle',.18);setTimeout(()=>tone(784,784,.12,'triangle',.18),90);},
+    fail(){tone(200,120,.3,'sawtooth',.2);}, taunt(){tone(160,90,.4,'square',.15);}, click(){tone(600,600,.04,'square',.07);},
+    splash(){noise(.35,.45);tone(280,70,.45,'sine',.35);}, cheers(){[523,659,784,1047].forEach((f,i)=>tone(f,f,.16,'triangle',.2,i*.11));}, setOn(v){on=v;} };
+})();
+
+/* ---------------- parole ---------------- */
+const WORDS=['finkure','liskato','losen','tosen','laskolaien','pesnotolen','kasmaion','tokozon','plekfa','falation','falakolaten','kolaten','drefgolding','strasspaper','nadorano','turmelan','tosen','weightlighter','schiverrrr'];
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pickOptions(target, words){
+  // 3 opzioni uniche che includono il target (target può essere "w1 w2")
+  const pool=shuffle(words.filter(w=>w!==target));
+  const opts=[target, pool[0], pool[1]].sort(()=>Math.random()-0.5);
+  return opts;
+}
+function pickPair(){
+  const w=shuffle(WORDS.slice());
+  return w[0]+' '+w[1];
+}
+function pickPairOptions(pair){
+  const base=pair.split(' ');
+  const others=[];
+  while(others.length<2){
+    const a=pick(WORDS), b=pick(WORDS);
+    const p=a+' '+b;
+    if(p!==pair && !others.includes(p) && !(a===base[0]&&b===base[1])) others.push(p);
+  }
+  return shuffle([pair, others[0], others[1]]);
+}
+
+/* ---------------- verifica vocale ---------------- */
+function norm(s){ return String(s||'').toLowerCase().replace(/[^a-zàèéìòù ]/g,'').replace(/\s+/g,' ').trim(); }
+function levenshtein(a,b){
+  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+    dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return dp[m][n];
+}
+function matchWord(spoken, word){
+  const t=norm(word), s=norm(spoken);
+  if(!t||!s) return false;
+  if(s.includes(t)) return true;
+  return levenshtein(s,t) <= Math.max(2, Math.floor(t.length*0.32));
+}
+function matchPair(spoken, pair){
+  const t=norm(pair), s=norm(spoken);
+  if(!t||!s) return false;
+  const words=pair.toLowerCase().split(' ');
+  const sw=s.split(' ');
+  // entrambe le parole presenti in ordine
+  let i=sw.indexOf(words[0]);
+  if(i>=0 && sw.slice(i+1).includes(words[1])) return true;
+  return levenshtein(s,t) <= Math.max(3, Math.floor(t.length*0.38));
+}
+
+/* ---------------- stato ---------------- */
+const G={
+  running:false, camOn:false, facing:'environment', muted:false,
+  score:0, kills:0, patas:0, combo:0, best:0,
+  monsters:[], parts:[], floaters:[], tokens:[], clouds:[],
+  time:0, spawnT:0, realeT:0, realeWarn:false, pataT:0, tokenT:0, shake:0,
+  orient:{gamma:0,beta:0,ok:false},
+  overlay:null, // mostro attualmente in sfida
+  jager:null, flash:0
+};
+(function(){ try{ G.best=Number(localStorage.getItem('sinibbio.best')||0); }catch(e){} })();
+function saveBest(){ if(G.score>G.best){ G.best=G.score; try{ localStorage.setItem('sinibbio.best',String(G.best)); }catch(e){} } }
+
+/* ---------------- fotocamera ---------------- */
+async function startCam(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) return false;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: G.facing, width:{ideal:1280}, height:{ideal:720} },
+      audio:false
+    });
+    const v=$('cam');
+    v.srcObject=stream;
+    await v.play().catch(()=>{});
+    v.style.transform = G.facing==='user' ? 'scaleX(-1)' : 'none';
+    G.camOn=true;
+    return true;
+  }catch(e){ console.warn('cam err',e); return false; }
+}
+async function toggleCam(){
+  AU.ensure(); AU.click();
+  const old=G.facing;
+  G.facing = old==='environment' ? 'user' : 'environment';
+  const ok=await startCam();
+  if(!ok){ G.facing=old; toast('Fotocamera non disponibile','t-bad'); }
+  else toast(G.facing==='user'?'📷 Fotocamera frontale':'📷 Fotocamera posteriore','t-good');
+}
+
+/* ---------------- orientamento (AR) ---------------- */
+function onOrient(e){
+  if(e.gamma==null) return;
+  G.orient.gamma=e.gamma; G.orient.beta=e.beta; G.orient.ok=true;
+}
+async function enableOrient(){
+  if(!window.DeviceOrientationEvent) return;
+  if(typeof window.DeviceOrientationEvent.requestPermission==='function'){
+    try{ const p=await window.DeviceOrientationEvent.requestPermission(); if(p==='granted') window.addEventListener('deviceorientation',onOrient); }catch(e){}
+  } else {
+    window.addEventListener('deviceorientation',onOrient);
+  }
+}
+/* posizione "di mondo" → schermo, compensando l'inclinazione */
+function anchor(place, base, zone){
+  if(!G.orient.ok || !base) return {x:place.x,y:place.y,s:1};
+  // in cielo il mostro è lontano: si muove meno quando inclini il telefono
+  const far = zone==='sky';
+  const kx = far? 1.7 : 3.4, ky = far? 1.5 : 3.0;
+  const dg=base.gamma-G.orient.gamma, db=base.beta-G.orient.beta;
+  const x=place.x + dg*kx;
+  const y=place.y + db*ky;
+  const s=clamp(1 + db*(far?0.002:0.004), .8, 1.25);
+  // micro-tremolio "mano che regge il telefono"
+  const jx=Math.sin(G.time*9)*1.2, jy=Math.cos(G.time*7.3)*1.1;
+  return {x:x+jx, y:y+jy, s};
+}
+
+/* ---------------- mostri ---------------- */
+function spawnMonster(reale){
+  const W=innerWidth, H=innerHeight;
+  const base=G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null;
+  const zone = chance(0.32) ? 'sky' : 'table';
+  const m={
+    reale:!!reale, zone,
+    x: zone==='sky'? rnd(W*0.15, W*0.85) : rnd(W*0.12, W*0.88),
+    y: zone==='sky'? rnd(H*0.08, H*0.27) : rnd(H*0.34, H*0.74),
+    base,
+    r: reale? 74 : rnd(40,54),
+    target: reale? pickPair() : pick(WORDS.filter(w=>w.length<=10)),
+    opts: [],
+    ph:rnd(0,6.28), dead:false, t:0, tries:0,
+    label: reale? 'SINIBBIO REALE' : 'SINIBBIO'
+  };
+  m.opts = reale? pickPairOptions(m.target) : pickOptions(m.target, WORDS);
+  G.monsters.push(m);
+}
+function spawnPatagarrri(){
+  const W=innerWidth, H=innerHeight;
+  const zone = chance(0.25) ? 'sky' : 'table';
+  G.monsters.push({
+    pata:true, reale:false, zone,
+    x:rnd(W*0.1,W*0.9),
+    y: zone==='sky'? rnd(H*0.1,H*0.26) : rnd(H*0.45,H*0.8),
+    base:null, r:16, ph:rnd(0,6.28), dead:false, t:0, vx:rnd(-20,20), vy:rnd(-8,8),
+    label:'patagarrro'
+  });
+}
+function tapMonster(m){
+  if(m.pata){ killPata(m); return; }
+  openWord(m);
+}
+function killMonster(m){
+  if(m.dead) return; m.dead=true;
+  G.kills++;
+  const mult = Math.max(1, G.combo);
+  const gain = m.reale? 50*mult : 10*mult;
+  G.score+=gain;
+  boom(m.x, m.y, m.reale? '#ff2d55':'#a78bfa', m.reale? 70:36, m.reale);
+  if(m.reale) AU.bigKill(); else AU.kill();
+  G.shake=Math.max(G.shake, m.reale? 16:6);
+  floater(m.x, m.y- m.r-10, (m.reale?'BOOM! +':'+')+gain, m.reale?'#ffd54a':'#fff');
+  saveBest();
+  refreshHud();
+  spawnPataBonus();
+}
+function killPata(m){
+  if(m.dead) return; m.dead=true;
+  G.patas++; G.score+=5;
+  boom(m.x,m.y,'#4ade80',14,false);
+  AU.pop();
+  floater(m.x,m.y-18,'+5','#4ade80');
+  refreshHud();
+}
+function spawnPataBonus(){ if(chance(.4)&&G.monsters.filter(x=>x.pata&&!x.dead).length<10) spawnPatagarrri(); }
+
+/* ---------------- particelle ---------------- */
+function boom(x,y,color,n,big){
+  for(let i=0;i<n;i++){ const a=rnd(0,6.28), sp=rnd(40,big?320:190); G.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-40,life:rnd(.5,big?1.1:.8),max:1,color,size:rnd(3,big?9:6)}); }
+}
+function floater(x,y,txt,color){ G.floaters.push({x,y,txt,color,life:1.4}); }
+function updateParts(dt){
+  for(let i=G.parts.length-1;i>=0;i--){ const p=G.parts[i]; p.life-=dt; if(p.life<=0){G.parts.splice(i,1);continue;} p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt; p.vx*=.98; }
+  for(let i=G.floaters.length-1;i>=0;i--){ const f=G.floaters[i]; f.life-=dt; f.y-=34*dt; if(f.life<=0) G.floaters.splice(i,1); }
+}
+
+/* ---------------- disegno mostri (procedurale) ---------------- */
+function drawSinibbio(ctx,m){
+  const p=anchor({x:m.x,y:m.y}, m.base, m.zone);
+  if(m.zone==='sky') p.y += Math.sin(G.time*1.8+m.ph)*5; // galleggia in cielo
+  const s=m.r*p.s;
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  if(m.zone==='sky'){
+    // alone morbido per i mostri in cielo
+    const gl=ctx.createRadialGradient(0,0,s*0.1,0,0,s*1.4);
+    gl.addColorStop(0,'rgba(255,255,255,.16)'); gl.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(0,0,s*1.4,0,6.29); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.ellipse(0, s*1.15, s*0.85, s*0.22, 0, 0, 6.29);
+    ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fill();
+  }
+  // wobble
+  const wob=Math.sin(G.time*3+m.ph)*0.06;
+  ctx.rotate(wob);
+  if(!m.reale){
+    // corpo
+    ctx.beginPath(); ctx.ellipse(0,0,s,s*0.92,0,0,6.29);
+    ctx.fillStyle='#8b5cf6'; ctx.fill();
+    ctx.strokeStyle='#5b21b6'; ctx.lineWidth=3; ctx.stroke();
+    // corni
+    ctx.fillStyle='#6d28d9';
+    ctx.beginPath(); ctx.moveTo(-s*0.45,-s*0.75); ctx.lineTo(-s*0.28,-s*1.25); ctx.lineTo(-s*0.12,-s*0.8); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(s*0.45,-s*0.75); ctx.lineTo(s*0.28,-s*1.25); ctx.lineTo(s*0.12,-s*0.8); ctx.closePath(); ctx.fill();
+    // occhi
+    eye(ctx,-s*0.28,-s*0.15,s*0.16,'#fff');
+    eye(ctx, s*0.28,-s*0.15,s*0.16,'#fff');
+    // bocca
+    ctx.strokeStyle='#3b0764'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,s*0.25,s*0.28,0.15,Math.PI-0.15); ctx.stroke();
+  } else {
+    // SINIBBIO REALE: grosso e spaventoso
+    const g=ctx.createRadialGradient(0,0,s*0.2,0,0,s);
+    g.addColorStop(0,'#ff5c7a'); g.addColorStop(1,'#7f1d1d');
+    ctx.beginPath(); ctx.ellipse(0,0,s,s*0.95,0,0,6.29);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='#450a0a'; ctx.lineWidth=4; ctx.stroke();
+    // corna grandi
+    ctx.fillStyle='#fecaca';
+    ctx.beginPath(); ctx.moveTo(-s*0.55,-s*0.7); ctx.lineTo(-s*0.7,-s*1.5); ctx.lineTo(-s*0.15,-s*0.85); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(s*0.55,-s*0.7); ctx.lineTo(s*0.7,-s*1.5); ctx.lineTo(s*0.15,-s*0.85); ctx.closePath(); ctx.fill();
+    // occhi rossi brillanti
+    eye(ctx,-s*0.3,-s*0.12,s*0.22,'#ffd54a');
+    eye(ctx, s*0.3,-s*0.12,s*0.22,'#ffd54a');
+    ctx.fillStyle='#450a0a';
+    ctx.beginPath(); ctx.arc(-s*0.3,-s*0.12,s*0.09,0,6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(s*0.3,-s*0.12,s*0.09,0,6.29); ctx.fill();
+    // denti
+    ctx.fillStyle='#fff';
+    for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*s*0.16-s*0.08, s*0.28); ctx.lineTo(i*s*0.16, s*0.52); ctx.lineTo(i*s*0.16+s*0.08, s*0.28); ctx.closePath(); ctx.fill(); }
+    // artigli
+    ctx.strokeStyle='#fecaca'; ctx.lineWidth=5;
+    for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(i*s*0.4-s*0.12, s*0.9); ctx.lineTo(i*s*0.4-s*0.18, s*1.15); ctx.stroke(); }
+  }
+  ctx.restore();
+  // etichetta
+  ctx.font='900 '+(m.reale? 17:13)+'px Inter,sans-serif';
+  ctx.textAlign='center';
+  const tw=ctx.measureText(m.label).width;
+  ctx.fillStyle='rgba(4,7,16,.75)';
+  rr(ctx, p.x-tw/2-8, p.y+s*1.25, tw+16, m.reale?30:24, 12); ctx.fill();
+  ctx.fillStyle= m.reale? '#ffd54a':'#d8c7ff';
+  ctx.fillText(m.label, p.x, p.y+s*1.25+(m.reale?21:18));
+  ctx.textAlign='left';
+}
+function eye(ctx,x,y,r,color){
+  ctx.beginPath(); ctx.arc(x,y,r,0,6.29);
+  ctx.fillStyle=color; ctx.fill();
+  ctx.fillStyle='#0a0f1e';
+  ctx.beginPath(); ctx.arc(x+r*0.28,y,r*0.5,0,6.29); ctx.fill();
+}
+function drawPata(ctx,m){
+  if(m.zone==='sky'){
+    const y=m.y+Math.sin(G.time*3+m.ph)*5;
+    ctx.save(); ctx.translate(m.x,y);
+    const flap=Math.sin(G.time*14+m.ph)*0.6;
+    ctx.fillStyle='#86efac';
+    ctx.save(); ctx.rotate(-0.3+flap*0.7); ctx.beginPath(); ctx.ellipse(-8,0,10,5,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.rotate(0.3-flap*0.7); ctx.beginPath(); ctx.ellipse(8,0,10,5,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(0,0,11,0,6.29);
+    ctx.fillStyle='#4ade80'; ctx.fill();
+    ctx.strokeStyle='#166534'; ctx.lineWidth=2; ctx.stroke();
+    eye(ctx,2,-3,4.5,'#fff');
+    ctx.restore();
+    return;
+  }
+  const hop=Math.abs(Math.sin(G.time*6+m.ph))*6;
+  const y=m.y-hop;
+  ctx.save();
+  ctx.translate(m.x,y);
+  ctx.beginPath(); ctx.ellipse(0,14,10,4,0,0,6.29);
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0,12,0,6.29);
+  ctx.fillStyle='#4ade80'; ctx.fill();
+  ctx.strokeStyle='#166534'; ctx.lineWidth=2; ctx.stroke();
+  eye(ctx,3,-3,5,'#fff');
+  ctx.fillStyle='#166534';
+  ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(-12,-14); ctx.lineTo(-5,-9); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(8,-6); ctx.lineTo(12,-14); ctx.lineTo(5,-9); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------------- cielo ---------------- */
+function initSky(){
+  const W=innerWidth,H=innerHeight;
+  G.clouds=[];
+  for(let i=0;i<5;i++) G.clouds.push({x:rnd(0,W), y:rnd(H*0.04,H*0.26), s:rnd(0.6,1.3), sp:rnd(6,16)});
+}
+function drawSky(){
+  const W=innerWidth, H=innerHeight, ty=H*0.30;
+  for(const c of G.clouds){
+    ctx.fillStyle='rgba(255,255,255,.20)';
+    ctx.beginPath(); ctx.arc(c.x,c.y,18*c.s,0,6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(c.x+16*c.s,c.y+4*c.s,14*c.s,0,6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(c.x-16*c.s,c.y+5*c.s,12*c.s,0,6.29); ctx.fill();
+  }
+  // uccelli lontani
+  ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=2;
+  for(let i=0;i<3;i++){
+    const bx=((G.time*22+i*300)%(W+80))-40, by=H*0.05+((i*47)%36);
+    ctx.beginPath(); ctx.arc(bx-6,by,5,Math.PI*1.15,Math.PI*1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx+6,by,5,Math.PI*1.15,Math.PI*1.85); ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(124,92,255,.35)'; ctx.font='700 12px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('CIELO — i mostri lontani vivono qui', W/2, 16);
+  ctx.textAlign='left';
+}
+
+/* ---------------- parole d'oro ---------------- */
+function spawnToken(){
+  const W=innerWidth,H=innerHeight;
+  if(G.tokens.length>=2) return;
+  G.tokens.push({ x:rnd(W*0.15,W*0.85), y:rnd(H*0.1,H*0.6), zone: chance(.5)?'sky':'table', t:0, ph:rnd(0,6.28) });
+}
+function drawToken(t){
+  const base=G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null;
+  const p=anchor({x:t.x,y:t.y}, base, t.zone);
+  const y=p.y+Math.sin(G.time*4+t.ph)*5;
+  ctx.save(); ctx.translate(p.x,y);
+  ctx.shadowColor='#ffd54a'; ctx.shadowBlur=16+8*Math.sin(G.time*5+t.ph);
+  rr(ctx,-17,-23,34,46,11); ctx.fillStyle='#ffd54a'; ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#7a4a00'; ctx.font='900 17px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('★',0,4);
+  ctx.textAlign='left';
+  ctx.restore();
+}
+function tapToken(t){
+  const i=G.tokens.indexOf(t); if(i<0) return;
+  G.tokens.splice(i,1);
+  G.score+=15; saveBest(); refreshHud();
+  boom(t.x,t.y,'#ffd54a',26,false);
+  AU.pop();
+  floater(t.x,t.y-20,'PAROLA D\'ORO +15','#ffd54a');
+  toast('PAROLA D\'ORO! +15 punti. Il SINIBBIO la voleva.','t-gold');
+}
+
+/* ---------------- JAGERBOMB (easter egg: shottino di Jägermeister e Red Bull) ---------------- */
+function triggerJagerbomb(){
+  if(G.jager) return;
+  G.jager={ t:0, splashed:false };
+  G.flash=0.35;
+  AU.cheers();
+  toast('🍸 JAGERBOMB! Un shottino di Jägermeister e Red Bull. Bomba in arrivo…','t-gold',4);
+}
+function updateJager(dt){
+  const j=G.jager; if(!j) return;
+  j.t+=dt;
+  if(!j.splashed && j.t>=0.8){
+    j.splashed=true;
+    const W=innerWidth,H=innerHeight, cx=W/2, cy=H*0.58;
+    // splash: bollicine e gocce
+    for(let i=0;i<42;i++){
+      const sp=rnd(90,280), a=rnd(0,6.28);
+      G.parts.push({x:cx+rnd(-26,26), y:cy-30, vx:Math.cos(a)*sp, vy:Math.abs(Math.sin(a))*sp*-1-40, life:rnd(.4,.95), max:1, color:pick(['#ffd54a','#d4a017','#6b3a1f','#fff']), size:rnd(3,8)});
+    }
+    G.flash=0.55; G.shake=Math.max(G.shake,11);
+    G.score+=100; saveBest(); refreshHud();
+    floater(cx, cy-170, 'JAGERBOMB! +100', '#ffd54a');
+    AU.splash();
+  }
+  if(j.t>=2.8) G.jager=null;
+}
+function drawJager(){
+  const W=innerWidth, H=innerHeight;
+  const cx=W/2, baseY=H*0.72, bw=122, bh=172;
+  const j=G.jager;
+  ctx.save();
+  // bicchiere grande con Red Bull
+  ctx.fillStyle='rgba(255,255,255,.07)';
+  rr(ctx, cx-bw/2, baseY-bh, bw, bh, 16); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=3;
+  rr(ctx, cx-bw/2, baseY-bh, bw, bh, 16); ctx.stroke();
+  ctx.fillStyle='rgba(224,166,40,.72)';
+  rr(ctx, cx-bw/2+8, baseY-bh+10, bw-16, bh-16, 10); ctx.fill();
+  // bollicine che salgono
+  ctx.fillStyle='rgba(255,240,180,.9)';
+  for(let i=0;i<14;i++){
+    const bx=cx-bw/2+18+((i*53)%(bw-36));
+    const by=baseY-14-((G.time*(20+i*3)+i*97)%(bh-40));
+    ctx.beginPath(); ctx.arc(bx,by,2+((i*7)%3),0,6.29); ctx.fill();
+  }
+  // lo shottino di Jägermeister che cade dentro
+  const drop=Math.min(1, j.t/0.8);
+  const sy=lerp(baseY-bh-72, baseY-bh+52, drop*drop);
+  ctx.save(); ctx.translate(cx, sy);
+  const sw=44, sh=62;
+  ctx.beginPath();
+  ctx.moveTo(-sw/2,0); ctx.lineTo(sw/2,0); ctx.lineTo(sw/2-8,sh); ctx.lineTo(-sw/2+8,sh); ctx.closePath();
+  ctx.fillStyle='rgba(58,31,15,.96)'; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.14)';
+  ctx.fillRect(-sw/2+3, 2, sw-6, 6);
+  ctx.restore();
+  // etichetta
+  ctx.fillStyle='#ffd54a'; ctx.font='900 27px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('JÄGERBOMB', cx, baseY-bh-26);
+  ctx.fillStyle='#cdeeff'; ctx.font='600 15px Inter,sans-serif';
+  ctx.fillText('uno shottino di Jägermeister e Red Bull', cx, baseY-bh-4);
+  ctx.textAlign='left';
+  ctx.restore();
+}
+
+/* ---------------- loop / render ---------------- */
+const cv=$('cv'), ctx=cv.getContext('2d');
+let DPR=1;
+function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); cv.width=Math.round(innerWidth*DPR); cv.height=Math.round(innerHeight*DPR); cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px'; }
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  const shx=G.shake>0? rnd(-G.shake,G.shake):0, shy=G.shake>0? rnd(-G.shake,G.shake):0;
+  ctx.save(); ctx.translate(shx,shy);
+  // cielo (nuvole + uccelli)
+  drawSky();
+  // tavolo (griglia prospettica)
+  drawTable();
+  // mostri
+  for(const m of G.monsters){ if(m.dead) continue; if(m.pata) drawPata(ctx,m); else drawSinibbio(ctx,m); }
+  // parole d'oro
+  for(const t of G.tokens) drawToken(t);
+  // JAGERBOMB (easter egg)
+  if(G.jager) drawJager();
+  // particelle
+  for(const p of G.parts){ ctx.globalAlpha=clamp(p.life/1,0,1); ctx.fillStyle=p.color; ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size); }
+  ctx.globalAlpha=1;
+  // floaters
+  ctx.font='900 20px Inter,sans-serif'; ctx.textAlign='center';
+  for(const f of G.floaters){ ctx.globalAlpha=clamp(f.life/1,0,1); ctx.fillStyle=f.color; ctx.fillText(f.txt,f.x,f.y); }
+  ctx.globalAlpha=1; ctx.textAlign='left';
+  ctx.restore();
+  if(G.flash>0){ ctx.fillStyle='rgba(255,255,255,'+G.flash.toFixed(3)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); G.flash=Math.max(0,G.flash-0.05); }
+  if(G.shake>0) G.shake=Math.max(0,G.shake-30);
+}
+function drawTable(){
+  const W=innerWidth,H=innerHeight;
+  const ty=H*0.30;
+  ctx.strokeStyle='rgba(124,92,255,.22)'; ctx.lineWidth=1.5;
+  for(let i=0;i<=10;i++){
+    const x=(i/10)*W;
+    ctx.beginPath(); ctx.moveTo(x,ty); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for(let j=0;j<=6;j++){
+    const yy=ty+((j/6)*(H-ty));
+    ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke();
+  }
+  ctx.fillStyle='rgba(124,92,255,.35)'; ctx.font='700 12px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('TABELLO VIRTUALE — i mostri vivono qui (e in cielo sopra di te)', W/2, ty-10);
+  ctx.textAlign='left';
+}
+
+function update(dt){
+  G.time+=dt;
+  for(const c of G.clouds){ c.x+=c.sp*dt; if(c.x>innerWidth+80) c.x=-80; }
+  G.tokenT-=dt;
+  if(G.tokenT<=0){ G.tokenT=rnd(12,20); spawnToken(); }
+  for(let i=G.tokens.length-1;i>=0;i--){ G.tokens[i].t+=dt; if(G.tokens[i].t>18) G.tokens.splice(i,1); }
+  if(G.jager) updateJager(dt);
+  // SINIBBIO: uno ogni 5-15 secondi
+  G.spawnT-=dt;
+  if(G.spawnT<=0 && G.monsters.filter(m=>!m.pata&&!m.dead).length<1){
+    G.spawnT= rnd(5,15);
+    spawnMonster(false);
+  }
+  // SINIBBIO REALE: uno ogni 2-3 minuti (max 2 vivi alla volta)
+  G.realeT-=dt;
+  if(G.realeT>0 && G.realeT<4 && !G.realeWarn){
+    G.realeWarn=true;
+    toast('⚠️ Il SINIBBIO REALE si avvicina… prepara parole lunghe!','t-bad',3);
+  }
+  if(G.realeT<=0 && G.monsters.filter(m=>!m.pata&&!m.dead).length<1){
+    G.realeT= rnd(120,180);
+    G.realeWarn=false;
+    spawnMonster(true);
+  }
+  // patagarrri: ogni 5-20 secondi
+  G.pataT-=dt;
+  if(G.pataT<=0){
+    G.pataT= rnd(5,20);
+    if(G.monsters.filter(m=>m.pata&&!m.dead).length<2) spawnPatagarrri();
+    if(G.monsters.filter(m=>m.pata&&!m.dead).length<2 && chance(.5)) spawnPatagarrri();
+  }
+  for(const m of G.monsters){
+    if(m.dead) continue;
+    if(m.pata){
+      m.x+=m.vx*dt; m.y+=m.vy*dt;
+      if(m.x<20||m.x>innerWidth-20) m.vx*=-1;
+      if(m.y<innerHeight*0.4||m.y>innerHeight*0.85) m.vy*=-1;
+    }
+    // i mostri scappano dopo 20s
+    m.t+=dt;
+    if(m.t>20){ m.dead=true; floater(m.x,m.y,'è scappato!','#9fb8d8'); }
+  }
+  updateParts(dt);
+}
+
+/* ---------------- sfida vocale ---------------- */
+function openWord(m){
+  if(G.overlay) return;
+  G.overlay=m;
+  $('wTitle').textContent = m.reale? 'SINIBBIO REALE' : 'SINIBBIO';
+  $('wHint').textContent = m.reale
+    ? 'Il REALE richiede parole più lunghe: scegli la coppia giusta e ripeti entrambe le parole insieme.'
+    : 'Scegli la parola giusta, poi ripetila ad alta voce al microfono.';
+  $('choicePhase').style.display='block';
+  $('micPhase').style.display='none';
+  const box=$('wopts'); box.innerHTML='';
+  shuffle(m.opts).forEach(w=>{
+    const b=document.createElement('button');
+    b.className='wopt';
+    b.textContent=w;
+    b.onclick=()=>chooseWord(w,b);
+    box.appendChild(b);
+  });
+  $('wordOverlay').classList.remove('hidden');
+  AU.click();
+}
+function chooseWord(word,btn){
+  const m=G.overlay; if(!m) return;
+  if(word!==m.target){
+    btn.classList.add('wrong');
+    setTimeout(()=>btn.classList.remove('wrong'),450);
+    G.combo=0; refreshHud();
+    AU.fail();
+    toast('Sbagliato! Il SINIBBIO ride. La combo è andata. Riprova.','t-bad');
+    return;
+  }
+  // parola giusta → fase microfono
+  btn.classList.add('correct');
+  setTimeout(()=>{
+    $('choicePhase').style.display='none';
+    $('micPhase').style.display='block';
+    $('sayWord').textContent = m.target;
+    $('heardTxt').textContent='🎙 In ascolto… parla ora!';
+    AU.ok();
+    listen(m);
+  }, 350);
+}
+function listen(m){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ $('heardTxt').textContent='Riconoscimento non supportato qui: usa "L\'ho detta!"'; return; }
+  const rec=new SR();
+  rec.lang='it-IT'; rec.interimResults=false; rec.maxAlternatives=4;
+  rec.onresult=(e)=>{
+    const texts=[];
+    for(let i=0;i<e.results.length;i++) for(let j=0;j<e.results[i].length;j++) texts.push(e.results[i][j].transcript);
+    const spoken=texts.join(' ');
+    $('heardTxt').textContent='Ho sentito: "'+spoken+'"';
+    const ok = m.reale? matchPair(spoken, m.target) : matchWord(spoken, m.target);
+    if(ok){ onWordOk(m); }
+    else { onWordFail(m, spoken); }
+  };
+  rec.onerror=()=>{ $('heardTxt').textContent='Microfono non disponibile: usa "L\'ho detta!"'; };
+  rec.onend=()=>{ /* il riconoscimento termina da solo */ };
+  try{ rec.start(); }catch(e){}
+}
+function onWordOk(m){
+  AU.ok();
+  G.combo = Math.min(5, G.combo+1);
+  toast('PAROLA PERFETTA! '+m.target+' → SINIBBIO distrutto! (combo x'+G.combo+')','t-good');
+  closeOverlay();
+  killMonster(m);
+  refreshHud();
+}
+function onWordFail(m, spoken){
+  m.tries++;
+  AU.fail();
+  if(m.tries>=3){
+    $('heardTxt').textContent='La parola era: "'+m.target+'". Riprova a dirla (o usa "L\'ho detta!").';
+    m.tries=0;
+  } else {
+    $('heardTxt').textContent='Quasi! Riprova a dire "'+m.target+'" (ho sentito: "'+spoken+'")';
+  }
+}
+function closeOverlay(){ G.overlay=null; $('wordOverlay').classList.add('hidden'); }
+$('btnRetryMic').addEventListener('click',()=>{ if(G.overlay){ AU.click(); $('heardTxt').textContent='🎙 In ascolto…'; listen(G.overlay); } });
+$('btnManual').addEventListener('click',()=>{ if(G.overlay){ onWordOk(G.overlay); } });
+$('btnCancel').addEventListener('click',()=>{ AU.click(); closeOverlay(); toast('Il SINIBBIO ti osserva. Tornerà.','t-gold'); });
+
+/* ---------------- input ---------------- */
+cv.addEventListener('pointerdown',(e)=>{
+  if(!G.running) return;
+  AU.ensure();
+  const x=e.clientX, y=e.clientY;
+  // hit test: parole d'oro, poi gabbiano, poi mostri
+  for(const t of G.tokens){
+    const p=anchor({x:t.x,y:t.y}, G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null, t.zone);
+    if(Math.hypot(x-p.x, y-(p.y+Math.sin(G.time*4+t.ph)*5)) < 34){ tapToken(t); return; }
+  }
+  let best=null, bd=1e9;
+  for(const m of G.monsters){
+    if(m.dead) continue;
+    const p = m.pata? {x:m.x,y:m.y-Math.abs(Math.sin(G.time*6+m.ph))*6} : anchor({x:m.x,y:m.y},m.base,m.zone);
+    const rr = m.pata? 22 : (m.r*p.s+14);
+    const d=Math.hypot(x-p.x,y-p.y);
+    if(d<rr && d<bd){ bd=d; best=m; }
+  }
+  if(best) tapMonster(best);
+});
+
+/* ---------------- HUD / toast ---------------- */
+function refreshHud(){
+  $('score').textContent=G.score; $('kills').textContent=G.kills; $('patas').textContent=G.patas; $('best').textContent=G.best;
+  const cc=$('comboChip');
+  if(G.combo>1){ cc.style.display=''; $('comboVal').textContent='x'+G.combo; }
+  else cc.style.display='none';
+}
+function toast(txt,cls){
+  const el=$('toasts'); const d=document.createElement('div');
+  d.className='toast '+(cls||''); d.textContent=txt;
+  el.appendChild(d);
+  setTimeout(()=>{ d.style.transition='opacity .4s'; d.style.opacity='0'; setTimeout(()=>d.remove(),450); },3200);
+  while(el.children.length>4) el.removeChild(el.firstChild);
+}
+
+/* ---------------- avvio ---------------- */
+function startGame(withCam){
+  AU.ensure();
+  $('intro').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  G.running=true;
+  initSky();
+  enableOrient();
+  G.spawnT=rnd(2,4);      // primo SINIBBIO presto
+  G.realeT=rnd(120,180);  // primo REALE tra 2 e 3 minuti
+  G.pataT=rnd(2,5);       // primi patagarrri presto
+  if(withCam) startCam();
+  resize();
+  let last=performance.now();
+  (function loop(ts){
+    requestAnimationFrame(loop);
+    const dt=Math.min((ts-last)/1000,.05); last=ts;
+    update(dt);
+    render();
+  })(last);
+}
+$('btnStart').addEventListener('click', async ()=>{
+  $('btnStart').disabled=true;
+  await enableOrient();
+  const ok=await startCam();
+  if(!ok && !navigator.mediaDevices) toast('Fotocamera non disponibile: si gioca senza AR','t-bad');
+  startGame(true);
+});
+$('btnNoCam').addEventListener('click', ()=>{ startGame(false); toast('Modalità senza fotocamera: i mostri vivono sul tavolo virtuale','t-good'); });
+$('btnCam').addEventListener('click', toggleCam);
+$('btnMute').addEventListener('click', ()=>{ G.muted=!G.muted; AU.setOn(!G.muted); $('btnMute').textContent=G.muted?'🔇':'🔊'; });
+window.addEventListener('resize', resize);
+resize();
+
+(function(){
+  let taps=0, tapT=0;
+  const titleEl=$('title');
+  if(titleEl) titleEl.addEventListener('click',()=>{
+    const now=Date.now();
+    if(now-tapT>2500) taps=0;
+    tapT=now; taps++;
+    if(taps>=5){ taps=0; triggerJagerbomb(); }
+  });
+  // tastiera: s-k-r-e-e
+  const seq=['j','a','g','e','r']; let si=0;
+  window.addEventListener('keydown',(e)=>{
+    const k=(e.key||'').toLowerCase();
+    if(k===seq[si]){ si++; if(si===seq.length){ si=0; triggerJagerbomb(); } }
+    else si = k===seq[0]?1:0;
+  });
+})();
+
+/* API di test */
+window.SINIBBIO={ G, spawnMonster, spawnPatagarrri, killMonster, killPata, matchWord, matchPair, pickOptions, pickPairOptions, pickPair, WORDS, norm, levenshtein, openWord, chooseWord, onWordOk, startGame, render, update, rr, triggerJagerbomb, updateJager, drawJager, spawnToken, tapToken };
+</script>
+</body>
+</html>
