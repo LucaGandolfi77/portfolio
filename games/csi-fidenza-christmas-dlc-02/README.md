@@ -150,6 +150,90 @@ Punteggio X/4, epilogo comico, reveal drammatico e confetti. Sbagliato? **Ripren
 
 ---
 
+## ✉️ LE BUSTE PERSONALI · da stampare e consegnare
+
+Stampa questa pagina (Ctrl/Cmd+P), **taglia le 9 buste lungo i bordi**, piegale e consegnane **una a ogni giocatore** prima dell'indagine. Ogni busta è il **pezzo di verità** che quel personaggio conosce già: in gioco compare da sola (schermata dossier → tab Parla → Condividi) e va letta ad alta voce quando la si condivide con la squadra.
+
+> 🖨️ **Suggerimento**: nella finestra di stampa scegli "solo questa sezione", oppure ricopia a mano le 9 card qui sotto su foglietti da piegare.
+>
+> 🔎 Nella versione digitale le buste si aprono PARLANDO (fiducia ●●○): la copia cartacea è un aiuto per chi preferisce il gioco da tavolo.
+
+---
+
+**1 · 🎟️ BUSTA DI SIMO** 📱 *(consegna a Simo — apri solo durante l'indagine)*
+
+> **SOLO PER TE, SIMO**
+>
+> Conferma ufficiale: IL NANO C'ERA. È apparso tra il presepe di sabbia davanti ai tuoi occhi.
+> L'OGGETTO che teneva e LE PAROLE che ha detto però sono svanite: servirà la squadra (e le altre buste) per ricostruirle.
+
+**2 · 🎟️ BUSTA DI FEDE** 🎨 *(consegna a Fede — sigillata dal Criminologo Capo)*
+
+> **BUSTA DI FEDE**
+>
+> Mentre riordinavi hai trovato PER TERRA, quasi nascosto:
+> **UNO SPARKLER SPENTO MA ANCORA CALDO ✨**
+> circondato da un'impronta minuscola. Non l'hai detto a nessuno: sembrava pazzo.
+
+**3 · 🎟️ BUSTA DI BICO** 🌾 *(consegna a Bico — sigillata dal Criminologo Capo)*
+
+> **BUSTA DI BICO**
+>
+> Ti è stato consegnato un sacchetto-prova con dentro:
+> **Uno sparkler SPENTO ma ancora caldo ✨**
+> Chi lo teneva in mano alle 13:04 sa qualcosa che nessun altro sa.
+
+**4 · 🎟️ BUSTA DI LEO** 📐 *(consegna a Leo — piegata quattro volte)*
+
+> **BUSTA DI LEO**
+>
+> Su un tovagliolo trovato sotto il tavolo c'è scritto l'INIZIO delle parole del nano:
+> **«Sono uscito dallo scher…»**
+> MANCA IL FINALE. Qualcun altro in tavola ne ha la seconda parte: trovalo, uniteli, URLATELA.
+
+**5 · 🎟️ BUSTA DI ALE** 🏍️ *(consegna ad Ale — sigillata dal Criminologo Capo)*
+
+> **BUSTA DI ALE**
+>
+> Biglietto ritrovato nella tua tasca con scritto il FINALE delle parole del nano:
+> **«…mo apposta per voi.»**
+> Manca l'inizio. Un altro giocatore ha la prima metà: insieme formano UNA FRASE INTERA.
+
+**6 · 🎟️ ASSEGO DI ASSOLUZIONE ⚖️** *(consegna a Seba — riservatissima)*
+
+> **ASSEGO DI ASSOLUZIONE ⚖️**
+>
+> Documento riservato: alle 13:04, Ludo era al tavolo dei dolci, verificato.
+> Quindi Ludo NON ha visto il nano. SCARTALO dalla lista dei sospetti e difendi questa tesi.
+
+**7 · 🎟️ ASSEGO DI ASSOLUZIONE ⚖️** *(consegna a Gando — riservatissima)*
+
+> **ASSEGO DI ASSOLUZIONE ⚖️**
+>
+> Documento riservato: alle 13:04, Ludo era sotto la tettoia delle luminarie, verificato.
+> Quindi Ludo NON ha visto il nano. SCARTALO dalla lista dei sospetti e difendi questa tesi.
+
+**8 · 🎟️ CONFERMA INDIPENDENTE 📍** *(consegna a Ludo — non modificare)*
+
+> **CONFERMA INDIPENDENTE 📍**
+>
+> Foto ritrovata sul telefono: sullo sfondo si vede CHIARAMENTE **TRA IL PRESEPE DI SABBIA**.
+> È lì che è successo qualcosa alle 13:04. Chi era lì vicino SA perché.
+
+**9 · 🎟️ LA REGOLA DEL PRIMO CHE URLA 🗣️** *(consegna a Luca — bruciare dopo lettura, scherzo: conservarla)*
+
+> **LA REGOLA DEL PRIMO CHE URLA 🗣️**
+>
+> Regola non scritta di ogni indagine a Fidenza:
+> CHI URLA PER PRIMO «IL NANO!» di solito… L'HA VISTO. Oppure sta coprendo chi l'ha visto.
+> Leo ha urlato per primo. Quindi: o Leo è il testimone, o conosce il testimone. Segui lo sguardo di Leo.
+
+---
+
+> 📌 **Nota per l'organizzatore — NON consegnare questo foglietto.** Le buste **6 (Seba)**, **7 (Gando)** e **9 (Luca)** contengono informazioni **FALSE** (trappole): chi le riceve parte già con un indizio sbagliato in mano. È voluto: spetta a loro capirlo da soli e **non condividerlo** con la squadra.
+
+---
+
 ## 🔑 Soluzione (spoiler!)
 
 > ⚠️ **SPOILER MASSIMO** — leggi solo se non vuoi più giocare.

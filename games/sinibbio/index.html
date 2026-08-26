@@ -16,6 +16,7 @@
     font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overscroll-behavior:none}
   #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#000}
   #cv{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:crosshair}
+  .ar-anchor{position:fixed;left:0;top:0;width:2px;height:2px;pointer-events:none;opacity:0;z-index:1;will-change:transform}
   .hidden{display:none !important}
 
   #hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
@@ -83,7 +84,7 @@
 
   <div id="intro">
     <h1 id="title" style="cursor:pointer" title="Clicca 5 volte…">SINIBBIO</h1>
-    <p class="sub">I mostri compaiono sul <b>tavolo</b> davanti a te. Inclina il telefono: restano lì, perché sono (quasi) veri.
+    <p class="sub">I mostri compaiono sul <b>tavolo</b> davanti a te e <b>restano attaccati al punto</b> dove sono comparsi (l'ancora è agganciata ai bordi della scena): inclina pure il telefono, non scappano.
       Tocca un <b>SINIBBIO</b> → scegli la parola giusta → <b>ripetila al microfono</b> per distruggerlo.
       I <b>patagarrri</b> bastano da schiacciare. E ogni tanto… arriva il <b>SINIBBIO REALE</b>: servono <b>due parole unite</b>.</p>
     <button class="btn" id="btnStart">▶ Avvia fotocamera e gioca</button>
@@ -202,6 +203,7 @@ const G={
   monsters:[], parts:[], floaters:[], tokens:[], clouds:[],
   time:0, spawnT:0, realeT:0, realeWarn:false, pataT:0, tokenT:0, shake:0,
   orient:{gamma:0,beta:0,ok:false},
+  smO:{gamma:0,beta:0},
   overlay:null, // mostro attualmente in sfida
   jager:null, flash:0
 };
@@ -233,10 +235,41 @@ async function toggleCam(){
   else toast(G.facing==='user'?'📷 Fotocamera frontale':'📷 Fotocamera posteriore','t-good');
 }
 
-/* ---------------- orientamento (AR) ---------------- */
+/* ================= AR ANCHOR LIBRARY =================
+   Lega i mostri a PUNTI FISSI dello schermo:
+   1) CONVOLUZIONE box (ring buffer) + media esponenziale sul segnale
+      di orientamento → il tremolio della mano sparisce.
+   2) ANCORE DOM: ogni mostro ha un elemento invisibile; il canvas
+      disegna DALL'elemento. Se l'elemento non si muove, il mostro non
+      si muove.
+   3) BORDI: estrazione dei bordi della scena (convoluzione di Sobel
+      su un frame minuscolo) per posizionare i mostri del tavolo sui
+      contorni reali (tavolo, tovaglia, piatti).
+   4) RE-ANCHOR: se inclini molto il telefono l'ancora si ricattura
+      (edge-trigger sul segnale) e i mostri restano in vista.
+===================================================================== */
+const ARLIB={
+  /* 1) smoothing per convoluzione: kernel box + EMA */
+  N:9, bufG:[], bufB:[], smG:0, smB:0, has:false,
+  step(gamma,beta){
+    this.bufG.push(gamma); if(this.bufG.length>this.N) this.bufG.shift();
+    this.bufB.push(beta);  if(this.bufB.length>this.N) this.bufB.shift();
+    const g=this.bufG.reduce((a,b)=>a+b,0)/this.bufG.length;
+    const b=this.bufB.reduce((a,b)=>a+b,0)/this.bufB.length;
+    if(!this.has){ this.smG=g; this.smB=b; this.has=true; }
+    const a=.30;
+    this.smG=this.smG*(1-a)+g*a;
+    this.smB=this.smB*(1-a)+b*a;
+    return {gamma:this.smG,beta:this.smB};
+  },
+  reset(){ this.bufG.length=0; this.bufB.length=0; this.smG=0; this.smB=0; this.has=false; }
+};
+
 function onOrient(e){
   if(e.gamma==null) return;
   G.orient.gamma=e.gamma; G.orient.beta=e.beta; G.orient.ok=true;
+  const sm=ARLIB.step(e.gamma,e.beta);
+  G.smO.gamma=sm.gamma; G.smO.beta=sm.beta;
 }
 async function enableOrient(){
   if(!window.DeviceOrientationEvent) return;
@@ -246,36 +279,146 @@ async function enableOrient(){
     window.addEventListener('deviceorientation',onOrient);
   }
 }
-/* posizione "di mondo" → schermo, compensando l'inclinazione */
+
+/* posizione "di mondo" → schermo, usando l'orientamento LISCIATO.
+   Zona morta + guadagni ridotti: i mostri restano quasi fermi. */
 function anchor(place, base, zone){
   if(!G.orient.ok || !base) return {x:place.x,y:place.y,s:1};
-  // in cielo il mostro è lontano: si muove meno quando inclini il telefono
-  const far = zone==='sky';
-  const kx = far? 1.7 : 3.4, ky = far? 1.5 : 3.0;
-  const dg=base.gamma-G.orient.gamma, db=base.beta-G.orient.beta;
-  const x=place.x + dg*kx;
-  const y=place.y + db*ky;
-  const s=clamp(1 + db*(far?0.002:0.004), .8, 1.25);
-  // micro-tremolio "mano che regge il telefono"
-  const jx=Math.sin(G.time*9)*1.2, jy=Math.cos(G.time*7.3)*1.1;
-  return {x:x+jx, y:y+jy, s};
+  const far=zone==='sky';
+  let dg=base.gamma-G.smO.gamma, db=base.beta-G.smO.beta;
+  const dz=0.6; // zona morta: ignora i micro-tremori
+  if(Math.abs(dg)<dz) dg=0; else dg-=Math.sign(dg)*dz;
+  if(Math.abs(db)<dz) db=0; else db-=Math.sign(db)*dz;
+  const kx=far?0.8:1.4, ky=far?0.7:1.2;
+  const x=place.x+dg*kx;
+  const y=place.y+db*ky;
+  const s=clamp(1+db*(far?0.001:0.002),.9,1.15);
+  // non uscire mai dai bordi dello schermo
+  return {x:clamp(x,-30,innerWidth+30), y:clamp(y,-30,innerHeight+30), s};
+}
+
+/* 2) ancora DOM: un elemento invisibile per ogni mostro */
+function makeAnchorEl(){
+  const d=document.createElement('div');
+  d.className='ar-anchor';
+  document.body.appendChild(d);
+  return d;
+}
+function disposeAnchor(m){
+  if(m.anchorEl && m.anchorEl.parentNode) m.anchorEl.parentNode.removeChild(m.anchorEl);
+  m.anchorEl=null;
+}
+function setAnchorEl(m,x,y){
+  if(!m.anchorEl) m.anchorEl=makeAnchorEl();
+  m.anchorEl.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)';
+}
+/* posizione schermo di un mostro = posizione del suo elemento DOM */
+function screenPos(m){
+  if(m.anchorEl){
+    const r=m.anchorEl.getBoundingClientRect();
+    return {x:r.left+1, y:r.top+1, s:m._s||1};
+  }
+  return anchor({x:m.x,y:m.y}, m.base, m.zone);
+}
+/* aggiorna l'ancora del mostro; ricattura la base se inclini tanto */
+function updateAnchor(m){
+  if(G.orient.ok && m.base){
+    const dg=Math.abs(m.base.gamma-G.smO.gamma), db=Math.abs(m.base.beta-G.smO.beta);
+    if(dg>42 || db>42) m.base={gamma:G.smO.gamma,beta:G.smO.beta};
+  }
+  const a=anchor({x:m.x,y:m.y}, m.base, m.zone);
+  m._s=a.s;
+  setAnchorEl(m,a.x,a.y);
+}
+
+/* 3) bordi: convoluzione di Sobel su un frame minuscolo della camera */
+const _ec=document.createElement('canvas'); _ec.width=48; _ec.height=32;
+const _ecx=_ec.getContext('2d',{willReadFrequently:true});
+let edgeMap=null;
+function updateEdgeMap(){
+  const v=$('cam');
+  if(!v || !v.videoWidth || !G.camOn) return;
+  try{ _ecx.drawImage(v,0,0,48,32); }catch(e){ return; }
+  let img; try{ img=_ecx.getImageData(0,0,48,32); }catch(e){ return; }
+  const gw=48, gh=32, d=img.data;
+  const gray=new Float32Array(gw*gh);
+  for(let i=0;i<gw*gh;i++) gray[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;
+  const mag=new Float32Array(gw*gh);
+  for(let y=1;y<gh-1;y++) for(let x=1;x<gw-1;x++){
+    const i=y*gw+x;
+    const gx=(-gray[i-gw-1]-2*gray[i-1]-gray[i+gw-1])+(gray[i-gw+1]+2*gray[i+1]+gray[i+gw+1]);
+    const gy=(-gray[i-gw-1]-2*gray[i-gw]-gray[i-gw+1])+(gray[i+gw-1]+2*gray[i+gw]+gray[i+gw+1]);
+    mag[i]=Math.sqrt(gx*gx+gy*gy);
+  }
+  edgeMap={w:gw,h:gh,mag};
+}
+function screenToGrid(sx,sy){
+  const v=$('cam');
+  if(!v || !v.videoWidth || !edgeMap) return null;
+  const W=innerWidth,H=innerHeight,vw=v.videoWidth,vh=v.videoHeight;
+  const scale=Math.max(W/vw,H/vh);
+  const px=(sx-W/2)/scale+vw/2;
+  const py=(sy-H/2)/scale+vh/2;
+  const mpx=G.facing==='user'? (vw-px):px;
+  return {
+    gx:clamp(Math.round(mpx/vw*(edgeMap.w-1)),0,edgeMap.w-1),
+    gy:clamp(Math.round(py/vh*(edgeMap.h-1)),0,edgeMap.h-1)
+  };
+}
+function gridToScreen(gx,gy){
+  const v=$('cam');
+  if(!v || !v.videoWidth || !edgeMap) return {x:0,y:0};
+  const W=innerWidth,H=innerHeight,vw=v.videoWidth,vh=v.videoHeight;
+  const scale=Math.max(W/vw,H/vh);
+  const mpx=(gx/(edgeMap.w-1))*vw;
+  const py=(gy/(edgeMap.h-1))*vh;
+  const px=G.facing==='user'? (vw-mpx):mpx;
+  return {x:(px-vw/2)*scale+W/2, y:(py-vh/2)*scale+H/2};
+}
+/* trova il bordo più vicino a un punto dello schermo (centroide pesato) */
+function snapToEdge(sx,sy){
+  if(!edgeMap || !G.camOn) return null;
+  const g=screenToGrid(sx,sy); if(!g) return null;
+  const gw=edgeMap.w, gh=edgeMap.h, mag=edgeMap.mag;
+  let best=0;
+  const R=6;
+  for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){
+    const x=g.gx+dx, y=g.gy+dy;
+    if(x<1||y<1||x>gw-2||y>gh-2) continue;
+    const v=mag[y*gw+x];
+    if(v>best) best=v;
+  }
+  const thr=best*0.35;
+  let ex=0, ey=0, en=0;
+  for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){
+    const x=g.gx+dx, y=g.gy+dy;
+    if(x<1||y<1||x>gw-2||y>gh-2) continue;
+    const v=mag[y*gw+x];
+    if(v>=thr && v>0.01){ ex+=x*v; ey+=y*v; en+=v; }
+  }
+  if(en<0.5) return null;
+  return gridToScreen(ex/en, ey/en);
 }
 
 /* ---------------- mostri ---------------- */
 function spawnMonster(reale){
   const W=innerWidth, H=innerHeight;
-  const base=G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null;
+  const base=G.orient.ok?{gamma:G.smO.gamma,beta:G.smO.beta}:null;
   const zone = chance(0.32) ? 'sky' : 'table';
+  let x= zone==='sky'? rnd(W*0.15, W*0.85) : rnd(W*0.12, W*0.88);
+  let y= zone==='sky'? rnd(H*0.08, H*0.27) : rnd(H*0.34, H*0.74);
+  // aggancio ai bordi reali della scena (Sobel + convoluzione)
+  if(zone==='table' && G.camOn){ updateEdgeMap(); const sn=snapToEdge(x,y); if(sn){ x=sn.x; y=sn.y; } }
   const m={
     reale:!!reale, zone,
-    x: zone==='sky'? rnd(W*0.15, W*0.85) : rnd(W*0.12, W*0.88),
-    y: zone==='sky'? rnd(H*0.08, H*0.27) : rnd(H*0.34, H*0.74),
+    x, y,
     base,
     r: reale? 74 : rnd(40,54),
     target: reale? pickPair() : pick(WORDS.filter(w=>w.length<=10)),
     opts: [],
-    ph:rnd(0,6.28), dead:false, t:0, tries:0,
-    label: reale? 'SINIBBIO REALE' : 'SINIBBIO'
+    ph:rnd(0,6.28), seed:Math.floor(rnd(0,1e9)), dead:false, t:0, tries:0,
+    label: reale? 'SINIBBIO REALE' : 'SINIBBIO',
+    anchorEl:makeAnchorEl()
   };
   m.opts = reale? pickPairOptions(m.target) : pickOptions(m.target, WORDS);
   G.monsters.push(m);
@@ -283,12 +426,15 @@ function spawnMonster(reale){
 function spawnPatagarrri(){
   const W=innerWidth, H=innerHeight;
   const zone = chance(0.25) ? 'sky' : 'table';
+  let x=rnd(W*0.1,W*0.9);
+  let y= zone==='sky'? rnd(H*0.1,H*0.26) : rnd(H*0.45,H*0.8);
+  if(zone==='table' && G.camOn){ updateEdgeMap(); const sn=snapToEdge(x,y); if(sn){ x=sn.x; y=sn.y; } }
   G.monsters.push({
     pata:true, reale:false, zone,
-    x:rnd(W*0.1,W*0.9),
-    y: zone==='sky'? rnd(H*0.1,H*0.26) : rnd(H*0.45,H*0.8),
-    base:null, r:16, ph:rnd(0,6.28), dead:false, t:0, vx:rnd(-20,20), vy:rnd(-8,8),
-    label:'patagarrro'
+    x, y,
+    base:null, r:16, ph:rnd(0,6.28), seed:Math.floor(rnd(0,1e9)), dead:false, t:0, vx:rnd(-20,20), vy:rnd(-8,8),
+    label:'patagarrro',
+    anchorEl:makeAnchorEl()
   });
 }
 function tapMonster(m){
@@ -297,6 +443,7 @@ function tapMonster(m){
 }
 function killMonster(m){
   if(m.dead) return; m.dead=true;
+  disposeAnchor(m);
   G.kills++;
   const mult = Math.max(1, G.combo);
   const gain = m.reale? 50*mult : 10*mult;
@@ -311,6 +458,7 @@ function killMonster(m){
 }
 function killPata(m){
   if(m.dead) return; m.dead=true;
+  disposeAnchor(m);
   G.patas++; G.score+=5;
   boom(m.x,m.y,'#4ade80',14,false);
   AU.pop();
@@ -329,73 +477,235 @@ function updateParts(dt){
   for(let i=G.floaters.length-1;i>=0;i--){ const f=G.floaters[i]; f.life-=dt; f.y-=34*dt; if(f.life<=0) G.floaters.splice(i,1); }
 }
 
-/* ---------------- disegno mostri (procedurale) ---------------- */
+/* ---------------- disegno mostri (caotico procedurale) ----------------
+   Ogni mostro ha un SEED: la sua forma è diversa e "sbagliata" in modo
+   deterministico — corpi a rigonfiamenti, occhi extra, tentacoli,
+   denti storti, glitch. Difficile capire dove inizia e dove finisce. */
+function prand(seed,k){ const x=Math.sin(seed*12.9898+k*78.233)*43758.5453; return x-Math.floor(x); }
+
 function drawSinibbio(ctx,m){
-  const p=anchor({x:m.x,y:m.y}, m.base, m.zone);
-  if(m.zone==='sky') p.y += Math.sin(G.time*1.8+m.ph)*5; // galleggia in cielo
+  if(m.reale){ drawReal(ctx,m); return; }
+  const p=screenPos(m);
   const s=m.r*p.s;
+  const seed=m.seed||1234;
+  const ph=m.ph;
   ctx.save();
   ctx.translate(p.x,p.y);
   if(m.zone==='sky'){
-    // alone morbido per i mostri in cielo
-    const gl=ctx.createRadialGradient(0,0,s*0.1,0,0,s*1.4);
-    gl.addColorStop(0,'rgba(255,255,255,.16)'); gl.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(0,0,s*1.4,0,6.29); ctx.fill();
+    const gl=ctx.createRadialGradient(0,0,s*0.1,0,0,s*1.5);
+    gl.addColorStop(0,'rgba(255,255,255,.15)'); gl.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(0,0,s*1.5,0,6.29); ctx.fill();
+    ctx.translate(0,Math.sin(G.time*1.6+ph)*3); // galleggia piano, l'ancora resta ferma
   } else {
-    ctx.beginPath(); ctx.ellipse(0, s*1.15, s*0.85, s*0.22, 0, 0, 6.29);
-    ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,s*1.15,s*0.9,s*0.2,0,0,6.29);
+    ctx.fillStyle='rgba(0,0,0,.38)'; ctx.fill();
   }
-  // wobble
-  const wob=Math.sin(G.time*3+m.ph)*0.06;
-  ctx.rotate(wob);
-  if(!m.reale){
-    // corpo
-    ctx.beginPath(); ctx.ellipse(0,0,s,s*0.92,0,0,6.29);
-    ctx.fillStyle='#8b5cf6'; ctx.fill();
-    ctx.strokeStyle='#5b21b6'; ctx.lineWidth=3; ctx.stroke();
-    // corni
-    ctx.fillStyle='#6d28d9';
-    ctx.beginPath(); ctx.moveTo(-s*0.45,-s*0.75); ctx.lineTo(-s*0.28,-s*1.25); ctx.lineTo(-s*0.12,-s*0.8); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(s*0.45,-s*0.75); ctx.lineTo(s*0.28,-s*1.25); ctx.lineTo(s*0.12,-s*0.8); ctx.closePath(); ctx.fill();
-    // occhi
-    eye(ctx,-s*0.28,-s*0.15,s*0.16,'#fff');
-    eye(ctx, s*0.28,-s*0.15,s*0.16,'#fff');
-    // bocca
-    ctx.strokeStyle='#3b0764'; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.arc(0,s*0.25,s*0.28,0.15,Math.PI-0.15); ctx.stroke();
-  } else {
-    // SINIBBIO REALE: grosso e spaventoso
-    const g=ctx.createRadialGradient(0,0,s*0.2,0,0,s);
-    g.addColorStop(0,'#ff5c7a'); g.addColorStop(1,'#7f1d1d');
-    ctx.beginPath(); ctx.ellipse(0,0,s,s*0.95,0,0,6.29);
-    ctx.fillStyle=g; ctx.fill();
-    ctx.strokeStyle='#450a0a'; ctx.lineWidth=4; ctx.stroke();
-    // corna grandi
-    ctx.fillStyle='#fecaca';
-    ctx.beginPath(); ctx.moveTo(-s*0.55,-s*0.7); ctx.lineTo(-s*0.7,-s*1.5); ctx.lineTo(-s*0.15,-s*0.85); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(s*0.55,-s*0.7); ctx.lineTo(s*0.7,-s*1.5); ctx.lineTo(s*0.15,-s*0.85); ctx.closePath(); ctx.fill();
-    // occhi rossi brillanti
-    eye(ctx,-s*0.3,-s*0.12,s*0.22,'#ffd54a');
-    eye(ctx, s*0.3,-s*0.12,s*0.22,'#ffd54a');
-    ctx.fillStyle='#450a0a';
-    ctx.beginPath(); ctx.arc(-s*0.3,-s*0.12,s*0.09,0,6.29); ctx.fill();
-    ctx.beginPath(); ctx.arc(s*0.3,-s*0.12,s*0.09,0,6.29); ctx.fill();
-    // denti
-    ctx.fillStyle='#fff';
-    for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*s*0.16-s*0.08, s*0.28); ctx.lineTo(i*s*0.16, s*0.52); ctx.lineTo(i*s*0.16+s*0.08, s*0.28); ctx.closePath(); ctx.fill(); }
-    // artigli
-    ctx.strokeStyle='#fecaca'; ctx.lineWidth=5;
-    for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(i*s*0.4-s*0.12, s*0.9); ctx.lineTo(i*s*0.4-s*0.18, s*1.15); ctx.stroke(); }
+  const wob=Math.sin(G.time*2.2+ph)*.05+Math.sin(G.time*5.1+ph*2.7)*.035;
+  const br=1+Math.sin(G.time*2.8+ph)*.025;
+  ctx.rotate(wob); ctx.scale(br,2-br);
+
+  /* — corpo: blob di tanti rigonfiamenti disuguali — */
+  const BODY='#8b5cf6', OUT='#5b21b6', DARK='#6d28d9';
+  for(let i=0;i<9;i++){
+    const a=prand(seed,i*3+1)*6.28;
+    const ox=Math.cos(a)*s*prand(seed,i*3+2)*0.55;
+    const oy=Math.sin(a)*s*prand(seed,i*3+2)*0.5;
+    const r=s*(0.5+prand(seed,i*3+3)*0.42);
+    ctx.beginPath(); ctx.ellipse(ox,oy,r*1.1,r,prand(seed,i*7)*3.14,0,6.29);
+    ctx.fillStyle=BODY; ctx.fill(); ctx.strokeStyle=OUT; ctx.lineWidth=2.5; ctx.stroke();
+  }
+  /* — aculei dorsali: triangoli sparsi, disuguali, storti — */
+  ctx.fillStyle=DARK;
+  for(let i=0;i<6;i++){
+    const a=-2.6+prand(seed,40+i)*2.4;
+    const len=s*(0.28+prand(seed,50+i)*0.5);
+    const base=0.35+prand(seed,60+i)*0.5;
+    const bx=Math.cos(a)*s*base, by=Math.sin(a)*s*base;
+    ctx.beginPath();
+    ctx.moveTo(bx-Math.sin(a)*s*0.07, by+Math.cos(a)*s*0.07);
+    ctx.lineTo(bx+Math.cos(a)*len, by+Math.sin(a)*len);
+    ctx.lineTo(bx+Math.sin(a)*s*0.07, by-Math.cos(a)*s*0.07);
+    ctx.closePath(); ctx.fill();
+  }
+  /* — tentacoli: 3 bracci ondulati, ognuno col suo ritmo — */
+  ctx.strokeStyle='#7c3aed'; ctx.lineWidth=s*0.09; ctx.lineCap='round';
+  for(let i=0;i<3;i++){
+    const a=0.9+prand(seed,70+i)*1.6;
+    const len=s*(0.9+prand(seed,80+i)*0.9);
+    const wav=Math.sin(G.time*(2.2+i*0.9)+ph+i*2)*s*0.12;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*s*0.4, Math.sin(a)*s*0.5);
+    ctx.quadraticCurveTo(Math.cos(a)*s*0.6+wav, Math.sin(a)*len*0.5, Math.cos(a)*len, Math.sin(a)*len+wav);
+    ctx.stroke();
+    ctx.fillStyle=DARK;
+    ctx.beginPath(); ctx.arc(Math.cos(a)*len, Math.sin(a)*len+wav, s*0.07, 0, 6.29); ctx.fill();
+  }
+  /* — occhi: 2 disuguali + 1 extra su peduncolo — */
+  eye(ctx,-s*0.3,-s*0.18,s*0.17,'#fff');
+  ctx.save(); ctx.translate(s*0.34,-s*0.1); ctx.rotate(0.6+Math.sin(G.time*2+ph)*0.2);
+  eye(ctx,0,0,s*0.13,'#fff'); ctx.restore();
+  const stalk=Math.sin(G.time*3.1+ph)*s*0.05;
+  ctx.strokeStyle=DARK; ctx.lineWidth=s*0.05;
+  ctx.beginPath(); ctx.moveTo(s*0.05,-s*0.5); ctx.quadraticCurveTo(s*0.16,-s*0.75+stalk, s*0.3,-s*0.68+stalk); ctx.stroke();
+  ctx.beginPath(); ctx.arc(s*0.3,-s*0.68+stalk, s*0.075, 0, 6.29); ctx.fillStyle='#fda4af'; ctx.fill();
+  ctx.fillStyle='#7f1d1d'; ctx.beginPath(); ctx.arc(s*0.3,-s*0.68+stalk, s*0.03, 0, 6.29); ctx.fill();
+  /* — bocca: crepa a zigzag con denti storti — */
+  ctx.fillStyle='#2e1065';
+  ctx.beginPath();
+  ctx.moveTo(-s*0.4,s*0.28);
+  let mx=-s*0.4;
+  for(let i=0;i<5;i++){
+    mx+=s*0.16*(0.7+prand(seed,90+i)*0.6);
+    ctx.lineTo(mx, s*0.28+prand(seed,100+i)*s*0.22*(i%2?1:-1));
+  }
+  ctx.lineTo(s*0.4,s*0.3); ctx.lineTo(s*0.3,s*0.5); ctx.lineTo(-s*0.3,s*0.52);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fef3c7';
+  ctx.beginPath(); ctx.moveTo(-s*0.1,s*0.34); ctx.lineTo(-s*0.02,s*0.62); ctx.lineTo(s*0.07,s*0.36); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(s*0.22,s*0.32); ctx.lineTo(s*0.3,s*0.52); ctx.lineTo(s*0.37,s*0.31); ctx.closePath(); ctx.fill();
+  /* — macchie — */
+  ctx.fillStyle='rgba(109,40,217,.5)';
+  for(let i=0;i<4;i++){
+    const a=prand(seed,120+i)*6.28;
+    ctx.save(); ctx.translate(Math.cos(a)*s*0.5,Math.sin(a)*s*0.45); ctx.rotate(prand(seed,130+i)*3);
+    ctx.beginPath(); ctx.ellipse(0,0,s*0.16,s*0.1,0,0,6.29); ctx.fill();
+    ctx.restore();
+  }
+  /* — branchie sul fianco — */
+  ctx.strokeStyle='rgba(91,33,182,.8)'; ctx.lineWidth=2;
+  for(let i=0;i<4;i++){
+    const yy=-s*0.15+i*s*0.14;
+    ctx.beginPath(); ctx.moveTo(s*0.72,yy);
+    ctx.quadraticCurveTo(s*0.8+Math.sin(G.time*4+i)*s*0.04,yy+s*0.05,s*0.72,yy+s*0.1);
+    ctx.stroke();
   }
   ctx.restore();
-  // etichetta
+  drawLabel(ctx,m,p,s);
+}
+
+function drawReal(ctx,m){
+  const p=screenPos(m);
+  const s=m.r*p.s;
+  const seed=m.seed||777;
+  const ph=m.ph;
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  if(m.zone==='sky'){
+    const gl=ctx.createRadialGradient(0,0,s*0.1,0,0,s*1.8);
+    gl.addColorStop(0,'rgba(255,92,122,.25)'); gl.addColorStop(1,'rgba(255,92,122,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(0,0,s*1.8,0,6.29); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.ellipse(0,s*1.25,s*1.05,s*0.22,0,0,6.29);
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fill();
+  }
+  const wob=Math.sin(G.time*2+ph)*.06+Math.sin(G.time*7.3+ph)*.04;
+  const br=1+Math.sin(G.time*2.2+ph)*.03;
+  ctx.rotate(wob); ctx.scale(br,2-br);
+  const P=13;
+  /* silhouette: stella irregolare a 13 punte, ogni punta diversa */
+  const g=ctx.createRadialGradient(0,0,s*0.1,0,0,s*1.15);
+  g.addColorStop(0,'#ff8fa3'); g.addColorStop(.55,'#dc2f4e'); g.addColorStop(1,'#5f0f1f');
+  ctx.beginPath();
+  for(let i=0;i<=P;i++){
+    const a=i/P*6.28;
+    const rr=s*(i%2? (0.9+prand(seed,i)*0.5) : (1.05+prand(seed,i+40)*0.4));
+    const ox=Math.cos(a)*rr, oy=Math.sin(a)*rr;
+    if(i===0) ctx.moveTo(ox,oy); else ctx.lineTo(ox,oy);
+  }
+  ctx.closePath(); ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle='#2b040b'; ctx.lineWidth=4; ctx.stroke();
+  /* glitch: ogni tanto il contorno slitta in ciano */
+  const gl2=Math.sin(G.time*1.9+ph);
+  if(gl2>0.55){
+    ctx.save();
+    ctx.translate(3*Math.sin(G.time*23),-2);
+    ctx.beginPath();
+    for(let i=0;i<=P;i++){
+      const a=i/P*6.28;
+      const rr=s*(i%2?(0.9+prand(seed,i)*0.5):(1.05+prand(seed,i+40)*0.4));
+      const ox=Math.cos(a)*rr, oy=Math.sin(a)*rr;
+      if(i===0) ctx.moveTo(ox,oy); else ctx.lineTo(ox,oy);
+    }
+    ctx.closePath();
+    ctx.strokeStyle='rgba(34,211,238,'+((gl2-0.55)*1.6).toFixed(2)+')'; ctx.lineWidth=2; ctx.stroke();
+    ctx.restore();
+  }
+  /* corona di corna curve, tutte diverse */
+  ctx.fillStyle='#fecaca';
+  for(let i=0;i<6;i++){
+    const a=-2.9+i*0.95+prand(seed,80+i)*0.4;
+    const len=s*(0.9+prand(seed,90+i)*0.8);
+    const bx=Math.cos(a)*s*0.85, by=Math.sin(a)*s*0.7;
+    ctx.save(); ctx.translate(bx,by); ctx.rotate(a+1.57+Math.sin(G.time*2+i)*0.06);
+    ctx.beginPath();
+    ctx.moveTo(-s*0.09,0); ctx.quadraticCurveTo(-s*0.05,-len*0.5, s*0.12,-len);
+    ctx.quadraticCurveTo(-s*0.02,-len*0.55, s*0.09,0);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  /* occhi: 3, uno su peduncolo, tutti che luccicano */
+  for(let i=0;i<3;i++){
+    const ex=i===0?-s*0.34:i===1?s*0.34:s*0.05;
+    const ey=i===2?-s*0.78:s*0.02;
+    ctx.save(); ctx.translate(ex,ey);
+    ctx.shadowColor='#ffd54a'; ctx.shadowBlur=14+6*Math.sin(G.time*5+i);
+    ctx.beginPath(); ctx.arc(0,0,s*(i===2?0.08:0.14),0,6.29); ctx.fillStyle='#ffd54a'; ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#3d0a10';
+    ctx.beginPath(); ctx.arc(Math.sin(G.time*1.3+i*2)*s*0.04,Math.cos(G.time*1.7+i)*s*0.04,s*0.055,0,6.29); ctx.fill();
+    ctx.restore();
+  }
+  /* bocca: doppia fila di denti */
+  ctx.fillStyle='#2b040b';
+  ctx.beginPath();
+  ctx.moveTo(-s*0.5,s*0.3);
+  ctx.quadraticCurveTo(0,s*0.85,s*0.5,s*0.3);
+  ctx.quadraticCurveTo(0,s*0.42,-s*0.5,s*0.3);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff';
+  for(let i=0;i<5;i++){
+    const bx=-s*0.42+i*s*0.21;
+    const h=s*(0.16+prand(seed,110+i)*0.2);
+    ctx.beginPath(); ctx.moveTo(bx-s*0.08,s*0.28); ctx.lineTo(bx,s*0.28+h); ctx.lineTo(bx+s*0.08,s*0.28); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle='#fecaca';
+  for(let i=0;i<4;i++){
+    const bx=-s*0.33+i*s*0.22+s*0.02;
+    const h=s*(0.1+prand(seed,120+i)*0.14);
+    ctx.beginPath(); ctx.moveTo(bx-s*0.06,s*0.4); ctx.lineTo(bx,s*0.4-h); ctx.lineTo(bx+s*0.06,s*0.4); ctx.closePath(); ctx.fill();
+  }
+  /* artigli */
+  ctx.strokeStyle='#fecaca'; ctx.lineWidth=s*0.1; ctx.lineCap='round';
+  for(let i=0;i<4;i++){
+    const a=0.5+i*0.5;
+    ctx.beginPath(); ctx.moveTo(Math.cos(a)*s*0.8,Math.sin(a)*s*0.75);
+    ctx.lineTo(Math.cos(a)*s*1.25,Math.sin(a)*s*1.15); ctx.stroke();
+  }
+  /* tendril infuocati */
+  for(let i=0;i<4;i++){
+    const a=1.6+prand(seed,130+i)*1.4;
+    const len=s*(1.1+prand(seed,140+i)*0.8);
+    const wav=Math.sin(G.time*(2+i*0.8)+ph+i*2)*s*0.14;
+    const gr=ctx.createLinearGradient(0,0,Math.cos(a)*len,Math.sin(a)*len);
+    gr.addColorStop(0,'#ff8fa3'); gr.addColorStop(1,'#7f1d1d');
+    ctx.strokeStyle=gr; ctx.lineWidth=s*0.11;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*s*0.7,Math.sin(a)*s*0.7);
+    ctx.quadraticCurveTo(Math.cos(a)*s*1.1+wav,Math.sin(a)*len*0.55,Math.cos(a)*len,Math.sin(a)*len-wav);
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawLabel(ctx,m,p,s);
+}
+
+function drawLabel(ctx,m,p,s){
   ctx.font='900 '+(m.reale? 17:13)+'px Inter,sans-serif';
   ctx.textAlign='center';
   const tw=ctx.measureText(m.label).width;
   ctx.fillStyle='rgba(4,7,16,.75)';
-  rr(ctx, p.x-tw/2-8, p.y+s*1.25, tw+16, m.reale?30:24, 12); ctx.fill();
+  rr(ctx, p.x-tw/2-8, p.y+s*1.4, tw+16, m.reale?30:24, 12); ctx.fill();
   ctx.fillStyle= m.reale? '#ffd54a':'#d8c7ff';
-  ctx.fillText(m.label, p.x, p.y+s*1.25+(m.reale?21:18));
+  ctx.fillText(m.label, p.x, p.y+s*1.4+(m.reale?21:18));
   ctx.textAlign='left';
 }
 function eye(ctx,x,y,r,color){
@@ -405,33 +715,58 @@ function eye(ctx,x,y,r,color){
   ctx.beginPath(); ctx.arc(x+r*0.28,y,r*0.5,0,6.29); ctx.fill();
 }
 function drawPata(ctx,m){
+  const p=screenPos(m);
+  const seed=m.seed||42;
+  const ph=m.ph;
   if(m.zone==='sky'){
-    const y=m.y+Math.sin(G.time*3+m.ph)*5;
-    ctx.save(); ctx.translate(m.x,y);
-    const flap=Math.sin(G.time*14+m.ph)*0.6;
+    const y=Math.sin(G.time*3+ph)*4;
+    ctx.save(); ctx.translate(p.x,p.y+y);
+    const flap=Math.sin(G.time*13+ph)*0.6;
+    /* ali asimmetriche: una grande, una piccola */
     ctx.fillStyle='#86efac';
-    ctx.save(); ctx.rotate(-0.3+flap*0.7); ctx.beginPath(); ctx.ellipse(-8,0,10,5,0,0,6.29); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.rotate(0.3-flap*0.7); ctx.beginPath(); ctx.ellipse(8,0,10,5,0,0,6.29); ctx.fill(); ctx.restore();
-    ctx.beginPath(); ctx.arc(0,0,11,0,6.29);
-    ctx.fillStyle='#4ade80'; ctx.fill();
+    ctx.save(); ctx.rotate(-0.35+flap*0.8); ctx.beginPath(); ctx.ellipse(-9,0,11,5,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.rotate(0.35-flap*0.55); ctx.beginPath(); ctx.ellipse(10,2,8,4,0,0,6.29); ctx.fill(); ctx.restore();
+    /* corpo blob */
+    ctx.beginPath(); ctx.arc(0,0,11,0,6.29); ctx.fillStyle='#4ade80'; ctx.fill();
     ctx.strokeStyle='#166534'; ctx.lineWidth=2; ctx.stroke();
-    eye(ctx,2,-3,4.5,'#fff');
+    /* ciuffo storto */
+    ctx.fillStyle='#166534';
+    ctx.beginPath(); ctx.moveTo(-3,-9); ctx.lineTo(-5,-16); ctx.lineTo(0,-10); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4,-9); ctx.lineTo(7,-15); ctx.lineTo(1,-10); ctx.closePath(); ctx.fill();
+    /* occhi diversi: uno bianco, uno nero */
+    eye(ctx,3,-3,4.5,'#fff');
+    ctx.fillStyle='#166534'; ctx.beginPath(); ctx.arc(-4,-2,2.2,0,6.29); ctx.fill();
     ctx.restore();
     return;
   }
-  const hop=Math.abs(Math.sin(G.time*6+m.ph))*6;
-  const y=m.y-hop;
+  const hop=Math.abs(Math.sin(G.time*6+ph))*6;
   ctx.save();
-  ctx.translate(m.x,y);
-  ctx.beginPath(); ctx.ellipse(0,14,10,4,0,0,6.29);
-  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fill();
-  ctx.beginPath(); ctx.arc(0,0,12,0,6.29);
-  ctx.fillStyle='#4ade80'; ctx.fill();
-  ctx.strokeStyle='#166534'; ctx.lineWidth=2; ctx.stroke();
-  eye(ctx,3,-3,5,'#fff');
-  ctx.fillStyle='#166534';
-  ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(-12,-14); ctx.lineTo(-5,-9); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(8,-6); ctx.lineTo(12,-14); ctx.lineTo(5,-9); ctx.closePath(); ctx.fill();
+  ctx.translate(p.x,p.y-hop);
+  /* ombra */
+  ctx.beginPath(); ctx.ellipse(0,14,11,4,0,0,6.29); ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fill();
+  /* zampe a zigzag */
+  ctx.strokeStyle='#166534'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(-5,4); ctx.lineTo(-8,9); ctx.lineTo(-4,12); ctx.lineTo(-9,16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(5,4); ctx.lineTo(8,9); ctx.lineTo(4,12); ctx.lineTo(9,16); ctx.stroke();
+  /* corpo: due rigonfiamenti disuguali */
+  ctx.beginPath(); ctx.ellipse(-2,0,9,8,0,0,6.29); ctx.fillStyle='#4ade80'; ctx.fill(); ctx.strokeStyle='#166534'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(5,-5,7,0,6.29); ctx.fillStyle='#86efac'; ctx.fill(); ctx.strokeStyle='#166534'; ctx.stroke();
+  /* ala storta */
+  ctx.fillStyle='#86efac';
+  ctx.save(); ctx.translate(-8,-1); ctx.rotate(-0.5+Math.sin(G.time*9+ph)*0.2);
+  ctx.beginPath(); ctx.ellipse(0,0,10,4.5,0,0,6.29); ctx.fill(); ctx.restore();
+  /* occhi: uno normale, uno a croce */
+  eye(ctx,3,-5,4,'#fff');
+  ctx.strokeStyle='#166534';
+  ctx.beginPath(); ctx.moveTo(-5,-7); ctx.lineTo(-2,-4); ctx.moveTo(-2,-7); ctx.lineTo(-5,-4); ctx.stroke();
+  /* becco storto a zigzag */
+  ctx.fillStyle='#a3e635';
+  ctx.beginPath(); ctx.moveTo(11,-6); ctx.lineTo(17,-3); ctx.lineTo(13,-2); ctx.lineTo(18,1); ctx.lineTo(10,-1); ctx.closePath(); ctx.fill();
+  /* coda a zigzag */
+  ctx.strokeStyle='#166534'; ctx.lineWidth=2;
+  for(let i=0;i<3;i++){
+    ctx.beginPath(); ctx.moveTo(-8+i,6); ctx.lineTo(-13-i*2,1+i*3); ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -468,7 +803,7 @@ function spawnToken(){
   G.tokens.push({ x:rnd(W*0.15,W*0.85), y:rnd(H*0.1,H*0.6), zone: chance(.5)?'sky':'table', t:0, ph:rnd(0,6.28) });
 }
 function drawToken(t){
-  const base=G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null;
+  const base=G.orient.ok?{gamma:G.smO.gamma,beta:G.smO.beta}:null;
   const p=anchor({x:t.x,y:t.y}, base, t.zone);
   const y=p.y+Math.sin(G.time*4+t.ph)*5;
   ctx.save(); ctx.translate(p.x,y);
@@ -613,7 +948,7 @@ function update(dt){
   // SINIBBIO: uno ogni 5-15 secondi
   G.spawnT-=dt;
   if(G.spawnT<=0 && G.monsters.filter(m=>!m.pata&&!m.dead).length<1){
-    G.spawnT= rnd(5,15);
+    G.spawnT= rnd(30,60);
     spawnMonster(false);
   }
   // SINIBBIO REALE: uno ogni 2-3 minuti (max 2 vivi alla volta)
@@ -643,7 +978,9 @@ function update(dt){
     }
     // i mostri scappano dopo 20s
     m.t+=dt;
-    if(m.t>20){ m.dead=true; floater(m.x,m.y,'è scappato!','#9fb8d8'); }
+    if(m.t>20){ m.dead=true; disposeAnchor(m); floater(m.x,m.y,'è scappato!','#9fb8d8'); continue; }
+    // ancora DOM aggiornata: il mostro resta legato al suo punto
+    updateAnchor(m);
   }
   updateParts(dt);
 }
@@ -738,14 +1075,16 @@ cv.addEventListener('pointerdown',(e)=>{
   const x=e.clientX, y=e.clientY;
   // hit test: parole d'oro, poi gabbiano, poi mostri
   for(const t of G.tokens){
-    const p=anchor({x:t.x,y:t.y}, G.orient.ok?{gamma:G.orient.gamma,beta:G.orient.beta}:null, t.zone);
+    const p=anchor({x:t.x,y:t.y}, G.orient.ok?{gamma:G.smO.gamma,beta:G.smO.beta}:null, t.zone);
     if(Math.hypot(x-p.x, y-(p.y+Math.sin(G.time*4+t.ph)*5)) < 34){ tapToken(t); return; }
   }
   let best=null, bd=1e9;
   for(const m of G.monsters){
     if(m.dead) continue;
-    const p = m.pata? {x:m.x,y:m.y-Math.abs(Math.sin(G.time*6+m.ph))*6} : anchor({x:m.x,y:m.y},m.base,m.zone);
-    const rr = m.pata? 22 : (m.r*p.s+14);
+    const sp=screenPos(m);
+    const hop=m.pata? Math.abs(Math.sin(G.time*6+m.ph))*6 : 0;
+    const p={x:sp.x, y:sp.y-hop};
+    const rr = m.pata? 24 : (m.r*sp.s+14);
     const d=Math.hypot(x-p.x,y-p.y);
     if(d<rr && d<bd){ bd=d; best=m; }
   }
@@ -775,9 +1114,11 @@ function startGame(withCam){
   G.running=true;
   initSky();
   enableOrient();
-  G.spawnT=rnd(2,4);      // primo SINIBBIO presto
+  ARLIB.reset();
+  edgeMap=null;
+  G.spawnT=rnd(10,15);      // primo SINIBBIO presto
   G.realeT=rnd(120,180);  // primo REALE tra 2 e 3 minuti
-  G.pataT=rnd(2,5);       // primi patagarrri presto
+  G.pataT=rnd(2,10);       // primi patagarrri presto
   if(withCam) startCam();
   resize();
   let last=performance.now();

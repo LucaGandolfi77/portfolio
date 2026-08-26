@@ -455,7 +455,7 @@ function newRun(){
     critC:ms.critC,critD:2,vamp:0,pickMul:has('magnet')?2.5:1,moveFire:false,
     fireCd:0,moving:false,inv:0,revived:false,
     waveShield:has('waveshield'),rerolls:(has('dice')?1:0)+(heroMods().luck?1:0),
-    greed:ms.greed,luck:ms.luck,runLv:1,xp:0,xpNeed:5};
+    greed:ms.greed,luck:ms.luck,runLv:1,xp:0,xpNeed:17,xpBuffer:0,wavePendingLv:0};
   enemies=[];bullets=[];ebullets=[];drops=[];parts=[];floats=[];
   run={level:pickStart(),wave:1,waves:wavesFor(run.level),coins:0,kills:0};
   bossRef=null;
@@ -609,8 +609,10 @@ function update(dt){
           DBG.push('CLEAR','condizione: tutti morti + wave '+run.wave+'/'+(run.waves+1)+' + boss assente → LIVELLO COMPLETATO');
           levelClear();return;
         }
-        DBG.push('WAVE-ADVANCE','ondata vuota → avanti a '+(run.wave+1));
-        run.wave++;startWave();
+        if(processWaveXp()){
+          return;
+        }
+        advanceWave();
       }else{
         DBG.push('WAIT','campo vuoto ma il boss è ancora vivo?? bossRef presente');
       }
@@ -818,12 +820,36 @@ function collectDrop(dr){
   }
 }
 function gainXp(n){
-  P.xp+=n;run.kills+=0;
+  P.xpBuffer+=n;
+  run.kills+=0;
+}
+function xpNeedFor(lv){return Math.floor(10+lv*6+lv*lv*1.2);}
+function processWaveXp(){
+  if(P.xpBuffer<=0)return false;
+  let gained=P.xpBuffer;P.xpBuffer=0;
+  P.xp+=gained;
+  floats.push({x:P.x,y:P.y-30,txt:'+'+gained+' XP',life:1,col:'#a78bfa'});
   while(P.xp>=P.xpNeed){
     P.xp-=P.xpNeed;P.runLv++;
-    P.xpNeed=4+P.runLv*3;
-    openDraft();
+    P.xpNeed=xpNeedFor(P.runLv);
+    P.wavePendingLv++;
   }
+  if(P.wavePendingLv>0){
+    P.wavePendingLv--;
+    openDraft();
+    return true;
+  }
+  return false;
+}
+function advanceWave(){DBG.push("WAVE-ADVANCE","→ ondata "+(run.wave+1));run.wave++;startWave();}
+function afterDraft(){
+  if(P.wavePendingLv>0){
+    P.wavePendingLv--;
+    openDraft();
+    return;
+  }
+  P.wavePendingLv=0;
+  advanceWave();
 }
 function hurtPlayer(dmg,src){
   if(P.inv>0)return;
@@ -1222,7 +1248,7 @@ function openDraft(){
     el.innerHTML=`<span class="ic">${d.ic}</span><span class="nm">${d.nm}</span><span class="ds">${d.ds}</span><span class="rar">${d.r}</span>`;
     el.onclick=()=>{
       d.f(P);AU.draft();if(d.lego)AU.lego();
-      $('draft').classList.remove('on');paused=false;
+      $('draft').classList.remove('on');paused=false;afterDraft();
       floats.push({x:P.x,y:P.y-30,txt:d.ic+' '+d.nm,life:1.2,col:'#fff'});
     };
     box.appendChild(el);
