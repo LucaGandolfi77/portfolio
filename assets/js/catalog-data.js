@@ -98,6 +98,7 @@
     ['battleship', 'Battleship Commander', 'Command your fleet and find the enemy.', 'games/battleship.html', '🚢', 'strategy', ['Board'], false],
     ['warship', 'Warship Commander', 'First-person naval action in the browser.', 'games/warship.html', '⚓', 'arcade', ['Action'], false],
     ['battlelands', 'Battlelands Royale 3D', 'Survive and eliminate opponents in a 3D arena.', 'games/battlelands_royale.html', '🪖', 'arcade', ['3D', 'Action'], false],
+    ['arena-royale-2', 'Arena Royale 2', 'Twin-stick 3D battle royale: loot 12 weapons, outlast the storm and 9 bots.', 'games/arena-royale-2/index.html', '🔥', 'action', ['3D', 'Twin-stick', 'PWA', 'iPhone'], true],
     ['echoes-last-dawn', 'Echoes of the Last Dawn', 'A low-poly story game with turn-based combat.', 'games/echoes-of-the-last-dawn/index.html', '☼', 'story', ['Three.js', '3D'], true],
     ['coop-game', 'Slips & Catastrophes', 'A cooperative narrative board game for friends.', 'games/coop-game/index.html', '✦', 'multiplayer', ['Co-op', 'PWA'], true],
     ['friends-tycoon', 'Friends Tycoon', 'A social management game experiment.', 'games/friends-tycoon.html', '♙', 'simulation', ['Simulation'], false],

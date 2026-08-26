@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Arena Royale 2 — Twin Stick Royale</title>
+<meta name="description" content="Arena Royale 2: mappa enorme, armi e munizioni da raccogliere, twin-stick shooter con tempesta che si restringe. PWA per iPhone e Android.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arena Royale 2">
+<meta name="theme-color" content="#0d1020">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./js/vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hpWrap"><div id="hpFill"></div><span id="hpVal">100</span></div>
+    <div id="statsBox"><span id="killsVal">0</span> 💀 · <span id="aliveVal">10</span> 👥 <span id="streakBox" class="hidden">· ⚡<span id="streakVal">0</span></span></div>
+    <div id="stormBox"><span id="stormVal">—</span></div>
+    <canvas id="minimap" width="110" height="110"></canvas>
+    <div id="weaponBox"><span class="rar" id="weaponRar">COMUNE</span><span id="weaponName">PUGNI</span> <span id="weaponAmmo">∞</span></div>
+    <button id="switchBtn" class="hidden">🔫 ARMA</button>
+    <button id="pauseBtn" title="Pausa (Esc)">⏸</button>
+    <div id="dropAlert" class="hidden">📦 SUPPLY DROP!</div>
+  </div>
+
+  <!-- Effetti schermo: vignetta HP basso + flash danno + freccia tempesta -->
+  <div id="vignette"></div>
+  <div id="flashOverlay"></div>
+  <div id="stormArrow" class="hidden"><span class="arrow">⚠</span><div id="stormArrowLabel">VAI AL CENTRO</div></div>
+  <div id="damageNumbers"></div>
+
+  <!-- Barre HP nemici + barra raccolta -->
+  <div id="botBars"></div>
+  <div id="pickupBar" class="hidden">
+    <span id="pickupLabel"></span>
+    <div id="pickupFillWrap"><div id="pickupFill"></div></div>
+  </div>
+
+  <!-- Joystick movimento (sinistra) e mira (destra) -->
+  <div id="joyBase" class="hidden"><div id="joyKnob"></div></div>
+  <div id="joyBase2" class="hidden"><div id="joyKnob2"></div></div>
+  <div id="crosshair" class="hidden"></div>
+  <div id="toast" class="hidden"><span id="toastText"></span></div>
+
+  <!-- Confetti vittoria -->
+  <canvas id="confettiCanvas" aria-hidden="true"></canvas>
+
+  <!-- Avvio -->
+  <div id="startOverlay">
+    <div class="card">
+      <h1>🔥 ARENA ROYALE 2</h1>
+      <p class="sub">Mappa enorme · armi a terra · <b>twin-stick</b></p>
+      <ul class="howto">
+        <li>🔄 Ruota il telefono: si gioca in <b>orizzontale</b></li>
+        <li>🕹️ Joystick <b>sinistro</b>: muovi · joystick <b>destro</b>: miri e spari</li>
+        <li>🖱️ PC: WASD per muoverti, <b>mouse per mirare</b>, click per sparare</li>
+        <li>👊 Tasto <b>PUGNI/ARMA</b> (o Q su PC): cambia tra pugni e arma</li>
+        <li>🔫 Le <b>armi</b> sono per terra: fermati sopra <b>2 secondi</b></li>
+        <li>🎯 Le <b>munizioni</b> a terra aggiungono una parte di colpi</li>
+        <li>🤖 I <b>nemici</b> hanno munizioni limitate: quando le finiscono usano i pugni o cercano munizioni</li>
+        <li>📦 I <b>supply drop</b> cadono dal cielo con armi speciali</li>
+        <li>🔥 La <b>tempesta</b> si restringe: stai dentro!</li>
+        <li>🧠 Segreto: prova la <b>KONAMI</b> code (↑↑↓↓←→←→BA)…</li>
+      </ul>
+      <p id="records" class="records"></p>
+      <p id="status" class="status">Caricamento...</p>
+      <button id="startBtn" disabled>TOCCA PER GIOCARE</button>
+      <div class="card-foot">
+        <button id="soundBtn" title="Suoni">🔊</button>
+        <a class="home-link" href="../../index.html">🏠 Home</a>
+      </div>
+      <p class="fine">iPhone · Android · PC</p>
+    </div>
+  </div>
+
+  <!-- Pausa -->
+  <div id="pausedOverlay" class="hidden">
+    <div class="card">
+      <h2>⏸ PAUSA</h2>
+      <p class="sub">Prenditi un respiro, l'arena aspetta.</p>
+      <button id="resumeBtn">▶️ RIPRENDI</button>
+      <div class="card-foot">
+        <button id="soundBtn2" title="Suoni">🔊</button>
+        <button id="quitBtn">🚪 ABBANDONA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avviso rotazione telefono -->
+  <div id="portraitOverlay">
+    <div class="card rotate-card">
+      <div class="rotate-phone" aria-hidden="true">📱</div>
+      <h2>Ruota il telefono!</h2>
+      <p class="sub">Arena Royale 2 si gioca in <b>orizzontale</b>.</p>
+    </div>
+  </div>
+
+  <!-- Fine partita -->
+  <div id="endOverlay" class="hidden">
+    <div class="card over">
+      <h2 id="endTitle">💀 GAME OVER</h2>
+      <p class="final" id="endInfo">Posizione: —</p>
+      <p class="final" id="endKills">Eliminazioni: 0</p>
+      <p class="final small" id="endStats"></p>
+      <p class="records" id="endRecords"></p>
+      <button id="restartBtn">🔄 RIGIOCA</button>
+      <div class="card-foot">
+        <a class="home-link" href="../../index.html">🏠 Home</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
