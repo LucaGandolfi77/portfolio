@@ -30,6 +30,20 @@
     ['quiz-02', 'Quiz 02', 'Another quick browser quiz.', 'projects/quizzes/quiz02.html', '?', 'quiz', ['Quiz']],
     ['fast-food-quiz', 'Fast Food Quiz', 'Test your fast-food knowledge.', 'projects/quizzes/quiz_fastfood.html', '🍔', 'quiz', ['Quiz']],
     ['taylor-swift-quiz', 'Taylor Swift Quiz', 'A themed music knowledge quiz.', 'projects/quizzes/taylor_swift_quiz.html', '♪', 'quiz', ['Quiz', 'Music']],
+    ['milanese-quiz', 'Quiz Milanese', 'Che tipo di milanese sei? Risultato in una card condivisibile (PNG, Web Share, copia).', 'projects/quizzes/milanese_quiz.html', '🍝', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['toothpaste-quiz', 'Quiz Dentifricio', 'Che dentifricio sei? Una domanda che nessuno si era mai posto. Risultato condivisibile.', 'projects/quizzes/toothpaste_quiz.html', '🦷', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['quiz-lab', 'Quiz Lab', 'La sezione Quiz del portfolio: 18 quiz con risultati in card condivisibili.', 'projects/quiz.html', '🧪', 'quiz', ['Quiz', 'Hub', 'Share']],
+    ['pasta-quiz', 'Quiz Pasta', 'Che pasta sei? 6 domande, 4 formati. Card condivisibile.', 'projects/quizzes/pasta_quiz.html', '🍝', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['gabbiano-quiz', 'Quiz Gabbiano', 'Quale gabbiano di Milano sei? Uno di loro sei tu. (Sì, anche tu.)', 'projects/quizzes/gabbiano_quiz.html', '🕊️', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['cinghiale-quiz', 'Quiz Cinghiale', 'Che cinghiale della bassa sei? La leggenda parmense ha bisogno di te.', 'projects/quizzes/cinghiale_quiz.html', '🐗', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['notifica-quiz', 'Quiz Notifica', 'Che suono di notifica sei? Il tuo telefono suona. Ma tu, che suono sei?', 'projects/quizzes/notifica_quiz.html', '🔔', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['panettone-quiz', 'Quiz Panettone', 'Che panettone sei? Il Natale è una scelta. Il panettone è un\'identità.', 'projects/quizzes/panettone_quiz.html', '🎄', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['ikea-quiz', 'Quiz IKEA', 'Quale mob IKEA sei? Billy, KALLAX, POÄNG o LACK: il tuo destino è in un catalogo.', 'projects/quizzes/ikea_quiz.html', '📦', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['collega-quiz', 'Quiz Collega', 'Che collega d\'ufficio sei? La giungla aziendale ti sta guardando.', 'projects/quizzes/collega_quiz.html', '💼', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['treno-quiz', 'Quiz Treno', 'Quale posto in treno sei? Il treno è la metafora della vita.', 'projects/quizzes/treno_quiz.html', '🚆', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['scusa-quiz', 'Quiz Scusa', 'Che tipo di scusa sei? Tutti ne abbiamo una. Qual è la tua?', 'projects/quizzes/scusa_quiz.html', '📵', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['gelato-quiz', 'Quiz Gelato', 'Che gelato sei? Il gelato è serio. Scopri il tuo gusto interiore.', 'projects/quizzes/gelato_quiz.html', '🍦', 'quiz', ['Quiz', 'Share', 'iPhone']],
+    ['iq-quiz', 'Test di Intelligenza', 'Matrici di Raven, sequenze, analogie e logica. Timer da 12 minuti, QI stimato e card con la gaussiana.', 'projects/quizzes/iq_quiz.html', '🧠', 'quiz', ['IQ', 'Timer', 'Share', 'iPhone']],
     ['rave-wrapper', 'RAVE', 'Launcher for the camera shader visualizer.', 'projects/rave.html', '✦', 'creative', ['WebGL', 'Camera']],
     ['rave', 'RAVE App', 'Live camera visuals, shaders, voice controls, and recording.', 'projects/rave/index.html', '✦', 'creative', ['WebGL', 'Camera']],
     ['shhh-reader-wrapper', 'Shhh Reader', 'Launcher for the quiet reading experience.', 'projects/shhh-reader.html', '◌', 'accessibility', ['Reader', 'PWA']],
@@ -47,7 +61,11 @@
 
   const games = [
     ['quotesmith', 'QuoteSmith', 'Bilingual quote quiz with 14 categories and offline scores.', 'games/quotesmith/', 'Q', 'quiz', ['Offline', 'PWA', 'iPhone'], true],
-    ['arcade-lab', 'Arcade Lab', 'Ten small games for reaction, memory, rhythm, strategy, physics, and simulation.', 'games/arcade-lab/', 'A', 'arcade', ['10 games', 'Offline'], true],
+    ['kalaazu', 'Kalaazu', 'The next generation of DO private servers — 0% Java, 100% JavaScript. Mine, fight, and gate-crash in your browser.', 'games/kalaazu/', '🚀', 'arcade', ['Canvas', 'iPhone', 'Offline', 'Save'], true],
+    ['arrowmatic', 'Arrowmatic', "Roguelite all'Archero: spari solo da fermo, draft di potenziamenti, boss comici e modalità AUTO che farma da sola.", 'games/arrowmatic/index.html', '🏹', 'arcade', ['Touch', 'iPhone', 'Offline', 'Roguelite'], true],
+    ['csi-fidenza', 'CSI:Fidenza · Summer Christmas DLC', "Whodunit cooperativo a 9 giocatori per la Cena del Natale Estivo: dossier segreti, indizi nascosti in casa reale e accusa finale in 4 indovinate.", 'games/csi-fidenza-christmas-dlc/index.html', '🕯️', 'party', ['Party', 'Co-op', 'iPhone', 'Offline'], true],
+    ['csi-milano', 'CSI: Milano', 'Orazio Caino, il detective dai capelli rossi, risolve i casi più assurdi di Milano. Dal gatto di Brera all\'arancia-killer. Touch-only.', 'games/csi-milano/', '🕵️', 'story', ['PixiJS', 'GSAP', 'iPhone', 'Offline'], true],
+    ['csi-fidenza', 'CSI: Fidenza', 'Stessa squadra di CSI: Milano, trasferita in provincia di Parma: dalla balena dello Stirone alla testa di San Donnino.', 'games/csi-fidenza/', '🕵️‍♂️', 'story', ['PixiJS', 'GSAP', 'iPhone', 'Offline'], true],
     ['math-duel', 'Math Duel', 'Challenge a friend to a fast-paced math battle.', 'games/math_duel.html', '∑', 'multiplayer', ['PvP', 'Speed'], false],
     ['card-collector', 'Card Collector', 'Collect, upgrade, and battle with rare cards.', 'games/cards.html', '🎴', 'cards', ['Cards'], false],
     ['uno-online', 'UNO Online', 'Host a room and play classic UNO with friends in real time.', 'games/UNO.html', '🎴', 'multiplayer', ['Multiplayer', 'Cards'], false],
@@ -71,6 +89,7 @@
     ['geometry-dash', 'Geometry Dash', 'Jump, time, and survive the moving course.', 'games/geom_dash.html', '◇', 'arcade', ['Timing'], false],
     ['space-invaders', 'Space Invaders', 'Retro arcade defense against descending enemies.', 'games/space_invaders.html', '▦', 'arcade', ['Retro'], false],
     ['space-universe', 'Space Universe', 'Explore a small universe in the browser.', 'games/space_universe.html', '✦', 'simulation', ['Space'], false],
+    ['blackhole-orbit', 'BlackHoleOrbit', 'MMO spaziale attorno a un buco nero: gravità reale, mining, boss e Frattura. Touch + desktop.', 'games/blackhole-orbit/index.html', '🕳️', 'simulation', ['Space', 'Touch', 'RPG'], false],
     ['tetris', 'Tetris', 'Fit falling pieces and clear lines.', 'games/tetris.html', '▦', 'puzzle', ['Retro'], false],
     ['poker', 'Poker', 'Classic poker hands and table play.', 'games/poker.html', '♠', 'cards', ['Cards'], false],
     ['blackjack', 'Blackjack', 'Play blackjack against the house.', 'games/blackjack.html', '21', 'cards', ['Cards'], false],
@@ -94,6 +113,7 @@
     ['yatzee-solo', 'Yatzee Solo', 'Challenge a browser opponent in a classic dice game.', 'games/yatzee_solo.html', '🤖', 'strategy', ['AI', 'Dice'], false],
     ['taboo', 'Taboo', 'Describe the word without using the forbidden ones.', 'games/taboo.html', '🚫', 'party', ['Party'], false],
     ['visual-novels', 'Visual Novels', 'Interactive stories and adventures.', 'pages/main/visualnovels.html', '📖', 'story', ['Story'], false],
+    ['bros-karamazov', 'I Fratelli Karamazov', 'Visual novel interattiva sul capolavoro di Dostoevskij: scelte, sottotrame e molteplici percorsi.', 'pages/content/karamazov.html', '🕯️', 'story', ['Story', 'Italiano'], false],
     ['neon-kart', 'Neon Kart', 'Drift and use nitro in a fast browser racer.', 'games/kart.html', '🏎', 'arcade', ['Racing'], false],
     ['battleship', 'Battleship Commander', 'Command your fleet and find the enemy.', 'games/battleship.html', '🚢', 'strategy', ['Board'], false],
     ['warship', 'Warship Commander', 'First-person naval action in the browser.', 'games/warship.html', '⚓', 'arcade', ['Action'], false],
@@ -119,8 +139,9 @@
     ,['referendum-game', 'Referendum Game', 'A multiplayer referendum and mini-game experiment.', 'games/referendum-game/index.html', '◉', 'multiplayer', ['PeerJS', 'PWA'], false]
     ,['slot-machine', 'Slot Machine', 'Spin and test your luck.', 'games/slot.html', '🎰', 'arcade', ['Casual'], false]
     ,['watermelon', 'Watermelon Game', 'A physics-inspired fruit merging game.', 'games/watermelon.html', '🍉', 'puzzle', ['Physics'], false]
-    ,['webgl-diagnostics', 'WebGL Diagnostics', 'Inspect browser graphics capabilities.', 'games/webgl_diagnostics.html', '▣', 'tools', ['WebGL', 'Diagnostics'], false]
+    ,    ['webgl-diagnostics', 'WebGL Diagnostics', 'Inspect browser graphics capabilities.', 'games/webgl_diagnostics.html', '▣', 'tools', ['WebGL', 'Diagnostics'], false]
+    ,['arcade-lab', 'Arcade Lab', 'The experimental arcade playground: prototypes and mini-games in one hub.', 'games/arcade-lab/index.html', '🕹️', 'arcade', ['Arcade', 'Hub'], false]
   ].map(([id,title,description,href,icon,category,badges,featured]) => ({ id, title, description, href, icon, category, badges, technologies: badges, featured, status: 'live', type: 'game', requirements: badges.includes('Camera') ? ['camera'] : [] }));
 
-  root.PORTFOLIO_CATALOG = { projects, games, categories: ['ai', 'audio', 'accessibility', 'computer-vision', 'creative', 'data', 'engineering', 'games', 'simulation', 'tools', 'quiz', 'arcade', 'multiplayer', 'cards', 'party', 'strategy', 'puzzle', 'story'] };
+  root.PORTFOLIO_CATALOG = { projects, games, categories: ['ai', 'audio', 'accessibility', 'computer-vision', 'creative', 'data', 'engineering', 'games', 'simulation', 'tools', 'quiz', 'arcade', 'action', 'multiplayer', 'cards', 'party', 'strategy', 'puzzle', 'story'] };
 }(window));

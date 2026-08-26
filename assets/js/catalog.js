@@ -4,7 +4,7 @@
   if (!catalog) return;
 
   const state = { query: '', category: 'all', sort: 'featured', favoritesOnly: false };
-  const labels = { all: 'All', ai: 'AI', audio: 'Audio', 'computer-vision': 'Vision', creative: 'Creative', data: 'Data', engineering: 'Engineering', tools: 'Tools', games: 'Games', quiz: 'Quiz', arcade: 'Arcade', multiplayer: 'Multiplayer', cards: 'Cards', party: 'Party', strategy: 'Strategy', puzzle: 'Puzzle', story: 'Story', simulation: 'Simulation', accessibility: 'Accessibility' };
+  const labels = { all: 'All', ai: 'AI', audio: 'Audio', 'computer-vision': 'Vision', creative: 'Creative', data: 'Data', engineering: 'Engineering', tools: 'Tools', games: 'Games', quiz: 'Quiz', arcade: 'Arcade', action: 'Action', multiplayer: 'Multiplayer', cards: 'Cards', party: 'Party', strategy: 'Strategy', puzzle: 'Puzzle', story: 'Story', simulation: 'Simulation', accessibility: 'Accessibility' };
 
   function getRoot() { return document.querySelector('[data-catalog]'); }
   function getItems() { return catalog[getRoot()?.dataset.catalog] || []; }

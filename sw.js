@@ -1,5 +1,5 @@
 // Service Worker per supporto offline
-const CACHE_NAME = 'portfolio-v5';
+const CACHE_NAME = 'portfolio-v9';
 const scopedStaticPaths = [
     './',
     'index.html',
@@ -9,7 +9,8 @@ const scopedStaticPaths = [
     // Core JS della home
     'assets/js/main.js',
     'assets/js/projects-data.js',
-    'assets/js/projects-renderer.js',
+    'assets/js/catalog-data.js',
+    'assets/js/catalog-home.js',
     // Icone + metadati PWA
     'assets/icon-192.png',
     'assets/icon-512.png',
@@ -30,9 +31,15 @@ self.addEventListener('install', event => {
         caches.open(CACHE_NAME)
             .then(cache => {
                 console.log('Cache aperta');
-                return cache.addAll(urlsToCache).catch(err => {
-                   console.warn("Alcuni file non sono stati cachati:", err);
-                });
+                // Cache file per file (non addAll, che è atomica): se una
+                // richiesta fallisce — es. redirect CORS verso il login in
+                // ambienti di preview come github.dev — le altre vengono
+                // comunque salvate e l'install non si blocca.
+                return Promise.allSettled(urlsToCache.map(url =>
+                    cache.add(url).catch(err => {
+                        console.warn('File non cachato:', url, err && err.message);
+                    })
+                ));
             })
             .then(() => self.skipWaiting())
     );
@@ -84,7 +91,7 @@ self.addEventListener('fetch', event => {
                         cache.put(request, responseToCache);
                     });
                     return response;
-                });
+                }).catch(() => new Response('', { status: 504, statusText: 'Offline' }));
             })
         );
         return;
@@ -95,27 +102,38 @@ self.addEventListener('fetch', event => {
         event.respondWith(
             fetch(request)
                 .then(response => {
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(request, responseToCache);
-                    });
+                    if (response && response.status === 200) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then(cache => {
+                            cache.put(request, responseToCache);
+                        });
+                    }
                     return response;
                 })
                 .catch(() => {
-                    return caches.match(request)
-                        .then(cachedResponse => {
-                                if (cachedResponse) return cachedResponse;
-                                 return caches.match(new URL('index.html', self.registration.scope).toString())
-                                     .then(response => response || createOfflineResponse());
-                        });
+                    // Offline: usa la cache SOLO se recente (max 10 min), così
+                    // non si vedono mai versioni vecchie di giorni. Altrimenti
+                    // pagina offline.
+                    return caches.match(request).then(cached => {
+                        if (cached) {
+                            const d = cached.headers.get('date');
+                            if (!d || (Date.now() - new Date(d).getTime()) < 10*60*1000) {
+                                return cached;
+                            }
+                        }
+                        return caches.match(new URL('index.html', self.registration.scope).toString())
+                            .then(response => response || createOfflineResponse());
+                    });
                 })
         );
         return;
     }
 
-    // DEFAULT: Network First
+    // DEFAULT: Network First (con risposta di riserva, mai undefined)
     event.respondWith(
-        fetch(request).catch(() => caches.match(request))
+        fetch(request)
+            .catch(() => caches.match(request))
+            .then(r => r || new Response('', { status: 504, statusText: 'Offline' }))
     );
 });
 

@@ -1,0 +1,2537 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="CSI: Fidenza — Orazio Caino, trasferito in provincia di Parma, risolve i misteri della cittadina emiliana: dalla balena dello Stirone alla testa di San Donnino. Touch-only.">
+<meta name="theme-color" content="#0b3d4d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CSI: Fidenza · Orazio Caino — Il detective dai capelli rossi (a Fidenza)</title>
+<style>
+  :root{
+    --teal:#0b3d4d; --teal2:#11586e; --deep:#06202b; --cream:#fff3d6; --orange:#ff8c42; --orange2:#ffb066;
+    --sun:#ffe08a; --ink:#2b2418; --line:#0e4d60; --good:#7ed957; --bad:#ff5c6b; --card:#fff8e8;
+    --blue:#4fa8ff;
+    --topbar-h:84px; /* altezza HUD, aggiornata da JS */
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--deep);color:var(--cream);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overscroll-behavior:none; touch-action:manipulation;}
+  #scene{position:fixed;inset:0;}
+  #scene canvas{display:block;touch-action:none;}
+  #mapCanvas{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none;}
+  .hidden{display:none !important;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:12px 18px;
+    border-radius:16px;border:2px solid rgba(255,255,255,.14);background:linear-gradient(180deg,#ffb066,#ff8c42);
+    color:#4a2300;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:.02em;box-shadow:0 4px 0 #b85f1f;}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #b85f1f;}
+  .btn.ghost{background:rgba(255,255,255,.08);color:var(--cream);box-shadow:none;border-color:rgba(255,255,255,.2);}
+  .btn.green{background:linear-gradient(180deg,#9be86b,#5fbf3c);color:#1c3d09;box-shadow:0 4px 0 #3c7f22;}
+  .btn:disabled{opacity:.4;transform:none;box-shadow:none;}
+
+  /* ============ TITLE ============ */
+  #titleScreen{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%,#15697f 0%,#0b3d4d 55%,#06202b 100%);padding:24px;text-align:center;gap:14px;}
+  #titleScreen h1{margin:0;font-size:clamp(44px,13vw,84px);font-weight:900;letter-spacing:.02em;line-height:.95;
+    background:linear-gradient(180deg,#fff 20%,var(--sun) 60%,var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 6px 30px rgba(255,140,66,.35);}
+  #titleScreen .csi{font-size:clamp(14px,4vw,20px);font-weight:800;letter-spacing:.5em;color:var(--orange2);}
+  #titleScreen .sub{margin:0;font-size:15px;line-height:1.5;color:#d9f2f7;max-width:340px;}
+  #titleScreen .sub b{color:var(--sun);}
+  #titleScreen .pulse{animation:pulse 1.6s ease-in-out infinite;font-weight:800;color:var(--sun);font-size:17px;letter-spacing:.1em;margin-top:8px;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .orazio-bust{width:150px;height:180px;}
+
+  /* ============ HUD ============ */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;}
+  #hud>*{pointer-events:auto;}
+  #topbar{position:absolute;top:auto;bottom:0;left:0;right:0;padding:8px 10px calc(env(safe-area-inset-bottom,0px)+8px);
+    display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;
+    background:linear-gradient(0deg, rgba(4,8,16,.6), rgba(4,8,16,0));}
+  #caseChip{background:rgba(6,32,43,.85);border:1px solid rgba(255,224,138,.4);border-radius:14px;padding:8px 12px;min-width:0;flex:1;}
+  #caseChip .t1{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--sun);text-transform:uppercase;}
+  #caseChip .t2{font-size:14px;font-weight:800;color:#fff;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #meterWrap{background:rgba(6,32,43,.85);border:1px solid rgba(255,224,138,.4);border-radius:14px;padding:8px 10px;width:128px;flex:none;}
+  #meterWrap .lbl{font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--sun);text-transform:uppercase;}
+  #meterBar{height:12px;border-radius:99px;background:#1c4a5c;margin-top:4px;overflow:hidden;border:1px solid rgba(255,255,255,.15);}
+  #meterBar i{display:block;height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,#7ed957,#ffe08a,#ff8c42);transition:width .4s;}
+  .hbtn{width:52px;height:52px;border-radius:16px;border:2px solid rgba(255,255,255,.16);background:rgba(6,32,43,.9);
+    color:var(--cream);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex:none;}
+  .hbtn:active{transform:scale(.94);}
+  .hbtn .badge{position:absolute;top:-6px;right:-6px;background:var(--orange);color:#4a2300;font-size:11px;font-weight:900;
+    min-width:22px;height:22px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--deep);}
+  #hbtnRow{display:flex;gap:8px;flex:none;}
+
+  #sunglassesBtn{position:absolute;right:12px;top:calc(env(safe-area-inset-top,0px)+12px);width:64px;height:64px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffd08a,#ff8c42);border:3px solid #ffefc2;color:#4a2300;font-size:26px;cursor:pointer;
+    box-shadow:0 6px 20px rgba(255,140,66,.5);display:flex;align-items:center;justify-content:center;animation:sway 3s ease-in-out infinite;}
+  @keyframes sway{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+
+  /* ============ DIALOGUE (in alto: la topbar ora è in basso) ============ */
+  #dialogue{position:absolute;left:10px;right:78px;top:calc(env(safe-area-inset-top,0px)+12px);z-index:20;
+    background:rgba(8,38,50,.96);border:2px solid rgba(255,224,138,.45);border-radius:20px;padding:12px 14px 10px;
+    box-shadow:0 12px 40px rgba(0,0,0,.55);max-height:46vh;overflow-y:auto;scrollbar-width:thin;}
+  @media (max-width:640px){
+    #dialogue{right:74px;}
+  }
+  #dName{font-size:12px;font-weight:900;letter-spacing:.08em;color:var(--sun);text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+  #dName .chip{background:var(--orange);color:#4a2300;border-radius:99px;padding:1px 8px;font-size:10px;}
+  #dText{font-size:16.5px;line-height:1.45;color:#fff;min-height:48px;}
+  #dTap{position:absolute;right:12px;bottom:8px;font-size:15px;color:var(--orange2);font-weight:900;animation:pulse 1s infinite;}
+  #dChoices{margin-top:8px;display:flex;flex-direction:column;gap:8px;}
+  #dChoices .btn{width:100%;text-align:center;}
+
+  /* ============ MODALS ============ */
+  #modalOverlay{position:fixed;inset:0;z-index:30;background:rgba(3,16,22,.78);display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px);}
+  #modalOverlay.open{display:flex;}
+  #modalCard{width:100%;max-width:720px;max-height:88vh;overflow-y:auto;background:linear-gradient(180deg,#fff8e8,#fdefcd);
+    border-radius:24px 24px 0 0;padding:16px 14px calc(env(safe-area-inset-bottom,0px)+20px);color:var(--ink);scrollbar-width:thin;}
+  @media (min-width:768px){ #modalOverlay{align-items:center;} #modalCard{border-radius:24px;max-height:86vh;} }
+  #modalHead{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  #modalHead h2{margin:0;font-size:19px;flex:1;}
+  #modalClose{background:var(--teal);color:#fff;border:none;border-radius:14px;width:44px;height:44px;font-size:17px;cursor:pointer;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .carditem{background:#fff;border:2px solid #e8dcc0;border-radius:16px;padding:10px;text-align:center;position:relative;cursor:pointer;box-shadow:0 3px 0 #e0d2ae;}
+  .carditem:active{transform:scale(.97);}
+  .carditem .ic{font-size:30px;line-height:1.2;}
+  .carditem .nm{font-size:12.5px;font-weight:800;margin-top:4px;line-height:1.2;}
+  .carditem .ds{font-size:11px;color:#7a6a4d;margin-top:4px;line-height:1.35;text-align:left;}
+  .carditem.sel{outline:3px solid var(--orange);outline-offset:-3px;background:#fff3da;}
+  .carditem.done{opacity:.55;}
+  .suspectRow{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #e8dcc0;border-radius:16px;padding:10px;margin-bottom:10px;cursor:pointer;box-shadow:0 3px 0 #e0d2ae;}
+  .suspectRow:active{transform:scale(.98);}
+  .suspectRow .av{width:76px;height:76px;flex:none;}
+  .suspectRow .inf{flex:1;min-width:0;}
+  .suspectRow .nm{font-weight:900;font-size:15px;}
+  .suspectRow .rl{font-size:11.5px;color:#7a6a4d;margin-top:2px;line-height:1.3;}
+  .qbtn{width:100%;text-align:left;background:#fff;border:2px solid #e8dcc0;border-radius:14px;padding:12px;font-size:14.5px;font-weight:700;color:var(--ink);margin-bottom:8px;cursor:pointer;line-height:1.35;}
+  .qbtn:active{background:#fff3da;}
+  .note{background:#fff0c9;border:1px dashed #e0b95c;border-radius:14px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin:8px 0;}
+  .clueFound{animation:pop .35s ease;}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+
+  /* ============ CASE SELECT ============ */
+  #caseSelect{position:fixed;inset:0;z-index:50;overflow-y:auto;background:linear-gradient(180deg,#0b3d4d,#06202b);
+    padding:calc(env(safe-area-inset-top,0px)+16px) 14px calc(env(safe-area-inset-bottom,0px)+24px);}
+  #csHead{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  #csHead h2{margin:0;font-size:20px;flex:1;}
+  .caseRow{display:flex;align-items:center;gap:12px;background:rgba(255,248,232,.06);border:2px solid rgba(255,224,138,.25);
+    border-radius:18px;padding:14px;margin-bottom:12px;cursor:pointer;color:var(--cream);}
+  .caseRow:active{transform:scale(.98);}
+  .caseRow .num{font-size:26px;width:46px;height:46px;flex:none;border-radius:14px;background:var(--orange);color:#4a2300;font-weight:900;display:flex;align-items:center;justify-content:center;}
+  .caseRow.locked .num{background:#274a58;color:#7fa8b8;}
+  .caseRow .inf{flex:1;min-width:0;}
+  .caseRow .tt{font-weight:900;font-size:15px;}
+  .caseRow .st{font-size:11.5px;color:#a8d4df;margin-top:2px;}
+  .caseRow .stars{font-size:13px;letter-spacing:2px;color:var(--sun);}
+  .caseRow.locked{opacity:.75;}
+  .caseRow.locked .tt{color:#8fb4c0;}
+  #csFoot{margin-top:16px;text-align:center;font-size:11px;color:#7fa8b8;line-height:1.6;}
+
+  /* ============ FLASH / TOASTS ============ */
+  #flash{position:fixed;inset:0;z-index:80;background:radial-gradient(80% 80% at 50% 50%,#ffd9a0 0%,#ff8c42 60%,#b85f1f 100%);
+    display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#4a2300;}
+  #flash .big{font-size:clamp(40px,12vw,90px);font-weight:900;letter-spacing:.05em;}
+  #flash .line{font-size:clamp(16px,4.5vw,26px);font-weight:800;max-width:90vw;text-align:center;}
+  #toasts{position:fixed;top:auto;bottom:calc(var(--topbar-h,84px) + 10px);left:50%;transform:translateX(-50%);z-index:40;
+    display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(460px, calc(100vw - 150px));
+    max-height:calc(100vh - var(--topbar-h,84px) - 120px);overflow:hidden;}
+  .toast{background:rgba(8,38,50,.95);border:2px solid rgba(255,224,138,.5);color:#fff;border-radius:14px;padding:10px 16px;
+    font-size:13.5px;line-height:1.4;animation:pop .3s ease;box-shadow:0 10px 30px rgba(0,0,0,.45);max-width:100%;text-align:center;}
+  .toast.t-good{border-color:#7ed957;} .toast.t-bad{border-color:#ff5c6b;} .toast.t-sun{border-color:#ffe08a;}
+
+  #sunglassesFlash{position:fixed;inset:0;z-index:70;pointer-events:none;display:none;
+    background:radial-gradient(60% 60% at 50% 50%,rgba(255,180,90,.9),rgba(255,120,40,.55) 55%,rgba(0,0,0,0) 80%);}
+  #yeahText{position:fixed;z-index:71;left:50%;top:42%;transform:translate(-50%,-50%);pointer-events:none;display:none;
+    font-size:clamp(70px,22vw,170px);font-weight:900;color:#fff;text-shadow:0 6px 0 #b85f1f,0 12px 40px rgba(0,0,0,.5);letter-spacing:.02em;}
+
+  @media (max-width:640px){
+    #topbar{gap:6px;}
+    #caseChip{flex:1 1 100%; order:0;}
+    #meterWrap{order:1; width:auto; flex:1 1 auto; max-width:150px;}
+    #hbtnRow{order:2; margin-left:auto;}
+    .hbtn{width:44px;height:44px;font-size:19px;border-radius:13px;}
+    #sunglassesBtn{right:10px;width:56px;height:56px;font-size:23px;}
+  }
+  @media (max-width:400px){
+    #caseChip .t2{font-size:12.5px;}
+    #meterWrap{width:96px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- TITLE -->
+<div id="titleScreen">
+  <div class="csi">CSI</div>
+  <h1>FIDENZA</h1>
+  <div class="orazio-bust" id="titleBust"></div>
+  <p class="sub"><b>Orazio Caino</b>, il detective dai capelli rossi e dagli occhiali da sole, è stato
+    trasferito a <b>Fidenza</b>, provincia di Parma, per un caso. Non è mai ripartito.
+    Tocca il pulsante e risolvi i misteri della città: dalla <b>balena dello Stirone</b> alla <b>testa di San Donnino</b>.</p>
+  <button class="btn" id="btnPlay" style="width:min(320px,80vw);font-size:19px;margin-top:6px">▶ INIZIA A INDAGARE</button>
+  <button class="btn" id="btnResume" style="width:min(320px,80vw);font-size:17px;margin-top:10px;display:none">🔁 Riprendi il caso in corso</button>
+  <p class="pulse" style="margin-top:4px">TAP TAP TAP</p>
+</div>
+
+<!-- CASE SELECT -->
+<div id="caseSelect" class="hidden">
+  <div id="csHead">
+    <h2>📁 La Bacheca dei Casi</h2>
+    <button class="btn ghost" id="btnCSBack" style="min-height:44px;padding:8px 14px;font-size:14px">←</button>
+    <button class="btn ghost" id="btnCSSettings" style="min-height:44px;padding:8px 14px;font-size:14px">⚙</button>
+  </div>
+  <div id="csList"></div>
+  <div id="csFoot">CSI: Fidenza — parodia non ufficiale. Nessun cinghiale è stato ingiustamente accusato. Beh, uno sì.<br>
+  <span id="csBread">🍖 Briciole di culatello raccolte: 0</span></div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="hidden">
+  <div id="scene">
+    <canvas id="mapCanvas"></canvas>
+  </div>
+  <div id="hud">
+    <div id="topbar">
+      <div id="caseChip"><div class="t1" id="caseT1">Caso 1</div><div class="t2" id="caseT2">Il Gatto di Brera</div></div>
+      <div id="meterWrap"><div class="lbl">🧠 Cervello di Caino</div><div id="meterBar"><i id="meterFill"></i></div></div>
+      <div id="hbtnRow">
+        <button class="hbtn" id="btnMode" title="Vista Mappa 2D (dall'alto)">🗺</button>
+        <button class="hbtn" id="btnEvidence" title="Indizi">📋<span class="badge" id="evBadge">0</span></button>
+        <button class="hbtn" id="btnSuspects" title="Sospetti">🕵<span class="badge" id="susBadge">0</span></button>
+        <button class="hbtn" id="btnSound" title="Audio">🔊</button>
+        <button class="hbtn" id="btnSettings" title="Impostazioni">⚙</button>
+      </div>
+    </div>
+    <button id="sunglassesBtn" title="Occhiali da sole di Orazio">🕶</button>
+    <div id="dialogue" class="hidden">
+      <div id="dName"></div>
+      <div id="dText"></div>
+      <div id="dTap">▼</div>
+      <div id="dChoices"></div>
+    </div>
+  </div>
+</div>
+
+<div id="sunglassesFlash"></div>
+<div id="yeahText">YEEAAAH!</div>
+<div id="toasts"></div>
+
+<div id="modalOverlay"><div id="modalCard">
+  <div id="modalHead"><h2 id="modalTitle">Finestra</h2><button id="modalClose">✕</button></div>
+  <div id="modalBody"></div>
+</div></div>
+
+<noscript><div style="position:fixed;inset:0;background:#06202b;color:#ff8c42;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:16px;z-index:999;">CSI: Fidenza richiede JavaScript. Anche Orazio richiede JavaScript, ma non lo ammetterà mai.</div></noscript>
+
+<script src="vendor/pixi.min.js"></script>
+<script src="vendor/gsap.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   CSI: MILANO — Orazio Caino, il detective dai capelli rossi
+   Parodia di CSI: Miami ambientata a Fidenza, provincia di Parma. Touch-only. Zero arte, zero
+   server: personaggi, scene e sfondi sono disegnati in tempo reale con
+   PixiJS. Le gag sono incluse. Il culatello è incluso. 
+   ===================================================================== */
+
+/* ---------------- utils ---------------- */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp = (a,b,t)=> a+(b-a)*t;
+const rnd = (a,b)=> a+Math.random()*(b-a);
+const rndi = (a,b)=> Math.floor(rnd(a,b+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const chance = p => Math.random()<p;
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const COL = hex => parseInt(hex.replace('#',''),16);
+const colWith = (hex,a)=>{ const n=COL(hex); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; };
+
+/* ---------------- storage (localStorage → sessionStorage → memoria) ---------------- */
+const SAVE_KEY='csi-fidenza.save.v1';
+const MEM_STORE={};
+const store={
+  persistent:true,
+  _probe(api){ try{ api.setItem('__csf_probe__','1'); api.removeItem('__csf_probe__'); return true; }catch(e){ return false; } },
+  get(k){
+    try{ const v=localStorage.getItem(k); if(v!==null) return v; }catch(e){}
+    try{ const v=sessionStorage.getItem(k); if(v!==null) return v; }catch(e){}
+    return (k in MEM_STORE)? MEM_STORE[k] : null;
+  },
+  set(k,v){
+    MEM_STORE[k]=v;
+    try{ localStorage.setItem(k,v); }catch(e){}
+    try{ sessionStorage.setItem(k,v); }catch(e){}
+  },
+  del(k){
+    delete MEM_STORE[k];
+    try{ localStorage.removeItem(k); }catch(e){}
+    try{ sessionStorage.removeItem(k); }catch(e){}
+  }
+};
+(function(){ try{ if(!store._probe(localStorage)){ if(store._probe(sessionStorage)) store.persistent='session'; else store.persistent='mem'; } }catch(e){ store.persistent='mem'; } })();
+function loadSave(){ try{ const j=JSON.parse(store.get(SAVE_KEY)); return j; }catch(e){ return null; } }
+function saveGame(){
+  const s = Object.assign({}, S);
+  // Persisti anche il caso in corso: così un ricaricamento della pagina
+  // (o un errore del service worker) non fa ripartire tutto da capo.
+  if(G.case && (G.phase==='explore'||G.phase==='interrogate')){
+    s.case = {
+      id: G.case.id, meter: G.meter,
+      evidence: G.evidence.slice(),
+      examined: Object.assign({}, G.examined),
+      asked: Object.assign({}, G.asked),
+      hintUsed: G.hintUsed, viewMode: viewMode
+    };
+  } else {
+    delete s.case;
+  }
+  store.set(SAVE_KEY, JSON.stringify(s));
+}
+const S = { unlocked:['conchiglia'], stars:{}, crumb:0, muted:false };
+(function(){ const j=loadSave(); if(j){ S.unlocked=j.unlocked||['conchiglia']; S.stars=j.stars||{}; S.crumb=j.crumb||0; S.muted=!!j.muted; } })();
+function pendingCase(){
+  const j=loadSave();
+  if(!j || !j.case || !j.case.id) return null;
+  if(!CASES || !CASES.find(c=>c.id===j.case.id)) return null;
+  if(!S.unlocked.includes(j.case.id)) return null;
+  return j.case;
+}
+
+/* ---------------- audio (WebAudio synth, zero files) ---------------- */
+const AU = (()=>{
+  let ac=null, master=null;
+  function ensure(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); master=ac.createGain(); master.gain.value=0.5; master.connect(ac.destination);}catch(e){ ac=null; } } if(ac&&ac.state==='suspended') ac.resume(); }
+  function tone(f0,f1,dur,type,vol,delay=0){ if(!ac||S.muted)return; try{ const t=ac.currentTime+delay; const o=ac.createOscillator(),g=ac.createGain(); o.type=type; o.frequency.setValueAtTime(Math.max(f0,1),t); o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur); o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.03);}catch(e){} }
+  function noise(dur,vol){ if(!ac||S.muted)return; try{ const t=ac.currentTime; const len=Math.max(1,Math.floor(ac.sampleRate*dur)); const buf=ac.createBuffer(1,len,ac.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len); const src=ac.createBufferSource(); src.buffer=buf; const g=ac.createGain(); g.gain.value=vol; const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1000; src.connect(f); f.connect(g); g.connect(master); src.start(t);}catch(e){} }
+  return { ensure,
+    click(){ tone(600,600,.04,'square',.06); },
+    clue(){ [660,880,1100].forEach((f,i)=>tone(f,f,.1,'triangle',.14,i*.07)); },
+    say(){ tone(200,140,.05,'sine',.05); },
+    wrong(){ tone(220,110,.4,'sawtooth',.2); noise(.25,.15); },
+    yea(){ noise(.35,.3); tone(200,800,.5,'sawtooth',.25); tone(160,1000,.6,'square',.15,.05); },
+    win(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,f,.22,'triangle',.2,i*.11)); },
+    fail(){ [400,330,250,180].forEach((f,i)=>tone(f,f,.25,'sawtooth',.16,i*.13)); },
+    pop(){ tone(880,1320,.08,'sine',.12); },
+    mute(v){ S.muted=v; saveGame(); $('btnSound').textContent = S.muted?'🔇':'🔊'; } };
+})();
+
+/* =====================================================================
+   I CASI — contenuti integralmente italiani, con riferimenti a Fidenza
+   Schema: intro = dialogo; locations = punti cliccabili; suspects =
+   interrogatori; solution = colpevole + prove richieste.
+   ===================================================================== */
+const CASES = [
+
+/* ---------- CASO 1 · LA CONCHIGLIA DEL PELLEGRINO ---------- */
+{
+id:'conchiglia', title:'La Conchiglia del Pellegrino', num:'Caso 1', diff:'Facile', minClues:3, reqClues:2,
+theme:['#ffd9a8','#e8c088'], bg:'duomo',
+signs:{duomo:'CATTEDRALE DI SAN DONNINO'},
+intro:[
+ {who:'narr', t:`Fidenza, un tempo Borgo San Donnino, tappa obbligata della Via Francigena. I pellegrini arrivano da tutta Europa. Ma questa mattina ne manca uno... e con lui è sparita la conchiglia d'oro dell'altare.`},
+ {who:'orazio', t:`La conchiglia d'oro della cattedrale. Il simbolo del pellegrino. Fontana, dimmi che è stata solo spostata.`},
+ {who:'fontana', t:`Capo... è stata presa. Sul vetro della teca c'è un'impronta con il guanto da museo. I ladri di chiese di una volta si vergognavano. I ladri di oggi hanno i guanti.`},
+ {who:'orazio', t:`Assistente, si torna sul campo: io guardo con stile, tu tocchi tutto. E stavolta il campo è sacro. Indaghiamo.`}
+],
+locations:[
+ {id:'altare', name:'L\'Altare della Cattedrale', icon:'🕯️', x:.3, y:.38,
+  desc:`L'inginocchiatoio dell'altare ha un'impronta fresca. Uno scarponcino da trekking. Piccolo, nuovo, con la suola da montagna. I pellegrini di Fidenza arrivano a piedi, non con gli scarponi da vetrina.`,
+  clue:{id:'scarponcino', name:'Impronta di scarponcino nuovo', icon:'🥾', desc:`Scarponi nuovi, suola mai consumata. Un pellegrino con gli scarponi nuovi è un pellegrino che mente. È la regola della Via Francigena.`}},
+ {id:'ufficio', name:'L\'Ufficio del Pellegrino', icon:'🗺️', x:.72, y:.5,
+  desc:`Sul banco dei registri, un biglietto: "BUON CAMMINO". La calligrafia è elegante, da scuola di penna. I pellegrini veri scrivono "BUON CAMMINO" coi piedi, non con la penna.`,
+  clue:{id:'buoncammino', name:'Biglietto "BUON CAMMINO"', icon:'✉️', desc:`Un biglietto elegante. Scritto con una penna da collezionista. Chi augura il buon cammino con una penna da collezionista... ha una collezione.`}},
+ {id:'sacrestia', name:'La Sacrestia', icon:'🕰️', x:.86, y:.32,
+  desc:`La teca della conchiglia d'oro è aperta. Le chiavi sono al loro posto. Sul vetro, un'impronta di mano con il guanto da museo. I ladri con i guanti sono educati. Gli educati sono i peggiori.`},
+ {id:'chiostro', name:'Il Chiostro', icon:'🌿', x:.12, y:.62,
+  desc:`Un pellegrino medita su una panchina. Ha 2.000 km nelle gambe e 0 sospetti in testa. "Buon cammino", dice. Sembra sincero. Sembra.`},
+ {id:'ponte', name:'Il Ponte Romano sullo Stirone', icon:'🌉', x:.55, y:.78,
+  desc:`Il ponte romano dove, secondo la leggenda, San Donnino perse... beh, la testa. Qui, sul selciato, un pezzetto di conchiglia d'oro. Qualcuno è caduto. O ha fatto finta.`,
+  clue:{id:'conchiglia', name:'Pezzetto di conchiglia d\'oro', icon:'✨', desc:`Un frammento dorato sul ponte romano. Caduto da chi scappava di corsa. La conchiglia d'oro non si rompe da sola: si rompe correndo.`}},
+ {id:'salsa', name:'La Banca del Salso', icon:'🪙', x:.4, y:.85,
+  desc:`Lungo il fiume Salso, tra i salici, un sacchetto di tela vuoto. Odora di cera d'api e di antica custodia. Qualcuno ha avvolto qualcosa. E qualcosa è rimasto qui.`,
+  flavor:`Il sacchetto è vuoto. Ma l'odore di cera e di sacrestia resta. I profumi non rubano. I profumi testimoniano.`}
+],
+suspects:[
+ {id:'amleto', name:'Amleto, il Sacrestano', role:'Custode della cattedrale · le chiavi sono sue. Tutte.', avatar:{skin:'#e8b48a', hair:'bald', hairColor:'#5a4a3a', glasses:'round', hat:null, cloth:'#4a5a4a', clothColor:'#4a5a4a'},
+  intro:`"Io? Io custodisco. Le chiavi sono mie. Tutte. Anche quelle che non servono. Soprattutto quelle che non servono."`,
+  questions:[
+   {q:'Dov\'era ieri sera?', a:`"A chiudere le porte. Poi a riaprirle. Poi a richiuderle. È il mio destino. Il mio destino non ruba."`},
+   {q:'Le chiavi della teca?', a:`"Ci sono due chiavi. Una è mia. L'altra è mia pure quella. Ma qualcuno ne ha fatta una copia. I fabbri di Fidenza copiano tutto. Anche i destini."`},
+   {q:'Ha visto pellegrini sospetti?', a:`"I pellegrini sono tutti sospetti. Arrivano, pregano, ripartono. Ma uno di loro era troppo pulito. I pellegrini non sono mai troppo puliti."`}
+  ]},
+ {id:'constance', name:'Constance, la Pellegrina', role:'Da Santiago a Fidenza · 2.000 km a piedi · una conchiglia in meno', avatar:{skin:'#f7d9b8', hair:'pony', hairColor:'#8a5a2a', glasses:null, hat:'headscarf', cloth:'#8f6a3a', clothColor:'#8f6a3a'},
+  intro:`"Io? Io cammino. Da Santiago a Fidenza. 2.000 km. Ho le vesciche per provarlo. E una conchiglia... che mi è caduta nel fiume. Per questo ero sul ponte."`,
+  questions:[
+   {q:'Da dove viene?', a:`"Da Santiago. Ho camminato 2.000 km. I miei scarponi veri si sono rotti a Piacenza. Ho comprato questi. Nuovi. Un pellegrino con gli scarponi nuovi è un pellegrino che si vergogna."`},
+   {q:'Perché la conchiglia d\'oro?', a:`"La conchiglia è il simbolo del cammino. La mia è caduta nello Stirone. Quella d'oro era... un ricordo. I ricordi, a volte, si prendono. Anche dagli altari."`},
+   {q:'Gli scarponcini sull\'inginocchiatoio?', a:`"Nuovi. Suola mai consumata. Io mi inginocchio in chiesa, ma non sugli inginocchiatoi. Mi inginocchio sul cammino. Il cammino è il mio inginocchiatoio."`}
+  ]},
+ {id:'custode', name:'Il Custode del Museo', role:'Colleziona conchiglie delle vie di pellegrinaggio · ne ha 47', avatar:{skin:'#c98d5e', hair:'buzz', hairColor:'#2a2a2a', glasses:'round', hat:'beret', cloth:'#5a6a3a', clothColor:'#5a6a3a'},
+  intro:`"Io colleziono conchiglie. 47. Una per ogni via di pellegrinaggio. La 48ª? Sarebbe stata... il completamento. Ma la conchiglia d'oro della cattedrale non è una via. È un altare."`,
+  questions:[
+   {q:'Conosce la conchiglia d\'oro?', a:`"È famosa. Una volta l'ho disegnata nel mio quaderno. I collezionisti disegnano ciò che non possono avere. I ladri, invece, lo prendono."`},
+   {q:'Dov\'era ieri sera?', a:`"Al museo. A lucidare le mie conchiglie. Ho 47 conchiglie e 47 alibi. Uno per ogni conchiglia. Il 48º alibo non ce l'ho. Ancora."`},
+   {q:'Ha visto Constance?', a:`"L'ho vista sul ponte. Con gli scarponi nuovi. I pellegrini con gli scarponi nuovi sono o ladri o turisti. A volte tutti e due. Ma le turiste non pregano inginocchiate."`}
+  ]}
+],
+solution:{culprit:'constance', clues:['scarponcino','conchiglia']},
+wrong:{
+ amleto:`Orazio: "Amleto apre e chiude le porte. Non apre le teche. La differenza è il rispetto."`,
+ custode:`Orazio: "Il custode colleziona conchiglie, non le ruba. Anche se 48 sarebbe stato il completamento."`
+},
+hint:`Chi aveva bisogno di una conchiglia? Chi ha perso la sua nel fiume? E chi aveva scarponi NUOVI da pellegrino? I pellegrini veri hanno i piedi. I falsi hanno gli scarponi.`,
+resolve:[
+ {who:'orazio', t:`Constance. La pellegrina senza conchiglia. Hai camminato 2.000 km... e poi hai rubato gli ultimi 10 metri.`},
+ {who:'constance', t:`"Era per il rito! Senza conchiglia non sono una pellegrina! Sono solo una con i calli e la vergogna!"`},
+ {who:'orazio', t:`La Via Francigena porta a casa i pellegrini, Constance. E i ladri, li porta via.`},
+ {who:'narr', t:`CASO CHIUSO. La conchiglia d'oro è tornata all'altare. Constance ha ripreso il cammino con una conchiglia di plastica, comprata dal custode del museo (47+1: il completamento).`}
+],
+oneLiner:`A Fidenza... anche i pellegrini hanno una strada. E chi la sbaglia, la paga.`
+},
+
+/* ---------- CASO 2 · LA BALENA DELLO STIRONE ---------- */
+{
+id:'balena', title:'La Balena dello Stirone', num:'Caso 2', diff:'Facile-medio', minClues:3, reqClues:2,
+theme:['#bfe3ff','#8fb8d8'], bg:'museo',
+intro:[
+ {who:'narr', t:`Fidenza, Museo dei Fossili dello Stirone. Il fiore all'occhiello è la balenottera del Pliocene, 10 metri di scheletro, la balena che 3 milioni di anni fa nuotava dove oggi ci sono i campi. Questa mattina... la balena non c'è più.`},
+ {who:'orazio', t:`Una balena di 10 metri. Fossile. Scomparsa da un museo. Fontana, dimmi che è uno scherzo.`},
+ {who:'fontana', t:`Capo, al suo posto hanno lasciato uno scheletro di cartone e un cartello: "IN RESTAURO". Scritto con il pennarello. Il pennarello è la firma dei dilettanti.`},
+ {who:'orazio', t:`Una balena che risale lo Stirone dopo 3 milioni di anni... Assistente, questa è la prima volta che un caso ha 3 milioni di anni. Indaghiamo.`}
+],
+locations:[
+ {id:'sala', name:'La Sala della Balena', icon:'🐋', x:.3, y:.35,
+  desc:`Il finto di cartone è coperto di gesso bianco. Qualcuno ha "fossilizzato" il cartone per farlo sembrare vero. Chi lavora con il gesso sa il fatto suo. E sa il finto.`,
+  clue:{id:'gesso', name:'Residui di gesso bianco', icon:'🧱', desc:`Gesso da modellismo. Chi ha fatto il finto conosce il gesso. E chi conosce il gesso... conosce i fossili. E i laboratori di restauro.`}},
+ {id:'vetrina', name:'La Vetrina dei Denti', icon:'🦈', x:.7, y:.55,
+  desc:`Denti di squalo megalodonte, grandi come una mano. Un cartello: "Non toccare. Non sognare. Non rubare." Il cartello è ancora lì. I denti pure. La balena no.`},
+ {id:'laboratorio', name:'Il Laboratorio di Restauro', icon:'🔬', x:.85, y:.35,
+  desc:`Sul banco, un'etichetta da spedizione: "ESPORT — VIA DEL MARE". Destinatario: un privato. I musei spediscono i fossili in prestito. I ladri li spediscono in salotto.`,
+  clue:{id:'etichetta', name:'Etichetta "ESPORT — VIA DEL MARE"', icon:'📦', desc:`Un'etichetta di spedizione per un privato. "VIA DEL MARE". La balena è arrivata dal mare 3 milioni di anni fa. E ci è tornata, via corriere.`}},
+ {id:'parco', name:'Il Parco dello Stirone', icon:'🏞️', x:.12, y:.6,
+  desc:`Sull'argilla del fiume, impronte di stivali da fiume. Fango dello Stirone, inconfondibile. Chi ha portato via la balena è passato dal fiume. I paleontologi usano il fiume. I ladri pure.`,
+  clue:{id:'stivali', name:'Impronte di stivali da fiume', icon:'🥾', desc:`Stivali da fiume, misura 43, fango dello Stirone. Il fango non mente. Lo Stirone ricorda. Lo Stirone non dimentica.`}},
+ {id:'deposito', name:'Il Deposito del Museo', icon:'📦', x:.5, y:.78,
+  desc:`Un cartello "BALENA IN RESTAURO" scritto di fretta. La "R" è al contrario. I professionisti firmano con la cura. I dilettanti con la R al contrario.`}
+],
+suspects:[
+ {id:'fossati', name:'Dott. Fossati, Paleontologo', role:'20 anni con la balena · le ha dato un nome: Bice', avatar:{skin:'#e8b48a', hair:'bald', hairColor:'#6a5a4a', glasses:'round', hat:null, cloth:'#4a5a6a', clothColor:'#4a5a6a'},
+  intro:`"Io? Io studio Bice da 20 anni. I paleontologi non danno i nomi ai fossili... se non ci tengono. Io ci tengo. Bice è la mia collega. Silenziosa, ma presente."`,
+  questions:[
+   {q:'Dov\'era la notte del furto?', a:`"Al laboratorio. Scrivevo un articolo: "Bice: 20 anni insieme". Un articolo scientifico. Con le lacrime. Le lacrime non si citano in bibliografia."`},
+   {q:'L\'etichetta di spedizione?', a:`"Le spedizioni le faccio io. Ma "VIA DEL MARE"? Io spedisco in aereo. Le balene in aereo? Preferiscono il mare. È una questione di rispetto."`},
+   {q:'Chi voleva Bice?', a:`"Tutti. È la balena più famosa dello Stirone. Ma uno la voleva di più: il Comm. Ravasi, collezionista di Parma. Ha un salotto grande come un museo. E un conto grande come un salotto."`}
+  ]},
+ {id:'ravasi', name:'Comm. Ravasi, Collezionista', role:'Un salotto grande come un museo · le pantofole sopra', avatar:{skin:'#f2c9a0', hair:'buzz', hairColor:'#8a8a8a', glasses:'monocle', hat:'top', cloth:'#3a3a5a', clothColor:'#3a3a5a'},
+  intro:`"Colleziono tutto. Fossili, quadri, navi. Il mio salotto è un museo privato. 'Un museo con le pantofole', dico io. Bice sarebbe stata il pezzo forte. Con le pantofole sotto."`,
+  questions:[
+   {q:'Il suo interesse per Bice?', a:`"Ho offerto 3 milioni. Mi hanno detto di no. Il 'no' non è mai stato il mio genere. Ma stavolta... stavolta è un fossile. I fossili non dicono di no. I fossili aspettano."`},
+   {q:'Dov\'era la notte del furto?', a:`"A Montecarlo. Ho le ricevute: albergo, casinò, ristorante. Ho ricevute di tutto. È il mio modo di viaggiare: con lo scontrino."`},
+   {q:'Le impronte nel fiume?', a:`"Io non vado nei fiumi. Io vado nei salotti. I fiumi sono per i paleontologi. E per i ladri con gli stivali. Io ho le pantofole."`}
+  ]},
+ {id:'gigi', name:'Gigi, Custode del Parco', role:'Conosce ogni sasso dello Stirone · e ogni impronta', avatar:{skin:'#c98d5e', hair:'buzz', hairColor:'#5a4a3a', glasses:null, hat:'cap', cloth:'#6a7a3a', clothColor:'#6a7a3a'},
+  intro:`"Vigilo sul parco. Conosco ogni sasso, ogni ansa del fiume, ogni impronta. Stanotte ho visto un furgone. Con un carico lungo. Troppo lungo. Ho pensato: un tubo. Poi: una balena. Poi: ma che pensieri."`,
+  questions:[
+   {q:'Ha visto qualcosa?', a:`"Un furgone. Di notte. Targa italiana. Il carico era coperto da un telo. Il telo aveva un buco. Dal buco usciva una costola. Le costole non escono dai teli. Di solito."`},
+   {q:'Le impronte nel fiume?', a:`"Stivali da fiume, misura 43. Il fango dello Stirone è inconfondibile. Come il profumo di chi ci lavora. O di chi ci ruba."`},
+   {q:'Chi conosce il parco?', a:`"Tutti. È un parco. Ma chi conosce il modo per portare via una balena da un museo... quello è uno del mestiere. O un pazzo con un furgone. O tutti e due."`}
+  ]},
+ {id:'tiziana', name:'Tiziana, Cercatrice Amatoriale', role:'Cerca fossili nel tempo libero · un dente sul comodino', avatar:{skin:'#f7d9b8', hair:'pony', hairColor:'#3a2a4a', glasses:null, hat:'cap', cloth:'#8f5a3a', clothColor:'#8f5a3a'},
+  intro:`"I fossili sono il mio hobby. Ho trovato un dente di squalo. Sta sul comodino. 'È il mio orologio biologico', dico. Le balene? Non stanno sul comodino. Le balene stanno nei musei."`,
+  questions:[
+   {q:'Cosa faceva sul fiume?', a:`"Cercavo fossili. Ho trovato un dente. L'ho messo in tasca. Il dente è in tasca. La balena no. Le balene non stanno in tasca. Nemmeno quelle finte."`},
+   {q:'Ha visto qualcuno?', a:`"Ho visto un'ombra con un carico lungo. Ho pensato: un pescatore con un pesce grosso. Poi: con un pesce di 10 metri. Poi ho pensato: meglio non pensare."`},
+   {q:'Gli stivali?', a:`"Io uso gli stivali da fiume. Ma i miei sono vecchi, vissuti. Quelli nuovi erano di qualcun altro. I ladri comprano stivali nuovi. Io compro fossili. È una differenza etica."`}
+  ]}
+],
+solution:{culprit:'ravasi', clues:['etichetta','stivali']},
+wrong:{
+ fossati:`Orazio: "Fossati dà i nomi alle balene. Non le spedisce. Anche se Bice gli mancherà."`,
+ gigi:`Orazio: "Gigi conosce le impronte del parco. Non le fa. Le sue impronte sono vecchie come le sue storie."`
+},
+hint:`Chi voleva Bice a tutti i costi? Chi ha un salotto grande come un museo? Chi non mette mai piede nei fiumi... ma ha chi lo fa per lui? L'etichetta dice "VIA DEL MARE". E il mare, qui, arriva fino allo Stirone.`,
+resolve:[
+ {who:'orazio', t:`Comm. Ravasi. Hai comprato tutto... tranne il "no" del museo. E allora hai spedito la balena. Via del mare.`},
+ {who:'ravasi', t:`"Era per il salotto! Bice sarebbe stata il pezzo forte! Con le pantofole e la balena sopra la scrivania!"`},
+ {who:'orazio', t:`Bice è tornata al museo. E il suo salotto è rimasto con le pantofole e il vuoto. Il vuoto, Ravasi, è anche un pezzo da collezione.`},
+ {who:'narr', t:`CASO CHIUSO. Bice è di nuovo sotto i faretti. Il museo ha messo un cartello: "Bice non si vende. Bice non si spedisce. Bice è di casa." Il Comm. Ravasi colleziona ora... pantofole.`}
+],
+oneLiner:`A Fidenza... anche le balene, prima o poi, tornano in mare. Anche se il mare è uno scaffale del museo.`
+},
+
+/* ---------- CASO 3 · IL PALIO DELLE CONTRADE ---------- */
+{
+id:'palio', title:'Il Palio delle Contrade', num:'Caso 3', diff:'Medio', minClues:4, reqClues:2,
+theme:['#ffd9a8','#e8b86a'], bg:'piazza',
+intro:[
+ {who:'narr', t:`Fidenza, vigilia del Palio delle Contrade. In piazza Garibaldi tutto è pronto: cavalli, fantini, tamburi. Ma stanotte qualcuno ha portato via il drappo, lo stendardo ricamato che va alla contrada vincitrice. Senza drappo, il palio non si può correre.`},
+ {who:'orazio', t:`Il drappo del palio. Il premio più onorato della città. Fontana: chi ruba il drappo non vuole la vittoria. Vuole il caos.`},
+ {who:'fontana', t:`Capo, sul palco c'è un'impronta di zoccolo. I cavalli non salgono sui palchi. A meno che qualcuno non li ci porti. E qualcuno li ci ha portati.`},
+ {who:'orazio', t:`Allora abbiamo due misteri: chi ha rubato il drappo, e chi ha portato un cavallo sul palco. Il secondo è più grave. Indaghiamo.`}
+],
+locations:[
+ {id:'piazza', name:'La Piazza Garibaldi', icon:'⛲', x:.3, y:.3,
+  desc:`Il palco del palio è vuoto. Lo stendardo è sparito. Sul legno, un'impronta di zoccolo e un filo rosso. I cavalli non rubano. Di solito.`,
+  clue:{id:'drappo', name:'Impronta di zoccolo sul palco', icon:'🐎', desc:`Uno zoccolo sul palco. I cavalli non salgono i palchi da soli. Qualcuno li ci porta. E chi porta un cavallo sul palco... ha un piano.`}},
+ {id:'scuderie', name:'Le Scuderie', icon:'🏇', x:.7, y:.55,
+  desc:`Ferri di cavallo nuovi, mai usati, appoggiati al muro. Il cavallo Nicolò guarda la porta. Sembra dire: "io so tutto". I cavalli sanno tutto.`,
+  clue:{id:'ferri', name:'Ferri di cavallo nuovi', icon:'🔩', desc:`Ferri nuovi, fatti su misura, mai usati. Chi li ha fatti conosce i cavalli. E chi conosce i cavalli... conosce le scuderie. E le scuderie hanno le porte.`}},
+ {id:'sarta', name:'La Bottega della Sarta', icon:'✂️', x:.15, y:.5,
+  desc:`Un drappo finto, cucito male, abbandonato su una sedia. Cuciture storte, da mani che non sanno cucire. E filo rosso. I fabbri non sanno cucire. Di solito.`,
+  clue:{id:'filorosso', name:'Drappo finto cucito male', icon:'🧵', desc:`Cuciture da fabbro, non da sarta. Storte, frettolose, con filo rosso. Chi ha cucito questo non cuce mai. E chi non cuce mai... ha le mani da martello.`}},
+ {id:'cortile', name:'Il Cortile della Contrada', icon:'🏰', x:.85, y:.4,
+  desc:`Un biglietto di sfida: "VI BATTEREMO COMUNQUE". Scritto con una penna da collezionista. I perdenti scrivono biglietti. I ladri anche.`,
+  clue:{id:'sfida', name:'Biglietto "VI BATTEREMO COMUNQUE"', icon:'📜', desc:`Una sfida scritta. Firmata con una penna da collezionista. Chi colleziona penne... colleziona anche altro. Forse drappi.`}},
+ {id:'torre', name:'La Torre dell\'Orologio', icon:'🕰️', x:.5, y:.7,
+  desc:`Il guardiano notturno giura: "Ho visto un'ombra con un sacco. Il sacco faceva 'cing'. Come il drappo? No. Come le monete."`,
+  flavor:`"Cing", dice il guardiano. Monete, non drappi. Qualcuno ha pagato. O qualcuno è stato pagato. A Fidenza le monete parlano più dei tamburi.`},
+ {id:'cantina', name:'La Cantina della Contrada', icon:'🍷', x:.12, y:.78,
+  desc:`Un contradaio nervoso beve vino e ripete: "Il palio è nostro. Il drappo... il drappo era nostro." Il vino non mente. I contraddai nemmeno. Di solito.`,
+  flavor:`Il contradaio è nervoso. Ha perso il drappo prima ancora di vincere il palio. "Il drappo era nostro", ripete. "Era". La parola più triste della lingua italiana.`}
+],
+suspects:[
+ {id:'capitano', name:'Il Capitano della Contrada del Castello', role:'Ha perso il palio 3 volte · la quarta sarebbe la fine', avatar:{skin:'#e8b48a', hair:'buzz', hairColor:'#5a3a2a', glasses:null, hat:null, cloth:'#8f3a2a', clothColor:'#8f3a2a'},
+  intro:`"Io? Io ho perso 3 pali. La quarta volta sarebbe la fine. Ma la fine la faccio in piazza, con i tamburi. Non con il furto. Il furto è per chi non ha tamburi."`,
+  questions:[
+   {q:'Dov\'era la notte?', a:`"A preparare la contrada. I cavalli, i fantini, i tamburi. I tamburi sono importanti. I tamburi non rubano. I tamburi annunciano."`},
+   {q:'Il biglietto di sfida?', a:`"Un biglietto? 'VI BATTEREMO COMUNQUE'? Io sfido in piazza, non su carta. Le penne sono per gli avvocati. E per i collezionisti di penne."`},
+   {q:'Il drappo?', a:`"Il drappo è il premio. Si vince. Non si ruba. C'è una differenza che qui a Fidenza conosciamo bene. Soprattutto chi perde."`}
+  ]},
+ {id:'marco', name:'Marco, il Fantino', role:'Monta da quando aveva 4 anni · Nicolò è il suo cavallo', avatar:{skin:'#f2c9a0', hair:'spiky', hairColor:'#3a2a1a', glasses:null, hat:'cap', cloth:'#2a5a8f', clothColor:'#2a5a8f'},
+  intro:`"Il cavallo sono io, solo più veloce. Nicolò è il mio cavallo. Nicolò non dormiva stanotte. I cavalli sentono tutto. E Nicolò ha sentito qualcosa."`,
+  questions:[
+   {q:'La notte del furto?', a:`"Ero alle scuderie. Nicolò scalpitava. Poi è arrivato Otello, il fabbro, a prendere i ferri nuovi. 'Per domani', ha detto. I ferri per domani... erano per stanotte."`},
+   {q:'Gli zoccoli sul palco?', a:`"Gli zoccoli? I cavalli non salgono sui palchi. A meno che qualcuno non li ci porti. E qualcuno li ci ha portati. Con i ferri nuovi. Senza far rumore."`},
+   {q:'Il drappo finto?', a:`"Cucito male. La sarta del Ponte cuce benissimo. Il fabbro... il fabbro martella. Le cuciture del drappo finto sembravano fatte col martello."`}
+  ]},
+ {id:'elvira', name:'Elvira, la Sarta della Contrada del Ponte', role:'Cuce gli stendardi di tutti · neutrale come la Croce Rossa', avatar:{skin:'#f7d9b8', hair:'bob', hairColor:'#c8a878', glasses:null, hat:null, cloth:'#8f3a5a', clothColor:'#8f3a5a'},
+  intro:`"Cuco gli stendardi di tutte le contrade. Sono neutrale. Come la Croce Rossa. Ma con le forbici. E con l'orgoglio."`,
+  questions:[
+   {q:'Il drappo finto?', a:`"Cucito male? Io non cucio male. Nemmeno per sbaglio. Le mie cuciture sono dritte come la via Emilia. Quel drappo lì l'ha cucito uno che non ha mai tenuto un ago."`},
+   {q:'Il filo rosso?', a:`"Il filo rosso è di tutti. Si trova in tutte le mercerie. Il filo non è una confessione. Il filo è un filo. Ma le cuciture storte... quelle sono una firma."`},
+   {q:'Chi ha potuto rubare?', a:`"Qualcuno che conosce il palco. Qualcuno che conosce i cavalli. Qualcuno che conosce i ferri. E qualcuno che ha perso troppe volte. Il fabbro Otello ha perso una scommessa. E le scommesse, a Fidenza, si pagano."`}
+  ]},
+ {id:'otello', name:'Otello, il Fabbro', role:'Fa i ferri dei cavalli · ha perso una scommessa', avatar:{skin:'#c98d5e', hair:'bald', hairColor:'#4a3a2a', glasses:null, hat:null, cloth:'#5a5a3a', clothColor:'#5a5a3a'},
+  intro:`"I ferri sono la scarpa del cavallo. Un cavallo senza ferri è un cavallo scalzo. Un ladro senza alibi è un ladro scalzo. Io i ferri li faccio. E gli alibi non li faccio."`,
+  questions:[
+   {q:'I ferri nuovi?', a:`"Li ho fatti io. Per il palio. Ma qualcuno li ha presi stanotte. I ferri non si rubano. I ferri si regalano. A chi li merita. E a chi li porta via."`},
+   {q:'Dov\'era stanotte?', a:`"In officina. A martellare. Il martello è il mio alibi. Lo sentono tutti. Anche chi non vuole. Anche chi sta rubando un drappo."`},
+   {q:'Perché avrebbe rubato il drappo?', a:`"Perché ho perso una scommessa. 'Se il Castello perde ancora, mi prendo il drappo', ho detto. Era una battuta. Le battute non si rubano. Il drappo sì."`}
+  ]}
+],
+solution:{culprit:'otello', clues:['ferri','filorosso']},
+wrong:{
+ capitano:`Orazio: "Il capitano perde i pali, non li ruba. È una distinzione onorevole."`,
+ elvira:`Orazio: "Elvira cuce dritto come la via Emilia. Il drappo finto è storto come una scusa."`
+},
+hint:`Chi ha fatto i ferri nuovi? Chi ha perso una scommessa? E chi ha cucito un drappo con le mani da... fabbro? I ferri non mentono. Le cuciture storte nemmeno.`,
+resolve:[
+ {who:'orazio', t:`Otello. Il fabbro. Hai perso la scommessa... e hai deciso di vincere il drappo. Cucendolo male. Con le mani da martello.`},
+ {who:'otello', t:`"Era una battuta! Poi la battuta è diventata un'ossessione. Il drappo era troppo bello per restare appeso. Il drappo voleva essere... mio."`},
+ {who:'orazio', t:`Il drappo è tornato al palco. Il palio si corre. E chi perde... perde. Ma stavolta con onore. E con i ferri nuovi.`},
+ {who:'narr', t:`CASO CHIUSO. Il palio è stato vinto dalla contrada del Castello. Otello, dal suo banco, ha applaudito. Con le mani da fabbro. E con il martello.`}
+],
+oneLiner:`A Fidenza... il palio si corre. Non si ruba. Di solito.`
+},
+
+/* ---------- CASO 4 · IL CULATELLO INTROVABILE ---------- */
+{
+id:'culatello', title:'Il Culatello Introvabile', num:'Caso 4', diff:'Medio', minClues:4, reqClues:3,
+theme:['#ffd9a8','#d8a878'], bg:'bottega',
+signs:{bottega:'SALUMIFICIO — CULATELLO DI ZIBELLO'},
+intro:[
+ {who:'narr', t:`Fidenza, nebbia della bassa. In una cella di stagionatura a due passi da Zibello, è sparito il culatello più pregiato della zona: 24 mesi di stagionatura, il Re dei salumi. E, dettaglio raccapricciante: è stato anche assaggiato.`},
+ {who:'orazio', t:`Il culatello. 24 mesi di stagionatura. Sparito in una notte. E assaggiato. Fontana: chi ruba un culatello a Fidenza non è un ladro. È un critico gastronomico.`},
+ {who:'fontana', t:`Capo, il morso è pulito, da intenditore. Il ladro ha assaggiato per verificare. I ladri non verificano. I critici sì. Gli chef pure.`},
+ {who:'orazio', t:`Assistente, seguiamo il profumo. E le tracce. A Fidenza il profumo dei salumi copre tutto. Anche i delitti. Indaghiamo.`}
+],
+locations:[
+ {id:'cella', name:'La Cella di Stagionatura', icon:'🥩', x:.25, y:.4,
+  desc:`Il gancio è vuoto. Sul pavimento, tracce di un morso. Un morso pulito, chirurgico, al punto giusto. I ladri non assaggiano. I critici sì. Gli chef pure.`,
+  clue:{id:'morso', name:'Un morso da intenditore', icon:'🦷', desc:`Un morso perfetto, al centro, nel punto migliore. Chi ha morso sapeva esattamente dove mordere. E chi sa dove mordere... ha un palato. E un mestiere.`}},
+ {id:'banco', name:'Il Banco della Salumeria', icon:'🧀', x:.72, y:.55,
+  desc:`Una mappa della cella disegnata su un tovagliolo. La cella ha una porta segreta. La mappa ha una X. I tovaglioli non mentono. Le X nemmeno.`,
+  clue:{id:'mappa', name:'Mappa della cella su un tovagliolo', icon:'🗺️', desc:`Una mappa con la X. Chi ha disegnato la mappa conosce la cella. E chi conosce la cella... è entrato. O ha studiato. Gli chef studiano. I ladri entrano.`}},
+ {id:'ufficio', name:'L\'Ufficio del Salumaio', icon:'📜', x:.85, y:.35,
+  desc:`Una lettera anonima: "TI COMPRO IL CULATELLO. QUALSIASI PREZZO." Firmata: "Un ammiratore". Gli ammiratori anonimi sono ladri con i baffi. O chef con le stelle.`,
+  clue:{id:'offerta', name:'Lettera "TI COMPRO IL CULATELLO"', icon:'✉️', desc:`Un'offerta anonima. "Qualsiasi prezzo". Chi ha scritto questa lettera vuole il culatello più di ogni cosa. E chi lo vuole più di ogni cosa... lo prende.`}},
+ {id:'cortile', name:'Il Cortile', icon:'🏡', x:.1, y:.62,
+  desc:`Impronte di scarpe da chef. Piccole, eleganti, con la suola da cucina. Le scarpe da chef non escono di notte. Di solito.`,
+  clue:{id:'scarpeschef', name:'Impronte di scarpe da chef', icon:'👟', desc:`Suola da cucina, inconfondibile. Gli chef non rubano. Di solito. Ma gli chef ambiziosi... gli chef con due stelle e la terza in arrivo... quelli camminano di notte.`}},
+ {id:'vini', name:'La Cantina dei Vini', icon:'🍷', x:.5, y:.78,
+  desc:`Vino e parmigiano. Il profumo della zona. Un cartello: "Il vino non si assaggia. Si accompagna." Qualcuno ha aggiunto sotto: "Il culatello si merita."`,
+  flavor:`La cantina odora di vino, parmigiano e storia. Il cartello è stato aggiunto di recente. La calligrafia è da chef. Gli chef scrivono sui cartelli. I ladri no.`},
+ {id:'zibello', name:'La Strada per Zibello', icon:'🛣️', x:.9, y:.7,
+  desc:`La nebbia della bassa. Il profumo dei salumi. Qualcuno è passato di qui. Con un culatello. E un morso. La nebbia non ricorda. Il profumo sì.`,
+  flavor:`La nebbia copre la strada per Zibello. I salumi la illuminano. Chi ha rubato il culatello ha attraversato la nebbia. Il profumo lo ha tradito. I profumi tradiscono sempre.`}
+],
+suspects:[
+ {id:'guerino', name:'Guerrino, il Salumaio', role:'Produce culatelli da 40 anni · il suo è il migliore', avatar:{skin:'#e8b48a', hair:'buzz', hairColor:'#5a4a3a', glasses:null, hat:null, cloth:'#8a5a3a', clothColor:'#8a5a3a'},
+  intro:`"Il mio culatello è il migliore. Lo dico io. E lo dicono i critici. E i ladri. 24 mesi di stagionatura. 24 mesi di attesa. E una notte di furto. Il bilancio non torna."`,
+  questions:[
+   {q:'La mappa sul tovagliolo?', a:`"Una mappa? Disegnata da me? Io conosco la cella a memoria. I ciechi non hanno bisogno di mappe. Io sono cieco di mappe."`},
+   {q:'Chi poteva entrare?', a:`"Io, i miei figli, i miei nipoti, i miei cugini. E lo chef Massimo. Lo chef viene ogni mese. Assaggia. Annuisce. Non paga. Poi paga. Ma annuisce prima."`},
+   {q:'Il morso?', a:`"Un morso da intenditore. Piccolo, preciso, al centro. Io taglio, non mordo. Chi morde... è uno che sa. O uno che ha fame. A volte tutte e due."`}
+  ]},
+ {id:'massimo', name:'Massimo, lo Chef Stellato', role:'Due stelle Michelin · la terza è questione di un piatto', avatar:{skin:'#f2c9a0', hair:'buzz', hairColor:'#2a2a2a', glasses:null, hat:'top', cloth:'#ffffff', clothColor:'#d8d8d8'},
+  intro:`"Di Parma. Due stelle. La terza è questione di un piatto. E quel piatto ha bisogno di un culatello... speciale. Il culatello di Guerrino. Il Re."`,
+  questions:[
+   {q:'L\'offerta anonima?', a:`"Un'offerta? 'Qualsiasi prezzo'? Io pago sempre. Pago tutto. La terza stella costa. Anche il culatello. Ma il culatello non si vende. Si merita. E si prende solo se non si vende."`},
+   {q:'Le scarpe da chef?', a:`"Le mie scarpe da chef sono in cucina. La notte del furto ero in cucina. A cucinare. Con le scarpe. E con l'alibi. L'alibi profuma di ristretto."`},
+   {q:'Ha assaggiato il culatello?', a:`"Ho assaggiato tutti i culatelli di Guerrino. Sono il suo consulente. Il culatello rubato era il migliore. L'ho saputo dopo. I migliori, a volte, scappano."`}
+  ]},
+ {id:'sgretola', name:'Il Ladro "Sgretola"', role:'Recidivo · collezionista di sapori · non lascia tracce', avatar:{skin:'#c98d5e', hair:'buzz', hairColor:'#1a1a1a', glasses:'shades', hat:'cap', cloth:'#4a4a4a', clothColor:'#4a4a4a'},
+  intro:`"Sono un collezionista di sapori. Ho rubato salumi in tutta la bassa. Ma stavolta... stavolta non ero io. Io non assaggio. Io rubo. L'assaggio è un rischio. Il rischio è per i critici."`,
+  questions:[
+   {q:'Dov\'era la notte?', a:`"A Modena. Ho una ricevuta. Di un parcheggio. I parcheggi sono il mio alibi. Pago sempre il parcheggio. È una questione di etica professionale."`},
+   {q:'Il morso?', a:`"Io non lascio tracce. Lascio scontrini. Il morso è una traccia. E le tracce sono per i dilettanti. Io sono un professionista. Con lo scontrino."`},
+   {q:'Perché il culatello?', a:`"Perché è il migliore. Rubo i migliori. È il mio mestiere. Ma stavolta il migliore l'ha preso qualcun altro. Qualcuno che ha assaggiato. Un dilettante. Con la stella."`}
+  ]},
+ {id:'giornalista', name:'La Giornalista Enogastronomica', role:'Scrive di cibo · assaggia tutto · la pancia è il suo mestiere', avatar:{skin:'#f7d9b8', hair:'bob', hairColor:'#8a5a2a', glasses:'cat', hat:null, cloth:'#8f3a5a', clothColor:'#8f3a5a'},
+  intro:`"La mia rubrica è un viaggio. Il viaggio è fatto di assaggi. Il culatello di Guerrino è il migliore della bassa. L'ho scritto. L'ho assaggiato. L'ho recensito. Ma non l'ho rubato."`,
+  questions:[
+   {q:'Il morso sul culatello?', a:`"Un morso da intenditore. Piccolo, preciso. Chi ha morso sapeva cosa stava mordendo. Io mordo sempre. Ma mordo in diretta. Con il pubblico. E con la rubrica."`},
+   {q:'La sua opinione?', a:`"Il culatello di Guerrino è il migliore. L'ho scritto tre volte. Tre recensioni. La terza era per la terza stella di qualcuno. Ma la terza stella non si ruba. Si cucina."`},
+   {q:'Chi è il ladro?', a:`"Uno che conosce la cella. Uno che conosce il culatello. Uno che ha le scarpe da chef... e la pancia da critico. Io ho la pancia. Ma non le scarpe. Le mie scarpe sono da ufficio."`}
+  ]}
+],
+solution:{culprit:'massimo', clues:['mappa','scarpeschef','offerta']},
+wrong:{
+ guerino:`Orazio: "Guerrino produce il culatello. Non lo ruba. Il produttore e il ladro sono due mestieri diversi. Come l'arte e il falso."`,
+ sgretola:`Orazio: "Sgretola ruba senza assaggiare. Questo ladro ha assaggiato. Questo ladro è un intenditore. E gli intenditori hanno le stelle."`
+},
+hint:`Chi aveva bisogno del culatello per un piatto? Chi ha le scarpe da chef? Chi ha fatto un'offerta "a qualsiasi prezzo"? E chi ha assaggiato... per verificare? I critici recensiscono. Gli chef assaggiano. E poi rubano.`,
+resolve:[
+ {who:'orazio', t:`Massimo. Lo chef con due stelle. Il culatello mancante era il terzo ingrediente. La terza stella si ottiene in cucina, Massimo. Non in cella.`},
+ {who:'massimo', t:`"Era per il piatto! Il Re dei salumi con la riduzione di Lambrusco! Sarebbe stata la terza stella! L'ho assaggiato... per verificare. Era perfetto. Come la mia recensione."`},
+ {who:'orazio', t:`Il culatello è tornato al suo gancio. Con un cartello: "Non si vende. Non si ruba. Non si assaggia. Si merita."`},
+ {who:'narr', t:`CASO CHIUSO. Massimo ha aperto un ristorante a Fidenza. Ha due stelle. La terza arriverà. Con un culatello... comprato. Pagato. Meritatamente.`}
+],
+oneLiner:`A Fidenza... il culatello non si ruba. Si merita. E si assaggia solo dopo.`
+},
+
+/* ---------- CASO 5 · IL FALSO AL FIDENZA VILLAGE ---------- */
+{
+id:'falso', title:'Il Falso al Fidenza Village', num:'Caso 5', diff:'Difficile', minClues:5, reqClues:3,
+theme:['#ffd9a8','#c9a86a'], bg:'corso',
+signs:{corso:'FIDENZA VILLAGE — OUTLET'},
+intro:[
+ {who:'narr', t:`Fidenza Village, l'outlet più famoso della zona. Sconti, sorrisi, borse firmate. Ma qualcosa non torna: le borse in vetrina sono false. Le cerniere si rompono. I bollini sono storti. E i soldi... i soldi spariscono.`},
+ {who:'orazio', t:`Un outlet dove i prezzi sono scontati... e i prodotti falsi. Fontana: questo non è un furto. È un'offerta. Con l'inganno.`},
+ {who:'fontana', t:`Capo, la manager dice che è tutto regolare. I bollini dicono "OUTLET". Ma le cerniere si rompono. Le cerniere non mentono. Le cerniere sono il mio oracolo.`},
+ {who:'orazio', t:`Assistente, segui i soldi. E le cerniere. A Fidenza il falso si nasconde negli sconti. E gli sconti si nascondono nel falso. Indaghiamo.`}
+],
+locations:[
+ {id:'negozio', name:'Il Negozio "Borse & C."', icon:'👜', x:.25, y:.4,
+  desc:`Bollini "OUTLET" storti. Storti, però, sempre uguali. La perfezione nella stortura è la firma dei falsari. I veri outlet hanno bollini dritti. I falsi hanno bollini storti.`,
+  clue:{id:'etichette', name:'Bollini outlet storti', icon:'🏷️', desc:`Storti, ma sempre uguali. Come stampati da una macchina storta. Le macchine storte sono macchine. I bollini storti sono firme.`}},
+ {id:'magazzino', name:'Il Magazzino', icon:'📦', x:.72, y:.55,
+  desc:`Una cassa con nastro "VENDITA PRIVATA". Dentro, l'odore di colla. La colla è il profumo del falso. I veri profumano di cuoio. I falsi di colla.`,
+  clue:{id:'cassa', name:'Cassa con nastro "VENDITA PRIVATA"', icon:'🎁', desc:`Un nastro "vendita privata" su una cassa di falsi. La vendita privata è il paravento del falso. Il falso si nasconde dietro le parole eleganti.`}},
+ {id:'ufficio', name:'L\'Ufficio della Manager', icon:'📊', x:.85, y:.32,
+  desc:`Una fattura con partita IVA inventata. I numeri sono veri. Il prefisso no. I falsari non sbagliano i numeri: sbagliano i prefissi.`,
+  clue:{id:'fattura', name:'Fattura con partita IVA falsa', icon:'🧾', desc:`Una fattura. La partita IVA non esiste. I numeri non mentono. Anche quando vorrebbero.`}},
+ {id:'qualita', name:'Il Controllo Qualità', icon:'🔍', x:.12, y:.5,
+  desc:`Cuciture perfette. Cerniere che si rompono. Le macchine cuciono. Le mani montano le cerniere. Le mani del falso non sanno montare.`,
+  clue:{id:'cerniere', name:'Cerniere che si rompono', icon:'⚙️', desc:`Cuciture perfette, cerniere fragili. Chi monta le cerniere non è il cucitore. Il falso è una squadra. E le squadre hanno un capitano.`}},
+ {id:'parcheggio', name:'Il Parcheggio', icon:'🚐', x:.5, y:.75,
+  desc:`Un furgone con targa straniera. Arriva di notte. Parte di notte. I furgoni notturni non fanno consegne: fanno smistamenti.`,
+  clue:{id:'furgone', name:'Furgone notturno con targa straniera', icon:'🚚', desc:`Un furgone che arriva e parte di notte. I corrieri notturni hanno orari. Gli orari hanno nomi. I nomi hanno numeri di telefono.`}},
+ {id:'te', name:'La Sala Tè del Village', icon:'☕', x:.9, y:.62,
+  desc:`Turisti contenti con borse nuove. "Che sconti!", dice uno. "Che cerniere", dice l'altro. Nessuno ascolta.`,
+  flavor:`Il tè è caldo. Le borse sono nuove. I turisti sono contenti. La contentezza è il miglior complice del falso.`},
+ {id:'concorrenza', name:'La Boutique della Concorrenza', icon:'👗', x:.35, y:.62,
+  desc:`Una denuncia mai presentata. "Avevo paura di fare brutta figura", dice il titolare. La paura è il miglior complice del falso.`,
+  flavor:`La denuncia è in un cassetto. La paura è in un altro. I cassetti non parlano. La paura nemmeno. Ma le cerniere sì.`}
+],
+suspects:[
+ {id:'rossi', name:'La Manager Rossi', role:'Dirige il negozio da 5 anni · i numeri sono la sua religione', avatar:{skin:'#f7d9b8', hair:'bob', hairColor:'#3a2a2a', glasses:'cat', hat:null, cloth:'#3a5a8f', clothColor:'#3a5a8f'},
+  intro:`"Dirigo il negozio da 5 anni. I numeri sono perfetti. Le vendite pure. Le cerniere... le cerniere sono un dettaglio. I dettagli si sistemano. I numeri no."`,
+  questions:[
+   {q:'La fattura falsa?', a:`"Una fattura? Falsa? Con la mia firma? Io firmo tutto. Anche gli errori. Ma gli errori non li commetto. I numeri sono la mia religione. La religione non sbaglia."`},
+   {q:'Il furgone notturno?', a:`"Il furgone? Quello delle consegne. Arriva di notte perché le strade sono libere. I furgoni amano le strade libere. Come i numeri. Come i bilanci."`},
+   {q:'Le cerniere?', a:`"Le cerniere si rompono. Succede. Anche agli originali. Soprattutto agli originali. È una questione di usura. L'usura è un dettaglio. I dettagli si sistemano."`}
+  ]},
+ {id:'luca', name:'Luca, il Commesso', role:'Vende borse da 3 anni · il sorriso è il suo mestiere', avatar:{skin:'#f2c9a0', hair:'spiky', hairColor:'#3a2a1a', glasses:null, hat:null, cloth:'#2a2a3a', clothColor:'#2a2a3a'},
+  intro:`"Sorrido sempre. Anche quando la cerniera si rompe. Il sorriso è il mio mestiere. Ma ultimamente sorrido con il cuore in gola."`,
+  questions:[
+   {q:'Ha notato qualcosa di strano?', a:`"I clienti tornano sempre. Con le borse rotte. Con i sorrisi spenti. Ho notato che le borse si rompono. E i sorrisi pure. I sorrisi non sono nel mio contratto."`},
+   {q:'Chi controlla il magazzino?', a:`"La manager. Solo la manager. Io sorrido. La manager controlla. È la divisione dei compiti. Il sorriso e il controllo."`},
+   {q:'Le consegne notturne?', a:`"Il furgone? Lo vedo dal negozio. Arriva di notte. Io sorrido ai clienti di giorno. Di notte... non sorrido a nessuno. Di notte osservo. L'osservazione è gratis."`}
+  ]},
+ {id:'boris', name:'Boris, il Corriere', role:'Consegna "merci speciali" · guida, non guarda', avatar:{skin:'#c98d5e', hair:'buzz', hairColor:'#1a1a1a', glasses:'shades', hat:'cap', cloth:'#5a3a2a', clothColor:'#5a3a2a'},
+  intro:`"Io guido. Non guardo. I guidatori non guardano. I guidatori arrivano. Io arrivo sempre. In orario. Con la merce. Speciale."`,
+  questions:[
+   {q:'Cosa trasporta?', a:`"Merci. Speciali. Non leggo le etichette. Le etichette sono per i curiosi. Io sono un guidatore. I guidatori guidano."`},
+   {q:'Il furgone è suo?', a:`"Il furgone è della ditta. La ditta non esiste. Esiste il furgone. Il furgone è reale. Le ditte, a volte, no. I furgoni sì."`},
+   {q:'Conosce la manager?', a:`"Conosco i numeri di telefono. I numeri non hanno nome. I numeri hanno orari. Io rispetto gli orari. Gli orari rispettano me."`}
+  ]},
+ {id:'katia', name:'Katia, Addetta al Controllo Qualità', role:'Apre le cerniere 100 volte al giorno · le cerniere sono il suo mestiere', avatar:{skin:'#f7d9b8', hair:'pony', hairColor:'#8a5a2a', glasses:'round', hat:null, cloth:'#5a8f3a', clothColor:'#5a8f3a'},
+  intro:`"Io le apro. Le tocco. Le annuso. Le borse hanno un odore. Le false odorano di colla. Ho segnalato. Tre volte. Le segnalazioni sono sparite. Io resto."`,
+  questions:[
+   {q:'Ha segnalato qualcosa?', a:`"Tre segnalazioni. Scritte, firmate, protocollate. Sono sparite. Le segnalazioni spariscono come le cerniere. Io resto. Le cerniere restano. I fatti restano."`},
+   {q:'Le cerniere?', a:`"Le apro cento volte al giorno. Le false si rompono al settantesimo. Le vere al centesimo. È una scienza. La mia scienza è stata ignorata tre volte."`},
+   {q:'Chi sapeva?', a:`"Tutti. Il negozio sa. Il magazzino sa. Il furgone sa. Ma nessuno dice nulla. Il falso si regge sul silenzio. E sul sorriso. E sui bollini storti."`}
+  ]},
+ {id:'turista', name:'La Turista Misteriosa', role:'Compratrice abituale · la famiglia è grande · ha molte borse', avatar:{skin:'#e8b48a', hair:'pony', hairColor:'#2a2a4a', glasses:null, hat:'beret', cloth:'#8f3a8f', clothColor:'#8f3a8f'},
+  intro:`"Compro in quantità. Per la famiglia. La famiglia è grande. La famiglia ha molte borse. Le borse della famiglia si rompono. La famiglia non si lamenta. La famiglia è educata."`,
+  questions:[
+   {q:'Perché compra così tanto?', a:`"Rivendo. È legale. Compro qui e rivendo a casa. I miei clienti vogliono l'outlet. L'outlet vuole me. È un matrimonio. Con gli sconti."`},
+   {q:'Ha notato le cerniere?', a:`"Le cerniere? Io guardo i prezzi. I prezzi sono onesti. Le cerniere... le cerniere sono un dettaglio. Come ha detto la manager. I dettagli si sistemano. I prezzi no."`},
+   {q:'Conosce Boris?', a:`"Boris? No. Io conosco i prezzi. I prezzi non hanno nome. I prezzi hanno sconti. Io rispetto gli sconti. Gli sconti rispettano me."`}
+  ]}
+],
+solution:{culprit:'rossi', clues:['fattura','cerniere','cassa']},
+wrong:{
+ luca:`Orazio: "Luca sorride. Non vende falsi. Il sorriso è il suo mestiere. Il falso è un altro mestiere. Con i bollini storti."`,
+ katia:`Orazio: "Katia apre le cerniere cento volte al giorno. Le ha aperte anche stanotte. Per noi. La sua scienza è la nostra."`
+},
+hint:`Chi firma tutto? Chi controlla il magazzino? Chi ha la partita IVA inventata? Le cerniere si rompono, le fatture no. Segui la carta. E le cerniere.`,
+resolve:[
+ {who:'orazio', t:`Signora Rossi. La manager dei numeri perfetti. Ha fatto il doppio giro: i veri finivano a lei, i falsi in vetrina. Con i bollini storti.`},
+ {who:'rossi', t:`"I numeri erano perfetti! Il bilancio era perfetto! Le cerniere... le cerniere erano l'unico errore. E gli errori si eliminano."`},
+ {who:'orazio', t:`Gli errori non si eliminano, signora Rossi. Si pagano. E a Fidenza, si pagano a prezzo pieno.`},
+ {who:'narr', t:`CASO CHIUSO. Il Village ha ripulito gli scaffali. La manager ha aperto un negozio di cerniere. Si è rivelata un'ottima direttrice. Le cerniere non mentono.`}
+],
+oneLiner:`A Fidenza... anche gli sconti possono essere falsi. Ma la giustizia no. Quella è full price.`
+},
+
+/* ---------- CASO 6 · LA TESTA DI SAN DONNINO ---------- */
+{
+id:'testa', title:'La Testa di San Donnino', num:'Caso 6 · FINALE', diff:'Difficile', minClues:5, reqClues:3,
+theme:['#ffd9a8','#d8b878'], bg:'duomo',
+signs:{duomo:'CATTEDRALE DI SAN DONNINO'},
+intro:[
+ {who:'narr', t:`Fidenza, Cattedrale di San Donnino. La leggenda dice che il santo, martirizzato sul ponte romano, raccolse la propria testa e camminò fino al punto dove oggi sorge la cattedrale. 1.700 anni dopo, la testa è sparita di nuovo. Dalla teca. Con le chiavi al loro posto.`},
+ {who:'orazio', t:`San Donnino. Il santo che ha camminato con la testa in mano. E 1.700 anni dopo, la testa è sparita di nuovo. Fontana: questa volta non cammina. È stata rubata.`},
+ {who:'fontana', t:`Capo, la teca è aperta. Le chiavi sono al loro posto. Chi apre con le chiavi al loro posto... è di casa. O ha le chiavi di casa. A Fidenza le chiavi di casa sono sacre.`},
+ {who:'orazio', t:`Assistente, questo è il caso più importante della mia carriera. Il patrono di Fidenza ha perso la testa. Di nuovo. E stavolta gliela restituiamo noi. Indaghiamo.`}
+],
+locations:[
+ {id:'altare', name:'L\'Altare Maggiore', icon:'⛪', x:.3, y:.35,
+  desc:`La teca del busto è aperta. Le chiavi sono al loro posto, appese. Chi apre con le chiavi al loro posto... è di casa. O ha le chiavi di casa.`,
+  clue:{id:'chiavi', name:'Teca aperta con le chiavi al posto', icon:'🔑', desc:`Le chiavi sono al loro posto. Chi le ha usate le ha rimesse. Un ladro educato. I ladri educati sono i peggiori: sanno di tornare.`}},
+ {id:'museo', name:'Il Museo del Duomo', icon:'🏛️', x:.7, y:.5,
+  desc:`Piume di piccione. Un piccione è entrato dal rosone. I piccioni entrano. Non rubano. Di solito. Ma i piccioni osservano.`,
+  clue:{id:'piume', name:'Piume di piccione', icon:'🪶', desc:`Piume fresche. Un piccione ha visitato il museo. I piccioni non rubano. Ma i piccioni vedono. E i piccioni custodiscono.`}},
+ {id:'sagrestia', name:'La Sagrestia', icon:'📖', x:.85, y:.3,
+  desc:`Un "passaporto del pellegrino" falso. I timbri della Via Francigena sono falsi. I timbri falsi sono la firma di chi vende reliquie false.`,
+  clue:{id:'passaporto', name:'Passaporto del pellegrino falso', icon:'🛂', desc:`Un passaporto con timbri falsi. Chi falsifica i timbri dei pellegrini... falsifica anche le reliquie. E a volte le ruba.`}},
+ {id:'cantiere', name:'Il Cantiere di Restauro', icon:'🪜', x:.12, y:.5,
+  desc:`Una scala. Il cantiere è aperto. I restauratori lavorano di giorno. I ladri di notte. La scala non sceglie. La scala serve.`,
+  clue:{id:'scala', name:'La scala del cantiere', icon:'🪜', desc:`Una scala spostata. Il cantiere era chiuso. La scala non era d'accordo. Qualcuno è salito. Qualcuno è sceso. Con un carico sacro.`}},
+ {id:'piazza', name:'La Piazza', icon:'🕊️', x:.5, y:.7,
+  desc:`Testimonianza: "Un pellegrino con scarponi NUOVI". I pellegrini veri hanno scarponi consumati. I falsi hanno scarponi nuovi. È la regola del cammino.`,
+  clue:{id:'scarponi', name:'Testimonianza: scarponi nuovi', icon:'🥾', desc:`Scarponi nuovi in piazza. I pellegrini veri hanno i piedi consumati. I falsi hanno i negozi. E i negozi hanno gli scarponi nuovi.`}},
+ {id:'ponte', name:'Il Ponte Romano', icon:'🌉', x:.6, y:.82,
+  desc:`Il ponte dove San Donnino perse la testa... per la prima volta. Il cartello dice: "Qui iniziò il cammino". Qualcuno ha aggiunto sotto: "E qui è ricominciato".`,
+  flavor:`Il cartello è stato aggiunto stanotte. La calligrafia è da mercante. I mercanti scrivono sui cartelli. I ladri no. I ladri corrono.`},
+ {id:'campanile', name:'La Torre Campanaria', icon:'🔔', x:.15, y:.78,
+  desc:`Nel campanile, il nido del piccione. Dentro: un frammento della reliquia. Il piccione non l'ha rubata. Il piccione la custodiva. I piccioni custodiscono.`,
+  clue:{id:'nido', name:'Frammento della reliquia nel nido', icon:'🥚', desc:`Un frammento nel nido del piccione. È caduto mentre qualcuno scappava. I piccioni non rubano: recuperano. E stavolta hanno recuperato un pezzo di verità.`}},
+ {id:'chiostro', name:'Il Chiostro', icon:'🌿', x:.4, y:.85,
+  desc:`Un frate medita. "La testa è sparita. Di nuovo. San Donnino riderà. I santi ridono. Soprattutto i santi senza testa."`,
+  flavor:`Il frate non ha visto nulla. I frati non vedono. I frati meditano. Ma la meditazione, a volte, vede più degli occhi.`}
+],
+suspects:[
+ {id:'battista', name:'Don Battista, il Sacrestano', role:'Custode della cattedrale · le chiavi sono sue. Tutte. Anche quelle che non servono', avatar:{skin:'#e8b48a', hair:'buzz', hairColor:'#5a5a5a', glasses:'round', hat:null, cloth:'#3a3a4a', clothColor:'#3a3a4a'},
+  intro:`"Io custodisco. Le chiavi sono mie. Tutte. Anche quelle che non servono. Soprattutto quelle che non servono. E stanotte qualcuno le ha usate. Con rispetto. I ladri rispettosi sono i peggiori."`,
+  questions:[
+   {q:'Le chiavi della teca?', a:`"Sono al loro posto. Io le tengo al loro posto. Chi le ha usate... le ha rimesse al posto. Un ladro educato. I ladri educati sanno di tornare. E i ladri che sanno di tornare... conoscono le chiavi."`},
+   {q:'Il passaporto del pellegrino?', a:`"Un passaporto falso? In sagrestia? Io registro tutti i pellegrini. I falsi non si registrano. I falsi scappano. E i falsi hanno gli scarponi nuovi."`},
+   {q:'Chi conosce la cattedrale?', a:`"Tutti. È una cattedrale. Ma chi conosce la teca, il cantiere e la scala... quello è uno di qui. O uno che ci lavora. O uno che ci vende. I venditori conoscono tutto."`}
+  ]},
+ {id:'greta', name:'Greta, la Guida Turistica', role:'Guida i turisti da 10 anni · conosce ogni leggenda, soprattutto quella della testa', avatar:{skin:'#f7d9b8', hair:'pony', hairColor:'#8a5a2a', glasses:null, hat:'cap', cloth:'#8f6a3a', clothColor:'#8f6a3a'},
+  intro:`"Conosco ogni angolo. E ogni leggenda. Soprattutto quella della testa. San Donnino è stato decapitato sul ponte. Ha raccolto la testa e ha camminato fino a qui. I turisti adorano la storia. I ladri pure."`,
+  questions:[
+   {q:'La leggenda della testa?', a:`"San Donnino camminò con la testa in mano. È il santo più fotografato della provincia. Nessuno fotografa la testa. Tutti fotografano il busto. I ladri, invece, fotografano le teche."`},
+   {q:'Ha visto qualcosa?', a:`"Ho visto un pellegrino. Con scarponi nuovi. Gli ho detto: 'Benvenuto a Fidenza'. Mi ha detto: 'Grazie'. I pellegrini veri dicono 'Buon cammino'. I falsi dicono 'Grazie'."`},
+   {q:'Chi vende reliquie?', a:`"C'è uno, in piazza. Vende 'reliquie della Via Francigena'. Conchiglie, medaglie, ossicini. I veri pellegrini regalano. I falsi vendono. E i falsi hanno gli scarponi nuovi."`}
+  ]},
+ {id:'belli', name:'Arch. Belli, il Restauratore', role:'Restaura la cattedrale · il cantiere è suo · la scala pure', avatar:{skin:'#f2c9a0', hair:'bald', hairColor:'#4a4a5a', glasses:'round', hat:null, cloth:'#4a5a6a', clothColor:'#4a5a6a'},
+  intro:`"Il cantiere è mio. La scala è mia. La testa... la testa non era mia. Io restauro. Il restauro è una religione. E la religione non ruba."`,
+  questions:[
+   {q:'Il cantiere?', a:`"Il cantiere è aperto. I lavori sono in corso. La scala è al suo posto. La notte del furto il cantiere era chiuso. La scala non era d'accordo. Le scale hanno le loro opinioni."`},
+   {q:'La teca?', a:`"La teca era sigillata. Io ho le misure. Tutte le misure della cattedrale. Ma le misure non aprono le teche. Le chiavi sì. E le chiavi sono del sacrestano. E del suo doppio."`},
+   {q:'Perché la testa?', a:`"La testa è il simbolo. San Donnino è il patrono. Un restauro senza il simbolo... è solo un cantiere. Ma io non rubo simboli. Io li restauro. E i simboli restaurati brillano."`}
+  ]},
+ {id:'macario', name:'Il Conte Macario, Collezionista', role:'Colleziona "cimeli dei santi camminanti" · la testa manca da 30 anni', avatar:{skin:'#e8b48a', hair:'bald', hairColor:'#5a5a5a', glasses:'monocle', hat:'top', cloth:'#2a2a4a', clothColor:'#2a2a4a'},
+  intro:`"Colleziono 'cimeli dei santi camminanti'. Conchiglie, bastoni, sandali. E una testa? No. Quella manca. La cerco da 30 anni. I collezionisti cercano. I ladri trovano. Io cerco."`,
+  questions:[
+   {q:'La sua collezione?', a:`"300 conchiglie, 200 bastoni, 150 sandali. E una testa di San Donnino? No. Quella non c'è. Ma c'è un posto vuoto. Il posto vuoto è il mio capolavoro. Aspetta."`},
+   {q:'Dov\'era stanotte?', a:`"A casa. A lucidare le conchiglie. Ho 300 conchiglie e 300 alibi. Uno per ogni conchiglia. Il 301º alibo non ce l'ho. Ancora."`},
+   {q:'Ha fatto offerte?', a:`"Ho offerto una fortuna per la testa. Mi hanno detto di no. Il 'no' non mi ha mai fermato. Ma stavolta... stavolta era la cattedrale. E la cattedrale è più forte del 'no'. Anche del mio."`}
+  ]},
+ {id:'pellegrino', name:'Il Falso Pellegrino', role:'Vende "reliquie della Via Francigena" in piazza · scarponi nuovi', avatar:{skin:'#c98d5e', hair:'buzz', hairColor:'#2a2a2a', glasses:'shades', hat:'headscarf', cloth:'#8a6a3a', clothColor:'#8a6a3a'},
+  intro:`"Sono un mercante di fede. La fede vende. Le reliquie pure. Vendo copie, dichiarate. La fede non ha bisogno di originali. I pellegrini comprano copie. I ladri rubano originali. Io vendo."`,
+  questions:[
+   {q:'Le reliquie che vende?', a:`"Copie. Dichiarate. Ho anche un cartello: 'Copie fedeli'. La fedeltà è importante. Anche nel falso. Soprattutto nel falso."`},
+   {q:'Il passaporto falso?', a:`"Un passaporto? Io non ho documenti. Io ho la merce. I documenti sono per i viaggiatori. Io non viaggio. Io vendo. I venditori non hanno bisogno di documenti."`},
+   {q:'Gli scarponi nuovi?', a:`"Gli scarponi nuovi sono un investimento. L'immagine è importante. Un mercante con gli scarponi vecchi... non vende. Un mercante con gli scarponi nuovi... vende. E compra. A volte compra anche ciò che non si vende."`}
+  ]}
+],
+solution:{culprit:'pellegrino', clues:['passaporto','scarponi','nido']},
+wrong:{
+ macario:`Orazio: "Macario colleziona conchiglie, non teste. La sua collezione è incompleta. Come il suo alibi. Ma il suo alibi è lucido."`,
+ belli:`Orazio: "Belli ha le misure della cattedrale. Non i moventi. Le misure non rubano. I restauri sì, ma solo con il permesso."`
+},
+hint:`Chi vende reliquie? Chi ha i timbri falsi? Chi ha gli scarponi nuovi? E il piccione del campanile custodiva un frammento... che cade da chi scappava di corsa. Segui la merce. E i timbri.`,
+resolve:[
+ {who:'orazio', t:`Tu. Il mercante di fede. Hai venduto copie per anni. E stanotte hai rubato l'originale. La testa di San Donnino. Il pezzo che non si vende.`},
+ {who:'pellegrino', t:`"Era il pezzo finale! La 'Testa del Cammino'! L'avrei venduta a un collezionista... e la mia collezione di reliquie sarebbe stata completa! La più completa della Via Francigena!"`},
+ {who:'orazio', t:`San Donnino ha camminato con la testa in mano per 1.700 anni. Stanotte ha camminato di nuovo. Ma con noi accanto.`},
+ {who:'narr', t:`CASO CHIUSO. La testa è tornata nella teca. Il piccione ha ricevuto una medaglia al valore, a forma di conchiglia. Il falso pellegrino vende ora... panini. Senza reliquie. Con onestà.`}
+],
+oneLiner:`A Fidenza... San Donnino ha perso la testa una volta. L'ha ritrovata. E stavolta, gliela restituiamo noi.`
+}
+];
+
+/* ---------------- frasi celebri di Orazio ---------------- */
+
+/* ---------------- frasi celebri di Orazio ---------------- */
+const ORAZIO_LINES = [
+ `A Fidenza... anche i cinghiali hanno un movente.`,
+ `La verità? Sta sotto la cattedrale. E un po' di culatello.`,
+ `Sulla Via Francigena non si mente. I pellegrini hanno troppe vesciche per mentire.`,
+ `La balena dello Stirone è la prova che anche qui... siamo arrivati dal mare.`,
+ `Il palio si corre. Non si ruba. Di solito.`,
+ `A Fidenza il delitto perfetto non esiste. Esiste solo la Fidenza Village.`,
+ `Nessuno scappa dal culatello. Nessuno.`,
+ `San Donnino ha perso la testa una volta. Non due.`,
+ `I piccioni di piazza Garibaldi hanno visto tutto. Non parlano. Ma hanno visto.`,
+ `Il Salso scorre. Come la giustizia. Più o meno.`,
+ `YEEAAAH.`,
+ `Gli occhiali da sole non sono un accessorio. Sono una filosofia. Anche a Fidenza.`,
+ `Un contradaio non mente mai... se glielo chiedi dopo il palio.`,
+ `Il cinghiale non è colpevole. Il cinghiale è solo affamato.`,
+ `A Fidenza si arriva in ritardo solo ai matrimoni. E neanche lì.`,
+ `La nebbia della bassa nasconde tutto. Tranne la verità. E il profumo dei salumi.`,
+ `Borgo San Donnino. Fidenza. Due nomi, una verità. Come me: due occhiali, una verità.`
+];
+const EMPTY_TAP_LINES = [
+ `Assistente, quello è un portico. I portici non hanno indizi. Di solito.`,
+ `Tocca le cose giuste, assistente. Fidenza non è un buffet. Anche se il culatello...`,
+ `Stai cercando indizi o stai facendo la Via Francigena?`,
+ `Anche la cattedrale ha i suoi tempi. Anche tu.`,
+ `Il mio occhiale da sole ha visto più di me. E io ho visto molto.`,
+ `Attenzione: qui non c'è nulla. Ma a Fidenza il nulla è sempre un indizio.`,
+ `Fontana, annota: l'assistente sta toccando la nebbia.`,
+ `Non è un caso se non trovi nulla. È un caso che non tocchi nel punto giusto.`
+];
+const FONTANA_LINES = [
+ `Capo, ho portato il culatello. Per la tensione.`,
+ `Capo, ho controllato: il cinghiale non ha un alibi. Ma ha le zanne.`,
+ `Capo, ho interrogato il piccione. Il piccione non parla. I piccioni non parlano mai.`,
+ `Capo, il caffè è pronto. Qui lo chiamano "al torinese". Non chiedere.`,
+ `Capo, ho fatto l'elenco dei sospetti. C'è scritto "tutti". Anche il sindaco.`,
+ `Capo, la balena dello Stirone è tornata al museo. Ma mi guarda strano.`,
+ `Capo, ho assaggiato il culatello per verificare. Era buono. Troppo buono.`,
+ `Capo, sul ponte romano c'è scritto "Qui iniziò il cammino". Io mi sono fermato qui.`
+];
+
+/* =====================================================================
+   AVATAR GENERATOR — personaggi disegnati proceduralmente (zero asset)
+   ===================================================================== */
+function drawAvatarBust(g, o, w, h){
+  // o: {skin,hair,hairColor,glasses,hat,cloth,clothColor,beak}
+  const s = Math.min(w,h)/240; // scala base
+  const cx = w/2;
+  const skin = COL(o.skin), hairC = COL(o.hairColor), clothC = COL(o.clothColor||'#2f6f8f');
+  // spalle
+  g.roundRect(cx-95*s, 150*s, 190*s, 120*s, 46*s).fill({color:clothC}).stroke({width:4*s,color:0x00000022});
+  // colletto
+  g.roundRect(cx-30*s, 128*s, 60*s, 34*s, 10*s).fill({color:0xffffff, alpha:.85});
+  // collo
+  g.rect(cx-16*s, 100*s, 32*s, 46*s).fill({color:skin}).stroke({width:3*s,color:0x00000018});
+  // testa
+  g.circle(cx, 62*s, 54*s).fill({color:skin}).stroke({width:4*s,color:0x00000022});
+  // orecchie
+  g.circle(cx-54*s, 66*s, 8*s).fill({color:skin});
+  g.circle(cx+54*s, 66*s, 8*s).fill({color:skin});
+  // capelli
+  const hc = {color:hairC};
+  if(o.hair==='spiky'){
+    g.poly([cx-50*s,58*s, cx-34*s,-6*s, cx-16*s,50*s]).fill(hc);
+    g.poly([cx-30*s,52*s, cx-6*s,-14*s, cx+10*s,48*s]).fill(hc);
+    g.poly([cx-8*s,50*s, cx+14*s,-8*s, cx+30*s,50*s]).fill(hc);
+    g.poly([cx+22*s,52*s, cx+40*s,0*s, cx+52*s,54*s]).fill(hc);
+    g.roundRect(cx-52*s,48*s,104*s,22*s,10*s).fill(hc);
+  } else if(o.hair==='bob'){
+    g.arc(cx,58*s,56*s,Math.PI,0).fill(hc);
+    g.roundRect(cx-56*s,40*s,112*s,52*s,16*s).fill(hc);
+    g.roundRect(cx-58*s,88*s,26*s,34*s,12*s).fill(hc);
+    g.roundRect(cx+32*s,88*s,26*s,34*s,12*s).fill(hc);
+  } else if(o.hair==='buzz'){
+    g.arc(cx,56*s,55*s,Math.PI,0).fill(hc);
+    g.roundRect(cx-55*s,30*s,110*s,30*s,14*s).fill(hc);
+  } else if(o.hair==='pony'){
+    g.arc(cx,56*s,55*s,Math.PI,0).fill(hc);
+    g.roundRect(cx-55*s,34*s,110*s,34*s,16*s).fill(hc);
+    g.roundRect(cx-6*s,70*s,14*s,40*s,7*s).fill(hc);
+    g.circle(cx+2*s,112*s,12*s).fill(hc);
+  } else if(o.hair==='curly'){
+    g.circle(cx-40*s,26*s,22*s).fill(hc);
+    g.circle(cx,16*s,24*s).fill(hc);
+    g.circle(cx+40*s,26*s,22*s).fill(hc);
+    g.circle(cx-20*s,38*s,20*s).fill(hc);
+    g.circle(cx+20*s,38*s,20*s).fill(hc);
+  } else if(o.hair==='none'){
+    g.arc(cx,56*s,55*s,Math.PI,0).fill({color:hairC,alpha:.25});
+  }
+  // sopracciglia
+  g.roundRect(cx-34*s,44*s,22*s,6*s,3*s).fill({color:0x00000088});
+  g.roundRect(cx+12*s,44*s,22*s,6*s,3*s).fill({color:0x00000088});
+  // occhi / occhiali
+  if(o.glasses==='shades'){
+    g.roundRect(cx-42*s,48*s,38*s,20*s,8*s).fill(0x111111).stroke({width:3*s,color:0x222222});
+    g.roundRect(cx+4*s,48*s,38*s,20*s,8*s).fill(0x111111).stroke({width:3*s,color:0x222222});
+    g.rect(cx-4*s,54*s,8*s,4*s).fill(0x222222);
+    g.rect(cx-30*s,52*s,10*s,4*s).fill({color:0xffffff,alpha:.5});
+    g.rect(cx+16*s,52*s,10*s,4*s).fill({color:0xffffff,alpha:.5});
+  } else {
+    g.circle(cx-23*s,56*s,12*s).fill(0xffffff).stroke({width:3*s,color:0x00000044});
+    g.circle(cx+23*s,56*s,12*s).fill(0xffffff).stroke({width:3*s,color:0x00000044});
+    g.circle(cx-23*s,56*s,5.5*s).fill(o.eyeColor||0x3a2a1a);
+    g.circle(cx+23*s,56*s,5.5*s).fill(o.eyeColor||0x3a2a1a);
+    if(o.glasses==='round'){
+      g.circle(cx-23*s,56*s,14*s).fill({color:0x000000,alpha:0}).stroke({width:3.5*s,color:0x333333});
+      g.circle(cx+23*s,56*s,14*s).fill({color:0x000000,alpha:0}).stroke({width:3.5*s,color:0x333333});
+      g.rect(cx-4*s,54*s,8*s,3*s).fill(0x333333);
+    } else if(o.glasses==='cat'){
+      g.poly([cx-37*s,50*s, cx-12*s,44*s, cx-8*s,58*s, cx-34*s,62*s]).fill({color:0x000000,alpha:0}).stroke({width:3.5*s,color:0x555555});
+      g.poly([cx+37*s,50*s, cx+12*s,44*s, cx+8*s,58*s, cx+34*s,62*s]).fill({color:0x000000,alpha:0}).stroke({width:3.5*s,color:0x555555});
+    } else if(o.glasses==='monocle'){
+      g.circle(cx+23*s,56*s,15*s).fill({color:0x000000,alpha:0}).stroke({width:3.5*s,color:0x888800});
+      g.rect(cx+33*s,44*s,3*s,26*s).fill(0x888800);
+    }
+  }
+  // becco (per i gabbiani)
+  if(o.beak){
+    g.poly([cx+10*s,70*s, cx+40*s,74*s, cx+10*s,82*s]).fill(0xffa02a).stroke({width:3*s,color:0xc97a1a});
+    g.circle(cx-10*s,76*s,6*s).fill({color:0x111111,alpha:.7});
+  } else {
+    // naso
+    g.ellipse(cx,72*s,7*s,5*s).fill({color:0x00000022});
+    // bocca
+    g.arc(cx,78*s,12*s,0.15,Math.PI-0.15).stroke({width:3.5*s,color:0x8a3a3a});
+  }
+  // barba
+  if(o.beard){
+    g.arc(cx,96*s,40*s,Math.PI*0.15,Math.PI*0.85).fill({color:hairC});
+  }
+  // baffi
+  if(o.mustache){
+    g.roundRect(cx-30*s,76*s,26*s,8*s,4*s).fill({color:hairC});
+    g.roundRect(cx+4*s,76*s,26*s,8*s,4*s).fill({color:hairC});
+  }
+  // cappello
+  if(o.hat==='beret'){
+    g.circle(cx-6*s,26*s,30*s).fill({color:o.hatColor?COL(o.hatColor):0x8f3a5a});
+    g.circle(cx-6*s,2*s,5*s).fill({color:o.hatColor?COL(o.hatColor):0x8f3a5a});
+  } else if(o.hat==='cap'){
+    g.arc(cx,34*s,44*s,Math.PI,0).fill({color:o.hatColor?COL(o.hatColor):0x2a3a5a});
+    g.roundRect(cx-46*s,34*s,92*s,12*s,6*s).fill({color:o.hatColor?COL(o.hatColor):0x2a3a5a});
+    g.roundRect(cx-46*s,32*s,24*s,8*s,4*s).fill({color:o.hatColor?COL(o.hatColor):0x2a3a5a});
+  } else if(o.hat==='top'){
+    g.rect(cx-26*s,-4*s,52*s,44*s).fill({color:o.hatColor?COL(o.hatColor):0x2a2a3a}).stroke({width:3*s,color:0x00000044});
+    g.roundRect(cx-36*s,36*s,72*s,8*s,4*s).fill({color:o.hatColor?COL(o.hatColor):0x2a2a3a});
+  } else if(o.hat==='headscarf'){
+    g.poly([cx-52*s,30*s, cx,2*s, cx+52*s,30*s, cx+40*s,60*s, cx-40*s,60*s]).fill({color:o.hatColor?COL(o.hatColor):0xc9685a});
+    g.poly([cx+40*s,58*s, cx+62*s,40*s, cx+54*s,70*s]).fill({color:o.hatColor?COL(o.hatColor):0xc9685a});
+  }
+}
+function makeAvatarContainer(o, w, h){
+  const c = new PIXI.Container();
+  const g = new PIXI.Graphics();
+  drawAvatarBust(g, o, w, h);
+  c.addChild(g);
+  return c;
+}
+
+/* =====================================================================
+   SCENE PAINTER — Milano disegnata in tempo reale
+   ===================================================================== */
+function paintScene(theme, bgType, W, H){
+  const c = new PIXI.Container();
+  const anims = [];
+  const groundY = H*0.82;
+  // --- STRATI DEL DIORAMA 3D (ciascuno si muove con la parallasse) ---
+  const skyG   = new PIXI.Graphics(); // cielo, sole, nuvole (profondo)
+  const farG   = new PIXI.Graphics(); // skyline lontano
+  const midG   = new PIXI.Graphics(); // skyline vicino + pavimento + riferimento
+  const frontG = new PIXI.Graphics(); // sagome in primo piano + piccioni
+  const fxG    = new PIXI.Graphics(); // vignette fisse (senza parallasse)
+  // CIELO
+  const grad = new PIXI.FillGradient(0,0,0,H);
+  grad.addColorStop(0, COL(theme[0]));
+  grad.addColorStop(0.72, COL(theme[1]));
+  grad.addColorStop(1, COL(theme[1]));
+  skyG.rect(0,0,W,H).fill(grad);
+  const sunX=W*0.84, sunY=H*0.13;
+  skyG.circle(sunX,sunY,64).fill({color:0xffe9a8, alpha:.22});
+  skyG.circle(sunX,sunY,44).fill(0xffe9a8);
+  const clouds=[];
+  for(let i=0;i<5;i++) clouds.push({x:rnd(0,W), y:H*(0.05+((i*53)%14)/100), sp:6+rnd(0,8), r:16+rnd(0,14)});
+  anims.push(dt=>{
+    clouds.forEach((cl,i)=>{
+      cl.x+=cl.sp*dt;
+      if(cl.x>W+90) cl.x=-90;
+      const cn=cloudGfx[i]; if(cn) cn.position.set(cl.x, cl.y);
+    });
+  });
+  const cloudGfx=[];
+  clouds.forEach(cl=>{
+    const cn=new PIXI.Graphics();
+    cn.circle(0,0,cl.r).fill({color:0xffffff, alpha:.8});
+    cn.circle(cl.r*0.9, cl.r*0.3, cl.r*0.75).fill({color:0xffffff, alpha:.75});
+    cn.circle(-cl.r*0.9, cl.r*0.35, cl.r*0.7).fill({color:0xffffff, alpha:.75});
+    cn.position.set(cl.x,cl.y);
+    skyG.addChild(cn); cloudGfx.push(cn);
+  });
+  drawSkyline(farG, W, H, groundY, 0x2a1e3a, 0.40, 0.5, true);
+  drawSkyline(midG, W, H, groundY, bgType==='navigli'? 0x3a2a3a : 0x2a2038, 0.92, 0.75, false);
+  midG.rect(0, groundY, W, H-groundY).fill(0x4a3a2a);
+  midG.rect(0, groundY-6, W, 6).fill(0x2a2018);
+  if(bgType==='piazza'||bgType==='brera'||bgType==='duomo'||bgType==='corso'){
+    for(let x=0;x<W;x+=56) midG.rect(x, groundY, 28, H-groundY).fill(0x54422e);
+  }
+  if(bgType==='duomo') drawDuomo(midG, W, H, anims, 1);
+  else if(bgType==='piazza') drawDuomo(midG, W, H, anims, 0.8);
+  else if(bgType==='navigli') drawNavigli(midG, W, H, anims);
+  else if(bgType==='bottega') drawBottega(midG, W, H, anims);
+  else if(bgType==='bar') drawBar(midG, W, H, anims);
+  else if(bgType==='deposito') drawDeposito(midG, W, H, anims);
+  else if(bgType==='brera') drawBrera(midG, W, H, anims);
+  else if(bgType==='corso') drawCorso(midG, W, H, anims);
+  else if(bgType==='museo') drawMuseo(midG, W, H, anims);
+  drawForeground(frontG, W, H);
+  const pigeons=[];
+  for(let i=0;i<4;i++) pigeons.push({x:W*(0.08+i*0.24), y:H*(0.34+((i*37)%16)/100), ph:rnd(0,6.28)});
+  anims.push(dt=>{
+    pigeons.forEach((p,idx)=>{
+      p.x += (idx%2? 16:-16)*dt;
+      if(p.x>W+30) p.x=-30; if(p.x<-30) p.x=W+30;
+      const pg=pigeonsGfx[idx]; if(pg){ pg.position.set(p.x, p.y+Math.sin(G.t*3+p.ph)*5); pg.rotation=Math.sin(G.t*9+p.ph)*0.14; }
+    });
+  });
+  const pigeonsGfx=[];
+  pigeons.forEach(p=>{
+    const pg=new PIXI.Graphics();
+    pg.circle(0,0,5).fill(0x777788);
+    pg.ellipse(4,-3,3,2).fill(0x777788);
+    pg.circle(-2,-2,1.6).fill(0xffffff);
+    pg.position.set(p.x,p.y);
+    frontG.addChild(pg); pigeonsGfx.push(pg);
+  });
+  const tg=new PIXI.FillGradient(0,0,0,210);
+  tg.addColorStop(0, 'rgba(5,10,18,0.5)');
+  tg.addColorStop(1, 'rgba(5,10,18,0)');
+  fxG.rect(0,0,W,210).fill(tg);
+  const sg=new PIXI.FillGradient(0,0,W,0);
+  sg.addColorStop(0, 'rgba(5,10,18,0.22)'); sg.addColorStop(0.15, 'rgba(5,10,18,0)');
+  sg.addColorStop(0.85, 'rgba(5,10,18,0)'); sg.addColorStop(1, 'rgba(5,10,18,0.22)');
+  fxG.rect(0,0,W,H).fill(sg);
+  c.addChild(skyG); c.addChild(farG); c.addChild(midG); c.addChild(frontG); c.addChild(fxG);
+  c._depthLayers = [
+    {c:skyG,   factor:-1.4, fy: 0.30, sc: 0.4},
+    {c:farG,   factor:-0.7, fy: 0.14, sc: 0.2},
+    {c:midG,   factor: 0.0, fy: 0.0,  sc: 0.0},
+    {c:frontG, factor: 1.3, fy:-0.12, sc:-0.35}
+  ];
+  c._anims = anims;
+  return c;
+}
+function drawForeground(g, W, H){
+  const s = Math.min(W,H);
+  g.circle(s*0.02, s*0.02, s*0.15).fill({color:0x0a1218, alpha:.82});
+  g.circle(s*0.10, s*0.00, s*0.12).fill({color:0x0a1218, alpha:.78});
+  g.circle(s*0.00, s*0.13, s*0.12).fill({color:0x0a1218, alpha:.78});
+  g.circle(W-s*0.01, H-s*0.02, s*0.10).fill({color:0x0a1218, alpha:.72});
+  g.circle(W-s*0.09, H-s*0.00, s*0.09).fill({color:0x0a1218, alpha:.68});
+  g.circle(s*0.02, H-s*0.01, s*0.08).fill({color:0x0a1218, alpha:.68});
+  const bg=new PIXI.FillGradient(0,H-s*0.16,0,H);
+  bg.addColorStop(0, 'rgba(5,10,18,0)');
+  bg.addColorStop(1, 'rgba(5,10,18,0.32)');
+  g.rect(0,H-s*0.16,W,s*0.16).fill(bg);
+}
+let depthMouseX=0, depthTiltX=0;
+function updateDepth(dt){
+  const sway = Math.sin(G.t*0.4)*0.16;
+  const target = clamp(depthMouseX*1.15 + depthTiltX*1.35 + sway, -1, 1);
+  G.depthTarget = target;
+  G.depth = lerp(G.depth||0, target, Math.min(1, dt*2.2));
+}
+function applyDepth(){
+  const sc=G.scene;
+  if(!sc || !sc._depthLayers || G.fallback) return;
+  const W=innerWidth, H=innerHeight;
+  const d = clamp(G.depth||0, -1, 1);
+  for(const L of sc._depthLayers){
+    const ox = d * L.factor * 26;
+    const oy = d * L.fy * 16;
+    const s  = 1 + d * L.sc * 0.035;
+    L.c.pivot.set(W/2, H/2);
+    L.c.position.set(W/2 + ox, H/2 + oy);
+    L.c.scale.set(s, s);
+  }
+}
+window.addEventListener('pointermove', (e)=>{
+  depthMouseX = (e.clientX/innerWidth - 0.5)*2;
+});
+function onOrient(e){
+  if(e.gamma==null) return;
+  depthTiltX = clamp(e.gamma/40, -1, 1);
+}
+function enableTilt(){
+  if(!window.DeviceOrientationEvent) return;
+  if(typeof window.DeviceOrientationEvent.requestPermission==='function'){
+    try{
+      window.DeviceOrientationEvent.requestPermission().then(p=>{
+        if(p==='granted') window.addEventListener('deviceorientation', onOrient);
+      }).catch(()=>{});
+    }catch(e){}
+  } else {
+    window.addEventListener('deviceorientation', onOrient);
+  }
+}
+
+const SCENE_TOP = 170; // zona riservata alla HUD: nessun hotspot sopra
+let HUD_H = 84;        // altezza reale della topbar, aggiornata da setTopbarVar()
+
+function drawSkyline(g, W, H, groundY, color, alpha, hScale, far){
+  let x=-30;
+  while(x<W+30){
+    const bw=(far? 40:60)+rndi(20,90);
+    const bh=H*(0.10+rnd(0,0.14))*hScale;
+    g.rect(x, groundY-bh, bw, bh).fill({color, alpha});
+    if(!far){
+      for(let wy=groundY-bh+10; wy<groundY-10; wy+=20){
+        for(let wx=x+7; wx<x+bw-8; wx+=13){
+          if(rnd()<0.55) g.rect(wx,wy,5,8).fill({color:0xffe9a8, alpha:.16});
+        }
+      }
+      if(rnd()<0.4) g.rect(x+bw*0.5-1, groundY-bh-12, 2, 12).fill({color, alpha});
+    }
+    x+=bw+4;
+  }
+}
+function drawCrowd(g, W, H, anims, cx, by){
+  const colors=[0xc96a5a,0x4a6ac9,0x3a8f5a,0xc9a03a,0x8f3a8f,0x3a8f8f];
+  const crowd=[];
+  for(let i=0;i<24;i++) crowd.push({x:cx-140+((i*37)%280), y:by-12-rnd(0,10), c:colors[i%6], ph:rnd(0,6.28)});
+  anims.push(dt=>{ crowd.forEach((p,idx)=>{ const cg=crowdGfx[idx]; if(cg) cg.position.y = p.y + Math.sin(G.t*2+p.ph)*2; }); });
+  const crowdGfx=[];
+  crowd.forEach(p=>{
+    const cg=new PIXI.Graphics();
+    cg.circle(0,0,4).fill(p.c);
+    cg.circle(0,-5,2.6).fill(0xf2c9a0);
+    cg.position.set(p.x,p.y);
+    g.addChild(cg); crowdGfx.push(cg);
+  });
+}
+function drawTree(g, x, groundY, s){
+  g.rect(x-4*s, groundY-40*s, 8*s, 40*s).fill(0x5a3a1a);
+  g.circle(x, groundY-46*s, 26*s).fill(0x3a7a3a);
+  g.circle(x-14*s, groundY-38*s, 18*s).fill(0x2a6a2a);
+  g.circle(x+14*s, groundY-38*s, 18*s).fill(0x2a6a2a);
+}
+function drawDuomo(g, W, H, anims, scale){
+  scale=scale||1;
+  const x=W*0.6, by=H*0.82, s=scale;
+  g.rect(x-110*s, by-150*s, 220*s, 150*s).fill(0xe8ddd0).stroke({width:3,color:0x9a8a7a});
+  g.rect(x-135*s, by-95*s, 270*s, 95*s).fill(0xd8cdc0).stroke({width:3,color:0x9a8a7a});
+  for(let i=-4;i<=4;i++){
+    g.poly([x+i*34*s-7*s, by-95*s, x+i*34*s, by-110*s, x+i*34*s+7*s, by-95*s]).fill(0xd8cdc0);
+  }
+  const spire=(sx, sy, hh, top)=>{
+    g.poly([sx-15*s, sy, sx, sy-hh*s, sx+15*s, sy]).fill(0xe8ddd0).stroke({width:2,color:0x9a8a7a});
+    if(top){ g.rect(sx-1.5*s, sy-hh*s-8*s, 3*s, 8*s).fill(0xffd54a); g.rect(sx-4*s, sy-hh*s-13*s, 8*s, 3*s).fill(0xffd54a); }
+  };
+  spire(x-100*s, by-95*s, 70*s);
+  spire(x-50*s, by-95*s, 105*s, true);
+  spire(x, by-95*s, 140*s, true);
+  spire(x+50*s, by-95*s, 105*s, true);
+  spire(x+100*s, by-95*s, 70*s);
+  g.circle(x, by-95*s-165*s, 14*s).fill({color:0xffd54a, alpha:.25});
+  g.rect(x-2.5*s, by-95*s-155*s, 5*s, 12*s).fill(0xffd54a);
+  g.circle(x, by-95*s-160*s, 5*s).fill(0xffe08a);
+  // insegna data-driven (es. Cattedrale di San Donnino)
+  const sgnDuomo=((G.case&&G.case.signs)||{}).duomo;
+  if(sgnDuomo){
+    const dsign=new PIXI.Text({text:sgnDuomo, style:{fontSize:Math.max(11,W*0.021), fontWeight:'900', fill:0x4a3a1a}});
+    dsign.anchor.set(0.5); dsign.position.set(x, by-95*s-188*s);
+    g.addChild(dsign);
+  }
+  g.circle(x, by-95*s-50*s, 22*s).fill(0x9a8a6a);
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; g.rect(x+Math.cos(a)*10*s-2*s, by-95*s-50*s+Math.sin(a)*10*s-2*s, 4*s, 4*s).fill(0x8a7a6a); }
+  g.arc(x, by-6*s, 34*s, Math.PI, 0).fill(0x5a4a3a);
+  g.rect(x-2*s, by-38*s, 4*s, 32*s).fill(0x8a7a6a);
+  for(let i=-3;i<=3;i++){
+    if(i===0) continue;
+    g.rect(x+i*30*s-5*s, by-90*s, 10*s, 30*s).fill(0x9a8a6a);
+    g.arc(x+i*30*s, by-90*s, 5*s, Math.PI, 0).fill(0x9a8a6a);
+  }
+  drawCrowd(g, W, H, anims, x, by);
+  const flags=[];
+  for(let i=0;i<5;i++) flags.push({fx:x-110*s+i*55*s, fy:by-95*s-18*s, ph:rnd(0,6.28)});
+  anims.push(dt=>{ flags.forEach((f,idx)=>{ const pg=flagGfx[idx]; if(pg) pg.rotation=Math.sin(G.t*4+f.ph)*0.25; }); });
+  const flagGfx=[];
+  flags.forEach(f=>{
+    const pg=new PIXI.Graphics();
+    pg.moveTo(0,0).lineTo(10,4).lineTo(0,9).closePath().fill(0xff8c42);
+    pg.position.set(f.fx, f.fy);
+    g.addChild(pg); flagGfx.push(pg);
+  });
+}
+function drawNavigli(g, W, H, anims){
+  const wy=H*0.76;
+  g.rect(0, wy, W, H-wy).fill(0x1a4a5a);
+  const shimmer=[];
+  for(let i=0;i<34;i++) shimmer.push({x:rnd(0,W), y:wy+rnd(0,H-wy), ph:rnd(0,6.28)});
+  anims.push(dt=>{ shimmer.forEach((s,idx)=>{ const sg2=shimmerGfx[idx]; if(sg2) sg2.alpha=0.10+0.10*Math.sin(G.t*3+s.ph); }); });
+  const shimmerGfx=[];
+  shimmer.forEach(s=>{ const sg2=new PIXI.Graphics(); sg2.rect(s.x,s.y,10,2).fill({color:0xbfe3ff, alpha:.2}); g.addChild(sg2); shimmerGfx.push(sg2); });
+  g.arc(W*0.5, wy+8, W*0.16, Math.PI, 0).stroke({width:12, color:0x6a4a2a});
+  g.rect(W*0.34, wy+8, W*0.32, 8).fill(0x5a3a1a);
+  for(let i=0;i<4;i++){
+    const bx=W*(0.06+i*0.13), bw2=W*0.11, bh=H*0.2;
+    g.rect(bx, wy-bh, bw2, bh).fill([0xd8c8b0,0xc8a878,0xe8d0b8][i%3]).stroke({width:3,color:0x8a6a4a});
+    for(let wy2=wy-bh+12; wy2<wy-10; wy2+=22) for(let wx2=bx+8; wx2<bx+bw2-8; wx2+=16) g.rect(wx2,wy2,9,12).fill(0x2a3a2a);
+    g.rect(bx+bw2*0.2, wy-30, bw2*0.6, 4).fill(0x8a3a2a);
+    g.circle(bx+bw2*0.35, wy-32, 3).fill(0xff5e5e);
+    g.circle(bx+bw2*0.5, wy-32, 3).fill(0xffd54a);
+    g.circle(bx+bw2*0.65, wy-32, 3).fill(0xff5e5e);
+  }
+  const boat=new PIXI.Graphics();
+  boat.ellipse(0,0,30,9).fill(0x3a2a1a);
+  boat.rect(-24,-14,48,8).fill(0x8a3a2a);
+  boat.circle(-8,-14,5).fill(0xf2c9a0);
+  boat.position.set(W*0.2, wy+H*0.12);
+  g.addChild(boat);
+  anims.push(dt=>{ boat.x+=10*dt; if(boat.x>W+40) boat.x=-40; boat.y=wy+H*0.12+Math.sin(G.t*1.5)*3; });
+  for(let i=0;i<5;i++){
+    const ux=W*(0.55+i*0.08), uy=wy-8;
+    g.rect(ux-1, uy-18, 2, 18).fill(0x5a3a1a);
+    g.arc(ux, uy-18, 14, Math.PI, 0).fill([0xc96a3a,0x3a6ac9,0x3a8f5a,0xc9a03a,0x8f3a8f][i%5]);
+  }
+  const lights=[];
+  for(let i=0;i<14;i++) lights.push({x:i*W/14, y:H*(0.2+((i*31)%14)/100), ph:rnd(0,6.28)});
+  anims.push(dt=>{ lights.forEach((l,idx)=>{ const lg=lightsGfx[idx]; if(lg) lg.alpha=0.55+0.45*Math.sin(G.t*5+l.ph); }); });
+  const lightsGfx=[];
+  lights.forEach(l=>{
+    const lg=new PIXI.Graphics();
+    lg.circle(0,0,3.4).fill(0xffe08a);
+    lg.position.set(l.x,l.y);
+    g.addChild(lg); lightsGfx.push(lg);
+  });
+}
+function drawBottega(g, W, H, anims){
+  const by=H*0.82;
+  g.rect(W*0.12, by-H*0.52, W*0.76, H*0.52).fill(0xf5e6c8).stroke({width:6,color:0x6a4a2a});
+  g.rect(W*0.16, by-H*0.42, W*0.68, H*0.26).fill(0xbfe3ff).stroke({width:5,color:0xffffff});
+  for(let i=0;i<5;i++){
+    const px=W*(0.2+i*0.135), py=by-H*0.18;
+    g.arc(px, py, W*0.032, Math.PI, 0).fill(0xc98a3a).stroke({width:2,color:0x8a5a1a});
+    g.rect(px-W*0.02, py-W*0.012, W*0.04, W*0.025).fill(0xffd98f);
+    g.circle(px+W*0.006, py-W*0.02, 1.6).fill(0x8a3a2a);
+  }
+  g.circle(W*0.88, by-H*0.16, 7).fill(0x8a8a8a);
+  const sgnBottega=((G.case&&G.case.signs)||{}).bottega||'DOLCE MENEGHINO';
+  const sign=new PIXI.Text({text:sgnBottega, style:{fontSize:Math.max(14,W*0.028), fontWeight:'900', fill:0xffe9a8}});
+  sign.anchor.set(0.5); sign.position.set(W*0.5, by-H*0.52-14);
+  g.addChild(sign);
+  for(let i=0;i<12;i++){
+    g.poly([W*(0.10+i*0.068), by-H*0.52, W*(0.145+i*0.068), by-H*0.60, W*(0.19+i*0.068), by-H*0.52]).fill(i%2? 0xff8c42:0xffd98f);
+  }
+  g.rect(0, by, W, H-by).fill(0x4a4a5a);
+  for(let i=0;i<6;i++) g.rect(i*W/6, by+H*0.03, W/12, 3).fill(0xffffff);
+  const tram=new PIXI.Graphics();
+  tram.rect(-70,-24,140,48).fill(0xc93a2a).stroke({width:4,color:0x8a2a1a});
+  tram.rect(-70,-24,140,12).fill(0xfff3d6);
+  for(let i=0;i<4;i++) tram.rect(-58+i*34,-20,26,18).fill(0xbfe3ff).stroke({width:2,color:0xffffff});
+  tram.circle(-50,24,6).fill(0x2a2a2a); tram.circle(50,24,6).fill(0x2a2a2a);
+  tram.position.set(W*0.1, by+24);
+  g.addChild(tram);
+  anims.push(dt=>{ tram.x+=70*dt; if(tram.x>W+140) tram.x=-140; });
+  g.rect(W*0.93, by-46, 4, 46).fill(0x2a2a2a);
+  g.circle(W*0.95, by-48, 6).fill(0xffe08a);
+}
+function drawBar(g, W, H, anims){
+  const by=H*0.82;
+  g.rect(0, by-H*0.6, W, H*0.6).fill(0x3a2a1a);
+  g.rect(0, by-H*0.6, W, 8).fill(0x2a1a0a);
+  for(let row=0; row<3; row++){
+    const ry=by-H*0.52+row*H*0.085;
+    g.rect(W*0.08, ry, W*0.84, 4).fill(0x5a4020);
+    for(let i=0;i<14;i++){
+      const bx=W*(0.10+i*0.058);
+      const cols=[0xc96a3a,0x8f3a5a,0x3a8f5a,0x5a3a8f,0xc9a03a,0x3a8f8f];
+      g.rect(bx, ry-H*0.05, W*0.016, H*0.05).fill(cols[(row*14+i)%6]);
+      g.rect(bx+W*0.004, ry-H*0.062, W*0.008, W*0.012).fill(0xffd54a);
+    }
+  }
+  g.roundRect(W*0.32, by-H*0.5, W*0.36, H*0.16, 10).fill({color:0xffffff, alpha:.12}).stroke({width:8,color:0x5a4020});
+  const sgnBar=((G.case&&G.case.signs)||{}).bar||'BAR BASSO';
+  const neon=new PIXI.Text({text:sgnBar, style:{fontSize:Math.max(13,W*0.026), fontWeight:'900', fill:0xff5eb0}});
+  neon.anchor.set(0.5); neon.position.set(W*0.5, by-H*0.42);
+  g.addChild(neon);
+  anims.push(dt=>{ neon.alpha = 0.75+0.25*Math.sin(G.t*5); });
+  g.rect(W*0.08, by-H*0.16, W*0.84, H*0.10).fill(0x8a6a3a).stroke({width:5,color:0x5a4020});
+  g.rect(W*0.08, by-H*0.17, W*0.84, 5).fill(0xc9a878);
+  for(let i=0;i<6;i++){
+    const sx=W*(0.13+i*0.13);
+    g.rect(sx, by-H*0.16+4, 4, H*0.05).fill(0x5a3a1a);
+    g.circle(sx+2, by-H*0.16+2, 8).fill(0x8f3a2a);
+  }
+  for(let i=0;i<4;i++){
+    const bx=W*(0.2+i*0.16), top=by-H*0.16-12;
+    g.poly([bx-6, by-H*0.16, bx+6, by-H*0.16, bx+4, top, bx-4, top]).fill(0xff8c42);
+    g.rect(bx-7, by-H*0.16, 14, 3).fill(0xffd98f);
+    g.circle(bx, top-3, 3).fill(0xffd54a);
+  }
+  g.rect(W*0.86, by-H*0.4, W*0.11, H*0.22).fill(0x0a2a4a).stroke({width:4,color:0x5a4020});
+  g.circle(W*0.92, by-H*0.31, 6).fill(0xffe08a);
+  for(let i=0;i<6;i++){
+    g.rect(W*(0.1+i*0.16), by-H*0.6, W*0.02, 5).fill(0x2a2a2a);
+    g.circle(W*(0.11+i*0.16), by-H*0.6+5, 5).fill({color:0xffe08a, alpha:.7});
+  }
+  g.rect(W*0.045, by-H*0.3, W*0.05, H*0.3).fill(0x2a1a0a);
+  g.circle(W*0.085, by-H*0.16, 3).fill(0xffd54a);
+}
+function drawDeposito(g, W, H, anims){
+  const by=H*0.82;
+  g.rect(0, by-H*0.5, W*0.4, H*0.5).fill(0x6a6a7a).stroke({width:6,color:0x3a3a4a});
+  g.rect(W*0.6, by-H*0.5, W*0.4, H*0.5).fill(0x6a6a7a).stroke({width:6,color:0x3a3a4a});
+  for(let i=0;i<3;i++){
+    g.rect(W*0.08+i*W*0.09, by-H*0.42, W*0.07, H*0.42).fill(0x3a3a4a).stroke({width:3,color:0x8a8a9a});
+    for(let j=0;j<3;j++) g.rect(W*0.085+i*W*0.09, by-H*0.36+j*H*0.11, W*0.06, 4).fill(0x8a8a9a);
+  }
+  const sgnDep=((G.case&&G.case.signs)||{}).deposito||'DEPOSITO ATM — TRAM 19';
+  const sign=new PIXI.Text({text:sgnDep, style:{fontSize:Math.max(11,W*0.02), fontWeight:'900', fill:0xffe9a8}});
+  sign.anchor.set(0.5); sign.position.set(W*0.2, by-H*0.55);
+  g.addChild(sign);
+  g.rect(0, by-6, W, 12).fill(0x2a2018);
+  for(let i=0;i<W;i+=22) g.rect(i, by-4, 12, 8).fill(0x4a3a2a);
+  g.rect(0, by+10, W, 6).fill(0x2a2018);
+  g.rect(0, by-56, W, 2).fill(0x1a1a1a);
+  for(let x=0;x<W;x+=90) g.rect(x, by-56, 2, 50).fill(0x1a1a1a);
+  const tram=new PIXI.Graphics();
+  tram.rect(-80,-30,160,58).fill(0xc93a2a).stroke({width:4,color:0x8a2a1a});
+  tram.rect(-80,-30,160,16).fill(0xfff3d6);
+  for(let i=0;i<5;i++) tram.rect(-68+i*32,-25,26,20).fill(0xbfe3ff).stroke({width:2,color:0xffffff});
+  tram.circle(-58,28,7).fill(0x2a2a2a); tram.circle(58,28,7).fill(0x2a2a2a);
+  tram.position.set(W*0.15, by);
+  g.addChild(tram);
+  anims.push(dt=>{ tram.x+=60*dt; if(tram.x>W+160) tram.x=-160; });
+  const sigs=[];
+  for(let i=0;i<3;i++) sigs.push({x:W*(0.15+i*0.3), ph:rnd(0,6.28)});
+  anims.push(dt=>{ sigs.forEach((s,idx)=>{ const on=Math.sin(G.t*3+s.ph)>0; const sg2=sigGfx[idx]; if(sg2){ sg2.clear(); sg2.circle(0,0,5).fill(on?0x7ed957:0x5a3a2a); } }); });
+  const sigGfx=[];
+  sigs.forEach(s=>{
+    const sg2=new PIXI.Graphics();
+    sg2.circle(0,0,5).fill(0x7ed957);
+    sg2.position.set(s.x, by-52);
+    g.addChild(sg2); sigGfx.push(sg2);
+  });
+  for(let i=0;i<4;i++){
+    g.rect(W*(0.1+i*0.26), by-H*0.52, 4, 8).fill(0x2a2a2a);
+    g.circle(W*(0.12+i*0.26), by-H*0.52+6, 6).fill({color:0xffe9a8, alpha:.5});
+  }
+}
+function drawBrera(g, W, H, anims){
+  const by=H*0.82;
+  const cols=[0xd8c8b0,0xc8b8a0,0xe8d8c0];
+  for(let i=0;i<5;i++){
+    const x=W*(0.04+i*0.20), w=W*0.18, h=H*(0.28+((i*29)%14)/100);
+    g.rect(x, by-h, w, h).fill(cols[i%3]).stroke({width:4,color:0x8a7a6a});
+    for(let wy=by-h+12; wy<by-12; wy+=24)
+      for(let wx=x+9; wx<x+w-12; wx+=18) g.rect(wx,wy,11,15).fill(0x3a4a3a);
+    if(i%2===0){
+      g.rect(x+w*0.15, by-h*0.35, w*0.7, 4).fill(0x5a4a3a);
+      g.rect(x+w*0.15, by-h*0.35, w*0.7, 10).fill({color:0x000000, alpha:.12});
+    }
+    g.rect(x+w*0.3, by-h*0.55, w*0.4, 2).fill(0x8a8a8a);
+    for(let j=0;j<4;j++) g.rect(x+w*(0.32+j*0.09), by-h*0.55+3, 10, 12).fill([0xffffff,0xff8c42,0x9ecbff,0xffd98f][j]);
+  }
+  g.rect(W*0.44, by-H*0.42, W*0.12, H*0.42).fill(0x8a6a3a);
+  g.rect(W*0.44, by-H*0.42, W*0.12, 10).fill(0xa87a4a);
+  for(let i=0;i<4;i++) g.rect(W*(0.4+i*0.068), by-H*0.36, W*0.012, H*0.36).fill(0xa87a4a);
+  const sgnBrera=((G.case&&G.case.signs)||{}).brera||'GALLERIA D\'ARTE';
+  const sign=new PIXI.Text({text:sgnBrera, style:{fontSize:Math.max(10,W*0.02), fontWeight:'900', fill:0x4a3a1a}});
+  sign.anchor.set(0.5); sign.position.set(W*0.5, by-H*0.45);
+  g.addChild(sign);
+  for(let i=0;i<10;i++){
+    g.poly([W*(0.38+i*0.026), by-H*0.4, W*(0.39+i*0.026), by-H*0.46, W*(0.40+i*0.026), by-H*0.4]).fill(0x8f3a2a);
+  }
+  drawTree(g, W*0.08, by, 1);
+  drawTree(g, W*0.93, by, 1.1);
+  drawTree(g, W*0.83, by, 0.8);
+  for(let i=0;i<2;i++){
+    const bx=W*(0.18+i*0.3);
+    g.circle(bx-8, by-8, 6).fill(0x2a2a2a);
+    g.circle(bx+8, by-8, 6).fill(0x2a2a2a);
+    g.rect(bx-8, by-14, 16, 6).fill(0x3a6ac9);
+  }
+  const cat=new PIXI.Graphics();
+  cat.ellipse(0,0,9,6).fill(0x3a3a4a);
+  cat.circle(8,-3,4.5).fill(0x3a3a4a);
+  cat.poly([11,-5, 14,-10, 12,-4]).fill(0x3a3a4a);
+  cat.circle(9,-4,1.4).fill(0xffe08a);
+  cat.position.set(W*0.72, by-H*0.28);
+  g.addChild(cat);
+  anims.push(dt=>{ cat.rotation=Math.sin(G.t*2)*0.08; cat.y=by-H*0.28+Math.sin(G.t*3)*1.5; });
+  g.rect(W*0.6, by-H*0.06, 3, 14).fill(0x5a5a5a);
+  g.circle(W*0.615, by-H*0.07, 11).fill(0xffffff).stroke({width:3,color:0xd43a3a});
+  const z=new PIXI.Text({text:'30', style:{fontSize:11, fontWeight:'900', fill:0x2a2a2a}});
+  z.anchor.set(0.5); z.position.set(W*0.615, by-H*0.065);
+  g.addChild(z);
+}
+function drawCorso(g, W, H, anims){
+  const by=H*0.78;
+  g.rect(0, by, W, H-by).fill(0x4a4a5a);
+  for(let i=0;i<7;i++) g.rect(i*W/7, by+H*0.05, W/14, 4).fill(0xffffff);
+  g.rect(0, by-4, W, 8).fill(0x2a2a2a);
+  for(let i=0;i<4;i++){
+    const x=W*(0.52+i*0.13), w=W*0.11, h=H*(0.26+((i*17)%12)/100);
+    g.rect(x, by-h, w, h).fill([0xd8c8b0,0xc8b8a0,0xe8d8c0][i%3]).stroke({width:3,color:0x8a7a6a});
+    for(let wy=by-h+12; wy<by-10; wy+=22) for(let wx=x+8; wx<x+w-10; wx+=14) g.rect(wx,wy,8,12).fill(0x3a4a3a);
+    g.rect(x+w*0.2, by-h*0.3, w*0.6, 3).fill(0xff8c42);
+  }
+  g.rect(W*0.08, by-26, W*0.3, 26).fill(0x8a6a3a).stroke({width:4,color:0x5a4020});
+  const ombrellone=new PIXI.Graphics();
+  ombrellone.arc(0,0,26,Math.PI,0).fill(0xff8c42);
+  ombrellone.position.set(W*0.23, by-26);
+  g.addChild(ombrellone);
+  for(let i=0;i<8;i++){
+    const ox=W*(0.10+i*0.036), oy=by-14;
+    g.circle(ox, oy, 7).fill(0xff8c42);
+    g.circle(ox+1.5, oy-1.5, 2).fill(0x3a7a3a);
+  }
+  const sgnCorso=((G.case&&G.case.signs)||{}).corso||'FRUTTA DI CARMELO — C.so Buenos Aires';
+  const sign=new PIXI.Text({text:sgnCorso, style:{fontSize:Math.max(10,W*0.019), fontWeight:'900', fill:0xfff3d6}});
+  sign.anchor.set(0.5); sign.position.set(W*0.23, by-34);
+  g.addChild(sign);
+  const tram=new PIXI.Graphics();
+  tram.rect(-70,-22,140,46).fill(0xc93a2a).stroke({width:4,color:0x8a2a1a});
+  tram.rect(-70,-22,140,12).fill(0xfff3d6);
+  for(let i=0;i<4;i++) tram.rect(-58+i*34,-18,26,18).fill(0xbfe3ff).stroke({width:2,color:0xffffff});
+  tram.circle(-50,24,6).fill(0x2a2a2a); tram.circle(50,24,6).fill(0x2a2a2a);
+  tram.position.set(W*0.15, by);
+  g.addChild(tram);
+  anims.push(dt=>{ tram.x+=65*dt; if(tram.x>W+140) tram.x=-140; });
+  for(let i=0;i<3;i++){
+    g.rect(W*(0.35+i*0.3), by-40, 4, 40).fill(0x2a2a2a);
+    g.circle(W*(0.37+i*0.3), by-42, 6).fill(0xffe08a);
+  }
+  const scooter=new PIXI.Graphics();
+  scooter.circle(0,0,5).fill(0x2a2a2a);
+  scooter.rect(-3,-2,6,4).fill(0xffd54a);
+  scooter.position.set(W*0.4, by+H*0.05);
+  g.addChild(scooter);
+  anims.push(dt=>{ scooter.x-=40*dt; if(scooter.x<-20) scooter.x=W+20; });
+}
+function drawMuseo(g, W, H, anims){
+  const by=H*0.82;
+  // parete e pavimento
+  g.rect(0, by-H*0.62, W, H*0.62).fill(0xe8e0d0);
+  g.rect(0, by-H*0.62, W, 10).fill(0xc8b8a0);
+  g.rect(0, by-10, W, 10).fill(0xa89070);
+  // faretti
+  for(let i=0;i<4;i++){
+    g.poly([W*(0.12+i*0.24)-34, by-H*0.62, W*(0.12+i*0.24)+34, by-H*0.62, W*(0.12+i*0.24)+78, by, W*(0.12+i*0.24)-78, by]).fill({color:0xffe9a8, alpha:.06});
+  }
+  // balenottera appesa (scheletro)
+  const wx=W*0.5, wy=by-H*0.34;
+  g.rect(wx-2, by-H*0.62, 2, wy-(by-H*0.62)).stroke({width:1,color:0x8a8a8a});
+  g.rect(wx+118, by-H*0.62, 2, wy-(by-H*0.62)).stroke({width:1,color:0x8a8a8a});
+  for(let i=-7;i<=7;i++) g.circle(wx+i*16, wy+Math.abs(i)*2, 5).fill(0xe8e0d0).stroke({width:2,color:0xb8a890});
+  for(let i=-4;i<=4;i++) g.arc(wx+i*18, wy+6, 26, 0.1, Math.PI-0.1).stroke({width:4,color:0xd8c8b0});
+  g.ellipse(wx+120, wy, 26, 16).fill(0xe8e0d0).stroke({width:2,color:0xb8a890});
+  g.rect(wx+140, wy-4, 18, 8).fill(0xe8e0d0).stroke({width:2,color:0xb8a890});
+  g.circle(wx+112, wy-6, 6).fill(0x8a7a6a);
+  const lbl=new PIXI.Text({text:'BALENOTTERA DELLO STIRONE — PLIOCENE', style:{fontSize:Math.max(10,W*0.018), fontWeight:'800', fill:0x4a3a2a}});
+  lbl.anchor.set(0.5); lbl.position.set(wx, wy+72);
+  g.addChild(lbl);
+  // vetrine con fossili
+  for(let i=0;i<3;i++){
+    const vx=W*(0.08+i*0.29), vy=by-H*0.16;
+    g.rect(vx, vy, W*0.24, H*0.16).fill(0xbfe3ff).stroke({width:4,color:0xffffff});
+    g.rect(vx+8, vy+8, W*0.24-16, H*0.16-16).fill({color:0xffffff, alpha:.3});
+    g.arc(vx+W*0.05, vy+H*0.07, 10, 0, 6.29).stroke({width:2,color:0x8a6a3a});
+    g.arc(vx+W*0.05, vy+H*0.07, 5, 0, 6.29).stroke({width:2,color:0x8a6a3a});
+    for(let j=0;j<3;j++) g.poly([vx+W*0.12+j*18, vy+H*0.06, vx+W*0.12+j*18+7, vy+H*0.12, vx+W*0.12+j*18-7, vy+H*0.12]).fill(0xf5f0e0);
+    g.ellipse(vx+W*0.18, vy+H*0.1, 12, 5).fill(0xc8b8a0);
+  }
+  const sign=new PIXI.Text({text:'MUSEO DEI FOSSILI DELLO STIRONE', style:{fontSize:Math.max(12,W*0.022), fontWeight:'900', fill:0xfff3d6}});
+  sign.anchor.set(0.5); sign.position.set(W*0.5, by-H*0.62-14);
+  g.addChild(sign);
+  // piccione che osserva (gag)
+  const pgn=new PIXI.Graphics();
+  pgn.circle(0,0,5).fill(0x777788);
+  pgn.circle(-3,-3,2).fill(0xffffff);
+  pgn.position.set(W*0.2, by-H*0.3);
+  g.addChild(pgn);
+  anims.push(dt=>{ pgn.position.y = by-H*0.3 + Math.sin(G.t*2)*4; });
+}
+let sceneAnims = [], c_tram = null;
+
+/* =====================================================================
+   MAPPA 2D — vista dall'alto (Canvas 2D: funziona anche senza WebGL)
+   ===================================================================== */
+const Map2D = {
+  canvas:null, ctx:null, raf:0, active:false, t:0, _init:false, pins:[], chars:[],
+  init(){
+    if(this._init) return;
+    this._init=true;
+    this.canvas=$('mapCanvas');
+    if(!this.canvas) return;
+    this.ctx=this.canvas.getContext('2d');
+    this.canvas.addEventListener('pointerdown', (e)=>{
+      if(!G.case||G.phase==='idle') return;
+      const r=this.canvas.getBoundingClientRect();
+      this.hit(e.clientX-r.left, e.clientY-r.top);
+    });
+    window.addEventListener('resize', ()=>this.resize());
+  },
+  resize(){
+    if(!this.canvas) return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    this.canvas.width=Math.round(innerWidth*dpr);
+    this.canvas.height=Math.round(innerHeight*dpr);
+    this.canvas.style.width=innerWidth+'px';
+    this.canvas.style.height=innerHeight+'px';
+    if(this.ctx) this.ctx.setTransform(dpr,0,0,dpr,0,0);
+  },
+  build(){
+    if(!G.case) return;
+    this.pins=G.case.locations.map(loc=>({loc, x:loc.x, y:loc.y, ph:rnd(0,6.28)}));
+    this.chars=[ {who:'orazio', x:0.08, y:0.82}, {who:'fontana', x:0.22, y:0.82} ];
+    this.resize();
+  },
+  show(){ this.active=true; if(this.canvas) this.canvas.style.display='block'; if(!this.raf) this.loop(); },
+  hide(){ this.active=false; if(this.canvas) this.canvas.style.display='none'; if(this.raf){ cancelAnimationFrame(this.raf); this.raf=0; } },
+  loop(){
+    Map2D.raf=requestAnimationFrame(Map2D.loop);
+    Map2D.t+=1/60;
+    Map2D.draw(Map2D.t);
+  },
+  pos(fx,fy){ return {x:fx*innerWidth, y:fy*innerHeight}; },
+  // posizione degli spilli: lontani dalla topbar (ora in basso) e dai bordi
+  pinPos(fx,fy){ return { x:clamp(fx*innerWidth, 44, innerWidth-44), y:clamp(fy*innerHeight, 110, innerHeight - HUD_H - 56) }; },
+  hit(x,y){
+    for(const p of this.pins){
+      const pp=this.pinPos(p.x,p.y);
+      if(Math.hypot(x-pp.x,y-pp.y)<40){ examine(p.loc); return; }
+    }
+    for(const ch of this.chars){
+      const cp=this.pos(ch.x,ch.y);
+      if(Math.hypot(x-cp.x,y-cp.y)<34){
+        if(ch.who==='orazio') sunglassesMoment(true);
+        else toast(pick(FONTANA_LINES),'t-sun');
+        return;
+      }
+    }
+    onEmptyTap();
+  },
+  draw(t){
+    const ctx=this.ctx; if(!ctx) return;
+    const W=innerWidth, H=innerHeight;
+    const cs=G.case; if(!cs) return;
+    ctx.fillStyle='#efe6d2'; ctx.fillRect(0,0,W,H);
+    this.drawCity(ctx,W,H,cs.bg,t);
+    for(const p of this.pins){
+      const pp=this.pinPos(p.x,p.y);
+      const pulse=1+0.12*Math.sin(t*3+p.ph);
+      const done=G.examined[p.loc.id];
+      ctx.save();
+      ctx.translate(pp.x,pp.y);
+      ctx.beginPath(); ctx.arc(0,0,24*pulse,0,6.29);
+      ctx.fillStyle= done? 'rgba(126,217,87,.22)':'rgba(255,140,66,.25)';
+      ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,17,0,6.29);
+      ctx.lineWidth=3;
+      ctx.strokeStyle= done? '#5fbf3c':(p.loc.clue? '#ff8c42':'#8a7a5a');
+      ctx.stroke();
+      ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(p.loc.icon,0,-2);
+      ctx.font='bold 11px -apple-system,sans-serif';
+      const label=p.loc.name;
+      const tw=ctx.measureText(label).width;
+      ctx.fillStyle='rgba(8,38,50,.9)';
+      roundRectPath(ctx,-tw/2-9,28,tw+18,18,9); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.fillText(label,0,37);
+      if(p.loc.clue && !done){
+        ctx.beginPath(); ctx.arc(14,-13,10,0,6.29);
+        ctx.fillStyle='#ff5c6b'; ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif';
+        ctx.fillText('!',14,-13);
+      } else if(done){
+        ctx.font='13px sans-serif'; ctx.fillText('✓',16,-15);
+      }
+      ctx.restore();
+    }
+    for(const ch of this.chars){
+      const cp=this.pos(ch.x,ch.y);
+      ctx.beginPath(); ctx.arc(cp.x,cp.y,15,0,6.29);
+      ctx.fillStyle= ch.who==='orazio'? '#0e7c7b':'#5a6a3a';
+      ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(ch.who==='orazio'?'🕶':'🧢',cp.x,cp.y-1);
+      ctx.font='bold 10px sans-serif'; ctx.fillStyle='#2b2418';
+      ctx.fillText(ch.who==='orazio'?'Orazio':'Fontana',cp.x,cp.y+28);
+    }
+    ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle='rgba(43,36,24,.75)';
+    ctx.fillText('🗺 VISTA DALL\'ALTO — '+cs.num.toUpperCase(), 12, H - HUD_H - 10);
+    const vg=ctx.createRadialGradient(W/2,H*0.45,Math.min(W,H)*0.35,W/2,H*0.5,Math.max(W,H)*0.7);
+    vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.18)');
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  },
+  drawCity(ctx,W,H,bg,t){
+    ctx.fillStyle='#e6ddc9'; ctx.fillRect(0,0,W,H);
+    const gx0=W*0.2, gy0=H*0.3;
+    ctx.strokeStyle='#d6cbb2'; ctx.lineWidth=18;
+    ctx.beginPath(); ctx.moveTo(0,gy0); ctx.lineTo(W,gy0); ctx.moveTo(gx0,0); ctx.lineTo(gx0,H); ctx.stroke();
+    ctx.strokeStyle='#cfc3a8'; ctx.lineWidth=10;
+    ctx.beginPath(); ctx.moveTo(0,gy0); ctx.lineTo(W,gy0); ctx.moveTo(gx0,0); ctx.lineTo(gx0,H); ctx.stroke();
+    ctx.strokeStyle='#e9e0cc'; ctx.lineWidth=4; ctx.setLineDash([10,8]);
+    ctx.beginPath(); ctx.moveTo(0,gy0); ctx.lineTo(W,gy0); ctx.moveTo(gx0,0); ctx.lineTo(gx0,H); ctx.stroke();
+    ctx.setLineDash([]);
+    const blocks=[[0.03,0.03,0.14,0.22],[0.24,0.03,0.72,0.22],[0.03,0.36,0.14,0.58],[0.24,0.36,0.6,0.58],[0.88,0.36,0.09,0.58],[0.03,0.68,0.14,0.28],[0.24,0.68,0.72,0.28]];
+    for(const b of blocks){
+      const bx=b[0]*W, by=b[1]*H, bw=b[2]*W, bh=b[3]*H;
+      ctx.fillStyle='#d9c9a8';
+      roundRectPath(ctx,bx,by,bw,bh,10); ctx.fill();
+      ctx.strokeStyle='#b8a581'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#cfbe9c';
+      for(let i=0;i<5;i++) ctx.fillRect(bx+8+i*(bw-16)/5, by+8, (bw-16)/5-6, 8);
+      ctx.fillStyle='#b8a581';
+      for(let i=0;i<3;i++) ctx.fillRect(bx+10+i*(bw-20)/3, by+20, (bw-20)/3-8, 8);
+    }
+    if(bg==='duomo'||bg==='piazza') this.landmarkDuomo(ctx,W,H,t);
+    else if(bg==='navigli') this.landmarkNavigli(ctx,W,H,t);
+    else if(bg==='bottega') this.landmarkBottega(ctx,W,H,t);
+    else if(bg==='bar') this.landmarkBar(ctx,W,H,t);
+    else if(bg==='deposito') this.landmarkDeposito(ctx,W,H,t);
+    else if(bg==='brera') this.landmarkBrera(ctx,W,H,t);
+    else if(bg==='corso') this.landmarkCorso(ctx,W,H,t);
+    else if(bg==='museo') this.landmarkMuseo(ctx,W,H,t);
+  },
+  landmarkDuomo(ctx,W,H,t){
+    ctx.fillStyle='#e3d5b8';
+    roundRectPath(ctx,W*0.3,H*0.2,W*0.4,H*0.4,18); ctx.fill();
+    ctx.strokeStyle='#cfbe9c'; ctx.lineWidth=4; ctx.stroke();
+    ctx.fillStyle='#d8cdc0';
+    ctx.fillRect(W*0.44,H*0.22,W*0.12,H*0.36);
+    ctx.fillRect(W*0.40,H*0.32,W*0.20,H*0.12);
+    ctx.strokeStyle='#9a8a7a'; ctx.lineWidth=2; ctx.strokeRect(W*0.44,H*0.22,W*0.12,H*0.36);
+    ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(W*0.5,H*0.4,6,0,6.29); ctx.fill();
+    ctx.fillStyle='#c8b8a0';
+    for(let i=0;i<5;i++) ctx.fillRect(W*(0.44+i*0.024),H*0.19,3,H*0.05);
+    ctx.fillStyle='#c93a2a'; ctx.fillRect(W*0.62+Math.sin(t)*8,H*0.44,26,10);
+  },
+  landmarkNavigli(ctx,W,H,t){
+    ctx.fillStyle='#1a4a5a';
+    ctx.fillRect(0,H*0.66,W,H*0.2);
+    ctx.fillStyle='rgba(191,227,255,.3)';
+    for(let i=0;i<8;i++) ctx.fillRect(i*W/8+Math.sin(t*2+i)*4, H*0.7, 14, 2);
+    ctx.fillStyle='#6a4a2a';
+    ctx.fillRect(W*0.28,H*0.64,6,H*0.24);
+    ctx.fillRect(W*0.68,H*0.64,6,H*0.24);
+    ctx.fillStyle='#d8c8b0';
+    for(let i=0;i<4;i++) ctx.fillRect(i*W*0.09+W*0.03, H*0.55, W*0.07, H*0.1);
+    ctx.fillStyle='#3a2a1a';
+    ctx.beginPath(); ctx.ellipse(W*0.5+Math.sin(t)*10, H*0.75, 16, 6, 0, 0, 6.29); ctx.fill();
+  },
+  landmarkBottega(ctx,W,H,t){
+    ctx.fillStyle='#f5e6c8';
+    roundRectPath(ctx,W*0.3,H*0.28,W*0.4,H*0.3,12); ctx.fill();
+    ctx.strokeStyle='#6a4a2a'; ctx.lineWidth=3; ctx.stroke();
+    ctx.fillStyle='#c98a3a';
+    ctx.beginPath(); ctx.arc(W*0.5,H*0.72,18,0,6.29); ctx.fill();
+    ctx.fillStyle='#ffd98f';
+    ctx.beginPath(); ctx.arc(W*0.5,H*0.62,8,0,6.29); ctx.fill();
+    ctx.fillStyle='#ff8c42';
+    for(let i=0;i<6;i++) ctx.fillRect(W*0.31+i*W*0.065, H*0.26, W*0.03, H*0.03);
+    ctx.fillStyle='#777788';
+    for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(W*(0.4+i*0.04), H*0.8, 2.5, 0, 6.29); ctx.fill(); }
+  },
+  landmarkBar(ctx,W,H,t){
+    ctx.fillStyle='#6a4a2a';
+    roundRectPath(ctx,W*0.2,H*0.3,W*0.6,H*0.4,12); ctx.fill();
+    ctx.fillStyle='#8a6a3a';
+    roundRectPath(ctx,W*0.25,H*0.42,W*0.5,H*0.14,8); ctx.fill();
+    ctx.fillStyle='#8f3a2a';
+    for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(W*(0.28+i*0.1),H*0.62,6,0,6.29); ctx.fill(); }
+    ctx.fillStyle='#3a8f5a';
+    for(let i=0;i<6;i++) ctx.fillRect(W*(0.26+i*0.08), H*0.34, 6, 10);
+    ctx.fillStyle='#ff8c42';
+    ctx.beginPath(); ctx.arc(W*0.5,H*0.36,5,0,6.29); ctx.fill();
+  },
+  landmarkDeposito(ctx,W,H,t){
+    ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(0,H*0.5); ctx.lineTo(W,H*0.5); ctx.stroke();
+    ctx.strokeStyle='#4a3a2a'; ctx.lineWidth=2; ctx.setLineDash([10,8]);
+    ctx.beginPath(); ctx.moveTo(0,H*0.5); ctx.lineTo(W,H*0.5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#6a6a7a';
+    ctx.fillRect(W*0.1,H*0.22,W*0.3,H*0.22);
+    ctx.strokeStyle='#3a3a4a'; ctx.lineWidth=3; ctx.strokeRect(W*0.1,H*0.22,W*0.3,H*0.22);
+    ctx.fillStyle='#c93a2a';
+    const tx=((t*50)%(W+100))-50;
+    ctx.fillRect(tx,H*0.47,34,12);
+    ctx.fillStyle='#fff3d6'; ctx.fillRect(tx+2,H*0.475,30,4);
+  },
+  landmarkBrera(ctx,W,H,t){
+    ctx.fillStyle='#b8d8a8';
+    roundRectPath(ctx,W*0.35,H*0.3,W*0.3,H*0.3,14); ctx.fill();
+    ctx.fillStyle='#3a7a3a';
+    for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(W*(0.38+i*0.06), H*0.36, 8, 0, 6.29); ctx.fill(); }
+    ctx.fillStyle='#8a6a3a';
+    ctx.fillRect(W*0.38,H*0.66,W*0.24,H*0.1);
+    ctx.fillStyle='#a87a4a';
+    for(let i=0;i<4;i++) ctx.fillRect(W*(0.4+i*0.06), H*0.66, 3, H*0.1);
+    ctx.fillStyle='#3a3a4a';
+    ctx.beginPath(); ctx.ellipse(W*0.72+Math.sin(t)*3, H*0.62, 6, 4, 0, 0, 6.29); ctx.fill();
+  },
+  landmarkCorso(ctx,W,H,t){
+    ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(0,H*0.5); ctx.lineTo(W,H*0.5); ctx.stroke();
+    ctx.fillStyle='#8a6a3a';
+    ctx.fillRect(W*0.14,H*0.36,W*0.2,H*0.12);
+    ctx.fillStyle='#ff8c42';
+    for(let i=0;i<8;i++){ ctx.beginPath(); ctx.arc(W*(0.16+i*0.022), H*0.4, 4, 0, 6.29); ctx.fill(); }
+    ctx.fillStyle='#c93a2a';
+    const tx=((t*50)%(W+100))-50;
+    ctx.fillRect(tx,H*0.475,34,12);
+  },
+  landmarkMuseo(ctx,W,H,t){
+    ctx.fillStyle='#d8c8b0';
+    roundRectPath(ctx,W*0.28,H*0.22,W*0.44,H*0.32,10); ctx.fill();
+    ctx.strokeStyle='#8a7a6a'; ctx.lineWidth=3; ctx.stroke();
+    // balena dall'alto
+    ctx.strokeStyle='#8a7a6a'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(W*0.5,H*0.38,46,12,0,0,6.29); ctx.stroke();
+    // vetrine
+    ctx.fillStyle='#bfe3ff';
+    for(let i=0;i<4;i++) ctx.fillRect(W*(0.33+i*0.08), H*0.46, W*0.06, H*0.04);
+    // faro
+    ctx.fillStyle='#ffd54a';
+    ctx.beginPath(); ctx.arc(W*0.5,H*0.28,4,0,6.29); ctx.fill();
+  }
+};
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+/* ---------------- vista scena illustrata / mappa 2D ---------------- */
+let viewMode='scene';
+function setViewMode(mode){
+  if(G.fallback) viewMode='map';
+  else viewMode=mode;
+  const btn=$('btnMode');
+  if(btn){
+    if(G.fallback){ btn.style.display='none'; }
+    else { btn.textContent = viewMode==='scene'? '🗺':'🏙'; btn.title = viewMode==='scene'? 'Vista Mappa 2D (dall\'alto)':'Vista scena illustrata'; }
+  }
+  if(G.app && G.app.canvas){ G.app.canvas.style.display = (viewMode==='scene' && !G.fallback)? 'block':'none'; }
+  if(viewMode==='map'){
+    if(G.case) Map2D.build();
+    Map2D.show();
+  } else {
+    Map2D.hide();
+  }
+}
+function toggleViewMode(){
+  if(G.fallback){ toast('Modalità mappa 2D attiva: il WebGL non è disponibile su questo dispositivo.','t-sun'); return; }
+  AU.click();
+  setViewMode(viewMode==='scene'? 'map':'scene');
+}
+function enableFallback(){
+  G.fallback=true;
+  setViewMode('map');
+  AU.ensure();
+  showTitle();
+  setTimeout(()=>toast('🖥️ Modalità compatibilità: vista 2D dall\'alto attivata (WebGL non disponibile).','t-sun',5), 600);
+}
+
+
+/* =====================================================================
+   STATO GLOBALE
+   ===================================================================== */
+const G = {
+  t:0, app:null, case:null, phase:'idle', meter:100, fallback:false,
+  evidence:[], examined:{}, asked:{}, hintUsed:false,
+  selClues:[], selSuspect:null,
+  hotspots:[], chars:[], layoutW:0, layoutH:0,
+  scene:null, depth:0, depthTarget:0
+};
+const avatarCache = {};
+
+/* ---------------- avatar → SVG dataURL (nessuna dipendenza da WebGL) ---------------- */
+function avatarDataURL(o, w, h){
+  const key = JSON.stringify(o)+'|'+w+'x'+h;
+  if(avatarCache[key]) return avatarCache[key];
+  const url = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(avatarSVG(o, w, h));
+  avatarCache[key]=url; return url;
+}
+function avatarSVG(o, w, h){
+  const s = Math.min(w,h)/240;
+  const skin=o.skin, hairC=o.hairColor, clothC=o.clothColor||'#2f6f8f';
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 240 260">`;
+  svg += `<path d="M45 260 L45 150 Q45 128 70 128 L170 128 Q195 128 195 150 L195 260 Z" fill="${clothC}"/>`;
+  svg += `<rect x="90" y="128" width="60" height="34" rx="10" fill="#ffffff" opacity=".85"/>`;
+  svg += `<rect x="104" y="100" width="32" height="46" fill="${skin}"/>`;
+  svg += `<circle cx="120" cy="62" r="54" fill="${skin}" stroke="#00000022" stroke-width="4"/>`;
+  svg += `<circle cx="66" cy="66" r="8" fill="${skin}"/><circle cx="174" cy="66" r="8" fill="${skin}"/>`;
+  if(o.hair==='spiky'){
+    svg += `<path d="M70 58 L86 -6 L104 50 Z" fill="${hairC}"/><path d="M90 52 L114 -14 L130 48 Z" fill="${hairC}"/><path d="M112 50 L134 -8 L150 50 Z" fill="${hairC}"/><path d="M142 52 L160 0 L172 54 Z" fill="${hairC}"/><rect x="68" y="48" width="104" height="22" rx="10" fill="${hairC}"/>`;
+  } else if(o.hair==='bob'){
+    svg += `<path d="M64 58 A56 56 0 0 1 176 58 L176 92 Q176 116 152 116 L142 116 L142 92 L98 92 L98 116 L88 116 Q64 116 64 92 Z" fill="${hairC}"/>`;
+  } else if(o.hair==='buzz'){
+    svg += `<path d="M65 56 A55 55 0 0 1 175 56 L175 30 L65 30 Z" fill="${hairC}"/>`;
+  } else if(o.hair==='pony'){
+    svg += `<path d="M65 56 A55 55 0 0 1 175 56 L175 34 L65 34 Z" fill="${hairC}"/><rect x="114" y="70" width="14" height="40" rx="7" fill="${hairC}"/><circle cx="122" cy="112" r="12" fill="${hairC}"/>`;
+  } else if(o.hair==='curly'){
+    svg += `<circle cx="80" cy="26" r="22" fill="${hairC}"/><circle cx="120" cy="16" r="24" fill="${hairC}"/><circle cx="160" cy="26" r="22" fill="${hairC}"/><circle cx="100" cy="38" r="20" fill="${hairC}"/><circle cx="140" cy="38" r="20" fill="${hairC}"/>`;
+  } else {
+    svg += `<path d="M65 56 A55 55 0 0 1 175 56 L175 40 L65 40 Z" fill="${hairC}" opacity=".25"/>`;
+  }
+  svg += `<rect x="86" y="44" width="22" height="6" rx="3" fill="#00000088"/><rect x="132" y="44" width="22" height="6" rx="3" fill="#00000088"/>`;
+  if(o.glasses==='shades'){
+    svg += `<rect x="78" y="48" width="38" height="20" rx="8" fill="#111111"/><rect x="124" y="48" width="38" height="20" rx="8" fill="#111111"/><rect x="116" y="54" width="8" height="4" fill="#222222"/><rect x="90" y="52" width="10" height="4" fill="#ffffff" opacity=".5"/><rect x="136" y="52" width="10" height="4" fill="#ffffff" opacity=".5"/>`;
+  } else {
+    svg += `<circle cx="97" cy="56" r="12" fill="#ffffff"/><circle cx="143" cy="56" r="12" fill="#ffffff"/><circle cx="97" cy="56" r="5.5" fill="${o.eyeColor||'#3a2a1a'}"/><circle cx="143" cy="56" r="5.5" fill="${o.eyeColor||'#3a2a1a'}"/>`;
+    if(o.glasses==='round'){
+      svg += `<circle cx="97" cy="56" r="14" fill="none" stroke="#333333" stroke-width="3.5"/><circle cx="143" cy="56" r="14" fill="none" stroke="#333333" stroke-width="3.5"/><rect x="116" y="54" width="8" height="3" fill="#333333"/>`;
+    } else if(o.glasses==='cat'){
+      svg += `<path d="M63 50 L88 44 L92 58 L66 62 Z" fill="none" stroke="#555555" stroke-width="3.5"/><path d="M177 50 L152 44 L148 58 L174 62 Z" fill="none" stroke="#555555" stroke-width="3.5"/>`;
+    } else if(o.glasses==='monocle'){
+      svg += `<circle cx="143" cy="56" r="15" fill="none" stroke="#888800" stroke-width="3.5"/><rect x="153" y="44" width="3" height="26" fill="#888800"/>`;
+    }
+  }
+  if(o.beak){
+    svg += `<path d="M130 70 L160 74 L130 82 Z" fill="#ffa02a" stroke="#c97a1a" stroke-width="3"/><circle cx="110" cy="76" r="6" fill="#111111" opacity=".7"/>`;
+  } else {
+    svg += `<ellipse cx="120" cy="72" rx="7" ry="5" fill="#00000022"/><path d="M108 78 Q120 90 132 78" fill="none" stroke="#8a3a3a" stroke-width="3.5" stroke-linecap="round"/>`;
+  }
+  if(o.beard){ svg += `<path d="M80 96 Q120 130 160 96 Q140 116 120 116 Q100 116 80 96 Z" fill="${hairC}"/>`; }
+  if(o.mustache){ svg += `<rect x="90" y="76" width="26" height="8" rx="4" fill="${hairC}"/><rect x="124" y="76" width="26" height="8" rx="4" fill="${hairC}"/>`; }
+  if(o.hat==='beret'){ svg += `<circle cx="114" cy="26" r="30" fill="${o.hatColor||'#8f3a5a'}"/><circle cx="114" cy="2" r="5" fill="${o.hatColor||'#8f3a5a'}"/>`; }
+  else if(o.hat==='cap'){ svg += `<path d="M76 34 A44 44 0 0 1 164 34 L164 46 L76 46 Z" fill="${o.hatColor||'#2a3a5a'}"/><rect x="74" y="32" width="24" height="8" rx="4" fill="${o.hatColor||'#2a3a5a'}"/>`; }
+  else if(o.hat==='top'){ svg += `<rect x="94" y="-4" width="52" height="44" fill="${o.hatColor||'#2a2a3a'}"/><rect x="84" y="36" width="72" height="8" rx="4" fill="${o.hatColor||'#2a2a3a'}"/>`; }
+  else if(o.hat==='headscarf'){ svg += `<path d="M68 30 L120 2 L172 30 L160 60 L80 60 Z" fill="${o.hatColor||'#c9685a'}"/><path d="M160 58 L182 40 L174 70 Z" fill="${o.hatColor||'#c9685a'}"/>`; }
+  svg += `</svg>`;
+  return svg;
+}
+function avatarImg(o, w, h){
+  const url = avatarDataURL(o,w,h);
+  return `<img src="${url}" style="width:${w}px;height:${h}px;border-radius:12px;display:block;background:#fdf6e3">`;
+}
+
+/* ---------------- speaker registry ---------------- */
+const SPEAKERS = {
+  orazio:{ name:'Orazio Caino', color:'#ff8c42', avatar:{skin:'#f6cf9d', hair:'spiky', hairColor:'#d33a1f', glasses:'shades', hat:null, cloth:'#0e7c7b', clothColor:'#0e7c7b'} },
+  fontana:{ name:'Agente Fontana', color:'#9ecbff', avatar:{skin:'#e8b48a', hair:'buzz', hairColor:'#5a4a3a', glasses:null, hat:'cap', cloth:'#5a6a3a', clothColor:'#5a6a3a'} },
+  narr:{ name:'Narratore', color:'#ffe08a', avatar:null }
+};
+function speaker(who){
+  if(SPEAKERS[who]) return SPEAKERS[who];
+  if(G.case){
+    const s = G.case.suspects.find(x=>x.id===who);
+    if(s) return { name:s.name, color:'#ffb066', avatar:s.avatar };
+  }
+  return { name:who, color:'#fff', avatar:null };
+}
+
+/* =====================================================================
+   DIALOGO (typewriter + scelte, tutto touch)
+   ===================================================================== */
+let typeTimer=null, typeResolve=null, typeDone=true;
+function say(who, text){
+  return new Promise(res=>{
+    setTopbarVar();
+    const sp = speaker(who);
+    const dlg = $('dialogue');
+    dlg.classList.remove('hidden');
+    dlg.scrollTop=0;
+    $('dName').innerHTML = (sp.avatar? `<img src="${avatarDataURL(sp.avatar,34,34)}" style="width:30px;height:30px;border-radius:8px;margin-right:2px">`:'') + `<span style="color:${sp.color}">${sp.name}</span>` + (who==='orazio'? '<span class="chip">IL DETECTIVE</span>':'');
+    $('dChoices').innerHTML='';
+    $('dTap').style.display='block';
+    let i=0;
+    typeDone=false;
+    if(typeTimer) clearInterval(typeTimer);
+    typeTimer = setInterval(()=>{
+      i++;
+      $('dText').textContent = text.slice(0,i);
+      if(chance(0.3)) AU.say();
+      if(i>=text.length){
+        clearInterval(typeTimer); typeTimer=null; typeDone=true;
+      }
+    }, 16);
+    typeResolve = ()=>{
+      if(!typeDone){ clearInterval(typeTimer); typeTimer=null; typeDone=true; $('dText').textContent=text; return; }
+      typeResolve=null;
+      dlg.classList.add('hidden');
+      res();
+    };
+  });
+}
+function choose(options){
+  return new Promise(res=>{
+    setTopbarVar();
+    typeResolve=null;
+    $('dName').innerHTML = `<span style="color:#ffe08a">ASSISTENTE</span><span class="chip">TU</span>`;
+    $('dText').textContent = options.prompt||'Cosa fai?';
+    $('dTap').style.display='none';
+    const c = $('dChoices');
+    c.innerHTML='';
+    options.items.forEach((it,idx)=>{
+      const b=document.createElement('button');
+      b.className='btn'; b.textContent=it;
+      b.onclick=()=>{ c.innerHTML=''; res(idx); };
+      c.appendChild(b);
+    });
+    $('dialogue').classList.remove('hidden');
+  });
+}
+function hideDialogue(){ $('dialogue').classList.add('hidden'); if(typeTimer){clearInterval(typeTimer);typeTimer=null;} }
+$('dialogue').addEventListener('click', (e)=>{
+  if(e.target.closest('#dChoices .btn')) return;
+  if(typeResolve) typeResolve();
+});
+
+/* =====================================================================
+   TOAST / MODAL
+   ===================================================================== */
+function toast(txt, cls){
+  const el=$('toasts');
+  const d=document.createElement('div');
+  d.className='toast '+(cls||'');
+  d.textContent=txt;
+  el.appendChild(d);
+  setTimeout(()=>{ d.style.transition='opacity .4s'; d.style.opacity='0'; setTimeout(()=>d.remove(),450); }, 3200);
+  while(el.children.length>4) el.removeChild(el.firstChild);
+}
+function openModal(title, body){
+  $('modalTitle').textContent=title;
+  $('modalBody').innerHTML=body;
+  $('modalOverlay').classList.add('open');
+}
+function closeModal(){ $('modalOverlay').classList.remove('open'); }
+$('modalClose').onclick=closeModal;
+$('modalOverlay').addEventListener('click',(e)=>{ if(e.target===$('modalOverlay')) closeModal(); });
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+function refreshHud(){
+  if(!G.case) return;
+  $('caseT1').textContent = G.case.num+' · '+G.case.diff;
+  $('caseT2').textContent = G.case.title;
+  $('meterFill').style.width = G.meter+'%';
+  $('evBadge').textContent = G.evidence.length;
+  $('susBadge').textContent = G.evidence.length>=G.case.minClues? '!' : '';
+  $('btnSuspects').style.opacity = G.evidence.length>=G.case.minClues? 1 : 0.55;
+  $('btnSound').textContent = S.muted? '🔇':'🔊';
+}
+
+/* =====================================================================
+   SCENA: hotspot, personaggi, layout
+   ===================================================================== */
+function clearScene(){
+  if(G.scene && G.app){ G.app.stage.removeChild(G.scene); G.scene.destroy({children:true}); }
+  G.scene=null; G.hotspots=[]; G.chars=[]; sceneAnims=[];
+}
+function buildScene(){
+  clearScene();
+  const W=innerWidth, H=innerHeight;
+  G.layoutW=W; G.layoutH=H;
+  const cs=G.case;
+  if(!G.fallback && G.app){
+    G.scene = paintScene(cs.theme, cs.bg, W, H);
+    sceneAnims = G.scene._anims||[];
+    // IMPORTANTE: la scena va SOPRA il layer tap a tutto schermo,
+    // altrimenti gli hotspot non ricevono i tocchi.
+    G.app.stage.addChild(G.scene);
+    cs.locations.forEach(loc=>{
+      const h = makeHotspot(loc);
+      G.hotspots.push(h);
+      G.scene.addChild(h.c);
+    });
+    // Orazio + Fontana in scena (in alto: la topbar ora è in basso)
+    G.chars.push(makeSceneChar('orazio', 0.06, 0.80));
+    G.chars.push(makeSceneChar('fontana', 0.15, 0.80));
+    G.chars.forEach(ch=>G.scene.addChild(ch.c));
+    layoutScene();
+  }
+  if(Map2D.canvas) Map2D.build();
+  setViewMode(viewMode); // riapplica la vista corrente (scena o mappa)
+  refreshHud();
+}
+function makeHotspot(loc){
+  const c = new PIXI.Container();
+  const cardW=100, cardH=106;
+  // ombra portata (profondità)
+  const sh=new PIXI.Graphics();
+  sh.ellipse(0, cardH/2+4, cardW*0.6, 9).fill({color:0x000000, alpha:.22});
+  c.addChild(sh);
+  const g = new PIXI.Graphics();
+  // ombra
+  g.roundRect(-cardW/2+3,-cardH/2+7,cardW,cardH,18).fill({color:0x000000, alpha:.18});
+  // carta
+  g.roundRect(-cardW/2,-cardH/2,cardW,cardH,18).fill(0xfff8e8).stroke({width:3,color:0xff8c42});
+  g.roundRect(-cardW/2+7,-cardH/2+7,cardW-14,cardH-14,12).fill({color:0xffffff, alpha:.55});
+  const icon = new PIXI.Text({text:loc.icon, style:{fontSize:38, fill:0x000000}});
+  icon.anchor.set(0.5); icon.position.set(0,-13);
+  // etichetta con pill scura (leggibile anche su sfondi chiari e sotto la HUD)
+  const label = new PIXI.Text({text:loc.name, style:{fontSize:11, fontWeight:'800', fill:0xfff8e8, wordWrap:true, wordWrapWidth:88, align:'center'}});
+  label.anchor.set(0.5,0.5);
+  const pill = new PIXI.Graphics();
+  pill.roundRect(-47,-9,94,18,9).fill(0x0b3d4d);
+  const lblC = new PIXI.Container();
+  lblC.addChild(pill, label);
+  lblC.position.set(0, 36);
+  // badge !
+  const badge = new PIXI.Container();
+  const bg2 = new PIXI.Graphics();
+  bg2.circle(0,0,13).fill(0xff5c6b).stroke({width:3,color:0xffffff});
+  const btxt = new PIXI.Text({text:'!', style:{fontSize:15, fontWeight:'900', fill:0xffffff}});
+  btxt.anchor.set(0.5);
+  badge.addChild(bg2,btxt);
+  badge.position.set(cardW/2-6,-cardH/2+2);
+  badge.visible = !!(loc.clue && !G.examined[loc.id]);
+  // anello pulsante (disegnato nel ticker)
+  const ring = new PIXI.Graphics();
+  ring.eventMode='none';
+  c.addChild(g, icon, lblC, badge, ring);
+  c._badge = badge; c._ring = ring;
+  c.eventMode='static'; c.cursor='pointer';
+  c.position.set(clamp(loc.x*G.layoutW, 64, G.layoutW-64), clamp(loc.y*G.layoutH, 110, G.layoutH - Math.max(HUD_H+70, 150)));
+  c._baseX = c.position.x; c._baseY = c.position.y;
+  c._phase = rnd(0,6.28);
+  c.on('pointertap', (ev)=>{ if(ev) ev.stopPropagation(); examine(loc); });
+  return {c, loc};
+}
+function makeSceneChar(who, fx, fy){
+  const c = new PIXI.Container();
+  const g = new PIXI.Graphics();
+  const isO = who==='orazio';
+  const skin=COL('#f6cf9d');
+  // ombra portata
+  g.ellipse(0, 40, 22, 6).fill({color:0x000000, alpha:.25});
+  // corpo
+  g.roundRect(-16,-6,32,44,12).fill(isO? 0x0e7c7b : 0x5a6a3a).stroke({width:2,color:0x00000033});
+  // testa
+  g.circle(0,-30,17).fill(skin).stroke({width:2,color:0x00000022});
+  if(isO){
+    g.poly([-14,-34, -10,-50, -5,-32]).fill(0xd33a1f);
+    g.poly([-6,-34, 0,-52, 7,-32]).fill(0xd33a1f);
+    g.poly([4,-33, 12,-46, 15,-30]).fill(0xd33a1f);
+    g.roundRect(-11,-38,22,8,3).fill(0x111111); // occhiali
+    g.rect(-6,-36,5,2).fill({color:0xffffff,alpha:.6});
+  } else {
+    g.arc(0,-34,16,Math.PI,0).fill(0x5a4a3a);
+    g.circle(-6,-30,2).fill(0x000000); g.circle(6,-30,2).fill(0x000000);
+    g.arc(0,-24,6,0.2,Math.PI-0.2).stroke({width:2,color:0x8a3a3a});
+  }
+  c.addChild(g);
+  c.eventMode='static'; c.cursor='pointer';
+  c.position.set(fx*G.layoutW, fy*G.layoutH);
+  c.on('pointertap', (ev)=>{
+    if(ev) ev.stopPropagation();
+    if(isO) sunglassesMoment(true);
+    else { toast(pick(FONTANA_LINES), 't-sun'); AU.pop(); }
+  });
+  return {c, who, fx, fy};
+}
+function layoutScene(){
+  const W=innerWidth, H=innerHeight;
+  if(!G.scene) return;
+  G.layoutW=W; G.layoutH=H;
+  G.hotspots.forEach(h=>{
+    const x=clamp(h.loc.x*W, 64, W-64), y=clamp(h.loc.y*H, 110, H - Math.max(HUD_H+70, 150));
+    h.c.position.set(x,y); h.c._baseX=x; h.c._baseY=y;
+  });
+  G.chars.forEach(ch=>ch.c.position.set(clamp(ch.fx*W, 30, W-30), ch.fy*H));
+}
+function examine(loc){
+  AU.pop();
+  if(G.phase!=='explore'&&G.phase!=='interrogate') return;
+  (async ()=>{
+    await say('orazio', loc.desc);
+    if(loc.clue){
+      if(!G.evidence.includes(loc.clue.id)){
+        G.evidence.push(loc.clue.id);
+        G.examined[loc.id]=true;
+        const hs = G.hotspots.find(h=>h.loc.id===loc.id);
+        if(hs) hs.c._badge.visible=false;
+        AU.clue();
+        if(!G.fallback && G.app && viewMode==='scene') spawnSparkle(loc.x, loc.y);
+        const b = G.evidence.length>=G.case.minClues;
+        await say('orazio', `Trovato: ${loc.clue.name}. ${loc.clue.desc} ${b? 'Ora abbiamo abbastanza per interrogare i sospetti!':'Aggiunto agli indizi.'}`);
+        if(chance(0.5)){ S.crumb+=rndi(1,4); }
+        if(b) toast('🕵 Hai abbastanza indizi: interroga i sospetti!','t-good');
+        refreshHud(); saveGame();
+      } else {
+        await say('orazio', 'Questo indizio lo abbiamo già, assistente. Non è un buffet: non si riprende due volte.');
+      }
+    } else {
+      await say('orazio', loc.flavor || 'Niente di utile. Solo Fidenza. E a Fidenza anche il niente ha un suo perché.');
+      if(chance(0.6)) await say('fontana', pick(FONTANA_LINES));
+    }
+  })();
+}
+
+function spawnSparkle(fx,fy){
+  const x=fx*G.layoutW, y=fy*G.layoutH;
+  const c=new PIXI.Container();
+  for(let i=0;i<10;i++){
+    const p=new PIXI.Graphics();
+    p.circle(0,0,3).fill([0xffe08a,0xff8c42,0xffd54a][i%3]);
+    const a=i/10*Math.PI*2;
+    p.position.set(x,y);
+    c.addChild(p);
+    p._a=a; p._sp=rnd(60,120);
+  }
+  G.app.stage.addChild(c);
+  let life=0;
+  const tick=(tk)=>{
+    life+=tk.deltaMS/1000;
+    c.children.forEach(p=>{
+      p.position.x+=Math.cos(p._a)*p._sp*(tk.deltaMS/1000);
+      p.position.y+=Math.sin(p._a)*p._sp*(tk.deltaMS/1000);
+      p.alpha=1-life/0.6;
+    });
+    if(life>0.6){ G.app.ticker.remove(tick); c.destroy({children:true}); }
+  };
+  G.app.ticker.add(tick);
+}
+
+/* =====================================================================
+   FLUSSO CASO
+   ===================================================================== */
+async function startCase(caseId){
+  setTopbarVar();
+  enableTilt();
+  const cs = CASES.find(c=>c.id===caseId);
+  G.case=cs;
+  G.phase='intro';
+  G.meter=100; G.evidence=[]; G.examined={}; G.asked={}; G.hintUsed=false;
+  G.selClues=[]; G.selSuspect=null;
+  buildScene();
+  AU.pop();
+  // intro
+  for(const line of cs.intro){
+    await say(line.who, line.t);
+  }
+  G.phase='explore';
+  saveGame(); // persisti subito il nuovo caso (sostituisce il precedente)
+  toast('🔍 Tocca i punti luminosi per cercare indizi. Quando ne hai abbastanza, interroga i sospetti.','t-sun',4);
+}
+async function doAccuse(){
+  const cs=G.case;
+  if(G.evidence.length<cs.minClues){
+    await say('orazio', 'Assistente, con questo poco non inchiodiamo nemmeno un piccione. Ci serve più evidenza.');
+    return;
+  }
+  if(G.selClues.length<cs.reqClues || !G.selSuspect){
+    await say('orazio', 'Servono il colpevole e almeno '+cs.reqClues+' prove che lo inchiodano, assistente. La giustizia è una questione di dettagli.');
+    return;
+  }
+  if(G.selSuspect===cs.solution.culprit && cs.solution.clues.every(c=>G.selClues.includes(c))){
+    await winCase();
+  } else {
+    await loseCase();
+  }
+}
+async function winCase(){
+  const cs=G.case;
+  G.phase='win';
+  AU.win();
+  // occhiali da sole!
+  await sunglassesMoment();
+  await sleep(700);
+  hideDialogue();
+  for(const line of cs.resolve){
+    await say(line.who, line.t);
+  }
+  // stelle
+  const stars = G.meter>=80?3 : G.meter>=50?2 : 1;
+  S.stars[cs.id]=Math.max(S.stars[cs.id]||0, stars);
+  const idx=CASES.findIndex(c=>c.id===cs.id);
+  if(idx>=0 && idx<CASES.length-1 && !S.unlocked.includes(CASES[idx+1].id)) S.unlocked.push(CASES[idx+1].id);
+  saveGame();
+  toast(`⭐ ${stars} stelle! Il caso è chiuso. Milano ti ringrazia (con un cenno del capo).`, 't-good', 4);
+  const nxt = CASES[idx+1];
+  if(nxt){
+    const r = await choose({prompt:'Prossimo caso?', items:[`▶ Apri il prossimo caso: ${nxt.title}`, '📁 Torna alla bacheca']});
+    if(r===0) startCase(nxt.id); else showCaseSelect();
+  } else {
+    await say('orazio', 'Hai risolto tutti i casi, assistente. Anche l\'arancia-killer. Milano può dormire tranquilla... fino al prossimo panettone scomparso.');
+    await say('narr', 'GRAZIE PER AVER GIOCATO. Orazio ti saluta mettendosi gli occhiali da sole. È il saluto più onorevole che esista.');
+    AU.yea();
+    showCaseSelect();
+  }
+}
+async function loseCase(){
+  const cs=G.case;
+  G.meter-=25;
+  if(G.meter<=0){
+    G.meter=0;
+    AU.fail();
+    await say('orazio', 'Assistente... questa volta hai accusato il torto con troppa convinzione. La Centrale mi ha sospeso. Il caso riparte da zero. E il caffè è dalla parte di Fontana.');
+    refreshHud();
+    const r = await choose({prompt:'Ripartire?', items:['🔁 Ricomincia il caso','📁 Torna alla bacheca']});
+    if(r===0) startCase(cs.id); else showCaseSelect();
+    return;
+  }
+  AU.wrong();
+  const line = cs.wrong[G.selSuspect] || `Orazio: "Sbagliato, assistente. ${G.selSuspect} non c'entra. Il cervello di Caino dice: ${G.meter}%. Continua a indagare."`;
+  await say('orazio', line);
+  refreshHud();
+  G.selClues=[]; G.selSuspect=null;
+}
+
+/* =====================================================================
+   MODAL: INDIZI + ACCUSA
+   ===================================================================== */
+function openEvidence(){
+  const cs=G.case;
+  if(!cs) return;
+  AU.click();
+  const clues = cs.locations.filter(l=>l.clue && G.evidence.includes(l.clue.id));
+  let body = `<div class="note">La verità è qui dentro. Scegli il colpevole e ${cs.reqClues} prove che lo inchiodano. Attenzione: le prove si usano con la testa, non col cuore.</div>`;
+  body += `<div style="font-weight:900;margin:10px 0 6px">CHI È IL COLPEVOLE?</div>`;
+  body += `<div class="grid2">`;
+  cs.suspects.forEach(s=>{
+    const sel = G.selSuspect===s.id;
+    body += `<div class="carditem ${sel?'sel':''}" data-sus="${s.id}">${avatarImg(s.avatar,64,72)}<div class="nm">${s.name}</div></div>`;
+  });
+  body += `</div>`;
+  body += `<div style="font-weight:900;margin:12px 0 6px">LE PROVE (${G.selClues.length}/${cs.reqClues} selezionate)</div>`;
+  body += `<div class="grid2">`;
+  clues.forEach(l=>{
+    const sel = G.selClues.includes(l.clue.id);
+    body += `<div class="carditem ${sel?'sel':''}" data-clue="${l.clue.id}"><div class="ic">${l.clue.icon}</div><div class="nm">${l.clue.name}</div></div>`;
+  });
+  body += `</div>`;
+  if(!clues.length) body += `<div class="note">Nessun indizio ancora. Tocca i punti luminosi sulla scena, assistente!</div>`;
+  body += `<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">`;
+  body += `<button class="btn" id="btnAccuse">⚖️ Formula l'accusa</button>`;
+  body += `<button class="btn ghost" id="btnHint">💡 Suggerimento (-10 cervello)</button>`;
+  body += `</div>`;
+  openModal('📋 Il Quaderno degli Indizi', body);
+  $('modalBody').querySelectorAll('[data-sus]').forEach(b=>b.onclick=()=>{
+    G.selSuspect = (G.selSuspect===b.dataset.sus)? null : b.dataset.sus;
+    openEvidence();
+  });
+  $('modalBody').querySelectorAll('[data-clue]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.clue;
+    // Il tetto di selezione segue sempre le prove davvero richieste dalla soluzione
+    const cap = Math.max(cs.reqClues, cs.solution.clues.length);
+    if(G.selClues.includes(id)) G.selClues=G.selClues.filter(c=>c!==id);
+    else if(G.selClues.length<cap) G.selClues.push(id);
+    else toast(`Puoi selezionare solo ${cap} prove per l'accusa. La giustizia ha un tetto di spesa.`,'t-bad');
+    openEvidence();
+  });
+  $('btnAccuse').onclick=()=>{ closeModal(); doAccuse(); };
+  $('btnHint').onclick=()=>{
+    if(G.hintUsed){ toast('Un solo suggerimento per caso. Il cervello di Caino non è un pozzo senza fondo.','t-bad'); return; }
+    if(G.meter<=10){ toast('Il cervello di Caino è a corto di energia. Trova indizi.','t-bad'); return; }
+    G.meter-=10; G.hintUsed=true; refreshHud();
+    toast('💡 '+cs.hint,'t-sun',5);
+  };
+}
+/* =====================================================================
+   MODAL: SOSPETTI + INTERROGATORIO
+   ===================================================================== */
+function openSuspects(){
+  const cs=G.case;
+  if(!cs) return;
+  AU.click();
+  if(G.evidence.length<cs.minClues){
+    toast('Prima servono più indizi! Senza prove, i sospetti fanno gli offesi. E a Milano gli offesi sono pericolosi.','t-bad');
+    openEvidence();
+    return;
+  }
+  let body = `<div class="note">Interroga i sospetti. Le domande giuste fanno emergere le contraddizioni. Alcune risposte... aggiungono indizi.</div>`;
+  cs.suspects.forEach(s=>{
+    body += `<div class="suspectRow" data-sus="${s.id}"><div class="av">${avatarImg(s.avatar,76,84)}</div><div class="inf"><div class="nm">${s.name}</div><div class="rl">${s.role}</div></div><div style="font-size:22px">${G.asked[s.id]?'✅':'🗨️'}</div></div>`;
+  });
+  openModal('🕵 I Sospetti', body);
+  $('modalBody').querySelectorAll('[data-sus]').forEach(b=>b.onclick=()=>interview(b.dataset.sus));
+}
+async function interview(susId){
+  const cs=G.case;
+  const s=cs.suspects.find(x=>x.id===susId);
+  closeModal();
+  hideDialogue();
+  setTopbarVar();
+  const dlg=$('dialogue');
+  dlg.classList.remove('hidden');
+  dlg.scrollTop=0;
+  $('dName').innerHTML = avatarImg(s.avatar,30,30) + `<span style="color:#ffb066">${s.name}</span><span class="chip">SOSPETTO</span>`;
+  $('dTap').style.display='none';
+  const c=$('dChoices');
+  const qs = s.questions.map((q,i)=>({txt:q.q, i}));
+  const showAnswer=(item)=>{
+    G.asked[susId+':'+item.i]=true;
+    $('dName').innerHTML = avatarImg(s.avatar,30,30) + `<span style="color:#ffb066">${s.name}</span>`;
+    // La risposta sostituisce le domande: sempre visibile, niente scroll nascosto
+    $('dText').textContent = s.questions[item.i].a;
+    c.innerHTML='';
+    const more=document.createElement('button');
+    more.className='qbtn';
+    more.textContent='◀ Altre domande';
+    more.onclick=()=>{ renderQuestions(); dlg.scrollTop=0; };
+    c.appendChild(more);
+    const back=document.createElement('button');
+    back.className='btn ghost'; back.style.marginTop='6px';
+    back.textContent='← Torna ai sospetti';
+    back.onclick=()=>{ hideDialogue(); openSuspects(); };
+    c.appendChild(back);
+    dlg.scrollTop=0;
+    AU.pop();
+    if(chance(0.5)) toast(pick(['Orazio annota: "interessante... molto interessante".','Orazio non dice nulla. Annuisce. È peggio.','Fontana sussurra: "questo lo scrivo nel rapporto".']),'t-sun');
+  };
+  const renderQuestions=()=>{
+    c.innerHTML='';
+    $('dText').textContent = s.intro;
+    qs.forEach((item)=>{
+      const b=document.createElement('button');
+      b.className='qbtn';
+      b.textContent = (G.asked[susId+':'+item.i]?'✔ ':'') + '❓ ' + item.txt;
+      b.onclick=()=>showAnswer(item);
+      c.appendChild(b);
+    });
+    const back=document.createElement('button');
+    back.className='btn ghost'; back.style.marginTop='6px';
+    back.textContent='← Torna ai sospetti';
+    back.onclick=()=>{ hideDialogue(); openSuspects(); };
+    c.appendChild(back);
+    dlg.scrollTop=0;
+  };
+  renderQuestions();
+}
+
+/* =====================================================================
+   OCCHIALI DA SOLE + GAG
+   ===================================================================== */
+function tween(el, from, to, dur, onDone){
+  if(window.gsap && gsap){
+    gsap.fromTo(el, from, Object.assign({}, to, {duration:dur, onComplete:onDone}));
+    return;
+  }
+  // fallback senza GSAP: transizione CSS
+  Object.assign(el.style, from);
+  el.style.transition = 'all '+dur+'s ease';
+  requestAnimationFrame(()=>{ Object.assign(el.style, to); });
+  setTimeout(onDone, dur*1000+50);
+}
+function sunglassesMoment(silent){
+  return new Promise(res=>{
+    const fl=$('sunglassesFlash'), yt=$('yeahText');
+    fl.style.display='block';
+    yt.style.display='block';
+    tween(yt, {scale:'2', opacity:'0'}, {scale:'1', opacity:'1'}, 0.35, ()=>{});
+    tween(fl, {opacity:'0'}, {opacity:'1'}, 0.18, ()=>AU.yea());
+    setTimeout(()=>{ tween(fl, {opacity:'1'}, {opacity:'0'}, 0.5, ()=>{}); }, 900);
+    setTimeout(()=>{ tween(yt, {opacity:'1', scale:'1'}, {opacity:'0', scale:'0.6'}, 0.4, ()=>{
+      fl.style.display='none'; yt.style.display='none';
+      if(!silent && G.case) toast('🕶 '+G.case.oneLiner,'t-sun',4);
+      else if(!silent) toast('🕶 '+pick(ORAZIO_LINES),'t-sun',4);
+      res();
+    }); }, 1150);
+  });
+}
+$('sunglassesBtn').onclick=()=>{ if(G.case) sunglassesMoment(false); };
+function onEmptyTap(){
+  // Se c'è un dialogo in corso, un tocco su uno spazio vuoto lo fa avanzare
+  if(typeResolve && !$('dialogue').classList.contains('hidden')){
+    typeResolve();
+    return;
+  }
+  if(G.phase!=='explore'&&G.phase!=='interrogate') return;
+  if(chance(0.25)) return;
+  toast(pick(EMPTY_TAP_LINES),'t-sun');
+}
+
+/* =====================================================================
+   CASE SELECT / TITLE / SETTINGS
+   ===================================================================== */
+function showTitle(){ $('titleScreen').classList.remove('hidden'); $('caseSelect').classList.add('hidden'); $('game').classList.add('hidden'); refreshResumeBtn(); }
+function showCaseSelect(){
+  $('titleScreen').classList.add('hidden');
+  $('game').classList.add('hidden');
+  $('caseSelect').classList.remove('hidden');
+  const list=$('csList');
+  list.innerHTML='';
+  CASES.forEach((c,i)=>{
+    const unlocked=S.unlocked.includes(c.id);
+    const stars=S.stars[c.id]||0;
+    const row=document.createElement('div');
+    row.className='caseRow'+(unlocked?'':' locked');
+    row.innerHTML=`<div class="num">${i+1}</div><div class="inf"><div class="tt">${unlocked?'': '🔒 '}${c.title}</div><div class="st">${c.num} · Difficoltà: ${c.diff} · ${c.locations.length} punti · ${c.suspects.length} sospetti</div>${unlocked?`<div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`:''}</div>`;
+    row.onclick=()=>{
+      if(!unlocked){ toast('Caso ancora chiuso. Milano ha i suoi tempi.','t-bad'); return; }
+      AU.click();
+      $('caseSelect').classList.add('hidden');
+      $('game').classList.remove('hidden');
+      startCase(c.id);
+    };
+    list.appendChild(row);
+  });
+  $('csBread').textContent=`🍖 Briciole di culatello raccolte: ${S.crumb} — il salume virtuale più stagionato della bassa`;
+}
+$('btnPlay').onclick=()=>{ AU.ensure(); AU.pop(); showCaseSelect(); };
+$('btnResume').onclick=resumeCase;
+function refreshResumeBtn(){ const b=$('btnResume'); if(b) b.style.display = pendingCase()? 'block':'none'; }
+function resumeCase(){
+  const pc=pendingCase(); if(!pc) return;
+  setTopbarVar();
+  enableTilt();
+  AU.ensure(); AU.pop();
+  $('titleScreen').classList.add('hidden');
+  $('caseSelect').classList.add('hidden');
+  $('game').classList.remove('hidden');
+  const cs=CASES.find(c=>c.id===pc.id);
+  G.case=cs; G.phase='explore';
+  G.meter=clamp(pc.meter||100,0,100);
+  G.evidence=Array.isArray(pc.evidence)? pc.evidence.slice() : [];
+  G.examined=pc.examined||{}; G.asked=pc.asked||{}; G.hintUsed=!!pc.hintUsed;
+  G.selClues=[]; G.selSuspect=null;
+  buildScene();
+  if(pc.viewMode) setViewMode(pc.viewMode);
+  refreshHud();
+  toast('🔁 Caso ripreso: '+cs.title+'. Milano ti aspettava.','t-good',4);
+  saveGame();
+}
+// Autosalvataggio: il caso in corso sopravvive a ricariche e distrazioni
+setInterval(()=>{ if(G.case && (G.phase==='explore'||G.phase==='interrogate')) saveGame(); }, 8000);
+window.addEventListener('beforeunload', ()=>{ if(G.case) saveGame(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && G.case) saveGame(); });
+// Il dialogo appare sotto la topbar: misuro l'altezza reale della HUD
+function setTopbarVar(){
+  try{
+    const tb=$('topbar');
+    if(tb && document.documentElement && document.documentElement.style){
+      HUD_H = (tb.offsetHeight||0)+10;
+      document.documentElement.style.setProperty('--topbar-h', HUD_H+'px');
+    }
+  }catch(e){}
+}
+window.addEventListener('load', setTopbarVar);
+$('btnCSBack').onclick=()=>showTitle();
+$('btnCSSettings').onclick=()=>openSettings();
+$('btnSettings').onclick=openSettings;
+$('btnSound').onclick=()=>{ AU.mute(!S.muted); };
+$('btnEvidence').onclick=openEvidence;
+$('btnSuspects').onclick=openSuspects;
+
+function openSettings(){
+  AU.click();
+  openModal('⚙ Impostazioni & Onori', `
+    <div class="carditem" data-set="sound" style="text-align:left;display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="font-size:24px">${S.muted?'🔇':'🔊'}</div><div style="flex:1"><div class="nm">Audio</div><div class="ds">Suoni sintetizzati in tempo reale. Nessun file è stato scaricato. Nessuno.</div></div></div>
+    <div class="carditem" data-set="mapmode" style="text-align:left;display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="font-size:24px">${G.fallback?'🗺':'🏙'}</div><div style="flex:1"><div class="nm">Vista della scena</div><div class="ds">${G.fallback? 'Modalità compatibilità attiva: mappa 2D dall\'alto (WebGL non disponibile).':'Alterna tra la scena illustrata e la mappa 2D dall\'alto (pulsante 🗺 nella barra).'}</div></div></div>
+    <div class="carditem" data-set="reset" style="text-align:left;display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="font-size:24px">🧹</div><div style="flex:1"><div class="nm">Reset dei casi</div><div class="ds">Cancella progressi e stelle. Milano dimenticherà. I gabbiani no.</div></div></div>
+    <div class="note" style="margin-top:10px"><b>CSI: Fidenza</b> — parodia non ufficiale, stessa squadra di CSI: Milano. Orazio Caino è stato trasferito a Fidenza, provincia di Parma, per un caso... e non è mai ripartito. Tutti i personaggi, i cinghiali e i culatelli sono di fantasia. Beh, i culatelli sono veri. La balena dello Stirone è vera. E San Donnino, secondo la leggenda, ha camminato con la testa in mano (i fidentini la giurano).<br><br>
+    <b>Ringraziamenti:</b> alla Cattedrale di San Donnino, al Museo dei Fossili dello Stirone, alla Via Francigena, al Palio delle Contrade, al culatello di Zibello, alla Fidenza Village, al ponte romano, e al cinghiale (per essersi presentato).</div>`);
+  $('modalBody').querySelector('[data-set="sound"]').onclick=()=>{ AU.mute(!S.muted); openSettings(); };
+  $('modalBody').querySelector('[data-set="mapmode"]').onclick=()=>{
+    if(G.fallback){ toast('La mappa 2D è l\'unica vista disponibile: niente WebGL su questo dispositivo.','t-sun'); return; }
+    closeModal();
+    setViewMode(viewMode==='scene'? 'map':'scene');
+    AU.click();
+  };
+  $('modalBody').querySelector('[data-set="reset"]').onclick=()=>{
+    closeModal();
+    (async()=>{
+      const r=await choose({prompt:'Cancellare tutto? Stelle, casi risolti, briciole di culatello...', items:['Sì, ricomincio da zero','No, la bacheca è la mia casa']});
+      if(r===0){ S.unlocked=['conchiglia']; S.stars={}; S.crumb=0; G.case=null; G.phase='idle'; saveGame(); toast('Progressi azzerati. Orazio si mette gli occhiali in segno di rispetto.','t-sun'); showCaseSelect(); }
+    })();
+  };
+}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+function bootTitleBust(){
+  const div=$('titleBust');
+  if(!div) return;
+  const url = avatarDataURL(SPEAKERS.orazio.avatar, 150, 170);
+  if(url) div.innerHTML=`<img src="${url}" style="width:150px;height:170px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.4);border:3px solid #ffd98f">`;
+}
+function wireCanvasTap(){
+  // tap sulla scena vuota (layer sfondo, SEMPRE sotto la scena)
+  const bg=new PIXI.Graphics();
+  bg.rect(0,0,innerWidth,innerHeight).fill({color:0x000000,alpha:0});
+  bg.eventMode='static';
+  bg.on('pointertap', onEmptyTap);
+  G.app.stage.addChildAt(bg, 0);
+}
+(async function boot(){
+  G.fallback = !window.PIXI || !window.gsap;
+  try{
+    if(!G.fallback){
+      G.app = new PIXI.Application();
+      await G.app.init({ resizeTo: window, antialias:true, resolution: Math.min(window.devicePixelRatio||1, 2), background:'#06202b' });
+      $('scene').appendChild(G.app.canvas);
+      wireCanvasTap();
+      window.addEventListener('resize', ()=>{ layoutScene(); setTopbarVar(); });
+      G.app.ticker.add((tk)=>{
+        const dt = tk.deltaMS/1000;
+        G.t += dt;
+        for(const a of sceneAnims){ try{ a(dt); }catch(e){} }
+        updateDepth(dt);
+        applyDepth();
+        G.hotspots.forEach(h=>{
+          h.c.y = h.c._baseY + Math.sin(G.t*2.2 + h.c._phase)*5;
+          const ring=h.c._ring;
+          if(ring && h.loc.clue && !G.examined[h.loc.id]){
+            ring.clear();
+            const ph=(G.t*26 + h.c._phase*10)%20;
+            ring.circle(0,0,30+ph).stroke({width:2.5, color:0xff8c42, alpha:Math.max(0.04, 0.5-ph/40)});
+          }
+        });
+      });
+    }
+    bootTitleBust();
+    Map2D.init();
+    $('btnMode').onclick = toggleViewMode;
+    $('btnSound').textContent = S.muted? '🔇':'🔊';
+    AU.ensure();
+    if(G.fallback){ enableFallback(); }
+    else { setViewMode('scene'); showTitle(); }
+    warnStorage();
+  }catch(err){
+    console.error(err);
+    G.fallback=true;
+    bootTitleBust();
+    Map2D.init();
+    $('btnMode').onclick = toggleViewMode;
+    AU.ensure();
+    enableFallback();
+    warnStorage();
+  }
+})();
+function warnStorage(){
+  if(store.persistent===true) return;
+  setTimeout(()=>{
+    toast(store.persistent==='session'
+      ? '💾 Storage limitato: i progressi sopravvivono solo a questa scheda.'
+      : '⚠️ Storage bloccato in questa finestra: i progressi durano solo per questa sessione.','t-bad',6);
+  }, 900);
+}
+</script>
+</body>
+</html>

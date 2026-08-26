@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BlackHoleOrbit — MMO spaziale nel browser</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Renderer PixiJS (WebGL/WebGPU) -->
+<div id="game-container"></div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div class="tleft">
+      <div id="hudName">PILOTA</div>
+      <div id="hudShip">ICARUS</div>
+      <div id="hudStats">LIVELLO 1 · RANK Recluta · ONORE 0</div>
+      <div id="hudDrone">DRONE <b>NESSUNO</b></div>
+      <div id="hudBoost" class="hidden"></div>
+    </div>
+    <div class="tright">
+      <button id="btnMute" title="Audio on/off" aria-label="Audio">🔊</button>
+      <div class="res" id="hudCredits">CREDITI <b>0</b></div>
+      <div class="res u" id="hudVoidium">VOIDIUM <b>0</b></div>
+      <div class="res" id="hudHull">SCOFO <b>0</b></div>
+    </div>
+  </div>
+
+  <div id="bars">
+    <div class="bar" id="barHp"><div class="fill hp"></div><span>HP</span></div>
+    <div class="bar" id="barShield"><div class="fill sh"></div><span>SCUDO</span></div>
+    <div class="bar" id="barEnergy"><div class="fill en"></div><span>ENERGIA</span></div>
+  </div>
+
+  <div id="sector">Periferia</div>
+  <div id="bhWarn">⚠ ORIZZONTE DEGLI EVENTI ⚠</div>
+  <div id="hudMission" class="hidden"></div>
+
+  <canvas id="minimap" width="150" height="150"></canvas>
+  <div id="tipbar">WASD volo · Click nemico: seleziona · CTRL: attacca · Click asteroide: mina · C negozio · M mappa · B missioni · G Frattura · V config · 1-4 munizioni</div>
+
+  <div id="ammoBar">
+    <button class="ammo" data-a="red" title="Danno ×1">1<small>0</small></button>
+    <button class="ammo" data-a="blue" title="Danno ×2">2<small>0</small></button>
+    <button class="ammo" data-a="green" title="Danno ×3">3<small>0</small></button>
+    <button class="ammo" data-a="white" title="Danno ×4">4<small>0</small></button>
+    <span id="ammoNow"></span>
+  </div>
+
+  <div id="targetInfo" class="hidden"><span id="tName"></span><div id="tBar"><div id="tFill"></div></div></div>
+</div>
+
+<!-- Joystick virtuale (touch) -->
+<div id="joyBase" class="hidden"></div>
+<div id="joyKnob" class="hidden"></div>
+
+<!-- Barra azioni touch -->
+<nav id="touchActions">
+  <button class="ta fire" id="btnFire" aria-label="Attacca il bersaglio selezionato">FUOCO</button>
+  <button class="ta" id="btnDeselect" aria-label="Deseleziona">✕</button>
+  <button class="ta" id="btnShop" aria-label="Negozio">NEG</button>
+  <button class="ta" id="btnMap" aria-label="Mappa">MAP</button>
+  <button class="ta" id="btnMissions" aria-label="Missioni">MIS</button>
+  <button class="ta" id="btnConfig" aria-label="Configurazione nave">CFG</button>
+  <button class="ta purple" id="btnGate" aria-label="Entra nella Frattura">FRA</button>
+</nav>
+
+<div id="message"></div>
+<div id="toast"></div>
+
+<!-- Avviso WebGL -->
+<div id="webglWarn" class="hidden" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#5c1a24;color:#ffb3bb;padding:8px 16px;border-radius:10px;font:600 12px sans-serif;z-index:500">
+  WebGL non disponibile: grafica ridotta non supportata su questo browser.
+</div>
+
+<!-- Login -->
+<div id="login" class="overlay">
+  <div class="panel">
+    <h1>BLACK<b>HOLE</b></h1>
+    <p class="sub">Orbita del Singolare · MMO locale</p>
+    <input id="loginName" type="text" maxlength="16" placeholder="Nome pilota" autocomplete="off">
+    <button id="loginBtn">ENTRA IN ORBITA</button>
+    <div id="accountList"></div>
+    <div class="hint">Suggerimento: l'account <b>admin</b> ha risorse illimitate.</div>
+    <div class="feat">⚫ Gravità reale del buco nero<br>🪐 4 orbite · 7 specie aliene · boss event<br>⛏ Mining · Fabbrica orbitale · La Frattura</div>
+  </div>
+</div>
+
+<!-- Negozio -->
+<div id="shop" class="overlay hidden">
+  <div class="panel wide">
+    <h2>NEGOZIO ORBITALE <button id="shopClose" class="close">✕</button></h2>
+    <div class="shopWallet">
+      <span id="shopCredits">CREDITI 0</span>
+      <span id="shopVoidium">VOIDIUM 0</span>
+      <span id="shopAdmin" class="adminBadge hidden">ADMIN · RISORSE INFINITE</span>
+    </div>
+    <div class="tabs">
+      <button data-tab="nave" class="tab on">Nave</button>
+      <button data-tab="navi" class="tab">Navi</button>
+      <button data-tab="laser" class="tab">Laser</button>
+      <button data-tab="scudo" class="tab">Scudo</button>
+      <button data-tab="gen" class="tab">Generatore</button>
+      <button data-tab="batt" class="tab">Batterie</button>
+      <button data-tab="prop" class="tab">Propulsore</button>
+      <button data-tab="drone" class="tab">Droni</button>
+      <button data-tab="munizioni" class="tab">Munizioni</button>
+      <button data-tab="minerali" class="tab">Minerali</button>
+      <button data-tab="skylab" class="tab">Fabbrica</button>
+      <button data-tab="portale" class="tab">Frattura</button>
+      <button data-tab="booster" class="tab">Booster</button>
+    </div>
+    <div id="shopItems"></div>
+  </div>
+</div>
+
+<!-- Mappa galattica -->
+<div id="map" class="overlay hidden">
+  <div class="panel wide">
+    <h2>CARTE STELLARE <button id="mapClose" class="close">✕</button></h2>
+    <canvas id="mapCanvas" width="760" height="560"></canvas>
+  </div>
+</div>
+
+<!-- Missioni -->
+<div id="missions" class="overlay hidden">
+  <div class="panel wide">
+    <h2>BACHECA MISSIONI <button id="missionsClose" class="close">✕</button></h2>
+    <div id="missionsItems"></div>
+  </div>
+</div>
+
+<script src="vendor/pixi.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/save.js"></script>
+<script src="js/world.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+<script>window.addEventListener('load', function () { GAME.init(); });</script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Test di intelligenza con matrici di Raven, sequenze, analogie e logica. Timer, QI stimato e card condivisibile con la gaussiana.">
+    <title>Test di Intelligenza — Quiz Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root{--accent:#7dd3fc}
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+        .container{width:100%;max-width:640px;padding:26px}
+        .header{text-align:center;margin-bottom:18px}
+        .back-btn{display:inline-block;margin-bottom:14px;color:var(--accent);text-decoration:none;font-weight:600;font-size:.9rem}
+        h1{font-size:1.65rem;margin:0 0 8px;line-height:1.25}
+        .sub{color:#9fb8d8;font-size:.93rem;margin:0;line-height:1.5}
+        .timer{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:9px 16px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);font-weight:800;font-size:1.05rem;letter-spacing:.04em}
+        .timer.low{color:#ff8f9e;border-color:rgba(255,92,122,.5);animation:blink 1s infinite}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+        .section-tag{text-align:center;color:#cdeeff;font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin:6px 0 2px}
+        .question{font-size:1.15rem;font-weight:700;margin:10px 0 14px;text-align:center;line-height:1.4}
+        .matrix-wrap{display:flex;justify-content:center;margin:6px 0 16px}
+        canvas#matrixCanvas{width:100%;max-width:340px;height:auto;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+        .opts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+        .opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:64px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.14);border-radius:14px;cursor:pointer;color:#fff;font-size:.95rem;text-align:center;padding:8px;transition:all .15s ease;font-family:inherit}
+        .opt:hover{border-color:var(--accent);transform:translateY(-2px)}
+        .opt.sel{background:rgba(125,211,252,.16);border-color:var(--accent);box-shadow:0 0 18px rgba(125,211,252,.35)}
+        .opt canvas{width:56px;height:56px}
+        .opt .lbl{font-size:.7rem;color:#9fb8d8;font-weight:700}
+        .next-row{display:flex;justify-content:center}
+        .btn-next{background:linear-gradient(92deg,var(--accent),#7c5cff);color:#04122b;border:none;padding:13px 34px;border-radius:99px;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;box-shadow:0 10px 26px rgba(0,0,0,.35);opacity:.35;pointer-events:none;transition:opacity .2s}
+        .btn-next.ready{opacity:1;pointer-events:auto}
+        .btn-next.ready:active{transform:scale(.97)}
+        .hidden{display:none !important}
+        /* risultati */
+        .result-view{text-align:center}
+        .iq-big{font-size:clamp(4rem,16vw,6.5rem);font-weight:900;line-height:1;margin:8px 0 2px;
+            background:linear-gradient(92deg,#fff,var(--accent) 60%,#ffd54a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+        .band{display:inline-block;padding:8px 18px;border-radius:99px;font-weight:800;font-size:.95rem;margin:6px 0 4px;background:rgba(125,211,252,.12);border:1px solid rgba(125,211,252,.4)}
+        .percentile{font-size:1.1rem;color:#cdeeff;font-weight:700;margin:6px 0}
+        .note{font-size:.8rem;color:#9fb8d8;line-height:1.5;margin:10px auto;max-width:460px}
+        canvas#iqCardCanvas{width:100%;max-width:520px;height:auto;border-radius:18px;margin:14px auto;display:block;border:1px solid rgba(255,255,255,.12)}
+        .share-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+        .share-btn{background:rgba(125,211,252,.1);border:1.5px solid rgba(125,211,252,.5);color:#eafcff;padding:12px 18px;border-radius:99px;font:700 14px Inter,sans-serif;cursor:pointer;transition:transform .15s,background .15s;font-family:inherit}
+        .share-btn:active{transform:scale(.95)}
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0 6px}
+        .stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 8px}
+        .stat b{display:block;font-size:1.4rem;color:var(--accent)}
+        .stat span{font-size:.72rem;color:#9fb8d8;text-transform:uppercase;letter-spacing:.06em}
+        .btn-restart{background:linear-gradient(92deg,var(--accent),#7c5cff);color:#04122b;border:none;padding:14px 30px;border-radius:99px;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;margin-top:12px}
+        .btn-restart:active{transform:scale(.97)}
+    </style>
+    <link rel="stylesheet" href="../../assets/css/quiz-theme.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../quiz.html" class="back-btn">← Torna ai quiz</a>
+            <h1>Test di Intelligenza 🧠</h1>
+            <p class="sub">Matrici di Raven, sequenze, analogie e logica. 15 domande, 12 minuti. Alla fine: QI stimato, percentile e una card con la gaussiana da condividere.</p>
+        </div>
+
+        <div id="introArea">
+            <div class="timer" style="justify-content:center;margin:18px 0 14px">⏱ 12:00</div>
+            <p class="note" style="text-align:center">Ogni risposta vale 1 punto. Non c'è penalità per le risposte sbagliate: meglio tentare che lasciare in bianco.
+            Allo scadere del tempo il test si consegna da solo. Test informale e divulgativo, non certificato: il QI è una stima per divertirsi (e per vantarsene).</p>
+            <div class="next-row"><button class="btn-next ready" id="startBtn">▶ Inizia il test</button></div>
+        </div>
+
+        <div id="quizArea" class="hidden">
+            <div class="timer" id="timer">⏱ 12:00</div>
+            <div class="section-tag" id="sectionTag"></div>
+            <div class="question" id="qText"></div>
+            <div class="matrix-wrap hidden" id="matrixWrap"><canvas id="matrixCanvas" width="330" height="330"></canvas></div>
+            <div class="opts" id="opts"></div>
+            <div class="next-row"><button class="btn-next" id="nextBtn">Avanti →</button></div>
+        </div>
+
+        <div id="resultArea" class="result-view hidden">
+            <div class="section-tag">Risultato</div>
+            <div class="iq-big" id="iqValue">—</div>
+            <div class="band" id="iqBand">Nella norma</div>
+            <div class="percentile" id="iqPercentile"></div>
+            <canvas id="iqCardCanvas" width="1200" height="630"></canvas>
+            <div class="share-row">
+                <button class="share-btn" id="btnShare">📤 Condividi</button>
+                <button class="share-btn" id="btnCopy">📋 Copia immagine</button>
+                <button class="share-btn" id="btnDownload">💾 Scarica PNG</button>
+            </div>
+            <div class="stats">
+                <div class="stat"><b id="stRaw">0/15</b><span>Corrette</span></div>
+                <div class="stat"><b id="stTime">—</b><span>Tempo usato</span></div>
+                <div class="stat"><b id="stPct">—</b><span>Percentile</span></div>
+            </div>
+            <button class="btn-restart" id="restartBtn">🔁 Rifai il test</button>
+        </div>
+    </div>
+
+    <script src="../../assets/js/quiz-enhance.js"></script>
+    <script>
+    'use strict';
+    /* ============================================================
+       TEST DI INTELLIGENZA — Quiz Lab
+       Matrici di Raven procedurali + sequenze + analogie + logica.
+       ============================================================ */
+
+    /* ---------- statistica: gaussiana ---------- */
+    function erf(x){
+      const sign = x<0?-1:1; x=Math.abs(x);
+      const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+      const t=1/(1+p*x);
+      return sign*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+    }
+    function normCdf(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+
+    /* ---------- RNG deterministico (matrici riproducibili) ---------- */
+    function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+    function shuffle(arr,rnd){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+    /* ---------- matrici di Raven: forme procedurali ---------- */
+    const SHAPES=['circle','square','tri','dia','star','cross'];
+    const PAL=['#4fc3f7','#ffd54a','#ff6b9d','#7c5cff','#4ade80'];
+    function shade(hex,amt){ const n=parseInt(hex.slice(1),16); let r=clamp2(((n>>16)&255)+amt),g=clamp2(((n>>8)&255)+amt),b=clamp2((n&255)+amt); return 'rgb('+r+','+g+','+b+')'; }
+    function clamp2(v){ return v<0?0:v>255?255:v; }
+
+    function drawShape(ctx,type,x,y,r,fill,color,rot){
+      ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+      ctx.beginPath();
+      if(type==='circle') ctx.arc(0,0,r,0,6.29);
+      else if(type==='square') ctx.rect(-r,-r,r*2,r*2);
+      else if(type==='tri'){ ctx.moveTo(0,-r); ctx.lineTo(r*0.95,r*0.7); ctx.lineTo(-r*0.95,r*0.7); ctx.closePath(); }
+      else if(type==='dia'){ ctx.moveTo(0,-r); ctx.lineTo(r,0); ctx.lineTo(0,r); ctx.lineTo(-r,0); ctx.closePath(); }
+      else if(type==='star'){ for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5; const rr=i%2? r*0.42:r; const px=Math.cos(a)*rr, py=Math.sin(a)*rr; if(i) ctx.lineTo(px,py); else ctx.moveTo(px,py); } ctx.closePath(); }
+      else if(type==='cross'){ ctx.rect(-r*0.32,-r,r*0.64,r*2); ctx.rect(-r,-r*0.32,r*2,r*0.64); }
+      if(fill===2){ ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle=shade(color,-70); ctx.lineWidth=Math.max(1.5,r*0.06); ctx.stroke(); }
+      else if(fill===1){ ctx.globalAlpha=.4; ctx.fillStyle=color; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,r*0.09); ctx.stroke(); }
+      else { ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,r*0.09); ctx.stroke(); }
+      ctx.restore();
+    }
+    function cellKey(c){ return JSON.stringify([c.shape,c.size,c.fill,c.rot,c.color]); }
+
+    function genMatrix(seed){
+      const rnd = mulberry32(seed);
+      const attrs=['size','fill','rot','color'];
+      shuffle(attrs,rnd);
+      const aRow=attrs[0], aCol=attrs[1];
+      const base={ shape: SHAPES[Math.floor(rnd()*SHAPES.length)], size:0, fill:0, rot:0, color:0 };
+      const grid=[];
+      for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+        const cell=Object.assign({}, base);
+        cell[aRow]=r%3; cell[aCol]=c%3;
+        grid.push(cell);
+      }
+      const answer=grid[8];
+      const options=[answer];
+      let guard=0;
+      while(options.length<8 && guard++<200){
+        const d=Object.assign({}, answer);
+        const k=rnd();
+        if(k<0.38) d[aRow]=(d[aRow]+(rnd()<0.5?1:2))%3;
+        else if(k<0.72) d[aCol]=(d[aCol]+(rnd()<0.5?1:2))%3;
+        else if(k<0.9) d.shape=SHAPES[Math.floor(rnd()*SHAPES.length)];
+        else d.color=(d.color+1+Math.floor(rnd()*2))%PAL.length;
+        if(options.some(o=>cellKey(o)===cellKey(d))) continue;
+        options.push(d);
+      }
+      shuffle(options,rnd);
+      return { grid, options, answerIdx: options.indexOf(answer), rule:[aRow,aCol] };
+    }
+
+    function drawCell(ctx,cell,x,y,r){
+      drawShape(ctx,cell.shape,x,y,r*(0.72+cell.size*0.34),cell.fill,PAL[cell.color],cell.rot*Math.PI/4);
+    }
+    function drawMatrix(ctx,grid,W){
+      const cell=W/3;
+      for(let i=0;i<9;i++){
+        const r=Math.floor(i/3), c=i%3;
+        const isMissing=(i===8);
+        if(isMissing){
+          ctx.setLineDash([5,5]);
+          ctx.strokeStyle='rgba(255,255,255,.35)';
+          ctx.lineWidth=2;
+          ctx.strokeRect(c*cell+6, r*cell+6, cell-12, cell-12);
+          ctx.setLineDash([]);
+          ctx.fillStyle='rgba(255,255,255,.5)';
+          ctx.font='bold '+(cell*0.4)+'px Inter,sans-serif';
+          ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText('?', c*cell+cell/2, r*cell+cell/2);
+          ctx.textBaseline='alphabetic';
+          continue;
+        }
+        drawCell(ctx,grid[i], c*cell+cell/2, r*cell+cell/2, cell*0.24);
+      }
+    }
+    function drawOption(ctx,cell,s){
+      drawCell(ctx,cell, s/2, s/2, s*0.3);
+    }
+
+    /* ---------- item del test ---------- */
+    function buildItems(){
+      const items=[];
+      // Sezione 1: matrici di Raven (5)
+      for(let i=0;i<5;i++) items.push({ type:'raven', section:'Matrici di Raven', q:'Completa la matrice (regola su righe e colonne)', mat: genMatrix(1000+i*77), answer:null });
+      // Sezione 2: numeri e lettere (4)
+      items.push({ type:'text', section:'Numeri e lettere', q:'2, 5, 10, 17, 26, ?', opts:['35','37','39','41'], answer:1 });
+      items.push({ type:'text', section:'Numeri e lettere', q:'3, 6, 12, 24, ?', opts:['36','42','48','60'], answer:2 });
+      items.push({ type:'text', section:'Numeri e lettere', q:'1, 1, 2, 3, 5, 8, ?', opts:['11','12','13','14'], answer:2 });
+      items.push({ type:'text', section:'Numeri e lettere', q:'A, C, F, J, ?', opts:['L','M','N','O'], answer:3 });
+      // Sezione 3: logica e linguaggio (6)
+      items.push({ type:'text', section:'Logica e linguaggio', q:'mano : guanto :: piede : ?', opts:['calzino','scarpa','tappeto','pantofola'], answer:1 });
+      items.push({ type:'text', section:'Logica e linguaggio', q:'scrittore : libro :: pittore : ?', opts:['colore','tela','quadro','museo'], answer:2 });
+      items.push({ type:'text', section:'Logica e linguaggio', q:'Qual è l\'intruso?', opts:['Mercurio','Venere','Luna','Marte'], answer:2 });
+      items.push({ type:'text', section:'Logica e linguaggio', q:'Qual è l\'intruso?', opts:['2','9','15','23'], answer:2 });
+      items.push({ type:'text', section:'Logica e linguaggio', q:'Tutti i gatti sono felini. Tutti i felini sono animali. Quindi:', opts:['Tutti gli animali sono gatti','Alcuni gatti non sono animali','I gatti sono animali','Nessuna delle precedenti'], answer:2 });
+      items.push({ type:'text', section:'Logica e linguaggio', q:'Se A > B e B > C, allora:', opts:['A < C','A = C','A > C','Impossibile stabilirlo'], answer:2 });
+      return items;
+    }
+
+    /* ---------- stato ---------- */
+    const TOTAL_TIME=720; // 12 minuti
+    const state = { items:[], current:0, answers:[], timeLeft:TOTAL_TIME, started:false, finished:false, timerId:null, iq:0, raw:0, used:0 };
+
+    function fmtTime(s){ const m=Math.floor(s/60), ss=s%60; return m+':'+(ss<10?'0':'')+ss; }
+
+    /* ---------- UI ---------- */
+    const $=id=>document.getElementById(id);
+    const qText=$('qText'), optsEl=$('opts'), timerEl=$('timer'), nextBtn=$('nextBtn'),
+          sectionTag=$('sectionTag'), matrixWrap=$('matrixWrap'), matrixCanvas=$('matrixCanvas'),
+          quizArea=$('quizArea'), introArea=$('introArea'), resultArea=$('resultArea');
+
+    function renderItem(){
+      const it=state.items[state.current];
+      sectionTag.textContent = 'Sezione '+(it.section==='Matrici di Raven'?1:it.section==='Numeri e lettere'?2:3)+' · '+it.section+' · '+(state.current+1)+'/'+state.items.length;
+      qText.textContent=it.q;
+      matrixWrap.classList.toggle('hidden', it.type!=='raven');
+      optsEl.innerHTML='';
+      nextBtn.classList.remove('ready');
+      if(it.type==='raven'){
+        const mctx=matrixCanvas.getContext('2d');
+        const W=matrixCanvas.width;
+        mctx.clearRect(0,0,W,W);
+        drawMatrix(mctx,it.mat.grid,W);
+        it.mat.options.forEach((cell,idx)=>{
+          const b=document.createElement('button');
+          b.className='opt'; b.dataset.idx=idx;
+          const cv=document.createElement('canvas'); cv.width=56; cv.height=56;
+          drawOption(cv.getContext('2d'),cell,56);
+          const lbl=document.createElement('span'); lbl.className='lbl'; lbl.textContent=String.fromCharCode(65+idx);
+          b.appendChild(cv); b.appendChild(lbl);
+          b.onclick=()=>selectOption(idx);
+          optsEl.appendChild(b);
+        });
+      } else {
+        it.opts.forEach((o,idx)=>{
+          const b=document.createElement('button');
+          b.className='opt'; b.dataset.idx=idx;
+          b.textContent=o;
+          b.onclick=()=>selectOption(idx);
+          optsEl.appendChild(b);
+        });
+      }
+    }
+
+    function selectOption(idx){
+      const it=state.items[state.current];
+      if(it.type==='raven') state.answers[state.current]= (idx===it.mat.answerIdx);
+      else state.answers[state.current]= (idx===it.answer);
+      optsEl.querySelectorAll('.opt').forEach((b,i)=>b.classList.toggle('sel', i===idx));
+      nextBtn.classList.add('ready');
+    }
+
+    function nextItem(){
+      if(!nextBtn.classList.contains('ready')) return;
+      state.current++;
+      if(state.current>=state.items.length){ finish(); return; }
+      renderItem();
+    }
+
+    /* ---------- timer ---------- */
+    function startTimer(){
+      state.timerId=setInterval(()=>{
+        state.timeLeft--;
+        timerEl.textContent='⏱ '+fmtTime(state.timeLeft);
+        timerEl.classList.toggle('low', state.timeLeft<=60);
+        if(state.timeLeft<=0){ clearInterval(state.timerId); state.timerId=null; finish(); }
+      },1000);
+    }
+
+    /* ---------- punteggio ---------- */
+    function computeIq(){
+      const total=state.items.length;
+      state.raw=state.answers.filter(Boolean).length;
+      const ratio=state.raw/total;
+      let iq=62+78*Math.pow(ratio,1.08);
+      // piccolo bonus velocità
+      if(state.used>0 && state.used < TOTAL_TIME*0.5) iq+=Math.round((1-state.used/(TOTAL_TIME*0.5))*4);
+      state.iq=Math.max(55,Math.min(150,Math.round(iq)));
+    }
+    function bandFor(iq){
+      if(iq<70) return ['Sotto la media (ma con un grande cuore)','#ff9f8f'];
+      if(iq<85) return ['Nella media bassa — il mondo ha comunque bisogno di te','#ffd54a'];
+      if(iq<=115) return ['Nella norma — il 68% del mondo è con te','#7dd3fc'];
+      if(iq<=130) return ['Sopra la media — il tuo QI è un segreto di Stato','#4ade80'];
+      return ['Geniale — Orazio Caino ti chiamerebbe per un caso','#c084fc'];
+    }
+
+    function finish(){
+      if(state.finished) return;
+      state.finished=true;
+      if(state.timerId){ clearInterval(state.timerId); state.timerId=null; }
+      state.used = TOTAL_TIME-state.timeLeft;
+      computeIq();
+      const pct=Math.round(normCdf((state.iq-100)/15)*100);
+      const [band,color]=bandFor(state.iq);
+      quizArea.classList.add('hidden');
+      resultArea.classList.remove('hidden');
+      $('iqValue').textContent=state.iq;
+      const bb=$('iqBand'); bb.textContent=band; bb.style.borderColor=color; bb.style.background=color+'22';
+      $('iqPercentile').textContent='Sei più intelligente del '+pct+'% delle persone.';
+      $('stRaw').textContent=state.raw+'/'+state.items.length;
+      $('stTime').textContent=fmtTime(state.used);
+      $('stPct').textContent=pct+'%';
+      state.pct=pct; state.band=band;
+      drawCard();
+      if(window.QuizConfetti) window.QuizConfetti(50);
+    }
+
+    /* ---------- card con gaussiana ---------- */
+    function bellX(px,w){ return 55+(px/w)*90; } // QI da 55 a 145
+    function bellY(iq){
+      return Math.exp(-((iq-100)*(iq-100))/(2*225)) / (15*Math.sqrt(2*Math.PI));
+    }
+    function drawCard(){
+      const cv=$('iqCardCanvas'); const ctx=cv.getContext('2d');
+      const W=cv.width, H=cv.height;
+      // sfondo
+      const g=ctx.createLinearGradient(0,0,W,H);
+      g.addColorStop(0,'#0a1628'); g.addColorStop(0.65,'#10233f'); g.addColorStop(1,'#0d1b30');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      // eyebrow
+      ctx.fillStyle='#00d4ff'; ctx.font='700 32px Inter,system-ui,sans-serif'; ctx.textAlign='left';
+      ctx.fillText('QUIZ LAB · TEST DI INTELLIGENZA', 90, 78);
+      // QI
+      ctx.fillStyle='#ffffff'; ctx.font='800 96px Inter,system-ui,sans-serif';
+      ctx.fillText('QI '+state.iq, 90, 180);
+      ctx.fillStyle='#a0c0e0'; ctx.font='400 30px Inter,system-ui,sans-serif';
+      ctx.fillText(state.band, 90, 222);
+      // gaussiana
+      const rx=90, ry=280, rw=W-180, rh=250;
+      const peak=bellY(100);
+      // campana
+      ctx.beginPath();
+      for(let px=0;px<=rw;px++){
+        const iq=bellX(px,rw);
+        const y=ry+rh-(bellY(iq)/peak)*rh*0.92;
+        if(px===0) ctx.moveTo(rx+px,y); else ctx.lineTo(rx+px,y);
+      }
+      ctx.strokeStyle='#7dd3fc'; ctx.lineWidth=5; ctx.stroke();
+      // area a sinistra del QI
+      const cut=Math.round(((state.iq-55)/90)*rw);
+      ctx.beginPath();
+      ctx.moveTo(rx,ry+rh);
+      for(let px=0;px<=cut;px++){
+        const iq=bellX(px,rw);
+        const y=ry+rh-(bellY(iq)/peak)*rh*0.92;
+        ctx.lineTo(rx+px,y);
+      }
+      ctx.lineTo(rx+cut,ry+rh);
+      ctx.closePath();
+      ctx.fillStyle='rgba(0,212,255,.28)'; ctx.fill();
+      // asse
+      ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(rx,ry+rh); ctx.lineTo(rx+rw,ry+rh); ctx.stroke();
+      ctx.fillStyle='#9fb8d8'; ctx.font='600 22px Inter,system-ui,sans-serif'; ctx.textAlign='center';
+      [55,70,85,100,115,130,145].forEach(v=>{
+        const px=rx+((v-55)/90)*rw;
+        ctx.fillText(String(v), px, ry+rh+34);
+        ctx.fillRect(px-1, ry+rh, 2, 8);
+      });
+      // marker del QI
+      const mx=rx+cut;
+      ctx.strokeStyle='#ffd54a'; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.moveTo(mx,ry); ctx.lineTo(mx,ry+rh); ctx.stroke();
+      ctx.fillStyle='#ffd54a'; ctx.font='800 30px Inter,system-ui,sans-serif';
+      ctx.fillText('TU → QI '+state.iq, mx, ry-12);
+      // percentile
+      ctx.fillStyle='#eaf6ff'; ctx.font='700 40px Inter,system-ui,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Sei più intelligente del '+state.pct+'% delle persone', W/2, ry+rh+96);
+      ctx.fillStyle='#5c7890'; ctx.font='600 26px Inter,system-ui,sans-serif';
+      ctx.fillText('gaussiana: media 100 · deviazione 15 · test informale', W/2, ry+rh+136);
+      ctx.textAlign='left';
+    }
+
+    /* ---------- condivisione (replica leggera di quiz-share) ---------- */
+    function cardBlob(){ return new Promise(res=>{ $('iqCardCanvas').toBlob(res,'image/png'); }); }
+    function toast(m){
+      let el=document.querySelector('.iq-toast');
+      if(!el){ el=document.createElement('div'); el.className='iq-toast'; el.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0a1628;color:#fff;padding:12px 20px;border-radius:30px;font:600 14px Inter,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.4);border:1px solid rgba(125,211,252,.5);z-index:9999;transition:opacity .4s;pointer-events:none;'; document.body.appendChild(el); }
+      el.textContent=m; el.style.opacity='1'; clearTimeout(el._t);
+      el._t=setTimeout(()=>{ el.style.opacity='0'; },2200);
+    }
+    $('btnShare').addEventListener('click', ()=>{
+      cardBlob().then(blob=>{
+        const file=new File([blob],'iq-card.png',{type:'image/png'});
+        if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){ navigator.share({files:[file], title:'Il mio QI: '+state.iq, text:'Sei più intelligente del '+state.pct+'% delle persone?'}).catch(()=>{}); }
+        else if(navigator.share){ navigator.share({title:'Il mio QI: '+state.iq, text:'Sei più intelligente del '+state.pct+'% delle persone?'}).catch(()=>{}); }
+        else copyImage();
+      });
+    });
+    function copyImage(){
+      cardBlob().then(blob=>{
+        if(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem){
+          navigator.clipboard.write([new ClipboardItem({'image/png':blob})]).then(()=>toast('Immagine copiata! 🎉')).catch(()=>downloadImage());
+        } else downloadImage();
+      });
+    }
+    function downloadImage(){
+      cardBlob().then(blob=>{
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='iq-card.png';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },400);
+        toast('Card scaricata! 📥');
+      });
+    }
+    $('btnCopy').addEventListener('click', copyImage);
+    $('btnDownload').addEventListener('click', downloadImage);
+
+    /* ---------- avvio ---------- */
+    $('startBtn').addEventListener('click', ()=>{
+      state.items=buildItems(); state.answers=new Array(state.items.length).fill(null);
+      state.current=0; state.timeLeft=TOTAL_TIME; state.used=0; state.finished=false;
+      introArea.classList.add('hidden');
+      resultArea.classList.add('hidden');
+      quizArea.classList.remove('hidden');
+      timerEl.textContent='⏱ '+fmtTime(TOTAL_TIME);
+      renderItem();
+      startTimer();
+    });
+    $('restartBtn').addEventListener('click', ()=>{
+      resultArea.classList.add('hidden'); introArea.classList.remove('hidden');
+    });
+    nextBtn.addEventListener('click', nextItem);
+
+    /* API di test (per i controlli automatici) */
+    window.IQState = state;
+    window.selectOption = selectOption;
+    window.nextItem = nextItem;
+    window.finish = finish;
+    window.genMatrix = genMatrix;
+    </script>
+</body>
+</html>
