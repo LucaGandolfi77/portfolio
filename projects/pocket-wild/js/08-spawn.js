@@ -1,6 +1,6 @@
 /* ================= SPAWNING ================= */
 function spawnWild(force){
-  if(G.wilds.length>70)return;
+  if(G.wilds.length>=70)return; /* cap rigoroso a 70 */
   if(G.dungeon||G.tower)return; /* niente spawn normali in dungeon/torre */
   const season=curSeason();
   for(let tries=0;tries<4;tries++){

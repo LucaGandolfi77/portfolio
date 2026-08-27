@@ -158,29 +158,71 @@ window.addEventListener('load', () => {
     });
   }
 
+  const BuildingData = {
+    gold_mine: { name: 'Gold Mine', produces: 'gold', populationBonus: 2 },
+    lumber_camp: { name: 'Lumber Camp', produces: 'wood', populationBonus: 2 },
+    farm: { name: 'Farm', produces: 'food', populationBonus: 0 },
+    quarry: { name: 'Quarry', produces: 'stone', populationBonus: 0 },
+    tavern: { name: 'Tavern', produces: 'happiness', populationBonus: 5 },
+    academy: { name: 'Academy', produces: 'resourceMultiplier', populationBonus: 0 },
+    barracks: { name: 'Barracks', produces: 'populationCapBonus', populationBonus: 3 }
+  };
+  
   function getBuildingName(type) {
-    const names = { gold_mine: 'Gold Mine', lumber_camp: 'Lumber Camp', farm: 'Farm', quarry: 'Quarry' };
-    return names[type] || 'Building';
+    return BuildingData[type] ? BuildingData[type].name : 'Building';
   }
 
   function getProductionRate(building) {
     const baseRates = { gold_mine: 1, lumber_camp: 1, farm: 1, quarry: 1 };
     const resourceKey = ResourceTypeMap[building.type] || building.type;
     const baseRate = baseRates[building.type] || 0;
+    
+    // Special building effects
+    if (building.type === 'tavern') {
+      return Math.floor(1 * Math.pow(building.level, 1.5)); // produces happiness indirectly
+    }
+    if (building.type === 'academy') {
+      return Math.floor(0.5 * Math.pow(building.level, 1.5)); // resource multiplier applied elsewhere
+    }
+    if (building.type === 'barracks') {
+      return 0; // no direct production, affects population cap
+    }
+    
     return Math.floor(baseRate * Math.pow(building.level, 1.5));
   }
 
   // Purchase building
   function purchaseBuilding(type) {
     const level = player.buildings.filter(b => b.type === type).length + 1;
-    const baseCost = { gold: 50, wood: 30, food: 40, stone: 60 }[type];
+    const bd = BuildingData[type];
+    const baseCost = BuildingCosts[type];
     const costMultiplier = Math.pow(1.3, level - 1);
-    const cost = {
-      gold: Math.floor(baseCost * costMultiplier),
-      wood: Math.floor((baseCost * 0.6) * costMultiplier),
-      food: Math.floor((baseCost * 0.8) * costMultiplier),
-      stone: Math.floor(baseCost * costMultiplier)
-    };
+    
+    if (!baseCost) {
+      console.log('Unknown building type:', type);
+      return;
+    }
+    
+    // Different cost structures for different building types
+    let cost;
+    if (bd.produces === 'happiness') {
+      // Tavern costs only gold
+      cost = { gold: Math.floor(baseCost * costMultiplier) };
+    } else if (bd.produces === 'resourceMultiplier') {
+      // Academy costs only gold
+      cost = { gold: Math.floor(baseCost * costMultiplier) };
+    } else if (bd.produces === 'populationCapBonus') {
+      // Barracks costs only wood
+      cost = { wood: Math.floor(baseCost * costMultiplier) };
+    } else {
+      // Standard resource buildings - full cost structure
+      cost = {
+        gold: Math.floor(baseCost * costMultiplier),
+        wood: Math.floor((baseCost * 0.6) * costMultiplier),
+        food: Math.floor((baseCost * 0.8) * costMultiplier),
+        stone: Math.floor(baseCost * costMultiplier)
+      };
+    }
     
     if (player.canAfford(cost)) {
       player.pay(cost);

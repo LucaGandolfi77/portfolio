@@ -1,6 +1,7 @@
 /* ================= WORLD ================= */
 const TILE=16, WORLD_T=2200, WORLD_PX=WORLD_T*TILE;
 let SEED=1;
+function setSeed(v){SEED=(v>>>0)||1;}
 function hash2(x,y,s){let h=s^Math.imul(x,374761393)^Math.imul(y,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return(h>>>0)/4294967296;}
 const BIOMES=['grass','forest','desert','snow','ocean','volcano','crystal'];
 const BIOME_COL={grass:'#3d8f4f',forest:'#2e6b3f',desert:'#c9a35f',snow:'#dbe6f2',ocean:'#2456a8',volcano:'#8a3a24',crystal:'#7a5ac8'};

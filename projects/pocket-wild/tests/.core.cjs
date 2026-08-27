@@ -7,13 +7,14 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function mulberry32(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function hashSeed(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
-function toast(msg,color){if(SILENT)return;const d=document.createElement('div');d.className='toast';d.textContent=msg;if(color)d.style.borderLeftColor=color;$('toasts').appendChild(d);setTimeout(()=>{d.style.opacity='0';d.style.transition='opacity .4s';setTimeout(()=>d.remove(),420);},3000);}
+function toast(msg,color){if(SILENT||globalThis.__TEST__)return;const d=document.createElement('div');d.className='toast';d.textContent=msg;if(color)d.style.borderLeftColor=color;$('toasts').appendChild(d);setTimeout(()=>{d.style.opacity='0';d.style.transition='opacity .4s';setTimeout(()=>d.remove(),420);},3000);}
 let SILENT=false; /* il motore di test mette a tacere toast/audio durante le simulazioni */
 function setSilent(v){SILENT=!!v;}
 
 /* ================= WORLD ================= */
 const TILE=16, WORLD_T=2200, WORLD_PX=WORLD_T*TILE;
 let SEED=1;
+function setSeed(v){SEED=(v>>>0)||1;}
 function hash2(x,y,s){let h=s^Math.imul(x,374761393)^Math.imul(y,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return(h>>>0)/4294967296;}
 const BIOMES=['grass','forest','desert','snow','ocean','volcano','crystal'];
 const BIOME_COL={grass:'#3d8f4f',forest:'#2e6b3f',desert:'#c9a35f',snow:'#dbe6f2',ocean:'#2456a8',volcano:'#8a3a24',crystal:'#7a5ac8'};
@@ -197,6 +198,7 @@ function loadGame(){
   try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));if(!d||!d.seed)return false;
     Object.assign(G,{seed:d.seed,player:d.player,sph:d.sph||[3,0,0],inv:d.inv,chest:d.chestInv,team:d.team,active:d.active,dex:d.dex,seen:d.seen||{},time:d.time,day:d.day,buildings:d.buildings,quests:d.quests,bosses:d.bosses,hunger:d.hunger!==undefined?d.hunger:100,weather:d.weather||'clear',weatherT:d.weatherT||0,equip:d.equip||'none',farms:d.farms||[],complete:!!d.complete,customs:d.customs||[],flying:false,tower:null,fishing:null,memories:d.memories||{},diff:DIFFS[d.diff]?d.diff:'normal',mode:['story','zen','speedrun'].includes(d.mode)?d.mode:'story',speedrun:d.speedrun||{on:false,elapsed:0},stat:Object.assign({catches:0,evolves:0,eggs:0,trainers:0,alphas:0,splices:0,fusions:0,customs:0,seasonsSeen:{},deaths:0,travel:0,style:{fight:0,gather:0,travel:0,catch:0,death:0},habits:0,eclipse:0,towerWins:0,fished:0,biomeVoices:{}},d.stat||{})});
     (G.customs||[]).forEach(sp=>{if(sp&&sp.id)CUSTOM_SPECIES[sp.id]=sp;});
+    SEED=G.seed; /* la mappa del seed salvato */
     /* migrazione: save vecchi che spawnavano nell'oceano → riporta su terra */
     if(solidAt(G.player.x,G.player.y)||biomeAt(Math.floor(G.player.x/TILE),Math.floor(G.player.y/TILE))==='ocean'){
       const sp=findSpawn();G.player.x=sp.x;G.player.y=sp.y;
@@ -471,7 +473,7 @@ const STRUCTURES=[
 
 /* ================= SPAWNING ================= */
 function spawnWild(force){
-  if(G.wilds.length>70)return;
+  if(G.wilds.length>=70)return; /* cap rigoroso a 70 */
   if(G.dungeon||G.tower)return; /* niente spawn normali in dungeon/torre */
   const season=curSeason();
   for(let tries=0;tries<4;tries++){
@@ -619,6 +621,7 @@ function copyShareLink(){
   }else{const i=document.createElement('input');i.value=link;document.body.appendChild(i);i.select();try{document.execCommand('copy');}catch(e){}i.remove();done();}
 }
 function spawnCustomWild(sp){
+  if(sp&&sp.id&&!CUSTOM_SPECIES[sp.id])CUSTOM_SPECIES[sp.id]=sp;
   for(let t=0;t<80;t++){
     const a=Math.random()*6.28,d=6+Math.random()*8;
     const x=G.player.x+Math.cos(a)*d*TILE,y=G.player.y+Math.sin(a)*d*TILE;
@@ -2582,9 +2585,9 @@ function render(){
       ctx.beginPath();ctx.arc(pr.x-camX,pr.y-camY,5+Math.sin(pr.t*20)*1.5,0,6.283);ctx.fill();
     }
   }
-  /* bobber pesca */
+  /* bobber pesca (usa G.player: p è dichiarato più sotto) */
   if(G.fishing){
-    const bx=p.x-camX,by=p.y-camY-10;
+    const bx=G.player.x-camX,by=G.player.y-camY-10;
     ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx,by+14);ctx.stroke();
     const bob=G.fishing.bitten?Math.sin(performance.now()/80)*3:Math.sin(performance.now()/400)*1.5;
@@ -3231,6 +3234,7 @@ function whisper(txt){
   const w=$('whisper');
   w.innerHTML='<span class="w">🎙</span> '+txt;
   w.classList.add('in');
+  if(globalThis.__TEST__)return;
   if(whisperTimer)clearTimeout(whisperTimer);
   whisperTimer=setTimeout(()=>w.classList.remove('in'),6000);
 }
@@ -3253,10 +3257,11 @@ function sovereignSays(txt){
   const b=$('bossvoice');
   b.innerHTML='<span class="s">THE SOVEREIGN</span> — '+txt;
   b.classList.add('in');
+  G.lastBossVoice=txt; /* per i test */
+  if(globalThis.__TEST__)return;
   if(bossVoiceTimer)clearTimeout(bossVoiceTimer);
   bossVoiceTimer=setTimeout(()=>b.classList.remove('in'),4200);
   try{SFX.tone(70,0.8,'sawtooth',0.02,0,55);}catch(e){}
-  G.lastBossVoice=txt; /* per i test */
 }
 
 /* ================= DIARIO DI LINA (33 pagine) ================= */
@@ -3355,6 +3360,7 @@ function newWorld(){
   if(BOT.intv)stopSim();
   const seedStr=$('seedInput').value.trim();
   G.seed=seedStr?hashSeed(seedStr):(Date.now()%100000);
+  SEED=G.seed; /* sincronizza il rumore del mondo col seed scelto */
   const sp=findSpawn();
   G.player={x:sp.x,y:sp.y,hp:100,maxHp:100,dir:0,invT:0,attackFx:0};
   G.team=[];G.active=-1;G.dex={};G.wilds=[];G.projectiles=[];
@@ -3523,4 +3529,4 @@ function applyLang(){
   renderOpts();
 })();
 
-module.exports={enterDungeon,spawnDungeonWave,dungeonTraps,dungeonClearReward,updateDungeon,enterTower,spawnTowerWave,updateTower,makeTrainerTeam,updateTrainer,challengeTrainer,updateTrainerDuel,updateMira,updateBram,talkMira,buyUpgrade,renderSmith,startFishing,updateFishing,reelIn,nearWater,defeatPal,spawnWild,startDuel,renderDex,renderEdit,renderLab,renderAch,renderTest,newWorld,findSpawn,initRuins,initBosses,initQuests,questEvent,questChapterDone,questUnlocked,questReward,maybeSpawnRift,spawnFinalBoss,updateFinalBoss,gameComplete,eclipseMult,startEclipse,spawnEcho,updateEvent,createCustomPal,copyShareLink,spawnCustomWild,importCustomPal,sanitizeCustom,encodePal,decodePal,snapshotG,restoreG,botDecide,botMove,botTick,stepSim,startSim,stopSim,simReport,testGive,seasonForTest,checkAch,saveProfile,gatherMultOf,setSilent,stylePush,maybeImprint,toggleRide,showStory,storyNext,skipStory,drawStory,addSphere,G,SPECIES,CUSTOM_SPECIES,SEASONS,seasonOf,curSeason,anytimePool,weatherFor,updateTime,updateWorkPals,updateFarms,speciesOf,makeWild,makeOwned,scalePal,addXp,TILE,dist,biomeAt,solidAt,circleHitsSolid,hashSeed,mulberry32,clamp,toast,saveGame,xpNeed,TRAITS,TYPES,E,SKILL_POOL,ACH,ACH_DEFS,BOT,RECIPES,STORY,MIRA_LINES,BRAM_LINES,AVERY_LINES,UPGRADES,WORLD_T,BIOMES,HABITS,SEA_POOL,CUTSCENES,playCutscene,cutNext,CUT,renderDiary,whisper,sovereignSays,updateBiomeVoice,BIOME_WHISPERS,LINA_NOTES,DIARY_FAVOURITES,diaryPageState,applyLang,renderOpts,t,setLang,diffMult,DIFFS,L,updateHunger,faint,get pendingCustom(){return pendingCustom;}};
+module.exports={enterDungeon,spawnDungeonWave,dungeonTraps,dungeonClearReward,updateDungeon,enterTower,spawnTowerWave,updateTower,makeTrainerTeam,updateTrainer,challengeTrainer,updateTrainerDuel,updateMira,updateBram,talkMira,buyUpgrade,renderSmith,startFishing,updateFishing,reelIn,nearWater,defeatPal,spawnWild,startDuel,renderDex,renderEdit,renderLab,renderAch,renderTest,newWorld,findSpawn,initRuins,initBosses,initQuests,questEvent,questChapterDone,questUnlocked,questReward,maybeSpawnRift,spawnFinalBoss,updateFinalBoss,gameComplete,eclipseMult,startEclipse,spawnEcho,updateEvent,createCustomPal,copyShareLink,spawnCustomWild,importCustomPal,sanitizeCustom,encodePal,decodePal,snapshotG,restoreG,botDecide,botMove,botTick,stepSim,startSim,stopSim,simReport,testGive,seasonForTest,checkAch,saveProfile,gatherMultOf,setSilent,stylePush,maybeImprint,toggleRide,showStory,storyNext,skipStory,drawStory,addSphere,G,SPECIES,CUSTOM_SPECIES,SEASONS,seasonOf,curSeason,anytimePool,weatherFor,updateTime,updateWorkPals,updateFarms,speciesOf,makeWild,makeOwned,scalePal,addXp,TILE,dist,biomeAt,solidAt,circleHitsSolid,hashSeed,mulberry32,clamp,toast,saveGame,xpNeed,TRAITS,TYPES,E,SKILL_POOL,ACH,ACH_DEFS,BOT,RECIPES,STORY,MIRA_LINES,BRAM_LINES,AVERY_LINES,UPGRADES,WORLD_T,BIOMES,HABITS,SEA_POOL,CUTSCENES,playCutscene,cutNext,CUT,renderDiary,whisper,sovereignSays,updateBiomeVoice,BIOME_WHISPERS,LINA_NOTES,DIARY_FAVOURITES,diaryPageState,applyLang,renderOpts,t,setLang,diffMult,DIFFS,L,updateHunger,faint,setSeed,tradeSell,tradeBuy,renderPanel,spliceGene,fusePals,teachSkill,placeBuild,tryPlace,renderTeam,renderCraft,renderBuild,renderChest,renderTrade,renderQuests,updateWeather,loadGame,updateTrader,render,renderMinimap,refreshHud,moveInput,resize,throwSphere,attack,shoot,interact,updateProjectiles,plantModeToggle,tryPlant,breedAtRanch,updateRanches,drawPalShape,STRUCTURES,catchChance,dmgCalc,get pendingCustom(){return pendingCustom;},get SEED(){return SEED;}};

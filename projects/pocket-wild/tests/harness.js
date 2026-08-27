@@ -26,7 +26,7 @@ function mkEl() {
     set(t, p, v) { t[p] = v; return true; }
   });
 }
-globalThis.document = { getElementById: () => mkEl(), querySelectorAll: () => [], createElement: () => mkEl(), querySelector: () => mkEl() };
+globalThis.document = { getElementById: () => mkEl(), querySelectorAll: () => [], createElement: () => mkEl(), querySelector: () => mkEl(), createTextNode: () => ({ nodeType: 3, nodeValue: '', textContent: '' }) };
 globalThis.window = { AudioContext: undefined, webkitAudioContext: undefined, addEventListener: noop };
 globalThis.addEventListener = noop;
 const __ls = {};
@@ -51,7 +51,7 @@ const EXPORTS = [
   'G','SPECIES','CUSTOM_SPECIES','SEASONS','seasonOf','curSeason','anytimePool','weatherFor','updateTime','updateWorkPals','updateFarms',
   'speciesOf','makeWild','makeOwned','scalePal','addXp','TILE','dist','biomeAt','solidAt','circleHitsSolid',
   'hashSeed','mulberry32','clamp','toast','saveGame','xpNeed','TRAITS','TYPES','E','SKILL_POOL',
-  'ACH','ACH_DEFS','BOT','RECIPES','STORY','MIRA_LINES','BRAM_LINES','AVERY_LINES','UPGRADES','WORLD_T','BIOMES','HABITS','SEA_POOL','CUTSCENES','playCutscene','cutNext','CUT','renderDiary','whisper','sovereignSays','updateBiomeVoice','BIOME_WHISPERS','LINA_NOTES','DIARY_FAVOURITES','diaryPageState','applyLang','renderOpts','t','setLang','diffMult','DIFFS','L','updateHunger','faint'
+  'ACH','ACH_DEFS','BOT','RECIPES','STORY','MIRA_LINES','BRAM_LINES','AVERY_LINES','UPGRADES','WORLD_T','BIOMES','HABITS','SEA_POOL','CUTSCENES','playCutscene','cutNext','CUT','renderDiary','whisper','sovereignSays','updateBiomeVoice','BIOME_WHISPERS','LINA_NOTES','DIARY_FAVOURITES','diaryPageState','applyLang','renderOpts','t','setLang','diffMult','DIFFS','L','updateHunger','faint','setSeed','tradeSell','tradeBuy','renderPanel','spliceGene','fusePals','teachSkill','placeBuild','tryPlace','renderTeam','renderCraft','renderBuild','renderChest','renderTrade','renderQuests','updateWeather','loadGame','updateTrader','render','renderMinimap','refreshHud','moveInput','resize','throwSphere','attack','shoot','interact','updateProjectiles','plantModeToggle','tryPlant','breedAtRanch','updateRanches','drawPalShape','STRUCTURES','catchChance','dmgCalc'
 ];
 
 function buildCore() {
@@ -59,7 +59,7 @@ function buildCore() {
   const files = fs.readdirSync(dir).sort();
   const code = files.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('');
   const modulePath = path.join(__dirname, '.core.cjs');
-  fs.writeFileSync(modulePath, code + '\nmodule.exports={' + EXPORTS.join(',') + ',get pendingCustom(){return pendingCustom;}};');
+  fs.writeFileSync(modulePath, code + '\nmodule.exports={' + EXPORTS.join(',') + ',get pendingCustom(){return pendingCustom;},get SEED(){return SEED;}};');
   const M = require(modulePath);
   return M;
 }

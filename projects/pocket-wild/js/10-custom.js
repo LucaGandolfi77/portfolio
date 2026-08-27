@@ -60,6 +60,7 @@ function copyShareLink(){
   }else{const i=document.createElement('input');i.value=link;document.body.appendChild(i);i.select();try{document.execCommand('copy');}catch(e){}i.remove();done();}
 }
 function spawnCustomWild(sp){
+  if(sp&&sp.id&&!CUSTOM_SPECIES[sp.id])CUSTOM_SPECIES[sp.id]=sp;
   for(let t=0;t<80;t++){
     const a=Math.random()*6.28,d=6+Math.random()*8;
     const x=G.player.x+Math.cos(a)*d*TILE,y=G.player.y+Math.sin(a)*d*TILE;

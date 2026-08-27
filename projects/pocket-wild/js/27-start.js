@@ -17,6 +17,7 @@ function newWorld(){
   if(BOT.intv)stopSim();
   const seedStr=$('seedInput').value.trim();
   G.seed=seedStr?hashSeed(seedStr):(Date.now()%100000);
+  SEED=G.seed; /* sincronizza il rumore del mondo col seed scelto */
   const sp=findSpawn();
   G.player={x:sp.x,y:sp.y,hp:100,maxHp:100,dir:0,invT:0,attackFx:0};
   G.team=[];G.active=-1;G.dex={};G.wilds=[];G.projectiles=[];

@@ -2,7 +2,7 @@
  * Cache-first per gli asset dell'app; il gioco è un singolo file, quindi
  * la shell intera sta in poche decine di KB. Bump CACHE_VERSION per invalidare. */
 'use strict';
-const CACHE_VERSION = 'pocketwild-v11';
+const CACHE_VERSION = 'pocketwild-v15';
 const ASSETS = [
   './',
   './index.html',

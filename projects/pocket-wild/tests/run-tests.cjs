@@ -1,9 +1,9 @@
 /* Pocket Wild — Node test suite
  * Run:  node tests/run-tests.cjs   (from projects/pocket-wild/)
- * Builds the game core from ../js/*.js via harness.js and asserts 310+ behaviours:
+ * Builds the game core from ../js/*.js via harness.js and asserts 313+ behaviours:
  * world/genetics/capture/quests/seasons/achievements/engine/NPCs/tower/eclipse/
  * fishing/flying/imprinting/cutscenes/biome-voices/sovereign-voice/diary/
- * difficulty/language/zen/speedrun. */
+ * difficulty/language/zen/speedrun/seed-determinism. */
 'use strict';
 const { buildCore } = require('./harness');
 const M = buildCore();
@@ -469,12 +469,20 @@ eq('respawn flag cleared',M.G.respawn,false);
 
 console.log('— Audit fix: spawn not in ocean —');
 for(const seed of [1,2,3,42,777]){
-  G.seed=seed;
+  M.setSeed(seed);
   const sp=M.findSpawn();
   const okSpawn=!M.solidAt(sp.x,sp.y)&&M.biomeAt(Math.floor(sp.x/M.TILE),Math.floor(sp.y/M.TILE))!=='ocean';
   ok('seed '+seed+' spawns on land',okSpawn);
   if(!okSpawn)break;
 }
+/* seed determinismo + newWorld sincronizza SEED */
+M.setSeed(1);const _b1=M.biomeAt(10,10);
+M.setSeed(42);const _b42=M.biomeAt(10,10);
+ok('different seeds give different maps',_b1!==_b42);
+M.setSeed(1);
+eq('same seed reproduces the map',M.biomeAt(10,10),_b1);
+M.newWorld();
+eq('newWorld syncs SEED to G.seed',M.SEED,G.seed);
 console.log('— Parallel engine: experiments —');
 M.G.inv={grass:0,wood:0,berry:1,stone:0,ess:0,potion:0,arrows:0,sword:0,bow:0,cooked:0,stew:0,seeds:0,scroll:0,coins:0};
 M.G.sph=[0,0,0];
@@ -625,7 +633,21 @@ const teamN=M.G.team.length;
 M.reelIn();
 ok('caught a sea Pal',M.G.team.length===teamN+1);
 ok('sea species in dex',Object.values(M.G.dex).some(v=>v>=1));
-M.G.player={x:500,y:500,dir:0,invT:0};
+/* trova un punto senza acqua nelle vicinanze e verifica il fallimento della pesca */
+let drySpot=null;
+outer:
+for(let tx=50;tx<200;tx++){
+  for(let ty=50;ty<200;ty++){
+    const px=tx*M.TILE+8,py=ty*M.TILE+8;
+    let wet=false;
+    for(const[ox,oy]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){
+      if(M.biomeAt(tx+ox,ty+oy)==='ocean'){wet=true;break;}
+    }
+    if(!wet&&!M.solidAt(px,py)){drySpot={x:px,y:py};break outer;}
+  }
+}
+M.G.player={x:drySpot.x,y:drySpot.y,dir:0,invT:0};
+M.G.fishing=null;
 M.startFishing();
 ok('no fishing away from water',M.G.fishing===null);
 

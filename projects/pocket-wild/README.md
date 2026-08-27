@@ -263,7 +263,7 @@ projects/pocket-wild/manifest.webmanifest → PWA manifest
 projects/pocket-wild/sw.js         → offline service worker (caches index + js/)
 projects/pocket-wild/icon-192.png  → PWA icon (generated)
 projects/pocket-wild/icon-512.png  → PWA icon (generated)
-projects/pocket-wild/tests/          → Node test suite + engine docs (see tests/README.md)
+projects/pocket-wild/tests/          → Node test suite (313) + fuzz (campagna + 28 assi) + ENGINE-GUIDE.md (come riusare il motore in altri progetti)
 ```
 
 ### Code layout (`js/`, load order = file order)
@@ -337,3 +337,8 @@ projects/pocket-wild/tests/          → Node test suite + engine docs (see test
 | Minimal night lighting (only campfires) | audit pass | full light-mask (player, Pal, lanterns, beds, workbench, chest, boss, rift) |
 | Minimap showed only buildings | audit pass | markers for ruins, trader, trainer, rift, bosses, dungeon |
 | Test-lab bot never executed build/craft goals (null target) | engine smoke | immediate-action goals in `botMove` + flee-from-danger logic |
+| **`World seed` non faceva nulla** — `newWorld` aggiornava solo `G.seed` ma la mappa usava `let SEED=1` fisso → ogni mondo era identico | analisi del motore (pre-fuzz) | `SEED=G.seed` in `newWorld` e `loadGame` + `setSeed()` testabile |
+| Report fuzz: le statistiche venivano stampate dopo il restore → "day+0" fuorviante | fuzz runner | statistiche raccolte prima del restore + check "bot idle" |
+| Fuzz assi: meteora attiva bloccava l'eclissi nel fast-forward; atterraggio del volo su tile solidi | fuzz-axes | eventi fatti scadere con dt alto; atterraggio condizionato a `!solidAt` |
+| **Il bobber di pesca crashava il rendering** (`p` usato prima di `const p`) → freeze visivo alla prima pescata | fuzz-axes (asse render) | blocco bobber riscritto su `G.player` |
+| `spawnCustomWild` poteva ricevere una specie non registrata → crash in render | fuzz-axes (asse custom) | registrazione difensiva in `CUSTOM_SPECIES` |

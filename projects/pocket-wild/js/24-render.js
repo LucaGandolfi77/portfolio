@@ -105,9 +105,9 @@ function render(){
       ctx.beginPath();ctx.arc(pr.x-camX,pr.y-camY,5+Math.sin(pr.t*20)*1.5,0,6.283);ctx.fill();
     }
   }
-  /* bobber pesca */
+  /* bobber pesca (usa G.player: p è dichiarato più sotto) */
   if(G.fishing){
-    const bx=p.x-camX,by=p.y-camY-10;
+    const bx=G.player.x-camX,by=G.player.y-camY-10;
     ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx,by+14);ctx.stroke();
     const bob=G.fishing.bitten?Math.sin(performance.now()/80)*3:Math.sin(performance.now()/400)*1.5;

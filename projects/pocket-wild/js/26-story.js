@@ -179,6 +179,7 @@ function whisper(txt){
   const w=$('whisper');
   w.innerHTML='<span class="w">🎙</span> '+txt;
   w.classList.add('in');
+  if(globalThis.__TEST__)return;
   if(whisperTimer)clearTimeout(whisperTimer);
   whisperTimer=setTimeout(()=>w.classList.remove('in'),6000);
 }
@@ -201,10 +202,11 @@ function sovereignSays(txt){
   const b=$('bossvoice');
   b.innerHTML='<span class="s">THE SOVEREIGN</span> — '+txt;
   b.classList.add('in');
+  G.lastBossVoice=txt; /* per i test */
+  if(globalThis.__TEST__)return;
   if(bossVoiceTimer)clearTimeout(bossVoiceTimer);
   bossVoiceTimer=setTimeout(()=>b.classList.remove('in'),4200);
   try{SFX.tone(70,0.8,'sawtooth',0.02,0,55);}catch(e){}
-  G.lastBossVoice=txt; /* per i test */
 }
 
 /* ================= DIARIO DI LINA (33 pagine) ================= */
