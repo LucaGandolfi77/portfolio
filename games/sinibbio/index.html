@@ -171,7 +171,27 @@ function pickPairOptions(pair){
 
 /* ---------------- verifica vocale ---------------- */
 function norm(s){ return String(s||'').toLowerCase().replace(/[^a-zàèéìòù ]/g,'').replace(/\s+/g,' ').trim(); }
-function levenshtein(a,b){
+function phon(s){
+  let p=norm(s).replace(/[àáâä]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i').replace(/[òóôö]/g,'o').replace(/[ùúûü]/g,'u');
+  return p
+    .replace(/(.)\1+/g,'$1')                    // doppie -> semplici
+    .replace(/ph/g,'f')                         // ph -> f
+    .replace(/ch/g,'k')                         // ch -> k
+    .replace(/gh/g,'g')                         // gh -> g
+    .replace(/gn/g,'n')                         // gn -> n (approssimazione sonora)
+    .replace(/gli/g,'lj')                       // gli -> lj
+    .replace(/ci(?![aou])/g,'c').replace(/ci(a|o|u)/g,'c$1') // ci/e->c, cia->ca...
+    .replace(/ge(?![aou])/g,'g').replace(/ge(a|o|u)/g,'g$1')
+    .replace(/gi(?![aou])/g,'j').replace(/gi(a|o|u)/g,'j$1') // gi->j (suono g dolce)
+    .replace(/ce/g,'c').replace(/ci/g,'c')
+    .replace(/ca/g,'ka').replace(/co/g,'ko').replace(/cu/g,'ku').replace(/ck/g,'k')
+    .replace(/qu/g,'kw')
+    .replace(/c(?=[aou])/g,'k')
+    .replace(/sc(i|e)/g,'s').replace(/sch/g,'sk')
+    .replace(/eigh/g,'ei').replace(/igh/g,'ai')            // sonorità inglese (weightlighter, light...)
+    .replace(/y/g,'i');
+}
+function lev(a,b){
   const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
   const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
   for(let j=0;j<=n;j++) dp[0][j]=j;
@@ -183,7 +203,13 @@ function matchWord(spoken, word){
   const t=norm(word), s=norm(spoken);
   if(!t||!s) return false;
   if(s.includes(t)) return true;
-  return levenshtein(s,t) <= Math.max(2, Math.floor(t.length*0.32));
+  // confronto fonetico: come suona la parola attesa vs come suona la trascrizione
+  const tp=phon(t), sp=phon(s);
+  if(tp && sp && sp.includes(tp)) return true;
+  const dPho=lev(sp,tp), dRaw=lev(s,t);
+  const thrPho=Math.max(1, Math.ceil(tp.length*0.28));
+  const thrRaw=Math.max(2, Math.floor(t.length*0.32));
+  return dPho<=thrPho || dRaw<=thrRaw;
 }
 function matchPair(spoken, pair){
   const t=norm(pair), s=norm(spoken);
@@ -193,7 +219,14 @@ function matchPair(spoken, pair){
   // entrambe le parole presenti in ordine
   let i=sw.indexOf(words[0]);
   if(i>=0 && sw.slice(i+1).includes(words[1])) return true;
-  return levenshtein(s,t) <= Math.max(3, Math.floor(t.length*0.38));
+  // confronto fonetico parola-per-parola (in ordine)
+  const tp=pair.toLowerCase().split(' ').map(phon), sp=s.split(' ').map(phon);
+  let pi=sp.findIndex(x=>x===tp[0]);
+  if(pi>=0 && sp.slice(pi+1).some(x=>x===tp[1])) return true;
+  const dPho=lev(phon(s),phon(pair)), dRaw=lev(s,t);
+  const thrPho=Math.max(2, Math.ceil(phon(pair).length*0.30));
+  const thrRaw=Math.max(3, Math.floor(t.length*0.38));
+  return dPho<=thrPho || dRaw<=thrRaw;
 }
 
 /* ---------------- stato ---------------- */
@@ -1161,7 +1194,7 @@ resize();
 })();
 
 /* API di test */
-window.SINIBBIO={ G, spawnMonster, spawnPatagarrri, killMonster, killPata, matchWord, matchPair, pickOptions, pickPairOptions, pickPair, WORDS, norm, levenshtein, openWord, chooseWord, onWordOk, startGame, render, update, rr, triggerJagerbomb, updateJager, drawJager, spawnToken, tapToken };
+window.SINIBBIO={ G, spawnMonster, spawnPatagarrri, killMonster, killPata, matchWord, matchPair, pickOptions, pickPairOptions, pickPair, WORDS, norm, phon, lev, openWord, chooseWord, onWordOk, startGame, render, update, rr, triggerJagerbomb, updateJager, drawJager, spawnToken, tapToken };
 </script>
 </body>
 </html>

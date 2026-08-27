@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070d1a">
+<meta name="description" content="Phonetic Transcriber: trascrivi suoni inventati o incomprensibili in chiave fonetica, IPA approssimato e guess della lingua. Tutto nel browser.">
+<title>PHONETIC TRANSCRIBER — Suoni senza alfabeto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070d1a;--panel:rgba(13,26,48,.72);--cyan:#00d4ff;--violet:#7c5cff;--green:#2dd4a0;
+  --pink:#ff5d8f;--amber:#ffb703;--txt:#eaf6ff;--dim:#8fb4d6;--faint:#5f7f9f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:var(--bg);color:var(--txt);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;min-height:100%}
+body{
+  background:radial-gradient(1000px 600px at -10% -10%,rgba(0,212,255,.10),transparent 60%),
+             radial-gradient(900px 700px at 110% 110%,rgba(124,92,255,.10),transparent 60%),
+             var(--bg);
+}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:clamp(22px,4.5vw,34px);letter-spacing:2px;display:flex;align-items:center;gap:10px}
+h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:pulse 1.6s infinite}
+.sub{color:var(--dim);font-size:12px;letter-spacing:1px;margin-top:6px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.tabs{display:flex;gap:8px;margin:22px 0 16px;flex-wrap:wrap}
+.tab{background:var(--panel);border:1px solid rgba(0,212,255,.25);color:var(--dim);padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;letter-spacing:.5px;backdrop-filter:blur(8px);transition:all .25s}
+.tab:hover{border-color:rgba(0,212,255,.5);color:var(--txt)}
+.tab.active{background:linear-gradient(135deg,rgba(0,212,255,.18),rgba(124,92,255,.18));border-color:var(--cyan);color:var(--txt);box-shadow:0 0 18px rgba(0,212,255,.15)}
+.pane{display:none}
+.pane.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--panel);border:1px solid rgba(0,212,255,.14);border-radius:16px;padding:20px;backdrop-filter:blur(12px)}
+.card h3{font-size:13px;letter-spacing:2px;color:var(--dim);margin-bottom:14px;font-weight:700}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:none;border-radius:10px;padding:12px 20px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;transition:all .22s;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#04121f}
+.btn.ghost{background:transparent;border:1px solid rgba(0,212,255,.3);color:var(--txt)}
+.btn.ghost:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,.18)}
+.btn.pink{background:linear-gradient(135deg,#ff5d8f,#a64cff);color:#1a0510}
+.btn.small{padding:8px 14px;font-size:13px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.dropzone{border:2px dashed rgba(0,212,255,.35);border-radius:14px;padding:34px;text-align:center;color:var(--dim);cursor:pointer;transition:all .25s;font-size:14px}
+.dropzone.drag{border-color:var(--cyan);background:rgba(0,212,255,.06);color:var(--txt)}
+.mini{background:#0a1426;border:1px solid rgba(0,212,255,.25);color:var(--txt);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit}
+select.mini{cursor:pointer}
+.inputbox{width:100%;background:#0a1322;border:1px solid rgba(0,212,255,.18);border-radius:12px;padding:14px;color:var(--txt);font-family:inherit;font-size:15px;min-height:80px;resize:vertical;margin:10px 0}
+.inputbox::placeholder{color:var(--faint)}
+#progWrap{display:none;margin-top:14px}
+#progBar{height:12px;background:#0a1426;border-radius:6px;overflow:hidden;border:1px solid rgba(0,212,255,.2)}
+#progFill{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s;border-radius:6px}
+#progLabel{font-size:12px;color:var(--dim);margin-top:8px;letter-spacing:.5px}
+#progPct{color:var(--cyan)}
+.mono{font-family:'SFMono-Regular',Consolas,'Courier New',monospace}
+
+/* output */
+.out{margin-top:16px}
+.outrow{display:grid;grid-template-columns:170px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid rgba(0,212,255,.08);align-items:baseline}
+.outrow:last-child{border-bottom:none}
+.outlabel{font-size:11px;letter-spacing:2px;color:var(--faint);font-weight:700}
+.outval{font-size:clamp(17px,3.4vw,26px);word-break:break-word}
+.tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.5px;background:rgba(45,212,160,.14);color:var(--green);border:1px solid rgba(45,212,160,.25)}
+.guessbar{display:flex;align-items:center;gap:10px;margin:6px 0}
+.guessbar .glabel{min-width:34px;width:34px;font-size:12px;font-weight:700;text-transform:uppercase;color:var(--dim)}
+.guessbar .gtrack{flex:1;height:8px;background:#0a1426;border-radius:4px;overflow:hidden}
+.guessbar .gfill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .5s}
+.guessbar .gval{font-size:12px;width:46px;text-align:right;color:var(--dim)}
+
+#status{font-size:12px;color:var(--dim);margin-top:10px}
+#status .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--pink);margin-right:6px;animation:pulse 1.2s infinite}
+
+/* history */
+.hist{margin-top:26px}
+.hist-item{background:var(--panel);border:1px solid rgba(0,212,255,.1);border-radius:14px;padding:14px;margin-bottom:12px;border-left:3px solid var(--cyan);animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.hist-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.hist-word{font-size:19px;font-weight:800;letter-spacing:.5px}
+.hist-ipa{font-size:14px;color:var(--dim);margin:8px 0 2px}
+.hist-lang{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.hist-lang small{background:rgba(124,92,255,.16);color:#b39dff;padding:3px 9px;border-radius:12px;font-size:11px}
+.hist-actions{display:flex;gap:6px}
+.hist-actions .btn{padding:6px 12px;font-size:12px}
+.note{font-size:11px;color:var(--faint);line-height:1.6;margin-top:10px}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(10,20,38,.95);border:1px solid var(--green);color:var(--txt);padding:12px 22px;border-radius:30px;font-size:13px;opacity:0;pointer-events:none;transition:all .3s;z-index:50}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:720px){.outrow{grid-template-columns:1fr}.outlabel{font-size:10px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot"></span>PHONETIC TRANSCRIBER</h1>
+  <div class="sub">🔤 Trascrivi suoni inventati o incomprensibili → chiave fonetica, IPA approssimato, lingua più simile.</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="live">🎙 Live / Microfono</button>
+    <button class="tab" data-tab="file">📁 File audio</button>
+    <button class="tab" data-tab="guess">🤔 Linguaggio</button>
+  </div>
+
+  <!-- LIVE -->
+  <div class="pane active" id="pane-live">
+    <div class="card">
+      <h3>ASCOLTO DAL VIVO</h3>
+      <div class="row">
+        <button class="btn primary" id="liveBtn">🎙 Avvia</button>
+        <label class="mini mono" style="font-size:12px">@huggingface/transformers — Whisper <b style="color:var(--cyan)">(local, ~150MB)</b></label>
+      </div>
+      <div id="status"></div>
+      <div id="progWrap">
+        <div id="progBar"><div id="progFill"></div></div>
+        <div id="progLabel">Download modello… <span id="progPct">0%</span></div>
+      </div>
+      <div class="out" id="liveOut"></div>
+      <div class="note">ⓘ Il riconoscimento avviene <b>interamente nel browser</b> via Whisper (Transformers.js). Ideale per suoni inventati: Whisper trascrive ciò che sente usando l’alfabeto più vicino. Da lì estraiamo <b>chiave fonetica</b> e <b>IPA approssimato</b>.</div>
+    </div>
+  </div>
+
+  <!-- FILE -->
+  <div class="pane" id="pane-file">
+    <div class="card">
+      <h3>UPLOAD AUDIO</h3>
+      <input type="file" id="fileInput" accept="audio/*" style="display:none">
+      <div class="dropzone" id="dropzone">Trascina qui un file audio<br><small>oppure clicca per selezionare</small></div>
+      <div style="margin-top:12px"><button class="btn primary" id="trBtn" disabled>🔥 Trascrivi</button></div>
+      <div id="progWrap2">
+        <div id="progBar2"><div id="progFill2"></div></div>
+        <div id="progLabel2">Download modello… <span id="progPct2">0%</span></div>
+      </div>
+      <div class="out" id="fileOut"></div>
+      <div class="note">ⓘ Formati supportati: webm, ogg, wav, mp3, m4a… (qualunque cosa decodifichi il browser). Whisper in <b>auto-language</b> rileva da solo ogni lingua/pseudo-lingua.</div>
+    </div>
+  </div>
+
+  <!-- GUESS -->
+  <div class="pane" id="pane-guess">
+    <div class="card">
+      <h3>≈ A CHE LINGUA SOMIGLIA?</h3>
+      <p style="color:var(--dim);font-size:14px;margin-bottom:10px">Incolla qui sopra una o più chiavi fonetiche (o lascia lo storico):</p>
+      <textarea class="inputbox mono" id="guessInput" rows="3" placeholder="es. ﬁkure&#10;liskato&#10;veltalaiter"></textarea>
+      <div class="row"><button class="btn primary" id="guessBtn">🤔 Indovina</button></div>
+      <div id="guessOut" style="margin-top:14px"></div>
+      <div class="note">ⓘ Analisi dei fonemi: inventario vocalico, gruppi consonantici consentiti e pattern fonotattici di italiano, inglese, spagnolo, francese, tedesco. Il risultato è una <b>somiglianza euristica</b> (non una lingua certa).</div>
+    </div>
+    <div class="card hist" id="histCard">
+      <div class="row" style="justify-content:space-between">
+        <h3>STORICO SALVATO <span id="histCount" style="color:var(--faint)"></span></h3>
+        <div class="row">
+          <button class="btn ghost small" id="copyAll">📋 Copia tutto</button>
+          <button class="btn ghost small" id="clearAll">🗑 Svuota</button>
+        </div>
+      </div>
+      <div id="histList"></div>
+      <div id="histEmpty" style="color:var(--faint);font-size:13px;padding:14px 0">Nessuna trascrizione salvata.</div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="../../top_buttons.js"></script>
+<script>
+/* ============================================================
+   PHONETIC TRANSCRIBER — suoni senza alfabeto
+   Whisper (Transformers.js) → ortografia → G2P → IPA approx + chiave
+   ============================================================ */
+const $=id=>document.getElementById(id);
+const LIB_URL='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1';
+let lib=null, pipe=null, pipeLoading=false;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+async function ensurePipe(progId){
+  if(pipe) return pipe;
+  if(pipeLoading) return pipe;
+  pipeLoading=true;
+  const prog=$('progWrap'), progF=$('progFill'), progL=$('progLabel'), progP=$('progPct');
+  prog.style.display='block';
+  if(!lib) lib=await import(LIB_URL);
+  pipe=await lib.pipeline('automatic-speech-recognition','Xenova/whisper-tiny',{
+    dtype:'q8',
+    progress_callback:p=>{
+      if(p.status==='progress' && p.file && p.total){ progF.style.width=(p.loaded/p.total*100)+'%'; progP.textContent=Math.round(p.loaded/p.total*100)+'%'; }
+      else if(p.status==='done'){ progF.style.width='100%'; progP.textContent='100%'; }
+    }
+  });
+  prog.style.display='none';
+  pipeLoading=false;
+  return pipe;
+}
+
+/* ---------------- G2P: ortografia → IPA approssimato + chiave astratta ---------------- */
+const V='aàáâäeèéêëiìíîïoòóôöuùúûüy';
+const PHON={'ph':'f','ck':'k','gh':'g','gn':'n','sch':'ʃ','sh':'ʃ','ch':'tʃ','ll':'l','rr':'r','th':'θ','igh':'ai','eigh':'ei'};
+function normSt(s){ return String(s||'').toLowerCase().replace(/[.,;:!?„""''-]+/g,' ').replace(/\s+/g,' ').trim(); }
+function g2p(word){
+  // → IPA approssimato (stringa leggibile)
+  let w=normSt(word).replace(/[àáâä]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i').replace(/[òóôö]/g,'o').replace(/[ùúûü]/g,'u');
+  let ipa='';
+  for(let i=0;i<w.length;i++){
+    const two=w.slice(i,i+2), three=w.slice(i,i+3), four=w.slice(i,i+4), five=w.slice(i,i+5);
+    let seg=null;
+    if(five==='eigh'){ seg='ei'; i+=4; }
+    else if(four==='ight'){ seg='ait'; i+=3; }
+    else if(three==='sch'){ seg='ʃ'; i+=2; }
+    else if(three==='gli'){ seg='lj'; i+=2; }
+    else if(three==='igh'){ seg='ai'; i+=2; }
+    else if(two==='ph'||two==='ck'||two==='sh'||two==='ch'||two==='gh'||two==='gn'||two==='th'){ seg=PHON[two]; i+=1; }
+    else if(two[0]===two[1]){ seg=g2pChr(two[0]); i+=1; }
+    else seg=g2pChr(two[0]);
+    ipa+=seg;
+  }
+  // → chiave astratta: consonanti/vocali canonizzate, niente simboli strani
+  let key=ipa
+    .replace(/ʃ/g,'s').replace(/tʃ/g,'c')
+    .replace(/θ/g,'t').replace(/ð/g,'d')
+    .replace(/ŋ/g,'n').replace(/œ/g,'e').replace(/ø/g,'e').replace(/ç/g,'c').replace(/ß/g,'s')
+    .replace(/(.)\1+/g,'$1');
+  return { ipa, key };
+}
+function g2pChr(c){
+  if('aeiou'.includes(c)) return c;
+  const map={j:'ʒ',w:'w',k:'k',x:'ks',q:'kw',z:'z',v:'v',b:'b',n:'n',r:'r',l:'l',m:'m',d:'d',t:'t',s:'s',p:'p',f:'f',g:'g',c:'k',h:'h'};
+  return map[c]||c;
+}
+
+/* ---------------- guess lingua (euristico fonotattico) ---------------- */
+const PROFILES={
+  it:{ vowels:['a','e','i','o','u'], consonantClusters:['st','str','sc','gn','gl','mb','mp','nt','nd','nc','ch','gh'], vowelsFinal:.45, stress:'penult'},
+  en:{ vowels:['a','e','i','o','u'], consonantClusters:['th','sh','ch','ng','ght','igh','ou','ea','ee'], vowelsFinal:.25, stress:'any'},
+  es:{ vowels:['a','e','i','o','u'], consonantClusters:['ll','ñ','rr','ch','nch','mbr'], vowelsFinal:.55, stress:'penult'},
+  fr:{ vowels:['a','e','i','o','u'], consonantClusters:['au','eau','oin','ch','gn','an','en','ui'], vowelsFinal:.5, stress:'final'},
+  de:{ vowels:['a','e','i','o','u'], consonantClusters:['sch','tsch','ch','st','sp','pf','tz','ei','eu','au'], vowelsFinal:.15, stress:'initial'}
+};
+function guessLanguage(keys){
+  const joined=(Array.isArray(keys)?keys:[keys]).map(normSt).join(' ');
+  const phonPart=joined.replace(/[^a-zʃʒθŋç]/g,'');
+  if(!phonPart) return [];
+  const totalLen=Math.max(1,phonPart.length);
+  let scores={};
+  for(const lang in PROFILES){
+    const P=PROFILES[lang]; let score=0;
+    // vocali in finale → probabilità (it/es/fr alzano, en/de abbassano)
+    const finals=phonPart.split(/[^aeiou]/).filter(Boolean);
+    const finalCount=finals.filter(f=>/a|e|i|o|u$/.test(f)).length;
+    const vRate=finalCount/Math.max(1,finals.length);
+    score+=(1-Math.abs(vRate-P.vowelsFinal))*4;
+    // gruppi tipici
+    for(const cl of P.consonantClusters){ if(phonPart.includes(cl)) score+=cl.length*1.2; }
+    // doppie: it/en comuni, fr meno
+    const doubles=(phonPart.match(/([a-z])\1/g)||[]).length;
+    if(lang==='en') score+=doubles*.6; else if(lang==='de') score+=doubles*.4; else score-=doubles*.3;
+    // occlusive finali → en/de
+    const endsHard=/([kptbdgsvfʒ])$/.test(phonPart);
+    if((lang==='en'||lang==='de')&&endsHard) score+=1.5;
+    if((lang==='it'||lang==='es')&&endsHard) score-=1;
+    scores[lang]=score;
+  }
+  const tot=Object.values(scores).reduce((a,b)=>a+b,0);
+  return Object.entries(scores)
+    .map(([l,s])=>({lang:l,pct:Math.round(s/Math.max(1e-6,tot)*100)}))
+    .sort((a,b)=>b.pct-a.pct);
+}
+const LANGNAME={it:'Italiano',en:'English',es:'Español',fr:'Français',de:'Deutsch'};
+
+/* ---------------- pipeline completa: audio blob → risultato ---------------- */
+function renderResult(outEl, data){
+  const guesses=guessLanguage([data.key]);
+  outEl.innerHTML=
+    '<div class="outrow"><div class="outlabel">SENTITO</div><div class="outval">'+esc(data.ortho)+'</div></div>'+
+    '<div class="outrow"><div class="outlabel">CHIAVE FONETICA</div><div class="outval mono" style="color:var(--cyan);font-weight:800">'+esc(data.key)+'</div></div>'+
+    '<div class="outrow"><div class="outlabel">IPA APPROSS.</div><div class="outval mono" style="color:var(--green)">'+esc(data.ipa)+'</div></div>'+
+    '<div class="outrow"><div class="outlabel">LINGUA Whisper</div><div class="outval"><span class="tag">'+esc(LANGNAME[data.whisperLang]||data.whisperLang||'auto')+'</span></div></div>'+
+    '<div class="outrow"><div class="outlabel">SIMILE A</div><div class="outval">'+
+      guesses.slice(0,3).map(g=>'<span class="tag" style="background:rgba(0,212,255,.12);color:var(--cyan);border-color:rgba(0,212,255,.25)">'+esc(LANGNAME[g.lang])+' '+g.pct+'%</span>').join(' ')+
+    '</div></div>';
+  saveHist(data);
+}
+function esc(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function blobToFloat32(blob){
+  const AudioCtx=window.AudioContext||window.webkitAudioContext;
+  const ac=new AudioCtx();
+  const buf=await ac.decodeAudioData(await blob.arrayBuffer());
+  await ac.close();
+  let ch=buf.getChannelData(0);
+  // resample 16k mono per whisper
+  const target=16000;
+  if(buf.sampleRate===target&&buf.numberOfChannels===1) return ch;
+  if(buf.numberOfChannels>1){ const mix=new Float32Array(buf.length); for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++)mix[i]+=d[i]/buf.numberOfChannels; } ch=mix; }
+  if(buf.sampleRate!==target){
+    const ratio=buf.sampleRate/target, len=Math.floor(ch.length/ratio), out=new Float32Array(len);
+    for(let i=0;i<len;i++) out[i]=ch[Math.floor(i*ratio)];
+    return out;
+  }
+  return ch;
+}
+
+/* ---------------- trascription engine ---------------- */
+async function transcribeAudio(audio, langHint){
+  const p=await ensurePipe();
+  const opts={chunk_length_s:8,stride_length_s:2}; // chunker per live/file
+  if(langHint) opts.language=langHint;
+  return await p(audio,opts);
+}
+
+/* ---------------- storico ---------------- */
+let hist=JSON.parse(localStorage.getItem('phon_trans_hist')||'[]');
+function saveHist(data){
+  hist.unshift(data);
+  hist=hist.slice(0,50);
+  localStorage.setItem('phon_trans_hist',JSON.stringify(hist));
+  renderHist();
+}
+function renderHist(){
+  $('histCount').textContent='('+hist.length+')';
+  $('histEmpty').style.display=hist.length?'none':'block';
+  $('histList').innerHTML=hist.map((d,i)=>'<div class="hist-item">'+
+    '<div class="hist-head"><div class="hist-word">'+esc(d.ortho)+'</div><div class="hist-actions">'+
+      '<button class="btn ghost small" data-c="'+i+'">📋 Copia</button></div></div>'+
+    '<div class="hist-ipa mono">'+esc(d.ipa)+'</div>'+
+    '<div class="hist-lang"><small>k: '+esc(d.key)+'</small><small>whisper '+esc(d.whisperLang||'auto')+'</small></div>'+
+  '</div>').join('');
+  $('histList').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{
+    const d=hist[+b.dataset.c];
+    navigator.clipboard.writeText(d.ortho+' — IPA: '+d.ipa+' — chiave: '+d.key+' — whisper: '+(d.whisperLang||'auto'))
+      .then(()=>toast('📋 Copiato')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=d.ortho; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');toast('📋 Copiato');}catch(_){} ta.remove(); });
+  });
+}
+$('copyAll').onclick=()=>{
+  const txt=hist.map(d=>d.ortho+' | IPA: '+d.ipa+' | chiave: '+d.key).join('\n');
+  if(!txt) return toast('Niente da copiare');
+  navigator.clipboard.writeText(txt).then(()=>toast('📋 Copiato tutto')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('📋 Copiato tutto');}catch(_){}ta.remove();});
+};
+$('clearAll').onclick=()=>{hist=[];localStorage.setItem('phon_trans_hist','[]');renderHist();toast('🗑 Svuotato');};
+renderHist();
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); $('pane-'+t.dataset.tab).classList.add('active');
+}));
+
+/* ---------------- LIVE ---------------- */
+let recStream=null, mediaRec=null, chunks=[];
+$('liveBtn').addEventListener('click',async()=>{
+  if(mediaRec){ mediaRec.stop(); return; }
+  if(!navigator.mediaDevices){ toast('Microfono non disponibile'); return; }
+  try{
+    recStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){ toast('Microfono negato'); return; }
+  chunks=[];
+  mediaRec=new MediaRecorder(recStream);
+  mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mediaRec.onstop=async()=>{
+    recStream.getTracks().forEach(t=>t.stop());
+    const blob=new Blob(chunks,{type:chunks[0]&&chunks[0].type||'audio/webm'});
+    $('liveBtn').textContent='🎙 Avvia'; mediaRec=null; recStream=null;
+    $('status').textContent='🎧 Decodifica audio…';
+    try{
+      const f32=await blobToFloat32(blob);
+      if(!f32||!f32.length){ $('status').textContent='ⓘ Nessun audio utile. Riprova parlando più vicino al mic.'; return; }
+      $('status').textContent='🧠 Whisper trascrive…';
+      const res=await transcribeAudio(f32);
+      const ortho=normSt(res.text||'');
+      const {ipa,key}=g2p(ortho);
+      renderResult($('liveOut'),{ortho,ipa,key,whisperLang:res.language||res.lang||'auto'});
+      $('status').textContent='✅ Fatto.';
+      buzz(12);
+    }catch(e){ $('status').textContent='⚠ '+e.message; }
+  };
+  $('liveBtn').textContent='⏹ Stop';
+  $('status').textContent='● ASCOLTO DAL VIVO — parla ora… (premi Stop per trascrivere)';
+  mediaRec.start();
+});
+function buzz(n){ try{ if(!recStream) return; const ac=new (window.AudioContext||window.webkitAudioContext)(); const g=ac.createGain(); g.gain.value=.3; const o=ac.createOscillator(); o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ac.destination); o.start(); o.stop(.08); }catch(e){} }
+
+/* ---------------- FILE ---------------- */
+const drop=$('dropzone'), fileInput=$('fileInput');
+drop.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',()=>{ if(fileInput.files[0]){ drop.innerHTML='🎵 <b>'+esc(fileInput.files[0].name)+'</b><br><small>'+(fileInput.files[0].size/1024/1024).toFixed(2)+' MB</small>'; $('trBtn').disabled=false; } });
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag');});
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('audio/')){fileInput.files={0:f,length:1};fileInput.dispatchEvent(new Event('change'));}});
+$('trBtn').addEventListener('click',async()=>{
+  const f=fileInput.files[0]; if(!f) return;
+  $('trBtn').disabled=true;
+  const prog=$('progWrap2'), progF=$('progFill2'), progP=$('progPct2');
+  prog.style.display='block'; progF.style.width='0%';
+  try{
+    const f32=await blobToFloat32(f);
+    progF.style.width='100%';
+    const res=await transcribeAudio(f32);
+    const ortho=normSt(res.text||'');
+    const {ipa,key}=g2p(ortho);
+    renderResult($('fileOut'),{ortho,ipa,key,whisperLang:res.language||res.lang||'auto'});
+    toast('✅ Trascrizione completata');
+  }catch(e){ toast('⚠ '+e.message); }
+  $('trBtn').disabled=false; prog.style.display='none';
+});
+
+/* ---------------- GUESS ---------------- */
+$('guessBtn').addEventListener('click',()=>{
+  const raw=$('guessInput').value || hist.map(h=>h.key).join('\n');
+  const keys=raw.split('\n').map(normSt).filter(Boolean).map(w=>g2p(w).key).filter(Boolean);
+  if(!keys.length){ $('guessOut').innerHTML='<div class="note">Incolla almeno una parola.</div>'; return; }
+  const guesses=guessLanguage(keys);
+  $('guessOut').innerHTML=guesses.map(g=>'<div class="guessbar"><span class="glabel">'+g.lang+'</span><div class="gtrack"><div class="gfill" style="width:'+g.pct+'%"></div></div><span class="gval">'+g.pct+'%</span></div>').join('');
+});
+</script>
+</body>
+</html>

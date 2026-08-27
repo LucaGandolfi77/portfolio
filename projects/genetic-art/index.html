@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#02100c">
+<meta name="description" content="Genetic Art — disegna creature bioluminescenti e falli evolvere: crossover, mutazioni, fitness che impara il tuo gusto, albero genealogico 3D. Three.js + algoritmi genetici puri.">
+<title>GENETIC ART — Evoluzione Artistica Interattiva</title>
+<style>
+:root{
+  --bg:#02100c; --panel:rgba(3,18,14,.78); --line:rgba(0,255,208,.18);
+  --teal:#00ffd0; --green:#52ff9e; --cyan:#3ee6ff; --text:#d8fff2;
+  --dim:#6fb8a4; --red:#ff5f6d; --amber:#ffc857;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--text);-webkit-user-select:none;user-select:none}
+canvas{display:block;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10;font-size:13px}
+.panel{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.45)}
+/* top bar */
+#top{position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap}
+#logo{font-weight:800;font-size:16px;letter-spacing:2px;color:var(--teal);text-shadow:0 0 14px rgba(0,255,208,.6);white-space:nowrap}
+#logo b{color:#fff}
+.tabbtn{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 13px;border-radius:20px;cursor:pointer;font:inherit;letter-spacing:1px;transition:all .25s}
+.tabbtn:hover{color:var(--text);border-color:var(--teal)}
+.tabbtn.on{background:rgba(0,255,208,.12);color:var(--teal);border-color:var(--teal);box-shadow:0 0 14px rgba(0,255,208,.25)}
+.tabbtn.danger:hover{color:var(--red);border-color:var(--red)}
+#spacer{flex:1}
+.badge{font-size:11px;color:var(--dim);letter-spacing:.5px}
+/* left dock */
+#dock{position:fixed;left:14px;top:64px;bottom:120px;width:225px;padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+#dock h3{font-size:11px;letter-spacing:2px;color:var(--teal);text-transform:uppercase}
+#parentList{display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:40px}
+.parentchip{display:flex;align-items:center;gap:8px;background:rgba(0,255,208,.06);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer;transition:all .2s;font-size:12px}
+.parentchip:hover{border-color:var(--amber)}
+.parentchip .dot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+.parentchip small{color:var(--dim)}
+.parentchip .x{margin-left:auto;color:var(--dim);font-size:14px}
+#dockActions{display:flex;flex-direction:column;gap:8px}
+.bigbtn{width:100%;padding:12px;border-radius:10px;border:1px solid var(--teal);background:linear-gradient(180deg,rgba(0,255,208,.18),rgba(0,255,208,.06));color:var(--text);font:inherit;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all .25s;text-shadow:0 0 8px rgba(0,255,208,.4)}
+.bigbtn:hover:not(:disabled){background:linear-gradient(180deg,rgba(0,255,208,.32),rgba(0,255,208,.12));box-shadow:0 0 20px rgba(0,255,208,.3)}
+.bigbtn:disabled{opacity:.35;cursor:not-allowed;border-color:var(--dim)}
+.ghostbtn{width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.ghostbtn:hover{color:var(--text);border-color:var(--cyan)}
+/* right details */
+#details{position:fixed;right:14px;top:64px;width:250px;padding:14px;display:none;flex-direction:column;gap:10px;max-height:calc(100vh - 190px);overflow-y:auto}
+#details.on{display:flex}
+#details h2{font-size:15px;color:#fff;text-shadow:0 0 10px currentColor}
+#details .sub{font-size:11px;color:var(--dim);letter-spacing:1px}
+#score{font-size:30px;font-weight:800;color:var(--teal);text-shadow:0 0 18px rgba(0,255,208,.5)}
+.fbar{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim)}
+.fbar .track{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+.fbar .fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--teal));box-shadow:0 0 8px rgba(0,255,208,.5)}
+.drow{display:flex;gap:6px;flex-wrap:wrap}
+.minibtn{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--text);font:inherit;font-size:12px;cursor:pointer;transition:all .2s}
+.minibtn:hover{border-color:var(--teal);background:rgba(0,255,208,.1)}
+.minibtn.like:hover{border-color:var(--green);background:rgba(82,255,158,.12)}
+.minibtn.nope:hover{border-color:var(--red);background:rgba(255,95,109,.12)}
+.minibtn.on{background:rgba(0,255,208,.15);border-color:var(--teal);color:var(--teal)}
+/* bottom */
+#bottom{position:fixed;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0) + 12px);display:flex;align-items:center;gap:14px;padding:10px 14px;flex-wrap:wrap}
+#genlabel{font-size:12px;color:var(--dim);letter-spacing:1px;white-space:nowrap}
+#genlabel b{color:var(--teal)}
+/* spettrogramma genico */
+#specPanel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0) + 78px);width:min(94vw,780px);padding:10px 14px;max-height:56vh;overflow-y:auto;z-index:12}
+#specPanel h3{font-size:11px;letter-spacing:2px;color:var(--teal);text-transform:uppercase;margin-bottom:6px}
+#specPanel h3 span{color:var(--text);text-transform:none;letter-spacing:0}
+#specCanvas{width:100%;height:auto;border-radius:6px;display:block}
+.specNote{font-size:10.5px;color:var(--dim);margin-top:6px;letter-spacing:.4px}
+.specNote .amb{color:var(--amber)}
+.sliderrow{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:110px;height:4px;border-radius:2px;background:rgba(0,255,208,.25);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--teal);cursor:pointer;box-shadow:0 0 10px rgba(0,255,208,.6)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;background:var(--teal);cursor:pointer}
+#hint{flex:1;text-align:right;font-size:11px;color:var(--dim);letter-spacing:.5px;min-width:140px}
+/* tooltip */
+#tip{position:fixed;display:none;background:rgba(2,16,12,.92);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;pointer-events:none;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#tip b{color:var(--teal)}
+/* toasts */
+#toasts{position:fixed;top:calc(env(safe-area-inset-top,0) + 60px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:40;align-items:center}
+.toast{background:rgba(2,16,12,.9);border:1px solid var(--line);border-left:3px solid var(--teal);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;animation:tin .3s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+/* modal */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30;pointer-events:auto}
+.modal.on{display:flex}
+.modalcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:560px;width:calc(100vw - 40px);max-height:86vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.6)}
+.modalcard h2{color:var(--teal);font-size:16px;letter-spacing:2px;margin-bottom:10px}
+.modalcard p{font-size:12.5px;color:var(--dim);line-height:1.6;margin-bottom:10px}
+#drawWrap{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px;background:#01120c}
+#drawCanvas{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+.toolrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.toolbtn{padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;transition:all .2s}
+.toolbtn.on{background:rgba(0,255,208,.14);color:var(--teal);border-color:var(--teal)}
+.modalrow{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+.closebtn{padding:8px 14px;border-radius:8px;border:1px solid var(--dim);background:transparent;color:var(--dim);font:inherit;cursor:pointer}
+.closebtn:hover{color:var(--text)}
+.okbtn{padding:8px 16px;border-radius:8px;border:1px solid var(--teal);background:rgba(0,255,208,.12);color:var(--teal);font:inherit;font-weight:700;cursor:pointer}
+.okbtn:hover{background:rgba(0,255,208,.24)}
+.modalcard .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modalcard .grid p{font-size:11.5px}
+#heroNote{display:none;margin-top:8px;padding:8px;border:1px dashed var(--amber);border-radius:8px;color:var(--amber);font-size:12px}
+@media(max-width:760px){
+  #dock{width:190px;left:8px;top:58px;bottom:150px;padding:10px}
+  #details{right:8px;width:200px;top:58px;padding:10px}
+  #dock h3{font-size:10px}
+  #logo{font-size:13px}
+  .tabbtn{padding:5px 9px;font-size:12px}
+  .sliderrow{font-size:10px}
+  #hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="top">
+    <div id="logo">GENETIC <b>ART</b> 🧬</div>
+    <button class="tabbtn on" id="tab-evo" data-mode="evo">🌊 Evoluzione</button>
+    <button class="tabbtn" id="tab-tree" data-mode="tree">🌳 Genealogia</button>
+    <button class="tabbtn" id="tab-diorama" data-mode="diorama">🫧 Diorama</button>
+    <div id="spacer"></div>
+    <span class="badge" id="worldStats"></span>
+    <button class="tabbtn" id="btn-sound">🔊 Suono</button>
+    <button class="tabbtn" id="btn-auto">▶️ Autopilota</button>
+    <button class="tabbtn" id="btn-help">❓</button>
+    <button class="tabbtn danger" id="btn-reset">♻️ Nuovo mondo</button>
+  </div>
+
+  <div class="panel" id="dock">
+    <h3>Genitori selezionati</h3>
+    <div id="parentList"><span class="badge">Clicca una creatura per aggiungerla qui</span></div>
+    <div id="dockActions">
+      <button class="bigbtn" id="btn-evolve">🧬 EVOLVI</button>
+      <button class="ghostbtn" id="btn-seeds">🌱 Nuovi semi casuali</button>
+      <button class="ghostbtn" id="btn-draw">✏️ Disegna un seme</button>
+    </div>
+  </div>
+
+  <div class="panel" id="details">
+    <h2 id="dName">—</h2>
+    <div class="sub" id="dSub">—</div>
+    <div id="score">0.00</div>
+    <div id="dFeatures"></div>
+    <div class="drow" id="dActions"></div>
+  </div>
+
+  <div class="panel" id="specPanel" style="display:none">
+    <h3>🧬 Spettrogramma genico · <span id="specTitle">—</span></h3>
+    <canvas id="specCanvas" width="760" height="120"></canvas>
+    <p class="specNote">colonna = gene (tipo, parent, angolo, distanza, dimensione, curvatura, tinta, saturazione, luminosità, pulsazione, fase, opacità) · riga = neurone · <span class="amb">■</span> ambra = mutato rispetto ai genitori</p>
+  </div>
+
+  <div class="panel" id="bottom">
+    <span id="genlabel">Generazione <b>0</b> · <span id="countLabel">8 individui</span></span>
+    <label class="sliderrow">Mutazione <input id="mutSlider" type="range" min="5" max="80" value="35"></label>
+    <label class="sliderrow">Popolazione <input id="popSlider" type="range" min="4" max="12" value="8"></label>
+    <span id="hint">Clicca una creatura per selezionarla · drag per orbitare · scroll per zoom</span>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="toasts"></div>
+
+<div class="modal" id="drawModal">
+  <div class="modalcard">
+    <h2>✏️ DISEGNA UN SEME</h2>
+    <p>Disegna forme base (cerchi, steli, nastri): ogni tratto diventerà un <b>segmento-neurone</b> della creatura. Colore e dimensione del tratto diventano geni.</p>
+    <div class="toolrow">
+      <button class="toolbtn on" data-tool="orb">● Cerchio</button>
+      <button class="toolbtn" data-tool="stem">│ Stelo</button>
+      <button class="toolbtn" data-tool="ribbon">～ Nastro</button>
+      <button class="toolbtn" data-tool="ring">⭕ Anello</button>
+      <button class="toolbtn" data-tool="crystal">🔷 Cristallo</button>
+      <button class="toolbtn" data-tool="blob">🫧 Ameba</button>
+      <button class="toolbtn" data-tool="eraser">🧽 Gomma</button>
+      <span style="flex:1"></span>
+      <label class="sliderrow">Colore <input id="drawHue" type="range" min="0" max="360" value="160"></label>
+      <label class="sliderrow">Dimensione <input id="drawSize" type="range" min="2" max="18" value="9"></label>
+    </div>
+    <div id="drawWrap"><canvas id="drawCanvas" width="520" height="360"></canvas></div>
+    <p id="drawInfo">0 forme · cerchio/stelo/nastro/anello/cristallo/ameba</p>
+    <div class="modalrow">
+      <button class="closebtn" id="drawClear">Svuota</button>
+      <button class="closebtn" data-close="drawModal">Annulla</button>
+      <button class="okbtn" id="drawOk">🧬 Converti in generazione</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="helpModal">
+  <div class="modalcard">
+    <h2>🧬 GUIDA — EVOLUZIONE ARTISTICA</h2>
+    <div class="grid">
+      <div><p><b>🌊 Evoluzione</b> — ogni creatura è una rete di segmenti-neuroni: colore = gene, struttura = genoma. Clicca una creatura per selezionarla come genitore (max 2), poi premi EVOLVI: crossover + mutazioni generano la prossima generazione. ❤️/👎 insegnano alla fitness il tuo gusto. 👨‍👧 <b>Confronta</b> mostra figlio e genitori affiancati: i segmenti mutati pulsano in ambra e sotto compare lo <b>spettrogramma genico</b> (12 geni × neuroni).</p></div>
+      <div><p><b>🌳 Genealogia</b> — albero genealogico 3D di tutta la linea evolutiva: clicca un nodo per ispezionare l'individuo, "Vedi in 3D" per osservarlo da vicino.</p></div>
+      <div><p><b>🫧 Diorama</b> — le creature evolute vivono insieme in un acquario bioluminescente e suonano un sottofondo generato dai loro geni.</p></div>
+      <div><p><b>✏️ Disegna</b> — crea il tuo seme a mano: 6 primitive (cerchio, stelo, nastro, anello, cristallo, ameba) vengono tradotte in geni reali. 💾 <b>Esporta/Importa</b> genoma in file JSON. 🧬 <b>Fitness</b> = euristiche (simmetria, equilibrio, organicità, armonia, complessità, vitalità) pesate da un modello che impara dai tuoi click.</p></div>
+    </div>
+    <div class="modalrow"><button class="okbtn" data-close="helpModal">Capito</button></div>
+  </div>
+</div>
+
+<input type="file" id="genomeFile" accept=".json,application/json" style="display:none">
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= UTILS ================= */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const wrap = (v,a,b)=>{const r=b-a;return ((v-a)%r+r)%r+a;};
+function mulberry32(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function gauss(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function toast(msg,color){const d=document.createElement('div');d.className='toast';d.textContent=msg;if(color)d.style.borderLeftColor=color;$('toasts').appendChild(d);setTimeout(()=>{d.style.transition='opacity .4s';d.style.opacity='0';setTimeout(()=>d.remove(),400);},2600);}
+
+/* ================= CONSTANTS ================= */
+const MAX_SEG=24, GENES=12;
+const G_RANGE=[[0,5],[-1,23],[0,6.283],[0.12,0.95],[0.12,1.7],[-1,1],[0,360],[0.45,1],[0.35,0.95],[0,1],[0,6.283],[0.55,1]];
+const TYPE_NAMES=['cerchio','stelo','nastro','anello','cristallo','ameba'];
+function randType(){const r=Math.random();return r<0.3?0:(r<0.55?1:(r<0.8?2:(3+Math.floor(Math.random()*3))));}
+
+/* ================= STATE ================= */
+const LS={lineage:'ga_lineage',taste:'ga_taste',favs:'ga_favs',diorama:'ga_diorama',settings:'ga_settings'};
+function load(k,def){try{const v=localStorage.getItem(k);return v===null?def:JSON.parse(v);}catch(e){return def;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){toast('Memoria locale piena','var(--amber)');}}
+const state={
+  individuals:[], nextId:1, gen:0,
+  taste:load(LS.taste,[1,1,1,1,1,1]),
+  favs:load(LS.favs,[]), diorama:load(LS.diorama,[]),
+  settings:Object.assign({mutRate:.35,pop:8,sound:true,speed:3200},load(LS.settings,{})),
+  dock:[], currentGen:[], autopilot:false, mode:'evo',
+  selectedId:null, expandedId:null, hoverId:null
+};
+function find(id){return state.individuals.find(i=>i.id===id);}
+
+/* ================= GENOMA ================= */
+function rowArray(g,i){return g.slice(i*GENES,(i+1)*GENES);}
+function setRow(g,i,row){for(let k=0;k<GENES;k++)g[i*GENES+k]=row[k];}
+function rowEmpty(g,i){return g[i*GENES]===-1;}
+function activeIndices(g){const r=[];for(let i=0;i<MAX_SEG;i++)if(!rowEmpty(g,i))r.push(i);return r;}
+function newRow(t,p){const r=[t,p,0,0.4,0.5,0,160,0.8,0.7,0.4,0,0.85];for(let k=2;k<GENES;k++)r[k]=G_RANGE[k][0]+Math.random()*(G_RANGE[k][1]-G_RANGE[k][0]);if(p>=0)r[3]=G_RANGE[3][0]+Math.random()*(G_RANGE[3][1]-G_RANGE[3][0])*0.7;return r;}
+function randomGenome(){const g=new Float32Array(MAX_SEG*GENES).fill(-1);setRow(g,0,newRow(0,-1));g[0*GENES+3]=0.25+Math.random()*0.5;const n=4+Math.floor(Math.random()*9);for(let k=0;k<n;k++){const i=activeIndices(g);const slot=firstEmpty(g);if(slot<0)break;const p=i.length?i[Math.floor(Math.random()*i.length)]:-1;setRow(g,slot,newRow(randType(),p));}return g;}
+function firstEmpty(g){for(let i=1;i<MAX_SEG;i++)if(rowEmpty(g,i))return i;return -1;}
+
+/* Crossover: per-segment row pick (uniforme a righe) con riparazione dei parent */
+function crossover(a,b,rnd){
+  const c=new Float32Array(MAX_SEG*GENES).fill(-1);
+  const active=[];for(let i=0;i<MAX_SEG;i++){const ea=!rowEmpty(a,i),eb=!rowEmpty(b,i);
+    if(ea&&eb){setRow(c,i,rnd()<0.5?rowArray(a,i):rowArray(b,i));}
+    else if(ea&&rnd()<0.75)setRow(c,i,rowArray(a,i));
+    else if(eb&&rnd()<0.75)setRow(c,i,rowArray(b,i));
+    if(!rowEmpty(c,i))active.push(i);}
+  if(!active.length)return randomGenome();
+  if(rowEmpty(c,0)){setRow(c,0,newRow(0,-1));active.unshift(0);}
+  /* riparazione: parent deve essere attivo e con indice minore */
+  for(let i=1;i<MAX_SEG;i++){if(rowEmpty(c,i))continue;const r=rowArray(c,i);let p=r[1];
+    if(p>=i||(p>=0&&rowEmpty(c,p))){p=-1;for(let j=i-1;j>=0;j--){if(!rowEmpty(c,j)){p=j;break;}}r[1]=p;setRow(c,i,r);}}
+  return c;
+}
+/* Mutazione: parametrica + strutturale. Ritorna {g, mutated:[rowIdx]} */
+function mutate(g,mr){
+  const out=g.slice();const mutated=[];
+  const rnd=Math.random;
+  const rows=activeIndices(out);
+  if(!rows.length)return{g:out,mutated};
+  for(const i of rows){
+    const row=rowArray(out,i);
+    /* strutturale */
+    if(rnd()<0.10&&i>0){ /* rimuovi, ripara i figli */
+      const p=row[1];
+      for(let j=i+1;j<MAX_SEG;j++){
+        if(!rowEmpty(out,j)&&out[j*GENES+1]===i)out[j*GENES+1]=(p<0||rowEmpty(out,p))?-1:p;
+      }
+      out[i*GENES]=-1;mutated.push(i);continue;
+    }
+    if(rnd()<0.12){const s=firstEmpty(out);if(s>=0){let par=-1;const cands=[];for(let j=0;j<s;j++)if(!rowEmpty(out,j))cands.push(j);if(cands.length)par=cands[Math.floor(rnd()*cands.length)];setRow(out,s,newRow(randType(),par));mutated.push(s);}}
+    if(rnd()<0.08){row[0]=randType();mutated.push(i);}
+    if(rnd()<0.10&&i>0){const cands=[];for(let j=0;j<i;j++)if(!rowEmpty(out,j))cands.push(j);if(cands.length){row[1]=cands[Math.floor(rnd()*cands.length)];mutated.push(i);}}
+    /* parametrica */
+    for(let k=2;k<GENES;k++){
+      if(rnd()<mr*2.6){
+        let v=row[k]+gauss()*0.11*(G_RANGE[k][1]-G_RANGE[k][0]);
+        if(k===6)v=wrap(v,0,360);else v=clamp(v,G_RANGE[k][0],G_RANGE[k][1]);
+        row[k]=v;mutated.push(i);
+      }
+    }
+    setRow(out,i,row);
+  }
+  return{g:out,mutated};
+}
+/* ---- Fenotipo: decodifica in segmenti attivi ordinati ---- */
+function decodeGenome(g){
+  const segs=[];for(let i=0;i<MAX_SEG;i++){if(rowEmpty(g,i))continue;const r=rowArray(g,i);segs.push({idx:i,t:r[0],p:r[1],a:r[2],d:r[3],s:r[4],c:r[5],h:r[6],st:r[7],l:r[8],pu:r[9],ph:r[10],o:r[11]});}
+  return segs;
+}
+/* ---- Feature per la fitness ---- */
+function featuresOf(g){
+  const segs=decodeGenome(g);
+  if(!segs.length)return[0,0,0,0,0,0];
+  const n=segs.length;
+  /* posizione 2D proiettata per simmetria/equilibrio */
+  const pos={};let rootCount=0;
+  for(const s of segs){
+    if(s.p<0){rootCount++;pos[s.idx]={x:Math.cos(s.a)*0.5*s.d,y:Math.sin(s.a)*0.5*s.d};continue;}
+    const pp=pos[s.p]||{x:0,y:0};const ps=segs.find(q=>q.idx===s.p)?.s||0.5;
+    pos[s.idx]={x:pp.x+Math.cos(s.a)*s.d*ps,y:pp.y+Math.sin(s.a)*s.d*ps};
+  }
+  let lx=0,ly=0,lc=0,left=0,right=0;
+  for(const s of segs){const p=pos[s.idx];const w=s.s;lx+=p.x*w;ly+=p.y*w;lc+=w;
+    if(Math.sin(s.a)>=0)right+=w;else left+=w;}
+  const cx=lx/lc,cy=ly/lc;
+  const bal=clamp(1-Math.hypot(cx,cy)/1.8,0,1);
+  const sym=clamp(1-Math.abs(left-right)/(left+right+1e-6),0,1);
+  /* organicità: curvatura media + mix di tipi + irregolarità dimensioni */
+  let curv=0;for(const s of segs)curv+=Math.abs(s.c);curv/=n;
+  const types=new Set(segs.map(s=>s.t));const mix=types.size>=4?1:(types.size===3?0.7:(types.size===2?0.4:0.15));
+  let meanS=0;for(const s of segs)meanS+=s.s;meanS/=n;
+  let varS=0;for(const s of segs)varS+=(s.s-meanS)**2;varS/=n;
+  const irr=clamp(1-Math.abs(Math.sqrt(varS)-0.25)/0.8,0,1);
+  const org=clamp(0.45*curv+0.3*mix+0.25*irr,0,1);
+  /* armonia: pochi cluster di hue = più armonico */
+  const buckets=new Array(12).fill(0);for(const s of segs)buckets[Math.floor((s.h%360)/30)]++;
+  let occupied=buckets.filter(b=>b>0).length;
+  let hl=0;for(const s of segs)hl+=s.l;hl/=n;
+  const harm=clamp(0.7*(1-(occupied-1)/8)+0.3*hl,0,1);
+  /* complessità: entropia tipi + copertura struttura */
+  const tc=[0,0,0,0,0,0];for(const s of segs)tc[s.t]++;
+  let ent=0;for(const c of tc){const p=c/n;if(p>0)ent-=p*Math.log2(p);}
+  const com=clamp(0.5*ent/2.585+0.5*Math.min(1,n/16),0,1);
+  /* vitalità: pulsazione + luminosità */
+  let pu=0;for(const s of segs)pu+=s.pu;pu/=n;
+  const vib=clamp(0.5*pu+0.5*hl,0,1);
+  return[sym,bal,org,harm,com,vib];
+}
+function fitnessOf(g,feats){
+  const t=state.taste;let num=0,den=0;
+  for(let i=0;i<6;i++){num+=t[i]*feats[i];den+=t[i];}
+  return clamp(den?num/den:0,0,1);
+}
+/* ---- Nomi latini ---- */
+const GENUS={deep:['Corallus','Lumenis','Abysso','Nebularis','Marinara'],branchy:['Ramulus','Dendris','Caudalis','Arborea','Lorica'],busy:['Fibrus','Serratus','Nodalis','Trames','Plexus'],plain:['Orbis','Spira','Glacius','Pulmo','Vesperis']};
+const SPECIES=[[330,20,'Rubra'],[20,50,'Aurea'],[50,85,'Flava'],[85,150,'Viridis'],[150,200,'Cyanis'],[200,250,'Caerulea'],[250,295,'Purpura'],[295,330,'Rosea']];
+function nameOf(g){
+  const segs=decodeGenome(g);const n=segs.length;if(!n)return 'Abysso Incognita';
+  const children={};for(const s of segs){if(s.p>=0)children[s.p]=(children[s.p]||0)+1;}  const maxCh=Math.max(0,...Object.values(children));
+  let pool=GENUS.plain;
+  if(maxCh>=3)pool=GENUS.branchy;else if(n>=12)pool=GENUS.busy;else if(n>=7)pool=GENUS.deep;
+  let hueSum=0,wsum=0;for(const s of segs){const rad=s.h*Math.PI/180;hueSum+=Math.cos(rad)*s.s;wsum+=s.s;}
+  const avgHue=wrap(Math.atan2(hueSum,wsum)*180/Math.PI,0,360);
+  let sp=SPECIES[0][2];for(const b of SPECIES)if(avgHue>=b[0]&&avgHue<b[1])sp=b[2];
+  let h=hashStr(g.join(','));const rnd=mulberry32(h);
+  const genus=pool[Math.floor(rnd()*pool.length)];
+  return genus+' '+sp+' f.'+(h%97);
+}
+/* ---- Codifica URL ---- */
+function encodeGenome(g){
+  const segs=decodeGenome(g);
+  const json=JSON.stringify(segs.map(s=>[s.idx,s.t,s.p,+s.a.toFixed(4),+s.d.toFixed(4),+s.s.toFixed(4),+s.c.toFixed(4),s.h,+s.st.toFixed(3),+s.l.toFixed(3),+s.pu.toFixed(3),+s.ph.toFixed(3),+s.o.toFixed(3)]));
+  return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function decodeGenomeStr(str){
+  try{
+    const json=decodeURIComponent(escape(atob(str.replace(/-/g,'+').replace(/_/g,'/'))));
+    const rows=JSON.parse(json);
+    if(!rows.length)return randomGenome();
+    const out=new Float32Array(MAX_SEG*GENES).fill(-1);
+    /* le righe arrivano ordinate per indice originale: i genitori hanno sempre indice minore */
+    for(const r of rows){
+      const idx=Math.floor(r[0]);
+      if(idx<0||idx>=MAX_SEG)continue;
+      const row=[r[1], r[2], r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12]];
+      for(let g2=0;g2<GENES;g2++)out[idx*GENES+g2]=row[g2];
+    }
+    if(rowEmpty(out,0)){setRow(out,0,newRow(0,-1));}
+    return out;
+  }catch(e){return randomGenome();}
+}
+
+/* ================= AUDIO ================= */
+const AudioFX=(function(){
+  let ctx=null,master=null,enabled=true,ambientTimer=null,lastNote=0;
+  function ensure(){if(!ctx){try{ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=0.5;master.connect(ctx.destination);}catch(e){return false;}}if(ctx.state==='suspended')ctx.resume();return true;}
+  const PENTA=[0,2,4,7,9];
+  function quantize(n){const oct=Math.floor(n/12);const r=n%12;let best=0,bd=99;for(const p of PENTA){const d=Math.abs(r-p);if(d<bd){bd=d;best=p;}}return oct*12+best;}
+  function pluck(freq,t,type,dur,gain,detune){
+    if(!ensure()||!enabled)return;
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=type||'sine';o.frequency.value=freq;if(detune)o.detune.value=detune;
+    g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
+    g.gain.exponentialRampToValueAtTime(gain||0.18,ctx.currentTime+t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+(dur||0.9));
+    o.connect(g);g.connect(master);o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+(dur||0.9)+0.1);
+  }
+  function hueRoot(h){return quantize(40+(h%360)/360*26);}
+  return{
+    setEnabled(v){enabled=v;if(master)master.gain.value=v?0.5:0;},
+    birth(ind){
+      if(!ensure()||!enabled)return;
+      const root=hueRoot(ind.domHue||160);
+      const notes=[0,4,7,12].slice(0,3+Math.floor(Math.random()*2));
+      notes.forEach((iv,i)=>pluck(root+iv,i*0.09,'triangle',0.7,0.1));
+      setTimeout(()=>pluck(root+12,0.01,'sine',0.9,0.06),40);
+    },
+    select(ind){if(!ensure()||!enabled)return;const root=hueRoot(ind.domHue||160);pluck(root,0,'sine',0.5,0.08);pluck(root+7,0.06,'sine',0.6,0.06);},
+    like(){if(!ensure()||!enabled)return;pluck(523,0,'triangle',0.3,0.1);pluck(659,0.07,'triangle',0.35,0.08);},
+    nope(){if(!ensure()||!enabled)return;pluck(196,0,'sawtooth',0.4,0.06);pluck(185,0.09,'sawtooth',0.5,0.05);},
+    evolve(){if(!ensure()||!enabled)return;pluck(330,0,'sine',0.2,0.07);pluck(440,0.12,'sine',0.25,0.07);pluck(550,0.24,'sine',0.3,0.08);},
+    ambientTick(hue){
+      if(!ensure()||!enabled)return;
+      const now=performance.now();if(now-lastNote<900)return;lastNote=now;
+      const root=hueRoot(hue);pluck(root+[0,7,12,16][Math.floor(Math.random()*4)],0,'sine',2.4,0.03);
+    }
+  };
+})();
+
+/* ================= THREE SETUP ================= */
+let renderer,scene,camera,controls,composer,bloom,raycaster,clock;
+let ambientStarted=false;
+let staticLayer=new THREE.Group(),dynLayer=new THREE.Group();
+const creatures=new Map(); /* id -> {group, meshes:{segIdx:mesh}, base:{segIdx:Color}, fx, domHue, pedestal, ring, bar} */
+const picked=new THREE.Vector2(),hueCol=new THREE.Color();
+let white=new THREE.Color(1,1,1),amber=new THREE.Color(1,0.78,0.34);
+
+function initScene(){
+  try{renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});}catch(e){document.body.innerHTML='<div style="padding:40px;color:#ff5f6d">WebGL non disponibile su questo dispositivo 😢</div>';return false;}
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.toneMapping=THREE.NoToneMapping;
+  document.body.prepend(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color('#02100c');
+  scene.fog=new THREE.FogExp2('#02100c',0.035);
+  camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,120);
+  camera.position.set(0,5.6,8.6);
+  controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=0.08;
+  controls.target.set(0,0.6,0);
+  controls.minDistance=2.5;controls.maxDistance=30;
+  controls.maxPolarAngle=Math.PI*0.55;
+  raycaster=new THREE.Raycaster();clock=new THREE.Clock();
+  const res=new THREE.Vector2(innerWidth,innerHeight);
+  composer=new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene,camera));
+  bloom=new UnrealBloomPass(res,1.25,0.55,0.15);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  scene.add(staticLayer);scene.add(dynLayer);
+  buildParticles();
+  addEventListener('resize',onResize);
+  addEventListener('pointerdown',onPointerDown);
+  addEventListener('pointermove',onPointerMove);
+  addEventListener('pointerup',onPointerUp);
+  return true;
+}
+function buildParticles(){
+  const N=420,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){pos[i*3]= (Math.random()-0.5)*34;pos[i*3+1]=Math.random()*12-1;pos[i*3+2]=(Math.random()-0.5)*34;}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const mat=new THREE.PointsMaterial({color:0x3ee6ff,size:0.05,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false});
+  const pts=new THREE.Points(geo,mat);pts.userData.particles=true;
+  staticLayer.add(pts);
+}
+function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);}
+let downX=0,downY=0,moved=false;
+function onPointerDown(e){downX=e.clientX;downY=e.clientY;moved=false;}
+function onPointerMove(e){
+  const tip=$('tip');
+  picked.x=(e.clientX/innerWidth)*2-1;picked.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(picked,camera);
+  const hits=raycaster.intersectObjects(dynLayer.children,true);
+  let cid=null,ind=null;
+  for(const h of hits){const c=cidOf(h.object);if(c!==null){cid=c;break;}}
+  if(cid!==null)ind=find(cid);
+  if(ind){tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.innerHTML='<b>'+ind.n+'</b> · Gen '+ind.gen+' · Fit '+ind.f.toFixed(2);}
+  else tip.style.display='none';
+  state.hoverId=cid;
+}
+function onPointerUp(e){
+  if(Math.hypot(e.clientX-downX,e.clientY-downY)>7)return;
+  if(e.target!==renderer.domElement)return; /* click su pannelli HUD: ignora il raycast */
+  picked.x=(e.clientX/innerWidth)*2-1;picked.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(picked,camera);
+  const hits=raycaster.intersectObjects(dynLayer.children,true);
+  for(const h of hits){
+    const c=cidOf(h.object);
+    if(c!==null){handleCreatureClick(c);return;}
+    const t=tidOf(h.object);
+    if(t!==null){handleTreeClick(t);return;}
+  }
+}
+function cidOf(o){let x=o;while(x){if(x.userData&&x.userData.cid!==undefined)return x.userData.cid;x=x.parent;}return null;}
+function tidOf(o){let x=o;while(x){if(x.userData&&x.userData.tid!==undefined)return x.userData.tid;x=x.parent;}return null;}
+
+/* ================= CREATURE (fenotipo Three.js) ================= */
+function hsl(h,s,l){return hueCol.setHSL(((h%360)+360)%360/360,clamp(s,0,1),clamp(l,0,1)).clone();}
+function buildCreatureMesh(seg){
+  const col=hsl(seg.h,seg.st,seg.l);
+  let mesh;
+  if(seg.t===0){ /* orb */
+    mesh=new THREE.Mesh(new THREE.SphereGeometry(seg.s*0.45,16,12),new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+  }else if(seg.t===1){ /* stem */
+    mesh=new THREE.Mesh(new THREE.CylinderGeometry(seg.s*0.06,seg.s*0.13,seg.s,6),new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+    mesh.position.y=seg.s*0.5;mesh.userData.isStem=true;mesh.userData.stemLen=seg.s;
+  }else{ /* ribbon */
+    const a=new THREE.Vector3(0,0,0),b=new THREE.Vector3(seg.s,seg.s*seg.c*0.6,0),c2=new THREE.Vector3(seg.s*0.5,seg.s*seg.c*1.2,0);
+    const curve=new THREE.QuadraticBezierCurve3(a,b,c2);
+    mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,9,seg.s*0.05,6,false),new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+  }
+  if(seg.t===3){ /* anello */
+    mesh=new THREE.Mesh(new THREE.TorusGeometry(seg.s*0.38,seg.s*0.1,8,20),new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+  }else if(seg.t===4){ /* cristallo (piramide) */
+    mesh=new THREE.Mesh(new THREE.ConeGeometry(seg.s*0.22,seg.s*0.75,4),new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+    mesh.position.y=seg.s*0.375;
+  }else if(seg.t===5){ /* ameba: icosaedro deformato in modo deterministico */
+    const rnd=mulberry32(Math.floor(seg.h*13.37+seg.s*7919+seg.c*4093));
+    const geo=new THREE.IcosahedronGeometry(seg.s*0.34,0);
+    const p=geo.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const dx=p.getX(i),dy=p.getY(i),dz=p.getZ(i);
+      const r=Math.hypot(dx,dy,dz)||1;
+      const k=1+(rnd()-0.5)*0.55;
+      p.setXYZ(i,dx*k,dy*k,dz*k);
+    }
+    geo.computeVertexNormals();
+    mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:col,transparent:seg.o<1,opacity:seg.o}));
+  }
+  mesh.userData.base=col.clone();
+  return mesh;
+}
+function buildCreature(g,id){
+  const segs=decodeGenome(g);
+  const group=new THREE.Group();
+  const meshes={};
+  const groups={};
+  const sizes={};
+  let rootCount=0;
+  for(const s of segs)if(s.p<0)rootCount++;
+  let rootAngle=Math.random()*Math.PI*2;
+  let rootI=0;
+  for(const s of segs){
+    const sub=new THREE.Group();
+    const mesh=buildCreatureMesh(s);
+    sub.add(mesh);
+    meshes[s.idx]=mesh;sizes[s.idx]=s.s;
+    const parentGroup=(s.p>=0&&groups[s.p])?groups[s.p]:group;
+    if(s.p<0){
+      const ang=rootAngle+rootI*(Math.PI*2/Math.max(1,rootCount));
+      rootI++;
+      sub.position.set(Math.cos(ang)*0.32*s.d,0,Math.sin(ang)*0.32*s.d);
+      sub.rotation.y=ang;
+    }else{
+      const ps=sizes[s.p]||0.5;
+      sub.position.set(Math.cos(s.a)*s.d*ps,Math.sin(s.a)*s.d*ps*0.65,0);
+      sub.rotation.z=s.a;sub.rotation.x=s.c*0.9;
+    }
+    parentGroup.add(sub);groups[s.idx]=sub;
+  }
+  group.userData.cid=id;
+  /* tinta dominante (media circolare pesata) */
+  let sx=0,sy=0,sw=0;
+  for(const s of segs){const rad=s.h*Math.PI/180;sx+=Math.cos(rad)*s.s;sy+=Math.sin(rad)*s.s;sw+=s.s;}
+  const domHue=sw?wrap(Math.atan2(sy,sx)*180/Math.PI,0,360):160;
+  group.userData.domHue=domHue;
+  /* fit: normalizza le dimensioni perché le creature restino comparabili */
+  const box=new THREE.Box3().setFromObject(group);
+  const dim=box.getSize(new THREE.Vector3());
+  const maxDim=Math.max(dim.x,dim.y,dim.z,0.001);
+  const fit=Math.min(1,2.1/maxDim);
+  group.scale.setScalar(fit);
+  return{group,meshes,segs,domHue,fit};
+}
+function disposeCreature(cr){
+  if(!cr)return;
+  cr.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});
+  if(cr.pedestal)cr.pedestal.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});
+}
+
+/* ================= MODI ================= */
+function showMode(mode){
+  state.mode=mode;
+  document.querySelectorAll('.tabbtn[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
+  $('bottom').style.display=mode==='detail'?'none':'flex';
+  $('specPanel').style.display=mode==='compare'?'block':'none';
+  clearDyn();
+  if(mode==='detail'&&!find(state.selectedId))state.selectedId=state.currentGen[0];
+  if(mode==='evo'){camera.position.set(0,5.6,8.6);controls.target.set(0,0.6,0);controls.update();buildEvoScene();}
+  else if(mode==='tree')buildTreeScene();
+  else if(mode==='diorama')buildDioramaScene();
+  else if(mode==='detail')buildDetailScene(state.selectedId);
+  else if(mode==='compare'){buildCompareScene(state.selectedId);drawSpectrogram(state.selectedId);}
+  refreshPanels();
+}
+function clearDyn(){
+  creatures.clear();
+  treeNodes.clear();
+  state.expandedId=null;
+  dynLayer.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});
+  dynLayer.clear();
+}
+
+/* ---- Modalità Evoluzione: griglia di individui ---- */
+function buildEvoScene(){
+  const ids=state.currentGen.slice(0,state.settings.pop);
+  const cols=Math.min(4,Math.max(2,Math.ceil(Math.sqrt(ids.length*1.6))));
+  ids.forEach((id,i)=>{
+    const ind=find(id);if(!ind)return;
+    const col=i%cols,row=Math.floor(i/cols);
+    const x=(col-(cols-1)/2)*3.1,z=(row-Math.ceil(ids.length/cols-1)/2)*3.1;
+    const cr=buildCreature(ind.g,id);
+    cr.group.position.set(x,0.7,z);
+    cr.baseScale=cr.fit*0.85;cr.homeY=0.7;
+    cr.group.scale.setScalar(cr.baseScale);
+    addPedestal(cr,x,z,id,ind);
+    dynLayer.add(cr.group);
+    creatures.set(id,cr);
+    if(ind.fx){cr.fx={t:0,mutated:ind.fx.mutated||[],ring:makeRing(),active:true};dynLayer.add(cr.fx.ring);ind.fx=null;}
+  });
+}
+function addPedestal(cr,x,z,id,ind){
+  const dish=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.15,0.08,24),new THREE.MeshBasicMaterial({color:0x03170f}));
+  dish.position.set(x,-0.02,z);dish.userData.cid=id;
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.95,0.02,8,40),new THREE.MeshBasicMaterial({color:hsl(ind.domHue||160,0.9,0.55)}));
+  ring.position.set(x,0.05,z);ring.rotation.x=Math.PI/2;ring.userData.cid=id;
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.06,0.05),new THREE.MeshBasicMaterial({color:hsl(115-ind.f*115,0.95,0.55)}));
+  bar.position.set(x,0.14,z);bar.scale.x=Math.max(0.05,ind.f);bar.userData.cid=id;
+  cr.pedestal=new THREE.Group();
+  cr.pedestal.add(dish,ring,bar);
+  cr.pedestal.userData.cid=id;
+  dynLayer.add(cr.pedestal);
+}
+function makeRing(){
+  const m=new THREE.Mesh(new THREE.TorusGeometry(0.4,0.03,8,32),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.rotation.x=Math.PI/2;return m;
+}
+
+/* ---- Modalità Genealogia ---- */
+const treeNodes=new Map();
+function buildTreeScene(){
+  const inds=state.individuals;
+  if(!inds.length){
+    state.mode='evo';
+    document.querySelectorAll('.tabbtn[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode==='evo'));
+    buildEvoScene();return;
+  }
+  const maxGen=Math.max(...inds.map(i=>i.gen));
+  const visible=inds.filter(i=>i.gen>=maxGen-11);
+  const genMap={};
+  visible.forEach(i=>{(genMap[i.gen]=genMap[i.gen]||[]).push(i);});
+  const posById={};
+  for(const g in genMap){
+    const arr=genMap[g];const yy=parseInt(g)*1.05;
+    arr.forEach((ind,i)=>{
+      const x=(i-(arr.length-1)/2)*1.5;
+      posById[ind.id]={x,y:yy,z:0};
+    });
+  }
+  /* nodi */
+  for(const ind of visible){
+    const p=posById[ind.id];
+    const node=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10),new THREE.MeshBasicMaterial({color:hsl(ind.domHue||160,0.9,0.6)}));
+    node.position.set(p.x,p.y,p.z);node.userData.tid=ind.id;
+    const fr=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.015,6,24),new THREE.MeshBasicMaterial({color:hsl(115-ind.f*115,0.95,0.55),transparent:true,opacity:0.8}));
+    fr.position.copy(node.position);fr.userData.tid=ind.id;fr.rotation.x=Math.PI/2;fr.scale.setScalar(Math.max(0.3,ind.f));
+    treeNodes.set(ind.id,{node,fr,pos:p});
+    dynLayer.add(node,fr);
+  }
+  /* archi genitore->figlio con gradienti di colore */
+  const lines=[],cols=[];
+  for(const ind of visible){
+    for(const pid of ind.p){
+      const pp=posById[pid];if(!pp)continue;
+      const c=posById[ind.id];
+      lines.push(pp.x,pp.y,pp.z,c.x,c.y,c.z);
+      const a=hsl(ind.domHue||160,0.8,0.5),b=hsl((find(pid)?.domHue||160),0.8,0.5);
+      cols.push(b.r,b.g,b.b,a.r,a.g,a.b);
+    }
+  }
+  if(lines.length){
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(lines),3));
+    geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+    const mat=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.4});
+    dynLayer.add(new THREE.LineSegments(geo,mat));
+  }
+  /* asse generazioni */
+  const maxY=Math.max(0,...visible.map(i=>i.gen));
+  const camY=Math.min(3,maxY*0.75)+1.6;
+  camera.position.set(0,camY,9);controls.target.set(0,maxY*0.6,0);controls.update();
+}
+function handleTreeClick(id){
+  const ind=find(id);if(!ind)return;
+  state.selectedId=id;
+  if(state.expandedId){
+    const prev=treeNodes.get(state.expandedId);if(prev&&prev.creature){dynLayer.remove(prev.creature.group);disposeCreature(prev.creature);prev.creature=null;}
+  }
+  const t=treeNodes.get(id);
+  if(t){
+    const cr=buildCreature(ind.g,id);
+    cr.group.position.set(t.pos.x,t.pos.y+0.4,t.pos.z);
+    cr.baseScale=cr.fit*0.3;cr.homeY=t.pos.y+0.4;
+    cr.group.scale.setScalar(cr.baseScale);
+    dynLayer.add(cr.group);t.creature=cr;state.expandedId=id;
+  }
+  refreshPanels();AudioFX.select(ind);
+}
+/* ---- Modalità Diorama ---- */
+function buildDioramaScene(){
+  const ids=state.diorama.slice(0,16);
+  ids.forEach((id,i)=>{
+    const ind=find(id);if(!ind)return;
+    const cr=buildCreature(ind.g,id);
+    cr.group.position.set((Math.random()-0.5)*14,1+Math.random()*6,(Math.random()-0.5)*14);
+    cr.baseScale=cr.fit*(0.5+Math.random()*0.7);
+    cr.group.scale.setScalar(cr.baseScale);
+    cr.diorama={seed:Math.random()*100,baseY:cr.group.position.y,rot:Math.random()*6.28};
+    dynLayer.add(cr.group);
+    creatures.set(id,cr);
+  });
+  camera.position.set(0,5,12);controls.target.set(0,3,0);controls.update();
+  if(ids.length&&state.settings.sound&&!ambientStarted){ambientStarted=true;setInterval(()=>{if(state.mode==='diorama'&&state.settings.sound){const dd=state.diorama.map(x=>find(x)?.domHue||160);if(dd.length)AudioFX.ambientTick(dd[Math.floor(Math.random()*dd.length)]);}},1500);}
+}
+function toggleDiorama(id){
+  const i=state.diorama.indexOf(id);
+  if(i>=0){state.diorama.splice(i,1);toast('Rimosso dal diorama','var(--dim)');}
+  else{state.diorama.push(id);toast('Aggiunto al diorama 🫧','var(--teal)');}
+  save(LS.diorama,state.diorama);
+  if(state.mode==='diorama')showMode('diorama');
+  refreshPanels();
+}
+/* ---- Modalità Dettaglio (individuo singolo) ---- */
+function buildDetailScene(id){
+  const ind=find(id);if(!ind)return;
+  const cr=buildCreature(ind.g,id);
+  cr.group.position.set(0,0.6,0);
+  cr.baseScale=cr.fit*0.95;cr.homeY=0.6;
+  cr.group.scale.setScalar(cr.baseScale);
+  const dish=new THREE.Mesh(new THREE.CylinderGeometry(2,2.2,0.1,32),new THREE.MeshBasicMaterial({color:0x03170f}));
+  dish.position.y=-0.02;dish.userData.cid=id;
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.9,0.03,8,48),new THREE.MeshBasicMaterial({color:hsl(ind.domHue||160,0.9,0.6)}));
+  ring.rotation.x=Math.PI/2;ring.position.y=0.06;ring.userData.cid=id;
+  dynLayer.add(dish,ring,cr.group);
+  creatures.set(id,cr);
+  camera.position.set(0,1.6,4.4);controls.target.set(0,0.6,0);controls.update();
+}
+/* ---- Confronto affiancato genitore <-> figlio ---- */
+function makeLabel(line1,line2,color){
+  const cv=document.createElement('canvas');
+  cv.width=512;cv.height=96;
+  const cx=cv.getContext('2d');
+  cx.fillStyle='rgba(2,16,12,0.82)';
+  cx.fillRect(0,0,512,96);
+  cx.textAlign='center';cx.textBaseline='middle';
+  cx.font='700 30px -apple-system,Segoe UI,sans-serif';
+  cx.fillStyle='#'+('00000'+color.toString(16)).slice(-6);
+  cx.fillText(line1,256,34);
+  cx.font='500 22px -apple-system,Segoe UI,sans-serif';
+  cx.fillStyle='#9fe8d0';
+  cx.fillText(line2,256,70);
+  const tex=new THREE.CanvasTexture(cv);
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+  const sp=new THREE.Sprite(mat);
+  sp.scale.set(2.7,0.5,1);
+  return sp;
+}
+function mutatedSegsOf(ind,parents){
+  /* segmenti del figlio significativamente diversi da entrambi i genitori */
+  const diffs=new Set();
+  for(let i=0;i<MAX_SEG;i++){
+    if(rowEmpty(ind.g,i))continue;
+    const row=rowArray(ind.g,i);
+    let inherited=false;
+    for(const par of parents){
+      if(!par||rowEmpty(par.g,i))continue;
+      const pr=rowArray(par.g,i);
+      let d=0;
+      for(let k=2;k<GENES;k++){
+        let v=row[k]-pr[k];
+        if(k===6)v=Math.min(Math.abs(v),360-Math.abs(v));
+        d+=Math.abs(v);
+      }
+      if(row[0]!==pr[0]||row[1]!==pr[1])d+=1.5;
+      if(d<1.2){inherited=true;break;}
+    }
+    if(!inherited)diffs.add(i);
+  }
+  return diffs;
+}
+function buildCompareScene(id){
+  const ind=find(id);if(!ind)return;
+  const parents=ind.p.map(pid=>find(pid)).filter(Boolean);
+  const slots=[];
+  if(parents.length===2)slots=[{ind:parents[0],x:-3.4,label:'GENITORE 1'},{ind,x:0,label:'FIGLIO'},{ind:parents[1],x:3.4,label:'GENITORE 2'}];
+  else if(parents.length===1)slots=[{ind:parents[0],x:-3.4,label:'GENITORE'},{ind,x:0,label:'FIGLIO'}];
+  else slots=[{ind,x:0,label:'FIGLIO · SEME'}];
+  for(const s of slots){
+    const cr=buildCreature(s.ind.g,s.ind.id);
+    cr.group.position.set(s.x,0.9,0);
+    cr.baseScale=cr.fit*0.85;cr.homeY=0.9;
+    cr.group.scale.setScalar(cr.baseScale);
+    const dish=new THREE.Mesh(new THREE.CylinderGeometry(1.75,1.9,0.1,28),new THREE.MeshBasicMaterial({color:0x03170f}));
+    dish.position.set(s.x,-0.02,0);dish.userData.cid=s.ind.id;
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.62,0.03,8,44),new THREE.MeshBasicMaterial({color:hsl(s.ind.domHue||160,0.9,0.6)}));
+    ring.rotation.x=Math.PI/2;ring.position.set(s.x,0.07,0);ring.userData.cid=s.ind.id;
+    const bar=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.07,0.05),new THREE.MeshBasicMaterial({color:hsl(115-s.ind.f*115,0.95,0.55)}));
+    bar.position.set(s.x,0.17,0);bar.scale.x=Math.max(0.05,s.ind.f);bar.userData.cid=s.ind.id;
+    dynLayer.add(dish,ring,bar,cr.group);
+    creatures.set(s.ind.id,cr);
+    const lab=makeLabel(s.label,s.ind.n+' · fit '+s.ind.f.toFixed(2),s.ind.id===id?0x00ffd0:0x9fe8d0);
+    lab.position.set(s.x,3.15,0);
+    dynLayer.add(lab);
+    if(s.ind.id===id&&parents.length)cr.highlight=mutatedSegsOf(s.ind,parents);
+  }
+  /* legami figlio->genitori */
+  if(parents.length){
+    const pts=[];
+    for(const par of parents){
+      const slot=slots.find(s=>s.ind.id===par.id);
+      if(slot)pts.push(0,2.2,0,slot.x,2.2,0);
+    }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3));
+    const mat=new THREE.LineBasicMaterial({color:0x3ee6ff,transparent:true,opacity:0.35});
+    dynLayer.add(new THREE.LineSegments(geo,mat));
+  }
+  camera.position.set(0,2.5,7.6);controls.target.set(0,0.8,0);controls.update();
+}
+/* ---- Spettrogramma genico: 12 geni x neuroni, genitori <-> figlio ---- */
+const GENELABELS=['TIPO','PAR','ANG','DIST','DIM','CURV','TINTA','SAT','LUM','PULS','FASE','OPAC'];
+const TYPE_COLORS=['#3ee6ff','#52ff9e','#ffd166','#ff5f9e','#b28dff','#ff8d5f'];
+let specOff=null,specCells=[];
+function geneColor(row,k){
+  if(k===0)return TYPE_COLORS[Math.min(5,Math.max(0,row[0]))];
+  if(k===1)return row[1]<0?'#eafff7':'hsl('+(row[1]*15)+',70%,55%)';
+  if(k===6)return 'hsl('+(((row[6]%360)+360)%360)+',80%,60%)';
+  const rng=G_RANGE[k];
+  const v=clamp((row[k]-rng[0])/(rng[1]-rng[0]),0,1);
+  return 'hsl(172,75%,'+(14+v*52)+'%)';
+}
+function cellMutated(row,i,k,parents){
+  /* true se il gene del figlio non combacia con NESSUN genitore */
+  for(const p of parents){
+    if(rowEmpty(p.g,i))continue;
+    const pr=rowArray(p.g,i);
+    if(k===0||k===1){if(pr[k]===row[k])return false;continue;}
+    let d=Math.abs(row[k]-pr[k]);
+    if(k===6)d=Math.min(d,360-d);
+    const rng=G_RANGE[k];
+    const thr=(k===6?20:0.22*(rng[1]-rng[0]));
+    if(d<thr)return false;
+  }
+  return true;
+}
+function drawSpectrogram(childId){
+  const child=find(childId);if(!child)return;
+  const parents=child.p.map(pid=>find(pid)).filter(Boolean);
+  const blocks=[];
+  if(parents[0])blocks.push({ind:parents[0],label:'GENITORE 1',color:'#9fe8d0'});
+  blocks.push({ind:child,label:'FIGLIO',color:'#00ffd0'});
+  if(parents[1])blocks.push({ind:parents[1],label:'GENITORE 2',color:'#9fe8d0'});
+  /* unione degli indici dei neuroni tra figlio e genitori */
+  const union=new Set();
+  for(const b of blocks)for(let i=0;i<MAX_SEG;i++)if(!rowEmpty(b.ind.g,i))union.add(i);
+  const idxs=[...union].sort((a,b)=>a-b);
+  const W=760,labelW=54,headerH=24,blockPad=20,blockH=17;
+  const geneW=Math.floor((W-labelW)/12);
+  const H=headerH+blocks.length*(blockPad+idxs.length*blockH)+10;
+  specOff=document.createElement('canvas');
+  specOff.width=W;specOff.height=Math.max(130,H);
+  const x=specOff.getContext('2d');
+  x.fillStyle='#02100c';x.fillRect(0,0,W,specOff.height);
+  x.fillStyle='#6fb8a4';x.font='600 11px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
+  for(let k=0;k<12;k++)x.fillText(GENELABELS[k],labelW+k*geneW+2,15);
+  x.strokeStyle='rgba(0,255,208,.10)';x.beginPath();
+  for(let k=1;k<12;k++){x.moveTo(labelW+k*geneW,20);x.lineTo(labelW+k*geneW,specOff.height);}
+  x.stroke();
+  specCells=[];
+  let y=headerH;
+  for(const b of blocks){
+    x.fillStyle=b.color;x.font='700 12px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
+    x.fillText(b.label,labelW+2,y+12);
+    y+=blockPad;
+    for(const i of idxs){
+      const active=!rowEmpty(b.ind.g,i);
+      x.fillStyle='#4a7a6b';x.font='10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
+      x.fillText('#'+i,labelW-34,y+blockH-4);
+      if(active){
+        const row=rowArray(b.ind.g,i);
+        for(let k=0;k<12;k++){
+          const cx2=labelW+k*geneW,cy=y,cw=geneW-2,ch=blockH-3;
+          x.fillStyle=geneColor(row,k);
+          x.fillRect(cx2+1,cy+1,cw,ch);
+          if(b.ind.id===child.id&&parents.length&&cellMutated(row,i,k,parents)){
+            specCells.push({x:cx2+1,y:cy+1,w:cw,h:ch});
+          }
+        }
+      }else{
+        x.fillStyle='rgba(40,30,30,0.55)';
+        x.fillRect(labelW+1,y+1,W-labelW-2,blockH-3);
+      }
+      y+=blockH;
+    }
+  }
+  $('specCanvas').width=W;$('specCanvas').height=specOff.height;
+  $('specTitle').textContent=child.n;
+  $('specPanel').style.display='block';
+  pulseSpectrogram(0);
+}
+function pulseSpectrogram(t){
+  const cv=$('specCanvas');
+  const x=cv.getContext('2d');
+  x.clearRect(0,0,cv.width,cv.height);
+  if(specOff)x.drawImage(specOff,0,0);
+  if(!specCells.length)return;
+  const a=0.5+0.5*Math.sin(t*5);
+  x.fillStyle='rgba(255,200,87,'+(0.35+0.45*a)+')';
+  for(const c of specCells)x.fillRect(c.x,c.y,c.w,c.h);
+  x.strokeStyle='rgba(255,200,87,'+(0.5+0.5*a)+')';
+  for(const c of specCells)x.strokeRect(c.x+0.5,c.y+0.5,c.w-1,c.h-1);
+}
+
+/* ================= EVOLUZIONE ================= */
+function makeIndividual(genome,parents,gen,opts){
+  const feats=featuresOf(genome);
+  /* salva il genoma come array plain: Float32Array non si serializza come array in JSON */
+  const ind={id:state.nextId++,g:Array.from(genome),p:parents,n:nameOf(genome),gen,f:0,fe:feats,domHue:domHueOf(genome)};
+  ind.f=fitnessOf(genome,feats);
+  if(opts&&opts.fx)ind.fx={mutated:opts.fx.mutated};
+  state.individuals.push(ind);
+  return ind;
+}
+function domHueOf(g){
+  const segs=decodeGenome(g);let sx=0,sy=0,sw=0;
+  for(const s of segs){const rad=s.h*Math.PI/180;sx+=Math.cos(rad)*s.s;sy+=Math.sin(rad)*s.s;sw+=s.s;}
+  return sw?wrap(Math.atan2(sy,sx)*180/Math.PI,0,360):160;
+}
+function makeChild(p1,p2){
+  const rnd=Math.random;
+  const cross=crossover(p1.g,p2.g,rnd);
+  const m=mutate(cross,state.settings.mutRate);
+  return makeIndividual(m.g,[p1.id,p2.id],state.gen,{fx:{mutated:m.mutated}});
+}
+function makeWild(){return makeIndividual(randomGenome(),[],state.gen);}
+function cloneInd(ind){return makeIndividual(ind.g,[ind.id],state.gen);}
+function topN(n){return state.currentGen.map(id=>find(id)).filter(Boolean).sort((a,b)=>b.f-a.f).slice(0,n);}
+function evolve(){
+  if(state.dock.length<1){toast('Seleziona almeno un genitore (clicca una creatura)','var(--amber)');return;}
+  const parents=state.dock.map(id=>find(id)).filter(Boolean);
+  if(!parents.length)return;
+  const pop=state.settings.pop;
+  const elite=topN(2);
+  const kids=[];
+  let guard=0;
+  state.gen++;
+  while(kids.length<pop-3&&guard++<60){
+    const p1=parents[Math.floor(Math.random()*parents.length)];
+    const p2=parents.length>1?parents[Math.floor(Math.random()*parents.length)]:topN(3)[Math.floor(Math.random()*3)]||p1;
+    const c=makeChild(p1,p2);
+    kids.push(c);
+  }
+  for(const e of elite)kids.push(cloneInd(e));
+  kids.push(makeWild());
+  state.currentGen=kids.map(k=>k.id);
+  state.dock=[];
+  state.selectedId=null;
+  saveAll();
+  AudioFX.evolve();
+  if(state.mode==='evo'){clearDyn();buildEvoScene();}
+  toast('🧬 Generazione '+state.gen+': '+kids.length+' individui');
+  refreshPanels();
+}
+function seedGeneration(genomes,bump){
+  const pop=state.settings.pop;
+  const gs=(genomes&&genomes.length?genomes.slice(0,pop):[]);
+  while(gs.length<pop)gs.push(randomGenome());
+  if(bump)state.gen++;
+  const fresh=[];
+  for(const g of gs)fresh.push(makeIndividual(g,[],state.gen));
+  state.currentGen=fresh.map(k=>k.id);
+  state.dock=[];state.selectedId=null;
+  saveAll();
+  if(state.mode==='evo'){clearDyn();buildEvoScene();}
+  refreshPanels();
+}
+function autoSelect(){state.dock=topN(2).map(i=>i.id);}
+function autoLoop(){setInterval(()=>{
+  if(!state.autopilot)return;
+  if(state.mode!=='evo')return;
+  autoSelect();evolve();
+},state.settings.speed);}
+
+/* ================= INTERAZIONE ================= */
+function handleCreatureClick(id){
+  const ind=find(id);if(!ind)return;
+  state.selectedId=id;
+  if(state.mode==='evo'){
+    if(state.dock.indexOf(id)<0){
+      if(state.dock.length>=2){state.dock.shift();}
+      state.dock.push(id);
+    }
+    AudioFX.select(ind);
+  }
+  refreshPanels();
+}
+function toggleFav(id){
+  const i=state.favs.indexOf(id);
+  if(i>=0){state.favs.splice(i,1);toast('Rimosso dai preferiti','var(--dim)');AudioFX.nope();}
+  else{state.favs.push(id);toast('❤️ Preferito salvato','var(--green)');AudioFX.like();updateTaste(find(id),+1);}
+  save(LS.favs,state.favs);
+  refreshPanels();
+}
+function dislike(id){
+  updateTaste(find(id),-1);toast('👎 La fitness ora lo valuta meno','var(--red)');AudioFX.nope();
+  refreshPanels();
+}
+function updateTaste(ind,dir){
+  if(!ind)return;
+  const feats=ind.fe,t=state.taste;
+  for(let i=0;i<6;i++){
+    const delta=(feats[i]-ind.f)*0.12*dir;
+    t[i]=clamp(t[i]+delta,0.15,3);
+  }
+  save(LS.taste,t);
+  /* ricalcola fitness di tutti gli individui vivi */
+  for(const id of state.currentGen){const k=find(id);if(k)k.f=fitnessOf(k.g,k.fe);}
+}
+/* ---- Esporta ---- */
+function exportPNG(id){
+  const ind=find(id);if(!ind){toast('Nessuna creatura selezionata','var(--amber)');return;}
+  const S=1024;
+  const prevSize={w:innerWidth,h:innerHeight};
+  dynLayer.visible=false;
+  const cr=buildCreature(ind.g,id);
+  cr.group.position.set(0,0.9,0);cr.group.scale.setScalar(cr.fit*1.15);
+  scene.add(cr.group);
+  const prevCam=camera.position.clone();const prevTarget=controls.target.clone();
+  renderer.setSize(S,S,false);composer.setSize(S,S);
+  camera.aspect=1;camera.updateProjectionMatrix();
+  camera.position.set(0,1.3,3.6);camera.lookAt(0,0.5,0);
+  renderer.render(scene,camera); /* senza bloom: pulito */
+  const url=renderer.domElement.toDataURL('image/png');
+  scene.remove(cr.group);disposeCreature(cr);
+  dynLayer.visible=true;
+  renderer.setSize(prevSize.w,prevSize.h,false);composer.setSize(prevSize.w,prevSize.h);
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  camera.position.copy(prevCam);controls.target.copy(prevTarget);controls.update();
+  download(url,ind.n.replace(/\s+/g,'_')+'.png');
+  toast('🖼️ PNG esportato');
+}
+function exportSVG(id){
+  const ind=find(id);if(!ind){toast('Nessuna creatura selezionata','var(--amber)');return;}
+  const segs=decodeGenome(ind.g);
+  const pos={};let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for(const s of segs){
+    if(s.p<0){pos[s.idx]={x:Math.cos(s.a)*0.4*s.d,y:Math.sin(s.a)*0.4*s.d};}
+    else{const pp=pos[s.p]||{x:0,y:0};const ps=segs.find(q=>q.idx===s.p)?.s||0.5;pos[s.idx]={x:pp.x+Math.cos(s.a)*s.d*ps,y:pp.y+Math.sin(s.a)*s.d*ps};}
+    const p=pos[s.idx];
+    minX=Math.min(minX,p.x-s.s);maxX=Math.max(maxX,p.x+s.s);minY=Math.min(minY,p.y-s.s);maxY=Math.max(maxY,p.y+s.s);
+  }
+  const W=800,V=80,scale=Math.min(720/(maxX-minX||1),720/(maxY-minY||1));
+  const X=v=>W/2+(v-(minX+maxX)/2)*scale,Y=v=>W/2-(v-(minY+maxY)/2)*scale;
+  const fill=s=>'hsl('+Math.round(s.h)+','+Math.round(s.st*100)+'%,'+Math.round(s.l*100)+'%)';
+  let body='';
+  for(const s of segs){
+    const p=pos[s.idx];const pp=pos[s.p]||{x:0,y:0};
+    if(s.t===0){body+='<ellipse cx="'+X(p.x).toFixed(1)+'" cy="'+Y(p.y).toFixed(1)+'" rx="'+(s.s*0.45*scale/2).toFixed(1)+'" ry="'+(s.s*0.45*scale/2).toFixed(1)+'" fill="'+fill(s)+'" opacity="'+s.o.toFixed(2)+'"/>';}
+    else if(s.t===1){body+='<line x1="'+X(pp.x).toFixed(1)+'" y1="'+Y(pp.y).toFixed(1)+'" x2="'+X(p.x).toFixed(1)+'" y2="'+Y(p.y).toFixed(1)+'" stroke="'+fill(s)+'" stroke-width="'+(s.s*0.12*scale).toFixed(1)+'" stroke-linecap="round" opacity="'+s.o.toFixed(2)+'"/>';}
+    else if(s.t===2){const mx=(pp.x+p.x)/2+(p.y-pp.y)*s.c*0.3,my=(pp.y+p.y)/2-(p.x-pp.x)*s.c*0.3;
+      body+='<path d="M'+X(pp.x).toFixed(1)+' '+Y(pp.y).toFixed(1)+' Q'+X(mx).toFixed(1)+' '+Y(my).toFixed(1)+' '+X(p.x).toFixed(1)+' '+Y(p.y).toFixed(1)+'" fill="none" stroke="'+fill(s)+'" stroke-width="'+(s.s*0.1*scale).toFixed(1)+'" stroke-linecap="round" opacity="'+s.o.toFixed(2)+'"/>';}
+    else if(s.t===3){const r=(s.s*0.38*scale/2).toFixed(1);
+      body+='<ellipse cx="'+X(p.x).toFixed(1)+'" cy="'+Y(p.y).toFixed(1)+'" rx="'+r+'" ry="'+r+'" fill="none" stroke="'+fill(s)+'" stroke-width="'+(s.s*0.1*scale).toFixed(1)+'" opacity="'+s.o.toFixed(2)+'"/>';}
+    else if(s.t===4){const h=(s.s*0.75*scale/2).toFixed(1),w=(s.s*0.22*scale).toFixed(1);
+      body+='<polygon points="'+X(p.x).toFixed(1)+','+(Y(p.y)-h)+' '+(X(p.x)-w).toFixed(1)+','+(Y(p.y)+h)+' '+(X(p.x)+w).toFixed(1)+','+(Y(p.y)+h)+'" fill="'+fill(s)+'" opacity="'+s.o.toFixed(2)+'"/>';}
+    else{const rx=(s.s*0.34*scale/2).toFixed(1),ry=(s.s*0.34*scale*(1+s.c*0.3)/2).toFixed(1);
+      body+='<ellipse cx="'+X(p.x).toFixed(1)+'" cy="'+Y(p.y).toFixed(1)+'" rx="'+rx+'" ry="'+ry+'" fill="'+fill(s)+'" opacity="'+s.o.toFixed(2)+'"/>';}
+  }
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+W+'" viewBox="0 0 '+W+' '+W+'"><rect width="100%" height="100%" fill="#02100c"/><g>'+body+'</g><text x="16" y="'+(W-14)+'" fill="#6fb8a4" font-family="monospace" font-size="14">'+ind.n.replace(/&/g,'&amp;')+' · gen '+ind.gen+' · fit '+ind.f.toFixed(3)+'</text></svg>';
+  download('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg),ind.n.replace(/\s+/g,'_')+'.svg');
+  toast('📐 SVG esportato');
+}
+function download(url,name){
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);
+}
+function copyLink(id){
+  const ind=find(id);if(!ind){toast('Nessuna creatura selezionata','var(--amber)');return;}
+  const url=location.origin+location.pathname+'#'+encodeGenome(ind.g);
+  if(navigator.clipboard){navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiato!'),()=>fallbackCopy(url));}
+  else fallbackCopy(url);
+}
+function fallbackCopy(txt){const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('🔗 Link copiato!');}catch(e){}ta.remove();}
+
+/* ---- Esporta / importa genoma in file JSON ---- */
+function exportGenomeFile(id){
+  const ind=find(id);if(!ind){toast('Nessuna creatura selezionata','var(--amber)');return;}
+  const data={
+    app:'genetic-art',version:2,name:ind.n,
+    genome:Array.from(ind.g),
+    parents:ind.p,gen:ind.gen,
+    fitness:+ind.f.toFixed(4),features:ind.fe,domHue:ind.domHue,
+    timestamp:Date.now()
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  download(url,ind.n.replace(/\s+/g,'_')+'.ga.json');
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast('💾 Genoma esportato in file');
+}
+function importGenomeFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      let g=null;
+      if(data&&Array.isArray(data.genome)&&data.genome.length===MAX_SEG*GENES&&data.genome.every(v=>typeof v==='number'))g=Array.from(data.genome);
+      else if(data&&typeof data.genome==='string')g=decodeGenomeStr(data.genome);
+      if(!g)throw new Error('formato non valido');
+      const ind=makeIndividual(g,[],state.gen,{});
+      state.currentGen.unshift(ind.id);
+      state.selectedId=ind.id;
+      if(state.favs.indexOf(ind.id)<0)state.favs.push(ind.id);
+      saveAll();save(LS.favs,state.favs);
+      showMode('detail');
+      AudioFX.birth(ind);
+      toast('📂 Creatura importata dal file: '+ind.n,'var(--teal)');
+    }catch(e){toast('File genoma non valido','var(--red)');}
+  };
+  reader.onerror=()=>toast('Impossibile leggere il file','var(--red)');
+  reader.readAsText(file);
+}
+
+/* ================= PANNELLI ================= */
+function refreshPanels(){
+  const dockEl=$('parentList');
+  dockEl.innerHTML='';
+  if(!state.dock.length)dockEl.innerHTML='<span class="badge">Clicca una creatura per aggiungerla qui</span>';
+  for(const id of state.dock){
+    const ind=find(id);if(!ind)continue;
+    const c=document.createElement('div');c.className='parentchip';
+    c.innerHTML='<span class="dot" style="color:'+cssHue(ind.domHue)+';background:'+cssHue(ind.domHue)+'"></span><span>'+ind.n+'</span><small>fit '+ind.f.toFixed(2)+'</small><span class="x">✕</span>';
+    c.onclick=()=>{state.dock=state.dock.filter(x=>x!==id);refreshPanels();};
+    dockEl.appendChild(c);
+  }
+  $('btn-evolve').disabled=state.dock.length<1;
+  $('btn-auto').textContent=state.autopilot?'⏸️ Autopilota':'▶️ Autopilota';
+  $('btn-auto').classList.toggle('on',state.autopilot);
+  $('btn-sound').textContent=state.settings.sound?'🔊 Suono':'🔇 Muto';
+  $('worldStats').textContent=state.individuals.length+' individui · '+state.favs.length+' ❤️';
+  $('genlabel').innerHTML='Generazione <b>'+state.gen+'</b> · <span id="countLabel">'+state.currentGen.length+' individui</span>';
+  const ind=find(state.selectedId);
+  const det=$('details');
+  if(ind){
+    det.classList.add('on');
+    $('dName').textContent=ind.n;$('dName').style.color=cssHue(ind.domHue);
+    $('dSub').textContent='Gen '+ind.gen+' · id #'+ind.id+(ind.p.length?' · figli di #'+ind.p.join(', #'):' · seme originario');
+    $('score').textContent=ind.f.toFixed(3);
+    const names=['Simmetria','Equilibrio','Organicità','Armonia','Complessità','Vitalità'];
+    $('dFeatures').innerHTML=names.map((n,i)=>'<div class="fbar"><span>'+n+'</span><div class="track"><div class="fill" style="width:'+(ind.fe[i]*100).toFixed(0)+'%"></div></div></div>').join('');
+    const isFav=state.favs.indexOf(ind.id)>=0;
+    const inDio=state.diorama.indexOf(ind.id)>=0;
+    const hasParents=ind.p.some(pid=>find(pid));
+    $('dActions').innerHTML=
+      '<button class="minibtn like'+(isFav?' on':'')+'" id="aFav">'+(isFav?'❤️ Salvata':'❤️ Mi piace')+'</button>'+
+      '<button class="minibtn nope" id="aNope">👎</button>'+
+      '<button class="minibtn'+(state.dock.indexOf(ind.id)>=0?' on':'')+'" id="aParent">⭐ Genitore</button>'+
+      '<button class="minibtn" id="aPng">🖼️ PNG</button>'+
+      '<button class="minibtn" id="aSvg">📐 SVG</button>'+
+      '<button class="minibtn" id="aLink">🔗 Link</button>'+
+      '<button class="minibtn" id="aFile">💾 Genoma</button>'+
+      '<button class="minibtn" id="aImport">📂 Importa</button>'+
+      (hasParents?'<button class="minibtn'+(state.mode==='compare'?' on':'')+'" id="aCmp">👨‍👧 Confronta</button>':'')+
+      (state.mode==='compare'?'<button class="minibtn" id="aBack">🌊 Evoluzione</button>':'')+
+      '<button class="minibtn'+(inDio?' on':'')+'" id="aDio">🫧 Diorama</button>'+
+      '<button class="minibtn" id="aSee">🔍 Vedi in 3D</button>';
+    $('aFav').onclick=()=>toggleFav(ind.id);
+    $('aNope').onclick=()=>dislike(ind.id);
+    $('aParent').onclick=()=>{if(state.dock.indexOf(ind.id)<0){if(state.dock.length>=2)state.dock.shift();state.dock.push(ind.id);}else state.dock=state.dock.filter(x=>x!==ind.id);refreshPanels();};
+    $('aPng').onclick=()=>exportPNG(ind.id);
+    $('aSvg').onclick=()=>exportSVG(ind.id);
+    $('aLink').onclick=()=>copyLink(ind.id);
+    $('aFile').onclick=()=>exportGenomeFile(ind.id);
+    $('aImport').onclick=()=>$('genomeFile').click();
+    if(hasParents)$('aCmp').onclick=()=>{state.selectedId=ind.id;showMode('compare');};
+    if(state.mode==='compare'&&$('aBack'))$('aBack').onclick=()=>showMode('evo');
+    $('aDio').onclick=()=>toggleDiorama(ind.id);
+    $('aSee').onclick=()=>{state.selectedId=ind.id;showMode('detail');};
+  }else det.classList.remove('on');
+}
+function cssHue(h){return 'hsl('+Math.round(h)+',85%,60%)';}
+
+/* ================= DISEGNO (seme manuale) ================= */
+const drawState={tool:'orb',strokes:[],hue:160,size:9,down:null,cur:null};
+const dcanvas=$('drawCanvas'),dctx=dcanvas.getContext('2d');
+function redrawDraw(){
+  dctx.fillStyle='#01120c';dctx.fillRect(0,0,dcanvas.width,dcanvas.height);
+  dctx.strokeStyle='rgba(0,255,208,.06)';dctx.lineWidth=1;
+  for(let i=0;i<dcanvas.width;i+=40){dctx.beginPath();dctx.moveTo(i,0);dctx.lineTo(i,dcanvas.height);dctx.stroke();}
+  for(let j=0;j<dcanvas.height;j+=40){dctx.beginPath();dctx.moveTo(0,j);dctx.lineTo(dcanvas.width,j);dctx.stroke();}
+  for(const s of drawState.strokes)drawStroke(s);
+  if(drawState.cur)drawStroke(drawState.cur);
+  $('drawInfo').textContent=drawState.strokes.length+' forme · cerchio/stelo/nastro · colore '+drawState.hue;
+}
+function drawStroke(s){
+  dctx.save();
+  dctx.strokeStyle='hsl('+s.hue+',90%,62%)';dctx.fillStyle='hsl('+s.hue+',90%,62%)';
+  dctx.lineWidth=Math.max(2,s.size*0.5);dctx.lineCap='round';
+  if(s.type==='orb'){dctx.beginPath();dctx.arc(s.x,s.y,s.size,0,6.283);dctx.fill();}
+  else if(s.type==='stem'){dctx.lineWidth=s.size;dctx.beginPath();dctx.moveTo(s.x,s.y);dctx.lineTo(s.x2,s.y2);dctx.stroke();}
+  else if(s.type==='ribbon'){dctx.lineWidth=s.size;dctx.beginPath();dctx.moveTo(s.x,s.y);const mx=(s.x+s.x2)/2+(s.y2-s.y)*0.4,my=(s.y+s.y2)/2-(s.x2-s.x)*0.4;dctx.quadraticCurveTo(mx,my,s.x2,s.y2);dctx.stroke();}
+  else if(s.type==='ring'){dctx.beginPath();dctx.arc(s.x,s.y,s.size*0.75,0,6.283);dctx.stroke();}
+  else if(s.type==='crystal'){dctx.beginPath();dctx.moveTo(s.x,s.y-s.size);dctx.lineTo(s.x-s.size*0.7,s.y+s.size);dctx.lineTo(s.x+s.size*0.7,s.y+s.size);dctx.closePath();dctx.fill();}
+  else if(s.type==='blob'){dctx.beginPath();for(let a=0;a<=Math.PI*2+0.1;a+=Math.PI/5){const r=s.size*(0.75+0.25*Math.sin(a*3+s.x*0.05));const px=s.x+Math.cos(a)*r,py=s.y+Math.sin(a)*r;a===0?dctx.moveTo(px,py):dctx.lineTo(px,py);}dctx.closePath();dctx.fill();}
+  dctx.restore();
+}
+function initDraw(){
+  document.querySelectorAll('.toolbtn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.toolbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');drawState.tool=b.dataset.tool;});
+  $('drawHue').oninput=e=>drawState.hue=+e.target.value;
+  $('drawSize').oninput=e=>drawState.size=+e.target.value;
+  const pt=e=>{const r=dcanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(dcanvas.width/r.width),y:(e.clientY-r.top)*(dcanvas.height/r.height)};};
+  dcanvas.addEventListener('pointerdown',e=>{drawState.down=pt(e);dcanvas.setPointerCapture(e.pointerId);});
+  dcanvas.addEventListener('pointermove',e=>{
+    if(!drawState.down)return;
+    const p=pt(e);
+    if(drawState.tool==='eraser'){drawState.strokes=drawState.strokes.filter(s=>Math.hypot(s.x-p.x,s.y-p.y)>14);drawState.down=p;redrawDraw();return;}
+    drawState.cur={type:drawState.tool,x:drawState.down.x,y:drawState.down.y,x2:p.x,y2:p.y,hue:drawState.hue,size:drawState.size};
+    redrawDraw();
+  });
+  dcanvas.addEventListener('pointerup',()=>{
+    if(drawState.cur){drawState.strokes.push(drawState.cur);}
+    drawState.cur=null;drawState.down=null;redrawDraw();
+  });
+  $('drawClear').onclick=()=>{drawState.strokes=[];redrawDraw();};
+  $('drawOk').onclick=()=>{
+    if(!drawState.strokes.length){toast('Disegna almeno una forma','var(--amber)');return;}
+    const genomes=strokesToGenomes(drawState.strokes);
+    seedGeneration(genomes,true);
+    closeModal('drawModal');
+    toast('✏️ Semi convertiti in nuova generazione');
+  };
+}
+function strokesToGenomes(strokes){
+  /* rigenera il genoma con le forme disegnate */
+  const g=new Float32Array(MAX_SEG*GENES).fill(-1);
+  const TYPES={orb:0,stem:1,ribbon:2,ring:3,crystal:4,blob:5};
+  const segs=strokes.map(s=>({x:s.x,y:s.y,x2:s.x2||s.x,y2:s.y2||s.y,size:s.size,hue:s.hue,type:TYPES[s.type]!==undefined?TYPES[s.type]:0}));
+  /* ordina per distanza dal centro così la radice è quella centrale */
+  const cx=dcanvas.width/2,cy=dcanvas.height/2;
+  segs.sort((a,b)=>Math.hypot(a.x-cx,a.y-cy)-Math.hypot(b.x-cx,b.y-cy));
+  const norm=Math.max(dcanvas.width,dcanvas.height)/2;
+  let slot=0;
+  segs.forEach((s,si)=>{
+    const dx=s.x-cx,dy=s.y-cy;
+    const a=Math.atan2(dy,dx);
+    const d=clamp(Math.hypot(dx,dy)/norm,0.08,0.95);
+    const len=Math.hypot(s.x2-s.x,s.y2-s.y);
+    const orbLike=s.type===0||s.type===3||s.type===5;
+    const size=orbLike?clamp(0.2+s.size*0.045,0.2,1.05):clamp(0.18+Math.min(s.size,len)*0.02,0.15,1.6);
+    const c=clamp((((s.y2-s.y)*0.3)-((s.x2-s.x)*0.1))/Math.max(1,len),-1,1);
+    const p=si===0?-1:0; /* radice centrale, resto agganciato alla radice */
+    const row=[s.type,p,a,d,size,c,s.hue,0.85,0.75,0.4+Math.random()*0.3,Math.random()*6.283,0.9];
+    for(let k=0;k<GENES;k++)g[slot*GENES+k]=row[k];
+    slot++;
+    if(slot>=MAX_SEG)return;
+  });
+  return[g];
+}
+
+/* ================= PERSISTENZA ================= */
+function saveAll(){
+  save(LS.lineage,{individuals:state.individuals,nextId:state.nextId,gen:state.gen});
+}
+function restore(){
+  const data=load(LS.lineage,null);
+  if(data&&data.individuals&&data.individuals.length){
+    state.individuals=data.individuals;state.nextId=data.nextId||(Math.max(...data.individuals.map(i=>i.id))+1);state.gen=data.gen||0;
+    const lastGen=state.individuals.filter(i=>i.gen===state.gen);
+    state.currentGen=(lastGen.length?lastGen:state.individuals.slice(-state.settings.pop)).map(i=>i.id).slice(0,state.settings.pop);
+    return true;
+  }
+  return false;
+}
+function resetWorld(){
+  if(!confirm('Cancellare tutta l\'evoluzione e ripartire da zero?'))return;
+  Object.values(LS).forEach(k=>localStorage.removeItem(k));
+  Object.assign(state,{individuals:[],nextId:1,gen:0,dock:[],selectedId:null,autopilot:false});
+  state.taste=[1,1,1,1,1,1];state.favs=[];state.diorama=[];
+  location.hash='';
+  initWorld();
+  toast('♻️ Nuovo mondo creato');
+}
+
+/* ================= MAIN ================= */
+function initWorld(){
+  const restored=restore();
+  if(!restored)seedGeneration(null,false);
+  if(location.hash.length>1){
+    const g=decodeGenomeStr(location.hash.slice(1));
+    const hero=makeIndividual(g,[],state.gen,{});
+    state.selectedId=hero.id;
+    if(state.favs.indexOf(hero.id)<0)state.favs.push(hero.id);
+    state.currentGen.unshift(hero.id);
+    saveAll();save(LS.favs,state.favs);
+    showMode('detail');
+    AudioFX.birth(hero);
+    toast('🧬 Creatura importata dal link: '+hero.n,'var(--teal)');
+  }else{
+    showMode('evo');
+  }
+}
+function initUI(){
+  document.querySelectorAll('.tabbtn[data-mode]').forEach(b=>b.onclick=()=>showMode(b.dataset.mode));
+  $('btn-evolve').onclick=evolve;
+  $('btn-seeds').onclick=()=>{seedGeneration(null,true);toast('🌱 Nuova generazione di semi casuali');};
+  $('btn-draw').onclick=()=>openModal('drawModal');
+  $('btn-auto').onclick=()=>{state.autopilot=!state.autopilot;if(state.autopilot)toast('▶️ Autopilota attivo','var(--teal)');refreshPanels();};
+  $('btn-sound').onclick=()=>{state.settings.sound=!state.settings.sound;AudioFX.setEnabled(state.settings.sound);save(LS.settings,state.settings);refreshPanels();};
+  $('btn-reset').onclick=resetWorld;
+  $('btn-help').onclick=()=>openModal('helpModal');
+  $('mutSlider').value=Math.round(state.settings.mutRate*100);
+  $('popSlider').value=state.settings.pop;
+  $('mutSlider').oninput=e=>{state.settings.mutRate=+e.target.value/100;save(LS.settings,state.settings);};
+  $('popSlider').oninput=e=>{state.settings.pop=+e.target.value;save(LS.settings,state.settings);};
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  $('genomeFile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])importGenomeFile(e.target.files[0]);e.target.value='';});
+  $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))closeModal('helpModal');});
+  $('drawModal').addEventListener('click',e=>{if(e.target===$('drawModal'))closeModal('drawModal');});
+  AudioFX.setEnabled(state.settings.sound);
+}
+function openModal(id){$(id).classList.add('on');}
+function closeModal(id){$(id).classList.remove('on');}
+
+/* ================= LOOP ================= */
+function animateCreature(cr,t,dt){
+  const segs=cr.segs;
+  let k=0;
+  for(const s of segs){
+    const mesh=cr.meshes[s.idx];if(!mesh)continue;
+    const pulse=1+s.pu*0.16*Math.sin(t*1.4+s.ph+k*0.4);
+    mesh.scale.setScalar(pulse);
+    k++;
+  }
+  /* fx: scossa visiva alla nascita */
+  if(cr.fx&&cr.fx.active){
+    cr.fx.t+=dt;
+    const ft=cr.fx.t;
+    const base=cr.baseScale||0.85,homeY=cr.homeY!==undefined?cr.homeY:0.7,homeX=cr.group.userData.homeX!==undefined?cr.group.userData.homeX:cr.group.position.x;
+    /* tremore */
+    const trem=(ft<0.4)?Math.sin(ft*70)*0.05*(1-ft/0.4):0;
+    cr.group.position.y=homeY+trem*2;cr.group.position.x=homeX+trem;
+    /* crescita elastica */
+    const g=Math.min(1,ft/0.6);
+    const el=g<1?(Math.pow(2,-10*g)*Math.sin((g*10-0.75)*2.09)+1):1;
+    cr.group.scale.setScalar(base*Math.max(0.01,el));
+    /* flash sui neuroni mutati */
+    for(const mi of cr.fx.mutated){
+      const m=cr.meshes[mi];if(!m)continue;
+      const kf=Math.max(0,1-ft/0.8);
+      m.material.color.copy(m.userData.base).lerp(white,kf*0.85);
+    }
+    /* onda d'urto */
+    if(cr.fx.ring){
+      cr.fx.ring.visible=true;
+      const rp=ft*2.6;
+      cr.fx.ring.position.set(cr.group.position.x,0.25,cr.group.position.z);
+      cr.fx.ring.scale.setScalar(1+rp);
+      cr.fx.ring.material.opacity=Math.max(0,1-ft/0.9);
+      if(ft>0.9)cr.fx.ring.visible=false;
+    }
+    if(ft>1.2){cr.fx.active=false;cr.group.scale.setScalar(base);cr.group.position.y=homeY;}
+  }
+}
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,clock.getDelta());
+  const t=clock.getElapsedTime();
+  for(const[id,cr]of creatures){
+    if(state.mode==='diorama'&&cr.diorama){
+      const d=cr.diorama;
+      cr.group.position.x=Math.sin(t*0.25+d.seed)*5;
+      cr.group.position.y=d.baseY+Math.sin(t*0.4+d.seed*2)*0.8;
+      cr.group.position.z=Math.cos(t*0.3+d.seed*1.7)*5;
+      cr.group.rotation.y=t*0.1+d.rot;
+      cr.group.rotation.z=Math.sin(t*0.2+d.seed)*0.15;
+    }else if(cr.group.userData.cid!==undefined&&cr.fx&&cr.fx.active){
+      cr.group.userData.homeX=cr.group.userData.homeX!==undefined?cr.group.userData.homeX:cr.group.position.x;
+    }
+    animateCreature(cr,t,dt);
+  }
+  /* plancton */
+  staticLayer.children.forEach(o=>{if(o.userData.particles){o.rotation.y=t*0.01;o.position.y=Math.sin(t*0.2)*0.3;}});
+  /* nodi albero: pulsazione + anello fitness */
+  if(state.mode==='tree'){
+    for(const[id,n]of treeNodes){
+      const ind=find(id);if(!ind)continue;
+      n.node.scale.setScalar(1+Math.sin(t*2+id)*0.15);
+      if(n.creature){animateCreature(n.creature,t,dt);}
+    }
+  }
+  /* confronto: i geni mutati del figlio pulsano in ambra */
+  if(state.mode==='compare'){
+    const pulse=0.5+0.5*Math.sin(t*6);
+    for(const[id,cr]of creatures){
+      if(!cr.highlight||!cr.highlight.size)continue;
+      for(const i of cr.highlight){
+        const m=cr.meshes[i];if(!m)continue;
+        m.material.color.copy(m.userData.base).lerp(amber,pulse*0.85);
+      }
+    }
+    if(specOff)pulseSpectrogram(t);
+  }
+  controls.update();
+  composer.render();
+}
+function init(){
+  if(!initScene())return;
+  initUI();
+  initDraw();
+  initWorld();
+  autoLoop();
+  loop();
+}
+init();
+</script>
+</body>
+</html>

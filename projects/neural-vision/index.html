@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070d1a">
+<meta name="description" content="Neural Vision — scrivi un numero, la rete neurale lo calcola davvero (TensorFlow.js) e tu lo guardi pensare in 3D (Three.js).">
+<title>NEURAL VISION</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070d1a;--cyan:#00d4ff;--violet:#7c5cff;--green:#2dd4a0;--pink:#ff5d8f;--amber:#ffb703;--txt:#eaf6ff;--dim:#8fb4d6;--faint:#5f7f9f}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--txt);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;width:100%;height:100%;overflow:hidden}
+canvas{display:block}
+#hud{position:fixed;top:0;left:0;right:0;z-index:20;padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:linear-gradient(180deg,rgba(7,13,26,.9),rgba(7,13,26,0));pointer-events:none}
+#hud>*{pointer-events:auto}
+.lbl{font-size:11px;letter-spacing:2px;color:var(--faint);font-weight:700;display:block}
+.hud-card{background:rgba(13,26,48,.72);border:1px solid rgba(0,212,255,.14);border-radius:12px;padding:10px 14px;backdrop-filter:blur(10px)}
+#numInp{width:88px;background:#0a1322;border:1px solid rgba(0,212,255,.3);color:var(--txt);font-family:inherit;font-size:30px;font-weight:800;text-align:center;border-radius:10px;padding:4px;letter-spacing:4px}
+#numInp:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 16px rgba(0,212,255,.25)}
+#calcBtn{background:linear-gradient(135deg,var(--cyan),var(--violet));border:none;color:#04121f;font-family:inherit;font-weight:800;font-size:14px;letter-spacing:1px;padding:12px 22px;border-radius:10px;cursor:pointer;transition:all .22s}
+#calcBtn:hover{box-shadow:0 0 22px rgba(0,212,255,.35);transform:translateY(-1px)}
+#calcBtn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
+.pred-bigs{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pred{background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.25);color:var(--dim);border-radius:10px;padding:8px 11px;font-size:15px;font-weight:800;min-width:40px;text-align:center;transition:all .3s}
+.pred.win{background:rgba(0,212,255,.2);border-color:var(--cyan);color:var(--txt);box-shadow:0 0 16px rgba(0,212,255,.3)}
+.pred .pct{display:block;font-size:9px;color:var(--faint);font-weight:400;letter-spacing:.5px}
+#status{font-size:12px;color:var(--dim);position:fixed;right:16px;top:14px;z-index:20;max-width:240px;text-align:right;background:rgba(7,13,26,.6);padding:8px 12px;border-radius:10px;border:1px solid rgba(0,212,255,.1);font-weight:600}
+#progWrap{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);width:min(520px,92vw);background:var(--panel, rgba(13,26,48,.85));border:1px solid rgba(0,212,255,.2);border-radius:16px;padding:18px 22px;backdrop-filter:blur(14px);z-index:40;display:none}
+#progFill{height:10px;background:linear-gradient(90deg,var(--cyan),var(--violet));border-radius:6px;width:0;transition:width .25s}
+#progLabel{font-size:12px;color:var(--dim);margin-top:10px}
+#lossRow{display:flex;gap:16px;margin-top:10px;align-items:center}
+#lossRow canvas{width:100%;height:44px;background:#0a1322;border-radius:8px;border:1px solid rgba(0,212,255,.14)}
+#controls{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:10px;background:rgba(10,20,38,.88);border:1px solid rgba(0,212,255,.2);border-radius:14px;padding:10px 16px;backdrop-filter:blur(12px);flex-wrap:wrap;justify-content:center;max-width:94vw}
+#controls button{background:transparent;border:1px solid rgba(0,212,255,.3);color:var(--txt);border-radius:8px;padding:6px 13px;font-family:inherit;font-size:12px;cursor:pointer;font-weight:700;transition:all .2s}
+#controls button:hover{border-color:var(--cyan);background:rgba(0,212,255,.1)}
+#controls button.on{background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(124,92,255,.2));border-color:var(--cyan)}
+#stepRange{width:120px;accent-color:var(--cyan)}
+#speedLabel{font-size:11px;color:var(--faint);font-weight:700}
+#stepInfo{font-size:11px;color:var(--dim);min-width:130px;text-align:center;font-family:inherit}
+#hint{position:fixed;bottom:66px;left:50%;transform:translateX(-50%);color:var(--faint);font-size:11px;z-index:5;text-align:center;width:100%;pointer-events:none}
+@media(max-width:640px){#status{position:static;text-align:left;margin-left:4px;max-width:none}.pred{min-width:30px;font-size:12px}#numInp{width:70px;font-size:24px}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="hud-card">
+    <span class="lbl">NUMERO</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="numInp" type="number" min="0" max="9" value="7">
+      <button id="calcBtn">🕸 CALCOLA</button>
+    </div>
+  </div>
+  <div class="hud-card" style="flex:1;min-width:200px">
+    <span class="lbl">PREDIZIONE</span>
+    <div class="pred-bigs" id="predBox"></div>
+  </div>
+</div>
+<div id="status">🧠 carico…</div>
+<div id="progWrap">
+  <span class="lbl" id="progTitle">MODEL</span>
+  <div style="background:#0a1426;border-radius:6px;overflow:hidden;margin-top:6px"><div id="progFill"></div></div>
+  <div id="progLabel">…</div>
+  <div id="lossRow"><canvas id="lossCv" width="240" height="40"></canvas><span id="lossTxt" style="font-size:11px;color:var(--green)"></span></div>
+</div>
+<div id="hint">🖱 trascina per ruotare · scroll per zoom · i flussi sono le sinapsi reali</div>
+<div id="controls">
+  <button id="btnReplay">▶ Replay</button>
+  <span class="lbl" style="letter-spacing:1px;color:var(--dim)">passo</span>
+  <input type="range" id="stepRange" min="0" max="5" value="0" step="1">
+  <span id="stepInfo">input</span>
+  <button id="btnWeights" class="on">↯ sinapsi</button>
+  <button id="btnAuto">⏵ auto</button>
+  <span class="lbl" id="speedLabel">vel</span>
+  <input type="range" id="speedRange" min="1" max="120" value="30">
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const $=id=>document.getElementById(id);
+function brush(txt){ const s=$('status'); s.textContent=txt; }
+
+/* ============================================================
+   RENDERER + SCENA
+   ============================================================ */
+const W=window.innerWidth,H=window.innerHeight;
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(W,H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x070d1a);
+scene.fog=new THREE.FogExp2(0x070d1a,0.012);
+const camera=new THREE.PerspectiveCamera(50,W/H,0.1,200);
+camera.position.set(0,2.4,7.5);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.06;controls.autoRotate=true;controls.autoRotateSpeed=0.25;
+controls.target.set(0,0,0);controls.minDistance=3;controls.maxDistance=20;
+
+const amb=new THREE.AmbientLight(0x1a1a2e,0.6);
+scene.add(amb);
+const key=new THREE.DirectionalLight(0x00d4ff,1.2);key.position.set(3,4,5);scene.add(key);
+const fill=new THREE.DirectionalLight(0x7c5cff,0.7);fill.position.set(-3,-1,2);scene.add(fill);
+
+const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),1.1,0.4,0.14);
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));composer.addPass(bloom);composer.addPass(new OutputPass());
+window.addEventListener('resize',()=>{const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();composer.setSize(w,h);});
+
+/* palette */
+function matC(c,e){ return new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:e||0,roughness:.4,metalness:.2,transparent:true}); }
+
+/* ---------------- TF.js ------------------ */
+async function tf(){ if(!window.tf){ await import('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'); } return window.tf; }
+
+/* ---------------- 28×28 da un numero ---------------- */
+let renderCv=null, renderX=null;
+function ensureRenderCv(){ if(renderCv) return; renderCv=document.createElement('canvas'); renderCv.width=28; renderCv.height=28; renderX=renderCv.getContext('2d'); }
+function digitToImage(d){
+  ensureRenderCv();
+  renderX.clearRect(0,0,28,28);
+  // renderizza il numero in un canvas grande poi rimpicciolisce con blur (anti-aliasing)
+  const big=document.createElement('canvas'); big.width=140; big.height=140; const bx=big.getContext('2d');
+  bx.fillStyle='#000';bx.fillRect(0,0,140,140);
+  bx.font='900 105px "Arial",sans-serif';bx.textAlign='center';bx.textBaseline='middle';
+  bx.fillStyle='#fff';
+  bx.fillText(String(d),70,74);
+  // Contrazione/espansione "a matita": piccolo blur + soglia → somiglia a MNIST
+  renderX.filter='blur(1px)';renderX.drawImage(big,0,0,28,28);renderX.filter='none';
+  const data=renderX.getImageData(0,0,28,28).data;
+  const img=new Float32Array(784);
+  for(let i=0;i<784;i++) img[i]=data[i*4]/255;
+  return img;
+}
+
+/* ============================================================
+   MODELLO: architettura MNIST (8-16 CNN + 10 softmax)
+   ============================================================ */
+const STEP_NAMES=['input','conv1','pool1','conv2','pool2','dense'];
+
+/* ---- raccolta attivazioni intermedie ---- */
+function buildModel(){
+  const t=window.tf;
+  const model=t.sequential();
+  // Layers visualizzati
+  model.add(t.layers.conv2d({inputShape:[28,28,1],filters:8,kernelSize:5,activation:'relu',name:'conv1'}));       // 24×24×8
+  model.add(t.layers.maxPooling2d({poolSize:[2,2],name:'pool1'}));                                            // 12×12×8
+  model.add(t.layers.conv2d({filters:8,kernelSize:5,activation:'relu',name:'conv2'}));                        // 8×8×8
+  model.add(t.layers.maxPooling2d({poolSize:[2,2],name:'pool2'}));                                          // 4×4×8
+  model.add(t.layers.flatten({name:'flat'}));                                                                    // 128
+  model.add(t.layers.dense({units:24,activation:'sigmoid',name:'dense'}));
+  model.add(t.layers.dense({units:10,activation:'softmax',name:'out'}));
+  return model;
+}
+
+/* ============================================================
+   GENERATORE MNIST SINTETICO (fallback training)
+   ============================================================ */
+function synthMNIST(n){
+  const data=[]; for(const cls of [0,1,2,3,4,5,6,7,8,9]) for(let k=0;k<Math.floor(n/10);k++){
+    const cv=document.createElement('canvas');cv.width=28;cv.height=28;const x=cv.getContext('2d');
+    x.fillStyle='#000';x.fillRect(0,0,28,28);
+    // scrittura con trasformazioni casuali
+    const sizes=[22,24,25,26,28,30];
+    const fSize=sizes[Math.floor(Math.random()*sizes.length)];
+    x.font='900 '+fSize+'px "Arial",sans-serif';x.textAlign='center';x.textBaseline='middle';
+    const rot=(Math.random()-0.5)*0.5, ox=(Math.random()-0.5)*5, oy=(Math.random()-0.5)*5;
+    x.translate(14+ox,14+oy);x.rotate(rot);x.fillStyle='#fff';x.fillText(String(cls),0,0);
+    x.setTransform(1,0,0,1,0,0);
+    const d=x.getImageData(0,0,28,28).data;
+    const arr=new Float32Array(784);for(let i=0;i<784;i++)arr[i]=d[i*4]/255;
+    data.push({img:arr,label:cls});
+  }
+  return data;
+}
+
+/* ============================================================
+   ATTIVAZIONI + VISUAL
+   ============================================================ */
+let sceneGroups={ input:null, conv1:null, pool1:null, conv2:null, pool2:null, dense:null, out:null };
+let collector=null, lastPrediction=null;
+let showWeights=true, playing=false, stepIdx=0, playTimer=0;
+
+function buildStatic(){
+  sceneGroups.input=new THREE.Group(); scene.add(sceneGroups.input);
+  sceneGroups.conv1=new THREE.Group(); scene.add(sceneGroups.conv1);
+  sceneGroups.pool1=new THREE.Group(); scene.add(sceneGroups.pool1);
+  sceneGroups.conv2=new THREE.Group(); scene.add(sceneGroups.conv2);
+  sceneGroups.pool2=new THREE.Group(); scene.add(sceneGroups.pool2);
+  sceneGroups.dense=new THREE.Group(); scene.add(sceneGroups.dense);
+  sceneGroups.out=new THREE.Group(); scene.add(sceneGroups.out);
+}
+buildStatic();
+
+/* INPUT: 28×28 piano di cubi */
+function buildInput(){
+  const g=sceneGroups.input;
+  const dim=28;
+  for(let i=0;i<dim;i++)for(let j=0;j<dim;j++){
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.09,0.09),matC(i%8===0?0x7c5cff:0x00d4ff,0));
+    mesh.position.set((j-dim/2)*0.11,0,(i-dim/2)*0.11);
+    mesh.userData.idx=j+i*dim;
+    g.add(mesh);
+  }
+}
+
+/* LAYER CONVOLUZIONE: griglia neuroni per canale (visual: N×N×ch su pannelli affiancati) */
+function buildConv(group, size, channels, spreadY, cyan){
+  const g=group;
+  for(let ch=0;ch<channels;ch++) for(let i=0;i<size;i++) for(let j=0;j<size;j++){
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.14,0.14),matC(cyan,0));
+    const fx=(size-1)*0.14*0.55;
+    mesh.position.set((j*0.14-fx)+(ch-(channels-1)/2)*1.6, -spreadY, (i*0.14-fx));
+    mesh.userData.idx=(j+i*size)+ch*size*size;
+    mesh.userData.h=0;
+    g.add(mesh);
+  }
+}
+/* DENSE: colonna di neuroni (max 48 — illumina quanti servono) */
+function buildDense(group, n, spreadY, color){
+  for(let i=0;i<n;i++){
+    const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.14,14,14),matC(color,0));
+    mesh.position.set((i-(n-1)/2)*0.42, spreadY, 0);
+    mesh.userData.idx=i;
+    mesh.userData.h=0;
+    group.add(mesh);
+  }
+}
+/* OUTPUT: 10 su una riga */
+function buildOut(){
+  const g=sceneGroups.out;
+  for(let i=0;i<10;i++){
+    const mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.2,20),matC(0xff5d8f,0));
+    mesh.position.set((i-4.5)*0.85,2.2,-1.4);
+    mesh.userData.h=0;
+    g.add(mesh);
+  }
+}
+
+buildInput();
+buildConv(sceneGroups.conv1,24,8,1.8,0x00d4ff);
+buildConv(sceneGroups.pool1,12,8,3.6,0x35d0ba);
+buildConv(sceneGroups.conv2,8,8,5.4,0x7c5cff);
+buildConv(sceneGroups.pool2,4,8,6.9,0xffb703);
+buildDense(sceneGroups.dense,48,1.4,0x00d4ff);
+buildOut();
+
+/* ---------------- FLUSSI SINAPSI (particelle) ---------------- */
+const streams=[];
+function buildStreams(){
+  // campiona connessioni: input(lato) → dense → out, + conv1→pool1
+  for(let s=0;s<130;s++){
+    const geo=new THREE.SphereGeometry(0.03,8,8);
+    const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x00d4ff,transparent:true,opacity:0}));
+    scene.add(m);
+    streams.push({mesh:m,src:new THREE.Vector3(0,1.4,0),dst:new THREE.Vector3(0,2.2,-1.4),t:Math.random(),dur:0.5+Math.random()*0.4,alive:0});
+  }
+}
+buildStreams();
+
+/* applica risultato forward → aggiorna meshes */
+function setLights(group, activations, key){
+  const visible=[]; group.visible=true;
+  group.children.forEach(m=>{ if(m.userData.idx!==undefined) visible.push(m); });
+  for(const m of visible) m.material.emissiveIntensity = m.userData.h = Math.min(1.6, activations[m.userData.idx]);
+}
+function applyActivations(acts){
+  const apply=(g,key,actsArr)=>{ const gr=sceneGroups[g]; const A=actsArr||[]; gr.children.forEach(m=>{ if(m.userData.idx!==undefined){ const v=A[m.userData.idx]||0; m.userData.h=v; m.material.emissiveIntensity=Math.min(1.8,v); m.material.opacity = (g==='dense' && m.userData.idx>=A.length) ? 0 : 1; } }); gr.visible=true; };
+  apply('input','input',acts.input);
+  apply('conv1','conv1',acts.conv1);
+  apply('pool1','pool1',acts.pool1);
+  apply('conv2','conv2',acts.conv2);
+  apply('pool2','pool2',acts.pool2);
+  apply('dense','dense',acts.dense);
+  // OUTPUT dedicato (10 cilindri)
+  sceneGroups.out.visible=true;
+  const arr=acts.out||[];
+  let mi=0; arr.forEach((v,i)=>{if(v>(arr[mi]||0))mi=i;});
+  sceneGroups.out.children.forEach((m,i)=>{ if(i<10){ const v=arr[i]||0; m.userData.h=v; m.material.emissiveIntensity=Math.min(2.4,v*2.2); m.material.color.setHex(i===mi?0x00d4ff:0xff5d8f); } });
+  // streams → output
+  if(showWeights){
+    for(let s=0;s<streams.length;s++){
+      const sm=streams[s]; const outIdx=mi; const outVal=arr[outIdx]||0;
+      sm.dst.set((outIdx-4.5)*0.85,2.2,-1.4);
+      sm.mesh.material.color.setHSL(outIdx/10,1,0.65);
+      if(stepIdx>=3 && outVal>0.02){ sm.mesh.material.opacity=Math.min(1,outVal*2+0.1); } else { sm.mesh.material.opacity=0; }
+    }
+  }
+}
+
+/* ---------------- FORWARD PASS ----------------
+   Esegue il forward pass REALE e cattura le attivazioni
+   di ciascun layer intermedio via sotto-modelli tf.model().
+   FORMATO conv/pool: shape [1,H,W,C] → indice visivo = row*W + col + ch*H*W
+   FORMATO dense/out:  shape [1,N]      → indice visivo diretto
+*/
+async function forward(img){
+  const t=window.tf;
+  const tensor=t.tensor4d([img],[1,28,28,1]);
+  const vals={ input:img };
+  const model=collector.model;
+  const layerItems=collector.hooks; // [{id,row:da layer}]
+
+  await t.nextFrame();
+  for(const it of layerItems){
+    const layer=model.getLayer(it.name);
+    const sub=t.model({inputs:model.inputs.length>0?model.inputs[0]:model.input,outputs:layer.output});
+    const r=sub.predict(tensor);
+    const dataArr=await r.data();
+    const shape=r.shape; // [1,H,W,C] per conv/pool ; [1,N] per dense
+    const H=shape[1]||1, W=shape[2]||1, C=shape[3]||1;
+    const vol=new Float32Array(H*W*C);
+    // riordina da [H,W,C] → [ch][row][col] con idx = row*W + col + ch*H*W
+    if(C>1){
+      for(let ch=0;ch<C;ch++) for(let row=0;row<H;row++) for(let col=0;col<W;col++)
+        vol[row*W + col + ch*H*W] = dataArr[((row*W)+col)*C + ch];
+    } else {
+      for(let i=0;i<dataArr.length;i++) vol[i]=dataArr[i];
+    }
+    vals[it.id]=vol;
+    r.dispose(); sub.dispose();
+    await t.nextFrame();
+  }
+  // output softmax (10)
+  const out=model.predict(tensor);
+  const outData=await out.data();
+  vals.out=[...outData];
+  out.dispose(); tensor.dispose();
+
+  applyActivations(vals);
+  lastPrediction=vals.out;
+  drawPredBars(vals.out);
+  return vals;
+}
+
+/* ---------------- PRED BARS ---------------- */
+function drawPredBars(arr){
+  const box=$('predBox'); box.innerHTML='';
+  const win=i=>{ let m=0,mi=0; arr.forEach((v,i)=>{if(v>m){m=v;mi=i;}}); return mi; };
+  const winner=win(arr);
+  for(let i=0;i<10;i++){
+    const el=document.createElement('div');
+    el.className='pred'+(i===winner?' win':'');
+    el.innerHTML=String(i)+'<span class="pct">'+Math.round(arr[i]*100)+'%</span>';
+    box.appendChild(el);
+  }
+}
+
+/* ============================================================
+   LOAD / FALLBACK TRAINING
+   ============================================================ */
+function showProg(title,txt,pct){ const p=$('progWrap'); p.style.display='block'; $('progTitle').textContent=title; $('progFill').style.width=(pct*100)+'%'; $('progLabel').textContent=txt; $('lossRow').style.display=(title==='TRAINING')?'flex':'none'; }
+function hideProg(){ $('progWrap').style.display='none'; }
+
+async function loadOrTrain(){
+  const t=await tf();
+  brush('⬇ scarico modello MNIST…');
+  const MNIST_URL='https://storage.googleapis.com/tfjs-tutorials/mnist/model.json';
+  let model=null;
+  try{
+    model=await t.loadLayersModel(MNIST_URL);
+    brush('✅ modello MNIST TF.js (ufficiale)');
+  }catch(e){
+    // fallback: training in-browser su MNIST sintetico
+    brush('🧠 offline → addestro nel browser…');
+    showProg('TRAINING','genero MNIST sintetico (1700 esempi)…',0.1);
+    await new Promise(r=>setTimeout(r,30));
+    model=buildModel();
+    model.compile({optimizer:'adam',loss:'categoricalCrossentropy',metrics:['accuracy']});
+    const data=synthMNIST(1700);
+    const xs=t.tensor4d(data.map(d=>d.img),[data.length,28,28,1]);
+    const ys=t.oneHot(t.tensor1d(data.map(d=>d.label),'int32'),10);
+    showProg('TRAINING','addestro CNN 8→16 + softmax su 1700 cifre…',0.15);
+    const lossCv=$('lossCv').getContext('2d');
+    const history=[];
+    await model.fit(xs,ys,{epochs:5,batchSize:64,shuffle:true,verbose:0,callbacks:{
+      onEpochEnd:(ep,log)=>{ history.push(log.loss); showProg('TRAINING','epoca '+(ep+1)+'/5  loss='+log.loss.toFixed(3)+'  acc='+log.acc.toFixed(2),(ep+1)/5); drawLoss(history); },
+      onBatchEnd:(nb)=>{ showProg('TRAINING','addestramento…',0.15+0.85*nb/90); }
+    }});
+    xs.dispose(); ys.dispose();
+    brush('✅ rete addestrata nel browser!');
+    hideProg();
+  }
+  collector={model};
+  // HOOK: layer da cui catturare attivazioni (per nome; se il modello non ha
+  // quel nome salta). FORMATO conv/pool [1,H,W,C] → idx=row*W+col + ch*H*W
+  // FORMATO dense → idx diretto.
+  const L=model.layers.map(l=>l.name);
+  const want=['conv1','pool1','conv2','pool2'];
+  collector.hooks=[];
+  for(const n of want){ if(L.includes(n)) collector.hooks.push({id:n,name:n}); }
+  // dense = penultimo layer Dense (l'ultimo è softmax)
+  const denseLayers=model.layers.filter(l=>l.getClassName()==='Dense');
+  if(denseLayers.length>=2) collector.hooks.push({id:'dense',name:denseLayers[denseLayers.length-2].name});
+  $('calcBtn').disabled=false;
+  return model;
+}
+
+function drawLoss(hist){
+  const cv=$('lossCv'); const x=cv.getContext('2d');
+  x.clearRect(0,0,240,40); if(!hist.length) return;
+  x.strokeStyle='#00d4ff'; x.beginPath();
+  const max=Math.max(...hist), min=Math.min(...hist);
+  hist.forEach((v,i)=>{ const px=i/(hist.length-1||1)*230+5; const py=38-((v-min)/((max-min)||1))*32; i===0?x.moveTo(px,py):x.lineTo(px,py); });
+  x.stroke();
+  $('lossTxt').textContent='loss '+hist[hist.length-1].toFixed(3);
+}
+
+/* ---------------- UI ---------------- */
+$('calcBtn').addEventListener('click',async()=>{
+  if(!collector){ return; }
+  const d=$('numInp').value.trim();
+  brush('🧠 forward pass…');
+  const img=digitToImage(Math.max(0,Math.min(9,parseInt(d)||0)));
+  const v=await forward(img);
+  brush('✅ predizione: '+lastIndex(lastPrediction));
+  startReplay();
+});
+function lastIndex(a){ if(!a) return '?'; let m=0,mi=0; a.forEach((v,i)=>{if(v>m){m=v;mi=i;}}); return mi; }
+function startReplay(){ stepIdx=0; setStep(0); }
+
+const RANGES={ input:0, conv1:1, pool1:2, conv2:3, pool2:4, dense:5, out:5 };
+function setStep(i){
+  stepIdx=i;
+  const shown={ input:0, conv1:1, pool1:2, conv2:3, pool2:4, dense:5 };
+  for(const k in sceneGroups){
+    const g=sceneGroups[k]; g.visible = !g.children.length || (RANGES[k]!==undefined && i>=RANGES[k]);
+  }
+  for(const s of streams) s.mesh.visible = showWeights && i>=3;
+  $('stepInfo').textContent = i===0?'input 28×28': i===1?'conv1 24×24×8': i===2?'pool1 12×12×8': i===3?'conv2 8×8×8': i===4?'pool2 4×4×8': 'dense+softmax';
+  $('stepRange').value=i;
+}
+
+$('stepRange').addEventListener('input',e=>{ setStep(+e.target.value); });
+$('btnReplay').addEventListener('click',()=>{ stepIdx=0; playing=true; });
+$('btnAuto').addEventListener('click',()=>{ playing=!playing; $('btnAuto').classList.toggle('on'); });
+$('btnWeights').addEventListener('click',()=>{ showWeights=!showWeights; $('btnWeights').classList.toggle('on'); for(const s of streams){ s.mesh.visible=showWeights&&stepIdx>=3; } });
+const speedRange=$('speedRange');
+
+/* animazione */
+let elapsed=0;
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clip(clock.getDelta(),0,0.05);
+  elapsed+=dt;
+  if(playing){
+    playTimer+=dt;
+    const step=1/((1+ (+speedRange.value)*0.4)/12);
+    if(playTimer>=step){ playTimer=0; if(stepIdx<5){ stepIdx++; setStep(stepIdx); if(stepIdx===5) playing=false; } }
+  }
+  // respirazione neuroni (posizione base fissa + ondulazione)
+  for(const k in sceneGroups){
+    const g=sceneGroups[k];
+    g.children.forEach(m=>{
+      if(m.userData.basePos===undefined){ m.userData.basePos=m.position.clone(); }
+      const b=m.userData.basePos;
+      m.position.set(b.x, b.y + Math.sin(elapsed*1.6 + m.position.x*1.7 + (m.position.z||0)*1.3)*0.02, b.z);
+    });
+  }
+  // streams fluiscono verso dst
+  for(const s of streams){ if(stepIdx<3) continue; s.t+=dt/(s.dur); if(s.t>1)s.t=0; s.mesh.position.lerpVectors(s.src,s.dst,s.t); }
+  controls.update();
+  composer.render();
+}
+function clip(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+// caricamento + avvio
+(async()=>{
+  $('predBox').innerHTML=''; for(let i=0;i<10;i++){ const el=document.createElement('div'); el.className='pred'; el.innerHTML=String(i)+'<span class="pct">–</span>'; $('predBox').appendChild(el); }
+  try{
+    await loadOrTrain();
+    $('calcBtn').disabled=false;
+  }catch(e){ brush('⚠ errore: '+e.message); }
+})();
+
+animate();
+</script>
+</body>
+</html>

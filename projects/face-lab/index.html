@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070812">
+<meta name="description" content="FACE LAB — a live facial-landmark AI mirror: 68 glowing points track your face in 3D, real-time metrics (blink, smile, head pose), and playful distortion modes. MediaPipe + Three.js, on-device.">
+<title>FACE LAB — Distortion Mirror</title>
+<style>
+:root{
+  --bg:#070812; --panel:rgba(14,16,34,.78); --line:rgba(120,140,255,.16);
+  --cyan:#3ee6ff; --violet:#b28dff; --magenta:#ff5f9e; --gold:#ffd166;
+  --text:#eef0ff; --dim:#8a92c8; --green:#52ff9e; --red:#ff5f6d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--text);-webkit-user-select:none;user-select:none}
+canvas{display:block;touch-action:none}
+#fxCanvas{position:fixed;inset:0;z-index:1;background:#000}
+#glCanvas{position:fixed;inset:0;z-index:2;pointer-events:none}
+.panel{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 44px rgba(0,0,0,.55)}
+/* top bar */
+#top{position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;display:flex;align-items:center;gap:8px;padding:10px 12px;z-index:20;flex-wrap:wrap}
+#logo{font-weight:800;font-size:15px;letter-spacing:2px;white-space:nowrap;
+  background:linear-gradient(90deg,var(--cyan),var(--violet),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent}
+#logo b{color:#fff;-webkit-text-fill-color:#fff}
+.tbtn{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 12px;border-radius:10px;cursor:pointer;font:inherit;font-size:12px;letter-spacing:.5px;transition:all .2s;white-space:nowrap}
+.tbtn:hover{color:var(--text);border-color:var(--cyan)}
+.tbtn.on{background:rgba(62,230,255,.12);color:var(--cyan);border-color:var(--cyan)}
+.tbtn.big{color:var(--text);border-color:var(--violet);font-weight:700}
+.tbtn.big:hover{background:rgba(178,141,255,.16);box-shadow:0 0 18px rgba(178,141,255,.35)}
+#spacer{flex:1}
+.modebtn{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 14px;border-radius:20px;cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;transition:all .25s}
+.modebtn.on{background:linear-gradient(90deg,rgba(62,230,255,.18),rgba(255,95,158,.18));color:var(--text);border-color:var(--violet);box-shadow:0 0 16px rgba(178,141,255,.3)}
+/* metrics panel: right desktop / bottom mobile */
+#metrics{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0) + 62px);width:236px;padding:14px;display:none;flex-direction:column;gap:10px;z-index:15;max-height:calc(100vh - 150px);overflow-y:auto}
+#metrics.on{display:flex}
+#metrics h3{font-size:10px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase}
+.mrow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dim)}
+.mrow .lab{width:64px;flex:none}
+.mrow .bar{flex:1;height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+.mrow .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--cyan),var(--violet));box-shadow:0 0 8px rgba(62,230,255,.5);transition:width .12s}
+.mrow .val{width:44px;text-align:right;font-weight:700;color:var(--text)}
+.mstat{display:flex;justify-content:space-between;font-size:11px;color:var(--dim)}
+.mstat b{color:var(--text)}
+#poseWidget{width:100%;height:88px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#emotionBox{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,95,158,.06)}
+#emotionBox .em{font-size:22px}
+#emotionBox .el{font-size:12px;font-weight:700;color:var(--magenta)}
+/* fun controls */
+#funPanel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0) + 14px);width:min(96vw,760px);padding:10px 12px;display:none;flex-direction:column;gap:8px;z-index:16}
+#funPanel.on{display:flex}
+#funPanel .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center}
+#funPanel h3{font-size:10px;letter-spacing:2px;color:var(--violet);text-transform:uppercase;text-align:center}
+.chip{padding:6px 11px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);font:inherit;font-size:11px;cursor:pointer;transition:all .2s}
+.chip:hover{color:var(--text)}
+.chip.on{background:linear-gradient(90deg,rgba(62,230,255,.16),rgba(255,95,158,.16));color:var(--text);border-color:var(--magenta);box-shadow:0 0 12px rgba(255,95,158,.25)}
+/* start & loading overlay */
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:40;background:radial-gradient(ellipse at 50% 30%,rgba(62,230,255,.10),rgba(7,8,18,0) 60%),var(--bg);text-align:center;padding:24px;pointer-events:auto}
+#start h1{font-size:clamp(34px,9vw,72px);font-weight:800;letter-spacing:6px;
+  background:linear-gradient(90deg,var(--cyan),var(--violet),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 50px rgba(178,141,255,.3)}
+#start p{color:var(--dim);font-size:clamp(12px,2.6vw,14px);margin-top:12px;letter-spacing:1.5px;max-width:460px;line-height:1.8}
+#start button{margin-top:30px;padding:15px 42px;border:1px solid var(--cyan);border-radius:14px;background:rgba(62,230,255,.1);color:var(--text);font:inherit;font-weight:800;font-size:15px;letter-spacing:2px;cursor:pointer;transition:all .3s}
+#start button:hover{background:rgba(62,230,255,.22);box-shadow:0 0 30px rgba(62,230,255,.4)}
+#start .hint{position:absolute;bottom:calc(env(safe-area-inset-bottom,0) + 18px);color:var(--dim);font-size:10px;letter-spacing:1px}
+#load{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:41;background:rgba(7,8,18,.92);flex-direction:column;gap:16px}
+#load.on{display:flex}
+#load .spin{width:44px;height:44px;border-radius:50%;border:3px solid rgba(178,141,255,.2);border-top-color:var(--violet);animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#load p{color:var(--dim);font-size:13px;letter-spacing:1px}
+#load b{color:var(--cyan)}
+/* toasts */
+#toasts{position:fixed;top:calc(env(safe-area-inset-top,0) + 58px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:7px;z-index:45;align-items:center;pointer-events:none}
+.toast{background:rgba(10,12,30,.92);border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);padding:8px 15px;border-radius:10px;font-size:12.5px;animation:tin .3s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+/* sketch gallery modal */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.65);z-index:38;pointer-events:auto}
+.modal.on{display:flex}
+.modalcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;max-width:560px;width:calc(100vw - 36px);max-height:84vh;overflow-y:auto}
+.modalcard h2{color:var(--violet);font-size:15px;letter-spacing:2px;margin-bottom:12px}
+.skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.skitem{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0a0c1c}
+.skitem canvas{width:100%;height:auto;display:block}
+.skitem .del{position:absolute;top:4px;right:4px;background:rgba(255,95,109,.85);border:none;color:#fff;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:11px}
+.skitem .time{font-size:9px;color:var(--dim);padding:3px 6px}
+.modalrow{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.okbtn{padding:9px 16px;border-radius:10px;border:1px solid var(--violet);background:rgba(178,141,255,.14);color:var(--violet);font:inherit;font-weight:700;cursor:pointer}
+.okbtn:hover{background:rgba(178,141,255,.26)}
+.closebtn{padding:9px 14px;border-radius:10px;border:1px solid var(--dim);background:transparent;color:var(--dim);font:inherit;cursor:pointer}
+.closebtn:hover{color:var(--text)}
+#err{display:none;position:fixed;inset:0;align-items:center;justify-content:center;z-index:42;background:var(--bg);text-align:center;padding:30px;flex-direction:column;gap:14px}
+#err.on{display:flex}
+#err h2{color:var(--red);font-size:18px;letter-spacing:1px}
+#err p{color:var(--dim);font-size:13px;line-height:1.7;max-width:420px}
+#err button{margin-top:8px}
+/* mobile */
+@media(max-width:899px){
+  #metrics{left:8px;right:8px;top:auto;bottom:calc(env(safe-area-inset-bottom,0) + 8px);width:auto;max-height:42vh;z-index:17;border-radius:16px}
+  #metrics.collapsed{max-height:34px;overflow:hidden}
+  #funPanel{width:96vw;padding:8px 8px}
+  #logo{font-size:12px}
+  .modebtn{padding:6px 10px;font-size:11px}
+  .tbtn{padding:6px 9px;font-size:11px}
+  #metrics h3{font-size:9px}
+}
+</style>
+</head>
+<body>
+<canvas id="fxCanvas"></canvas>
+<canvas id="glCanvas"></canvas>
+<video id="video" playsinline muted autoplay style="display:none"></video>
+
+<div id="top">
+  <div id="logo">FACE<b>//</b>LAB</div>
+  <div id="spacer"></div>
+  <button class="modebtn on" id="modeTech">🛰️ Tech</button>
+  <button class="modebtn" id="modeFun">🎈 Fun</button>
+  <button class="tbtn" id="btnFlip" title="Switch camera">📷</button>
+  <button class="tbtn" id="btnMirror" title="Mirror">🪞</button>
+  <button class="tbtn" id="btnSnap" title="Photo snapshot">📸</button>
+  <button class="tbtn" id="btnSketch" title="Save a sketch">✏️</button>
+  <button class="tbtn" id="btnGallery" title="My sketches">🗂️</button>
+</div>
+
+<div class="panel" id="metrics">
+  <h3>🔬 FACE TELEMETRY</h3>
+  <div class="mstat"><span>Blink counter</span><b id="blinkCount">0</b></div>
+  <div class="mstat"><span>Faces detected</span><b id="facesCount">0</b></div>
+  <div class="mrow"><span class="lab">Blink</span><div class="bar"><i id="mBlink"></i></div><span class="val" id="vBlink">0%</span></div>
+  <div class="mrow"><span class="lab">Smile</span><div class="bar"><i id="mSmile"></i></div><span class="val" id="vSmile">0%</span></div>
+  <div class="mrow"><span class="lab">Brow</span><div class="bar"><i id="mBrow"></i></div><span class="val" id="vBrow">0%</span></div>
+  <div class="mstat"><span>Mouth–nose</span><b id="mNose">—</b></div>
+  <div class="mstat"><span>Head pose</span><b id="poseTxt">—</b></div>
+  <canvas id="poseWidget" width="200" height="88"></canvas>
+  <div id="emotionBox"><span class="em" id="emEmoji">😐</span><span class="el" id="emLabel">neutral</span></div>
+</div>
+
+<div class="panel" id="funPanel">
+  <h3>🎈 DISTORTION LAB</h3>
+  <div class="row">
+    <button class="chip" id="cGiant">👁️ Giant eyes</button>
+    <button class="chip" id="cStretch">↔️ Funhouse</button>
+    <button class="chip" id="cEmoji">😳 Emoji swap</button>
+    <button class="chip" id="cFish">🔮 Fish-eye</button>
+    <button class="chip" id="cSquash">🫠 Squash</button>
+    <button class="chip" id="cCartoon">🎨 Cartoon</button>
+  </div>
+  <div class="row">
+    <button class="chip" id="cGlasses">👓</button>
+    <button class="chip" id="cCrown">👑</button>
+    <button class="chip" id="cMoustache">🥸</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="start">
+  <h1>FACE//LAB</h1>
+  <p>Look into the mirror. 68 AI points trace your face in 3D, live metrics read your expressions — then bend reality with six distortion modes. Everything runs on-device.</p>
+  <button id="btnStart">🎥 ENABLE CAMERA</button>
+  <span class="hint">🔒 Your video never leaves this device</span>
+</div>
+
+<div id="load">
+  <div class="spin"></div>
+  <p id="loadMsg">Loading AI model…</p>
+</div>
+
+<div id="err">
+  <h2>⚠️ Camera unavailable</h2>
+  <p id="errMsg">Allow camera access in your browser settings and try again. On iPhone: Settings → Safari → Camera.</p>
+  <button class="tbtn" id="errRetry">Retry</button>
+</div>
+
+<div class="modal" id="galleryModal">
+  <div class="modalcard">
+    <h2>🗂️ MY SKETCHES</h2>
+    <div class="skgrid" id="skGrid"></div>
+    <div class="modalrow"><button class="closebtn" data-close="galleryModal">Close</button></div>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/",
+  "mp-vision":"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { FaceLandmarker, FilesetResolver } from 'mp-vision';
+
+/* ================= CONSTANTS ================= */
+/* canonical 68-point subset mapped onto the 478 MediaPipe mesh */
+const M68=[162,127,234,93,132,58,172,136,150,149,176,148,152,377,400,378,379,
+  70,63,105,66,107, 336,296,334,293,300,
+  168,197,5,4,237,6,195,3,64,
+  33,160,158,133,153,144, 362,385,387,263,373,380,
+  61,146,91,181,84,17,314,405,321,375,291,409,
+  78,95,88,178,87,14,317,402];
+const CHAINS={
+  jaw:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+  browL:[17,18,19,20,21], browR:[22,23,24,25,26],
+  nose:[27,28,29,30], noseL:[31,32,33,34,35], noseSide:[27,31], nose2:[30,35],
+  eyeL:[36,37,38,39,40,41,36], eyeR:[42,43,44,45,46,47,42],
+  mouthOuter:[48,49,50,51,52,53,54,55,56,57,58,59,48],
+  mouthInner:[60,61,62,63,64,65,66,67,60],
+  connectors:[ [21,17],[26,22],[36,17],[42,26],[30,48],[27,33],[33,50],[33,58],[8,57],[8,51] ]
+};
+const BLINK_EYE=[33,160,158,133,153,144];   /* left eye chain (36..41) */
+const BLINK_EYER=[362,385,387,263,373,380]; /* right eye chain (42..47) */
+const EYE_L=[33,133],EYE_R=[362,263],NOSE_TIP=1,MOUTH_TOP=13,MOUTH_BOT=14,LIP_CENTER=0;
+const EMOJI_EYES=['😳','👁️','👀','🔥','✨'];
+const PALETTE=['#3ee6ff','#b28dff','#ff5f9e','#ffd166','#52ff9e'];
+
+/* ================= STATE ================= */
+const S={
+  mode:'tech', mirror:true, facing:'user',
+  fun:{giant:false,stretch:false,emoji:false,fish:false,squash:false,cartoon:false},
+  props:{glasses:false,crown:false,moustache:false},
+  running:false, blinkCount:0, lastBlink:0, faces:0,
+  metrics:{blink:0,smile:0,brow:0,mNose:0,pose:{yaw:0,pitch:0,roll:0},emotion:'neutral'},
+  sketchCount:0
+};
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function toast(msg,color){const d=document.createElement('div');d.className='toast';d.textContent=msg;if(color)d.style.borderLeftColor=color;$('toasts').appendChild(d);setTimeout(()=>{d.style.transition='opacity .4s';d.style.opacity='0';setTimeout(()=>d.remove(),400);},2600);}
+function bs(list,name){if(!list||!list.length)return 0;const c=list.find(c=>c.categoryName===name);return c?c.score:0;}
+
+/* ================= CANVASES ================= */
+const fx=$('fxCanvas'),fctx=fx.getContext('2d');
+const orig=document.createElement('canvas'),octx=orig.getContext('2d');
+const region=document.createElement('canvas'),rctx=region.getContext('2d');
+let VW=0,VH=0,scale=0,offX=0,offY=0,drawW=0,drawH=0;
+function resize(){
+  const dpr=Math.min(devicePixelRatio||1,2);
+  fx.width=innerWidth*dpr;fx.height=innerHeight*dpr;
+  fx.style.width=innerWidth+'px';fx.style.height=innerHeight+'px';
+  fctx.setTransform(dpr,0,0,dpr,0,0);
+  orig.width=innerWidth*dpr;orig.height=innerHeight*dpr;
+  orig.style.width=innerWidth+'px';
+  octx.setTransform(dpr,0,0,dpr,0,0);
+  resizeGL();
+}
+function computeLayout(){
+  if(!VW)return;
+  const cw=innerWidth,ch=innerHeight;
+  scale=Math.max(cw/VW,ch/VH);
+  drawW=VW*scale;drawH=VH*scale;
+  offX=(cw-drawW)/2;offY=(ch-drawH)/2;
+}
+
+/* ================= THREE OVERLAY ================= */
+let renderer,scene,glcam,ptsMesh,ptsGeo,ptsAttr,lineGeo,lineAttr,axes;
+const linePairs=[];
+function buildLinePairs(){
+  linePairs.length=0;
+  for(const k in CHAINS){
+    if(k==='connectors')continue;
+    const c=CHAINS[k];
+    for(let i=0;i<c.length-1;i++)linePairs.push([c[i],c[i+1]]);
+  }
+  for(const[a,b]of CHAINS.connectors)linePairs.push([a,b]);
+}
+const GL_VERT=`attribute float aSize;attribute vec3 aColor;uniform float uPR;uniform float uTime;
+varying vec3 vColor;
+void main(){
+  vColor=aColor;
+  vec4 mv=modelViewMatrix*vec4(position,1.0);
+  gl_PointSize=aSize*uPR*(10.0/max(0.1,-mv.z));
+  gl_PointSize+=sin(uTime*4.0+aSize*9.0)*1.6;
+  gl_Position=projectionMatrix*mv;
+}`;
+const GL_FRAG=`varying vec3 vColor;
+void main(){
+  vec2 c=gl_PointCoord-0.5;float d=length(c);
+  float a=smoothstep(0.5,0.02,d);
+  vec3 core=mix(vColor,vec3(1.0),smoothstep(0.3,0.06,d));
+  gl_FragColor=vec4(core*a*1.6,a*0.95);
+}`;
+function resizeGL(){
+  if(!renderer)return;
+  const dpr=Math.min(devicePixelRatio||1,2);
+  renderer.setSize(innerWidth,innerHeight,false);
+  renderer.domElement.width=innerWidth*dpr;renderer.domElement.height=innerHeight*dpr;
+  glcam.left=-innerWidth/2;glcam.right=innerWidth/2;glcam.top=innerHeight/2;glcam.bottom=-innerHeight/2;
+  glcam.updateProjectionMatrix();
+}
+function initGL(){
+  renderer=new THREE.WebGLRenderer({canvas:$('glCanvas'),antialias:true,alpha:true,premultipliedAlpha:true});
+  renderer.setClearColor(0x000000,0);
+  scene=new THREE.Scene();
+  glcam=new THREE.OrthographicCamera(-1,1,1,-1,0.1,100);
+  glcam.position.z=10;
+  ptsGeo=new THREE.BufferGeometry();
+  ptsAttr=new THREE.BufferAttribute(new Float32Array(68*3),3);
+  const colArr=new Float32Array(68*3),szArr=new Float32Array(68);
+  ptsGeo.setAttribute('position',ptsAttr);
+  ptsGeo.setAttribute('aColor',new THREE.BufferAttribute(colArr,3));
+  ptsGeo.setAttribute('aSize',new THREE.BufferAttribute(szArr,1));
+  const ptsMat=new THREE.ShaderMaterial({uniforms:{uPR:{value:1},uTime:{value:0}},vertexShader:GL_VERT,fragmentShader:GL_FRAG,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+  ptsMesh=new THREE.Points(ptsGeo,ptsMat);
+  scene.add(ptsMesh);
+  lineGeo=new THREE.BufferGeometry();
+  lineAttr=new THREE.BufferAttribute(new Float32Array(linePairs.length*6),3);
+  const lc=new Float32Array(linePairs.length*6);
+  for(let i=0;i<linePairs.length;i++){lc[i*6]=lc[i*6+1]=lc[i*6+2]=lc[i*6+3]=lc[i*6+4]=lc[i*6+5]=0.3;}
+  lineGeo.setAttribute('position',lineAttr);
+  lineGeo.setAttribute('color',new THREE.BufferAttribute(lc,3));
+  const lineMat=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false});
+  scene.add(new THREE.LineSegments(lineGeo,lineMat));
+  axes=new THREE.Group();
+  const mk=(c,r)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,0,r[0],r[1],r[2]]),3));const m=new THREE.LineBasicMaterial({color:c,transparent:true,opacity:0.9});return new THREE.Line(g,m);};
+  axes.add(mk(0xff5f6d,[0.25,0,0]));
+  axes.add(mk(0x52ff9e,[0,0.25,0]));
+  axes.add(mk(0x3ee6ff,[0,0,0.25]));
+  axes.visible=false;
+  scene.add(axes);
+  resizeGL();
+}
+
+/* ================= CAMERA ================= */
+const video=$('video');
+async function startCamera(silent){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream;
+    await new Promise(res=>{video.onloadedmetadata=()=>res();setTimeout(res,2500);});
+    await video.play();
+    VW=video.videoWidth||640;VH=video.videoHeight||480;
+    computeLayout();
+    return true;
+  }catch(e){
+    if(!silent){
+      $('errMsg').textContent=e&&e.name==='NotAllowedError'?'Camera permission denied. Allow access in your browser settings and try again. (iPhone: Settings → Safari → Camera)' : (e&&e.name==='NotFoundError'?'No camera found on this device.' : 'Camera error: '+(e&&e.message||e));
+      $('err').classList.add('on');
+    }
+    return false;
+  }
+}
+
+/* ================= MODEL ================= */
+let faceLandmarker=null,modelReady=false;
+async function loadModel(){
+  try{
+    $('loadMsg').innerHTML='Loading AI model <b>· MediaPipe FaceLandmarker</b>…';
+    const fileset=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    faceLandmarker=await FaceLandmarker.createFromOptions(fileset,{
+      baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},
+      outputFaceBlendshapes:true,
+      outputFacialTransformationMatrixes:true,
+      runningMode:'VIDEO',
+      numFaces:4
+    });
+    modelReady=true;
+  }catch(e){
+    try{ /* fallback: CPU delegate */
+      const fileset=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+      faceLandmarker=await FaceLandmarker.createFromOptions(fileset,{
+        baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'CPU'},
+        outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true,runningMode:'VIDEO',numFaces:4
+      });
+      modelReady=true;
+    }catch(e2){
+      $('errMsg').textContent='Failed to load the AI model. Check your connection and reload.';
+      $('err').classList.add('on');
+    }
+  }
+}
+
+/* ================= LANDMARKS → PIXELS ================= */
+const p68=new Float32Array(68*3); /* pixel coords of the 68 subset */
+function lmToPx(lm,i,out){
+  let x=lm[i].x,y=lm[i].y,z=lm[i].z;
+  if(S.mirror)x=1-x;
+  out[0]=offX+x*drawW;
+  out[1]=offY+y*drawH;
+  out[2]=z;
+}
+function faceMetrics(lm,bsh,mx){
+  const b=n=>bs(bsh,n);
+  /* blink EAR (eye aspect ratio) */
+  const ear=(eye)=>{
+    const a=Math.hypot(eye[1][0]-eye[5][0],eye[1][1]-eye[5][1]);
+    const b=Math.hypot(eye[2][0]-eye[4][0],eye[2][1]-eye[4][1]);
+    const c=Math.hypot(eye[0][0]-eye[3][0],eye[0][1]-eye[3][1]);
+    return (a+b)/(2*c);
+  };
+  const leftEye=BLINK_EYE.map(i=>[lm[i].x,lm[i].y]);
+  const rightEye=BLINK_EYER.map(i=>[lm[i].x,lm[i].y]);
+  const earL=ear(leftEye),earR=ear(rightEye);
+  const blinkBS=Math.max(b('eyeBlinkLeft'),b('eyeBlinkRight'));
+  const blink=Math.max(blinkBS,clamp(1-earL*3.4,0,1),clamp(1-earR*3.4,0,1));
+  const smile=clamp(Math.max(b('mouthSmileLeft'),b('mouthSmileRight')),0,1);
+  const brow=clamp(b('browInnerUp')+Math.max(b('browOuterUpLeft'),b('browOuterUpRight')),0,1);
+  const mouthNose=Math.abs(lm[13].y-lm[1].y)/Math.max(1e-4,Math.hypot(lm[234].x-lm[454].x,lm[234].y-lm[454].y));
+  /* head pose */
+  const roll=Math.atan2(lm[263].y-lm[33].y,lm[263].x-lm[33].x);
+  const faceW=Math.hypot(lm[234].x-lm[454].x,lm[234].y-lm[454].y);
+  const noseDx=(lm[1].x-(lm[234].x+lm[454].x)/2);
+  const yaw=Math.asin(clamp(noseDx/(faceW*0.7),-1,1));
+  const eyeY=(lm[33].y+lm[263].y)/2;
+  const noseEye=lm[1].y-eyeY, mouthNoseY=lm[13].y-lm[1].y;
+  const pitch=Math.asin(clamp((noseEye/mathMax1(mouthNoseY)-0.62)/0.5,-1,1)*1);
+  /* matrix pose if available */
+  let mYaw=yaw,mPitch=pitch,mRoll=roll;
+  if(mx){
+    const r00=mx[0],r10=mx[1],r20=mx[2],r01=mx[4],r11=mx[5],r21=mx[6],r02=mx[8],r12=mx[9],r22=mx[10];
+    mYaw=Math.atan2(r10,r00);mPitch=Math.asin(clamp(-r20,-1,1));mRoll=Math.atan2(r21,r22);
+  }
+  /* emotion */
+  let emotion='neutral',emScore=0;
+  const cands=[
+    ['happy',smile,0.45],['surprised',Math.min(b('browInnerUp')+0.5,1)*0.5+b('jawOpen')*0.5,0.55],
+    ['angry',Math.max(b('browDownLeft'),b('browDownRight'))*0.6+Math.max(b('mouthFrownLeft'),b('mouthFrownRight'))*0.4,0.5],
+    ['sad',Math.max(b('mouthFrownLeft'),b('mouthFrownRight'))*0.7+(1-brow)*0.3,0.5],
+    ['wink',(blinkBS>0.6&&Math.min(b('eyeBlinkLeft'),b('eyeBlinkRight'))<0.3)?1:0,0.6]
+  ];
+  for(const[name,s,th]of cands){if(s>emScore){emScore=s;emotion=name;}}
+  if(emScore<0.45)emotion='neutral';
+  return{blink,smile,brow,mNose:mouthNose,pose:{yaw:mYaw,pitch:mPitch,roll:mRoll},emotion,earL,earR};
+}
+function mathMax1(v){return Math.max(1e-4,v);}
+
+/* ================= RENDER: video + effects ================= */
+function drawVideoBase(){
+  if(!VW)return;
+  octx.fillStyle='#000';octx.fillRect(0,0,innerWidth,innerHeight);
+  octx.save();
+  if(S.mirror){octx.translate(innerWidth,0);octx.scale(-1,1);}
+  octx.filter=S.fun.cartoon?'saturate(1.35) contrast(1.18) brightness(1.02)':'none';
+  octx.drawImage(video,offX,offY,drawW,drawH);
+  octx.restore();
+  fctx.clearRect(0,0,innerWidth,innerHeight);
+  fctx.drawImage(orig,0,0,innerWidth,innerHeight);
+}
+function faceBox(lm){
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for(let i=0;i<478;i++){if(lm[i].x<minX)minX=lm[i].x;if(lm[i].x>maxX)maxX=lm[i].x;if(lm[i].y<minY)minY=lm[i].y;if(lm[i].y>maxY)maxY=lm[i].y;}
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2,w=(maxX-minX)*1.25,h=(maxY-minY)*1.3;
+  return{cx,cy,w,h};
+}
+function warpFace(lm){
+  const on=F=>S.fun[F];
+  if(!(on('stretch')||on('fish')||on('squash')||on('giant')))return;
+  const box=faceBox(lm);
+  const bxp=box.cx*drawW+offX,bxp2=box.cy*drawH+offY;
+  const bxw=box.w*drawW,bxh=box.h*drawH;
+  /* region crop from ORIGINAL (pre-warp) */
+  const R=Math.min(360,bxw);
+  region.width=R;region.height=Math.round(R*bxh/bxw);
+  const sx0=bxp-bxw/2,sy0=bxp2-bxh/2;
+  rctx.clearRect(0,0,region.width,region.height);
+  rctx.drawImage(orig,sx0,sy0,bxw,bxh,0,0,region.width,region.height);
+  /* fish-eye on region pixels */
+  if(on('fish')){
+    const img=rctx.getImageData(0,0,region.width,region.height);
+    const out=rctx.createImageData(region.width,region.height);
+    const w=region.width,h=region.height,cx=w/2,cy=h/2,Rmax=Math.hypot(cx,cy),K=1.15;
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const dx=x-cx,dy=y-cy,r=Math.hypot(dx,dy);
+        const t=r/Rmax;const s=t>0?1/(1+K*t*t):1;
+        const sx=Math.round(cx+dx*s),sy=Math.round(cy+dy*s);
+        const si=(clamp(sy,0,h-1)*w+clamp(sx,0,w-1))*4;
+        const di=(y*w+x)*4;
+        out.data[di]=img.data[si];out.data[di+1]=img.data[si+1];out.data[di+2]=img.data[si+2];out.data[di+3]=255;
+      }
+    }
+    rctx.putImageData(out,0,0);
+  }
+  /* expressive squash (reacts to jaw open + smile) */
+  let sy=1,sx=1;
+  if(on('squash')){
+    const jaw=bs('jawOpen');
+    sy=1-jaw*0.18;
+    sx=1+S.metrics.smile*0.22;
+  }
+  if(on('stretch'))sx*=1.42;
+  /* blit back */
+  const bw=bxw*sx,bh=bxh*sy;
+  fctx.drawImage(region,sx0+(bxw-bw)/2,sy0+(bxh-bh)/2,bw,bh);
+  /* giant eyes: cutouts from ORIGINAL */
+  if(on('giant')&&!on('emoji')){
+    for(const eye of [EYE_L,EYE_R]){
+      const ex=offX+(eye[0].x+eye[1].x)/2*drawW;
+      const ey=offY+(eye[0].y+eye[1].y)/2*drawH;
+      const r=Math.hypot(eye[0].x-eye[1].x,eye[0].y-eye[1].y)*drawW*0.72;
+      const cutR=r*2.1;
+      fctx.save();
+      fctx.beginPath();fctx.arc(ex,ey,cutR,0,6.283);fctx.clip();
+      fctx.drawImage(orig,ex-cutR,ey-cutR,cutR*2,cutR*2);
+      fctx.restore();
+    }
+  }
+}
+function drawEmoji(lm){
+  if(!S.fun.emoji)return;
+  const es=drawH*0.16;
+  fctx.textAlign='center';fctx.textBaseline='middle';
+  for(const eye of [EYE_L,EYE_R]){
+    const ex=offX+(eye[0].x+eye[1].x)/2*drawW,ey=offY+(eye[0].y+eye[1].y)/2*drawH;
+    fctx.font=es+'px serif';
+    fctx.fillText(EMOJI_EYES[Math.floor(performance.now()/700)%EMOJI_EYES.length],ex,ey);
+  }
+  const mx=offX+lm[13].x*drawW,my=offY+(lm[13].y+lm[14].y)/2*drawH;
+  fctx.font=(es*1.5)+'px serif';
+  fctx.fillText('😮',mx,my);
+}
+function drawProps(lm){
+  const P=S.props;
+  if(P.glasses){
+    fctx.strokeStyle='#3ee6ff';fctx.lineWidth=Math.max(2,drawH*0.006);fctx.lineCap='round';
+    for(const eye of [EYE_L,EYE_R]){
+      const ex=offX+(eye[0].x+eye[1].x)/2*drawW,ey=offY+(eye[0].y+eye[1].y)/2*drawH;
+      const r=Math.hypot(eye[0].x-eye[1].x,eye[0].y-eye[1].y)*drawW*0.55;
+      fctx.beginPath();fctx.arc(ex,ey,r,0,6.283);fctx.stroke();
+    }
+    const lx=offX+lm[33].x*drawW,rx=offX+lm[263].x*drawW,ly=offY+lm[33].y*drawH;
+    fctx.beginPath();fctx.moveTo(lx,ly);fctx.lineTo((lx+rx)/2,ly+drawH*0.02);fctx.lineTo(rx,ly);fctx.stroke();
+  }
+  if(P.crown){
+    const top=Math.min(...M68.map(i=>lm[i].y));
+    const cw=drawH*0.34,ch=drawH*0.16;
+    const cx0=offX+(lm[234].x+lm[454].x)/2*drawW,cy0=offY+top*drawH-ch;
+    fctx.fillStyle='#ffd166';fctx.strokeStyle='#ffb300';fctx.lineWidth=Math.max(2,drawH*0.004);
+    fctx.beginPath();
+    fctx.moveTo(cx0-cw/2,cy0+ch);fctx.lineTo(cx0-cw/2,cy0);
+    fctx.lineTo(cx0-cw/4,cy0+ch*0.55);fctx.lineTo(cx0,cy0);fctx.lineTo(cx0+cw/4,cy0+ch*0.55);fctx.lineTo(cx0+cw/2,cy0);
+    fctx.lineTo(cx0+cw/2,cy0+ch);fctx.closePath();
+    fctx.fill();fctx.stroke();
+    fctx.fillStyle='#ff5f9e';
+    [[cx0-cw/2,cy0+ch],[cx0,cy0+ch],[cx0+cw/2,cy0+ch]].forEach(p=>{fctx.beginPath();fctx.arc(p[0],p[1],drawH*0.008,0,6.283);fctx.fill();});
+  }
+  if(P.moustache){
+    const mx=offX+lm[0].x*drawW,my=offY+(lm[13].y+lm[14].y)/2*drawH,ms=drawH*0.07;
+    fctx.fillStyle='#4a2b17';fctx.strokeStyle='#4a2b17';
+    for(const s of [-1,1]){
+      fctx.beginPath();
+      fctx.moveTo(mx,my);
+      fctx.quadraticCurveTo(mx+s*ms,my-ms*0.4,mx+s*ms*1.5,my+ms*0.1);
+      fctx.quadraticCurveTo(mx+s*ms*0.8,my+ms*0.5,mx,my);
+      fctx.fill();
+    }
+  }
+}
+function drawCartoonOutlines(lm){
+  if(!S.fun.cartoon)return;
+  fctx.strokeStyle='rgba(12,12,30,0.85)';fctx.lineWidth=Math.max(2.5,drawH*0.005);fctx.lineJoin='round';fctx.lineCap='round';
+  const drawChain=(ch)=>{
+    fctx.beginPath();
+    for(let i=0;i<ch.length;i++){
+      const idx=M68[ch[i]];
+      const x=offX+lm[idx].x*drawW,y=offY+lm[idx].y*drawH;
+      if(i===0)fctx.moveTo(x,y);else fctx.lineTo(x,y);
+    }
+    fctx.stroke();
+  };
+  for(const k of ['jaw','browL','browR','nose','noseL','eyeL','eyeR','mouthOuter','mouthInner'])drawChain(CHAINS[k]);
+}
+
+/* ================= THREE OVERLAY UPDATE ================= */
+const pulseLevel={blink:0,smile:0,brow:0};
+function updateGL(lm,metrics){
+  if(!renderer||!lm)return;
+  for(let i=0;i<68;i++){
+    const idx=M68[i];
+    let x=lm[idx].x,y=lm[idx].y,z=lm[idx].z;
+    if(S.mirror)x=1-x;
+    ptsAttr.array[i*3]=(offX+x*drawW)-innerWidth/2;
+    ptsAttr.array[i*3+1]=-(offY+y*drawH)+innerHeight/2;
+    ptsAttr.array[i*3+2]=z*0.02;
+  }
+  ptsAttr.needsUpdate=true;
+  /* colors + sizes with pulse */
+  const col=ptsGeo.attributes.aColor.array,sz=ptsGeo.attributes.aSize.array;
+  const pulse=pulseLevel;
+  for(let i=0;i<68;i++){
+    const chain=chainOf(i);
+    let c=[0.55,0.85,1];
+    if(chain==='eyeL'||chain==='eyeR')c=[1,0.75,0.85];
+    else if(chain==='mouthOuter'||chain==='mouthInner')c=[1,0.6,0.9];
+    else if(chain==='browL'||chain==='browR')c=[0.75,0.9,1];
+    else if(chain==='nose'||chain==='noseL')c=[0.6,1,0.85];
+    let s=5;
+    if((chain==='eyeL'||chain==='eyeR')&&pulse.blink>0.4)s+=pulse.blink*9;
+    if((chain==='mouthOuter'||chain==='mouthInner')&&pulse.smile>0.4)s+=pulse.smile*6;
+    if((chain==='browL'||chain==='browR')&&pulse.brow>0.4)s+=pulse.brow*5;
+    col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];
+    sz[i]=s;
+  }
+  ptsGeo.attributes.aColor.needsUpdate=true;
+  ptsGeo.attributes.aSize.needsUpdate=true;
+  /* wireframe */
+  for(let p=0;p<linePairs.length;p++){
+    const[a,b]=linePairs[p];
+    const ax=offX+lm[M68[a]].x*drawW,ay=offY+lm[M68[a]].y*drawH;
+    const bx=offX+lm[M68[b]].x*drawW,by=offY+lm[M68[b]].y*drawH;
+    lineAttr.array[p*6]=(ax-innerWidth/2);lineAttr.array[p*6+1]=-(ay-innerHeight/2);lineAttr.array[p*6+2]=lm[M68[a]].z*0.02;
+    lineAttr.array[p*6+3]=(bx-innerWidth/2);lineAttr.array[p*6+4]=-(by-innerHeight/2);lineAttr.array[p*6+5]=lm[M68[b]].z*0.02;
+  }
+  lineAttr.needsUpdate=true;
+  /* head pose axes */
+  const nose=[offX+lm[1].x*drawW,offY+lm[1].y*drawH];
+  axes.position.set(nose[0]-innerWidth/2,-(nose[1]-innerHeight/2),0);
+  const p=metrics.pose;
+  axes.rotation.set(-p.pitch,p.yaw,p.roll);
+  axes.visible=S.mode==='tech';
+}
+function chainOf(i){
+  for(const k in CHAINS){if(k==='connectors')continue;if(CHAINS[k].includes(i))return k;}
+  return 'jaw';
+}
+
+/* ================= DETECTION LOOP ================= */
+let lastDetect=0,metricTimer=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!modelReady||!video.readyState)return;
+  if(now-lastDetect>1000/30){
+    lastDetect=now;
+    let res=null;
+    try{res=faceLandmarker.detectForVideo(video,now);}catch(e){}
+    if(res&&res.faceLandmarks&&res.faceLandmarks.length){
+      S.faces=res.faceLandmarks.length;
+      /* primary face = largest */
+      const sizes=res.faceLandmarks.map(lm=>Math.hypot(lm[234].x-lm[454].x,lm[234].y-lm[454].y));
+      let prim=0;for(let i=1;i<sizes.length;i++)if(sizes[i]>sizes[prim])prim=i;
+      drawVideoBase();
+      for(let f=0;f<res.faceLandmarks.length;f++){
+        const lm=res.faceLandmarks[f];
+        const bsh=res.faceBlendshapes&&res.faceBlendshapes[f]?res.faceBlendshapes[f].categories:null;
+        const mx=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[f]?res.facialTransformationMatrixes[f].data:null;
+        if(f===prim){
+          lastLM=lm;
+          const m=faceMetrics(lm,bsh,mx);
+          S.metrics=m;
+          pulseLevel.blink=lerp(pulseLevel.blink,m.blink,0.5);
+          pulseLevel.smile=lerp(pulseLevel.smile,m.smile,0.5);
+          pulseLevel.brow=lerp(pulseLevel.brow,m.brow,0.5);
+          /* blink counter */
+          if(m.blink>0.55&&now-S.lastBlink>350){S.blinkCount++;S.lastBlink=now;}
+          warpFace(lm);
+          drawEmoji(lm);
+          drawProps(lm);
+          if(S.fun.cartoon)drawCartoonOutlines(lm);
+          if(S.mode==='tech')updateGL(lm,m);
+        }else{
+          /* secondary faces: simple dots */
+          fctx.fillStyle='rgba(62,230,255,.5)';
+          for(const idx of M68){
+            let x=lm[idx].x;if(S.mirror)x=1-x;
+            fctx.beginPath();fctx.arc(offX+x*drawW,offY+lm[idx].y*drawH,2.2,0,6.283);fctx.fill();
+          }
+        }
+      }
+      if(now-metricTimer>120){metricTimer=now;updateMetricsUI();}
+    }else{
+      S.faces=0;
+      drawVideoBase();
+      if(S.mode==='tech'){ptsGeo.attributes.aSize.array.fill(0);ptsGeo.attributes.aSize.needsUpdate=true;axes.visible=false;}
+    }
+  }
+  if(renderer){
+    renderer.render(scene,glcam);
+    if(ptsMesh)ptsMesh.material.uniforms.uTime.value=now/1000;
+  }
+}
+function updateMetricsUI(){
+  const m=S.metrics;
+  $('blinkCount').textContent=S.blinkCount;
+  $('facesCount').textContent=S.faces;
+  setBar('mBlink','vBlink',m.blink);
+  setBar('mSmile','vSmile',m.smile);
+  setBar('mBrow','vBrow',m.brow);
+  $('mNose').textContent=m.mNose.toFixed(2);
+  $('poseTxt').textContent=Math.round(m.pose.yaw*57.3)+'° / '+Math.round(m.pose.pitch*57.3)+'° / '+Math.round(m.pose.roll*57.3)+'°';
+  const EM={happy:['😁','happy'],surprised:['😮','surprised'],angry:['😠','angry'],sad:['😢','sad'],wink:['😉','winking'],neutral:['😐','neutral']};
+  const e=EM[m.emotion]||EM.neutral;
+  $('emEmoji').textContent=e[0];$('emLabel').textContent=e[1];
+  drawPoseWidget();
+}
+function setBar(b,v){
+  const el=$(b);el.style.width=Math.round(clamp(v,0,1)*100)+'%';
+  $('v'+b.slice(1)).textContent=Math.round(clamp(v,0,1)*100)+'%';
+}
+function drawPoseWidget(){
+  const cv=$('poseWidget'),cx=cv.getContext('2d');
+  cx.clearRect(0,0,cv.width,cv.height);
+  const W=cv.width,H=cv.height,cx0=W/2,cy0=H/2+6,R=30;
+  cx.strokeStyle='rgba(138,146,200,.35)';cx.lineWidth=1;
+  cx.beginPath();cx.arc(cx0,cy0,R,0,6.283);cx.stroke();
+  cx.beginPath();cx.arc(cx0,cy0,R*0.6,0,6.283);cx.stroke();
+  cx.beginPath();cx.moveTo(cx0-R,cy0);cx.lineTo(cx0+R,cy0);cx.stroke();
+  cx.beginPath();cx.moveTo(cx0,cy0-R);cx.lineTo(cx0,cy0+R);cx.stroke();
+  const p=S.metrics.pose;
+  /* face disc tilted by roll, offset by yaw/pitch */
+  cx.save();
+  cx.translate(cx0+p.yaw*R*0.8,cy0-p.pitch*R*0.8);
+  cx.rotate(p.roll);
+  cx.strokeStyle='#3ee6ff';cx.lineWidth=1.6;
+  cx.beginPath();cx.ellipse(0,0,R*0.42,R*0.5,0,0,6.283);cx.stroke();
+  cx.fillStyle='#ff5f9e';
+  cx.beginPath();cx.arc(0,0,2.4,0,6.283);cx.fill();
+  cx.restore();
+}
+
+/* ================= SKETCH ================= */
+function captureSketch(){
+  if(S.faces<1){toast('No face detected — look at the camera','var(--amber)');return;}
+  /* need last landmarks: store from last detection */
+  if(!lastLM){toast('No face data yet','var(--amber)');return;}
+  const cv=document.createElement('canvas');cv.width=512;cv.height=512;
+  const cx=cv.getContext('2d');
+  cx.fillStyle='#0b0d1f';cx.fillRect(0,0,512,512);
+  /* normalize landmarks into 512 canvas (non-mirrored, face-centered) */
+  const lm=lastLM;
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for(const i of M68){minX=Math.min(minX,lm[i].x);maxX=Math.max(maxX,lm[i].x);minY=Math.min(minY,lm[i].y);maxY=Math.max(maxY,lm[i].y);}
+  const s=Math.min(400/(maxX-minX),400/(maxY-minY));
+  const ox=(512-(maxX-minX)*s)/2,oy=(512-(maxY-minY)*s)/2-40;
+  const P=i=>[ox+lm[i].x*s,oy+lm[i].y*s];
+  cx.strokeStyle='rgba(62,230,255,.9)';cx.lineWidth=3;cx.lineJoin='round';cx.lineCap='round';
+  const chain=(ch,color)=>{
+    cx.strokeStyle=color||'rgba(62,230,255,.9)';
+    cx.beginPath();
+    for(let i=0;i<ch.length;i++){const[x,y]=P(M68[ch[i]]);if(i===0)cx.moveTo(x,y);else cx.lineTo(x,y);}
+    cx.stroke();
+  };
+  chain(CHAINS.jaw,'#3ee6ff');
+  chain(CHAINS.browL,'#b28dff');chain(CHAINS.browR,'#b28dff');
+  chain(CHAINS.nose,'#52ff9e');chain(CHAINS.noseL,'#52ff9e');chain(CHAINS.nose2,'#52ff9e');
+  chain(CHAINS.eyeL,'#ff5f9e');chain(CHAINS.eyeR,'#ff5f9e');
+  chain(CHAINS.mouthOuter,'#ffd166');chain(CHAINS.mouthInner,'#ffd166');
+  /* points */
+  for(let i=0;i<68;i++){
+    const[x,y]=P(M68[i]);
+    cx.fillStyle='rgba(255,255,255,.85)';
+    cx.beginPath();cx.arc(x,y,2.2,0,6.283);cx.fill();
+  }
+  /* save to localStorage */
+  const data={t:Date.now(),w:512,h:512,pts:Array.from({length:68},(_,i)=>P(M68[i]).map(v=>Math.round(v)))};
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem('facelab_sketches')||'[]');}catch(e){}
+  list.unshift(data);
+  if(list.length>12)list.length=12;
+  try{localStorage.setItem('facelab_sketches',JSON.stringify(list));}catch(e){toast('Storage full','var(--amber)');}
+  toast('✏️ Sketch saved to your gallery','var(--violet)');
+  /* download PNG */
+  download(cv.toDataURL('image/png'),'face-sketch-'+Date.now()+'.png');
+}
+let lastLM=null;
+function renderGallery(){
+  const g=$('skGrid');g.innerHTML='';
+  let list=[];
+  try{list=JSON.parse(localStorage.getItem('facelab_sketches')||'[]');}catch(e){}
+  if(!list.length){g.innerHTML='<p style="color:var(--dim);font-size:12px">No sketches yet — press ✏️ while looking at the camera.</p>';return;}
+  list.forEach((sk,i)=>{
+    const d=document.createElement('div');d.className='skitem';
+    const cv=document.createElement('canvas');cv.width=sk.w;cv.height=sk.h;
+    const cx=cv.getContext('2d');
+    cx.fillStyle='#0b0d1f';cx.fillRect(0,0,sk.w,sk.h);
+    cx.strokeStyle='#3ee6ff';cx.lineWidth=3;cx.lineJoin='round';
+    /* rebuild chains from pts by drawing segments between consecutive indices */
+    const chains=[CHAINS.jaw,CHAINS.browL,CHAINS.browR,CHAINS.nose,CHAINS.noseL,CHAINS.nose2,CHAINS.eyeL,CHAINS.eyeR,CHAINS.mouthOuter,CHAINS.mouthInner];
+    for(const ch of chains){
+      cx.beginPath();
+      for(let j=0;j<ch.length;j++){const[x,y]=sk.pts[ch[j]];if(j===0)cx.moveTo(x,y);else cx.lineTo(x,y);}
+      cx.stroke();
+    }
+    const time=document.createElement('div');time.className='time';time.textContent=new Date(sk.t).toLocaleTimeString();
+    const del=document.createElement('button');del.className='del';del.textContent='✕';
+    del.onclick=e=>{e.stopPropagation();list.splice(i,1);try{localStorage.setItem('facelab_sketches',JSON.stringify(list));}catch(_){}renderGallery();};
+    d.appendChild(cv);d.appendChild(del);d.appendChild(time);
+    g.appendChild(d);
+  });
+}
+function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+
+/* ================= SNAPSHOT ================= */
+function snapshot(){
+  const cv=document.createElement('canvas');
+  cv.width=innerWidth*1.5;cv.height=innerHeight*1.5;
+  const cx=cv.getContext('2d');
+  cx.drawImage(fx,0,0,cv.width,cv.height);
+  if(renderer&&S.mode==='tech'){ /* composite the GL overlay */
+    renderer.render(scene,glcam);
+    cx.drawImage($('glCanvas'),0,0,cv.width,cv.height);
+  }
+  download(cv.toDataURL('image/png'),'facelab-'+Date.now()+'.png');
+  toast('📸 Snapshot saved','var(--cyan)');
+}
+
+/* ================= UI ================= */
+function initUI(){
+  $('btnStart').onclick=startAll;
+  $('errRetry').onclick=()=>{location.reload();};
+  $('btnFlip').onclick=async()=>{
+    S.facing=S.facing==='user'?'environment':'user';
+    const ok=await startCamera(true);
+    if(ok)toast('📷 Camera switched','var(--cyan)');
+    else{S.facing=S.facing==='user'?'environment':'user';toast('Could not switch camera','var(--red)');}
+  };
+  $('btnMirror').onclick=()=>{S.mirror=!S.mirror;$('btnMirror').classList.toggle('on',S.mirror);};
+  $('btnMirror').classList.toggle('on',S.mirror);
+  $('btnSnap').onclick=snapshot;
+  $('btnSketch').onclick=captureSketch;
+  $('btnGallery').onclick=()=>{renderGallery();$('galleryModal').classList.add('on');};
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.modal').classList.remove('on'));
+  $('galleryModal').addEventListener('click',e=>{if(e.target===$('galleryModal'))$('galleryModal').classList.remove('on');});
+  $('modeTech').onclick=()=>setMode('tech');
+  $('modeFun').onclick=()=>setMode('fun');
+  const funChips={cGiant:'giant',cStretch:'stretch',cEmoji:'emoji',cFish:'fish',cSquash:'squash',cCartoon:'cartoon'};
+  for(const[id,k]of Object.entries(funChips))$(id).onclick=()=>{S.fun[k]=!S.fun[k];$(id).classList.toggle('on',S.fun[k]);};
+  const propChips={cGlasses:'glasses',cCrown:'crown',cMoustache:'moustache'};
+  for(const[id,k]of Object.entries(propChips))$(id).onclick=()=>{S.props[k]=!S.props[k];$(id).classList.toggle('on',S.props[k]);};
+  addEventListener('resize',()=>{resize();computeLayout();});
+}
+function setMode(m){
+  S.mode=m;
+  $('modeTech').classList.toggle('on',m==='tech');
+  $('modeFun').classList.toggle('on',m==='fun');
+  $('metrics').classList.toggle('on',m==='tech');
+  $('funPanel').classList.toggle('on',m==='fun');
+  $('glCanvas').style.display=m==='tech'?'block':'none';
+  if(m==='tech'&&renderer)resizeGL();
+}
+async function startAll(){
+  $('start').style.display='none';
+  $('load').classList.add('on');
+  /* carica modello e camera in parallelo */
+  const modelP=loadModel();
+  const camOk=await startCamera();
+  if(!camOk){$('load').classList.remove('on');return;}
+  await modelP;
+  $('load').classList.remove('on');
+  if(modelReady){
+    buildLinePairs();
+    initGL();
+    setMode('tech');
+    resize();computeLayout();
+    requestAnimationFrame(loop);
+    toast('🛰️ Face tracking live','var(--green)');
+  }
+}
+
+/* ================= MAIN ================= */
+resize();
+initUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1020">
+<meta name="description" content="POCKET WILD — a minimalist 2D top-down creature-capture survival game. Catch geometric Pals, build a base, splice genes, evolve, fuse. Procedural world, plays in your browser.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pocket Wild">
+<title>POCKET WILD — Catch. Build. Mutate.</title>
+<style>
+:root{--bg:#0b1020;--panel:rgba(12,17,34,.92);--line:rgba(110,140,255,.22);--cyan:#3ee6ff;--green:#52ff9e;--red:#ff5f6d;--gold:#ffd166;--violet:#c26bff;--text:#eef0ff;--dim:#8a92c8}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none}
+canvas#game{position:fixed;inset:0;z-index:1;display:block}
+#ui{position:fixed;inset:0;pointer-events:none;z-index:10;font-size:13px}
+/* top HUD */
+#hud{position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;pointer-events:none;z-index:20}
+#hud .panel{pointer-events:auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hudbox{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:11px;color:var(--dim)}
+.hudbox b{color:var(--text)}
+#hpbar{width:110px;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden}
+#hpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--red),var(--gold));transition:width .2s}
+#hungbar{width:70px;height:6px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden}
+#hungbar i{display:block;height:100%;background:linear-gradient(90deg,#ffd166,#52ff9e);transition:width .2s}
+#daytag{color:var(--gold)}
+.spacer{flex:1}
+.tbtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:9px;padding:6px 10px;font:inherit;font-size:11px;cursor:pointer;letter-spacing:.4px;transition:all .15s}
+.tbtn:hover{color:var(--text);border-color:var(--cyan)}
+.tbtn.on{color:var(--cyan);border-color:var(--cyan);background:rgba(62,230,255,.1)}
+/* bottom action buttons */
+#actions{position:fixed;bottom:calc(env(safe-area-inset-bottom,0) + 10px);left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:15;pointer-events:none;flex-wrap:wrap;justify-content:center}
+#actions .tbtn{padding:9px 14px;font-size:12px}
+.big{color:var(--text);border-color:var(--green);font-weight:700}
+.big:hover{border-color:var(--green);background:rgba(82,255,158,.12)}
+/* joystick */
+#stick{position:fixed;left:0;bottom:0;width:46vw;height:40vh;z-index:5;pointer-events:auto;display:none}
+#stick .base{position:absolute;left:80px;bottom:70px;width:110px;height:110px;border-radius:50%;border:2px solid rgba(110,140,255,.35);background:rgba(12,17,34,.3)}
+#stick .knob{position:absolute;width:52px;height:52px;border-radius:50%;background:rgba(62,230,255,.35);border:2px solid rgba(62,230,255,.6);left:109px;bottom:99px;transform:translate(-50%,50%)}
+/* panels */
+.panelbox{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,560px);max-height:84vh;display:none;flex-direction:column;z-index:40;pointer-events:auto;overflow:hidden}
+.panelbox.on{display:flex}
+.panelbox .head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700;letter-spacing:1px;color:var(--cyan)}
+.panelbox .head .x{margin-left:auto;color:var(--dim);cursor:pointer;font-size:16px;padding:0 4px}
+.panelbox .body{padding:12px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;flex-wrap:wrap}
+.row .nm{font-weight:700;font-size:13px}
+.row .st{color:var(--dim);font-size:11px}
+.minibtn{pointer-events:auto;background:transparent;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:11px;cursor:pointer}
+.minibtn:hover{border-color:var(--cyan)}
+.minibtn.on{background:rgba(62,230,255,.14);border-color:var(--cyan);color:var(--cyan)}
+.minibtn:disabled{opacity:.35;cursor:not-allowed}
+.minibtn.gold:hover{border-color:var(--gold);color:var(--gold)}
+.minibtn.red:hover{border-color:var(--red);color:var(--red)}
+.selrow{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:11px;cursor:pointer}
+.chip.on{background:rgba(62,230,255,.14);color:var(--cyan);border-color:var(--cyan)}
+/* paldex */
+.dexgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:7px}
+.dexcell{display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:7px 4px 6px;cursor:pointer;transition:border-color .15s,transform .15s}
+.dexcell:hover{border-color:var(--cyan);transform:translateY(-2px)}
+.dexcell canvas{width:40px;height:40px;image-rendering:auto}
+.dexcell .dn{font-size:9px;font-weight:700;letter-spacing:.3px;white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
+.dexcell .dc{font-size:8.5px;color:var(--dim)}
+.dexcell.unseen{opacity:.55;filter:saturate(0)}
+.dexcell.unseen .dn{color:var(--dim)}
+#dexDetail{display:none;font-size:11.5px;color:var(--dim);line-height:1.7}
+#dexDetail.on{display:block}
+#dexDetail b{color:var(--text)}
+#toasts{position:fixed;top:calc(env(safe-area-inset-top,0) + 52px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:50;align-items:center;pointer-events:none}
+.toast{background:rgba(10,14,30,.95);border:1px solid var(--line);border-left:3px solid var(--cyan);padding:8px 14px;border-radius:9px;font-size:12.5px;animation:tin .25s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+/* story intro */
+#story{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:70;background:#0b1020;text-align:center;padding:24px;overflow:hidden}
+#story.on{display:flex}
+#story canvas{width:min(46vw,220px);height:min(46vw,220px);opacity:.95;filter:drop-shadow(0 0 26px rgba(62,230,255,.25))}
+#storyTxt{max-width:560px;min-height:88px;font-size:clamp(14px,3.2vw,19px);line-height:1.75;letter-spacing:.5px;color:var(--text);opacity:0;transition:opacity .6s ease;margin-top:22px}
+#storyTxt.in{opacity:1}
+#storyTxt .lina{color:#ffb8dc;font-weight:700}
+#storyDots{display:flex;gap:6px;margin-top:18px}
+#storyDots i{width:7px;height:7px;border-radius:50%;background:rgba(138,146,200,.35);transition:all .3s}
+#storyDots i.on{background:var(--cyan);transform:scale(1.25)}
+#storyBtns{display:flex;gap:10px;margin-top:22px}
+#storySkip{position:absolute;top:calc(env(safe-area-inset-top,0) + 12px);right:14px;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:9px;padding:6px 12px;font:inherit;font-size:11px;cursor:pointer;letter-spacing:.5px}
+#storySkip:hover{color:var(--text);border-color:var(--cyan)}
+/* start overlay */
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:60;background:radial-gradient(ellipse at 50% 30%,rgba(62,230,255,.10),rgba(11,16,32,0) 60%),var(--bg);text-align:center;padding:20px}
+#start h1{font-size:clamp(30px,8vw,60px);font-weight:800;letter-spacing:4px;background:linear-gradient(90deg,var(--cyan),var(--green),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+#start p{color:var(--dim);font-size:clamp(11px,2.4vw,13px);margin-top:10px;letter-spacing:1px;max-width:520px;line-height:1.8}
+#start input{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(12,17,34,.9);color:var(--text);font:inherit;font-size:13px;margin-top:18px;width:min(70vw,240px);text-align:center;outline:none}
+#start button{margin-top:14px;padding:13px 34px;border:1px solid var(--green);border-radius:12px;background:rgba(82,255,158,.1);color:var(--text);font:inherit;font-weight:800;font-size:14px;letter-spacing:1px;cursor:pointer}
+#start button:hover{background:rgba(82,255,158,.2);box-shadow:0 0 26px rgba(82,255,158,.3)}
+#start .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+#start .small{font-size:10px;color:var(--dim);margin-top:10px}
+#start .opts{display:flex;flex-direction:column;gap:8px;margin-top:14px;width:min(92vw,320px)}
+#start .optrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:7px 12px}
+#start .optrow>span{font-size:11px;color:var(--dim);letter-spacing:1px;font-weight:700}
+#start .optrow .selrow{display:flex;gap:5px}
+#start .optrow .chip{padding:4px 9px;font-size:10.5px}
+#start .optrow .chip.on{background:rgba(62,230,255,.16);color:var(--cyan);border-color:var(--cyan)}
+#respawn{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:55;background:rgba(11,16,32,.85);text-align:center;flex-direction:column;gap:12px}
+#respawn.on{display:flex}
+#respawn h2{color:var(--red);letter-spacing:2px}
+#respawn button{margin-top:8px}
+/* game complete */
+#complete{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60;background:radial-gradient(ellipse at 50% 30%,rgba(194,107,255,.18),rgba(11,16,32,0) 65%),rgba(11,16,32,.92);text-align:center;flex-direction:column;gap:14px;padding:24px}
+#complete.on{display:flex}
+#complete h1{font-size:clamp(26px,7vw,44px);font-weight:800;letter-spacing:3px;background:linear-gradient(90deg,var(--cyan),var(--violet,#c26bff),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+#complete p{color:var(--dim);font-size:13px;max-width:460px;line-height:1.8}
+#complete .stats{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:12px 18px;font-size:12.5px;line-height:2}
+#complete .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+/* minimap */
+#minimap{position:fixed;right:8px;top:calc(env(safe-area-inset-top,0) + 54px);width:120px;height:120px;border-radius:10px;z-index:12;pointer-events:none;opacity:.85}
+@media(max-width:760px){
+  #stick{display:block}
+  .hudbox{font-size:10px;padding:4px 7px}
+  #hpbar{width:80px}
+  #hud .tbtn{font-size:10px;padding:5px 8px}
+  #actions .tbtn{font-size:11px;padding:8px 11px}
+  #minimap{width:88px;height:88px}
+}
+/* whisper narratore (voci per bioma) */
+#whisper{position:fixed;top:calc(env(safe-area-inset-top,0) + 96px);left:50%;transform:translateX(-50%);max-width:86vw;z-index:44;background:rgba(12,10,26,.88);border:1px solid rgba(178,141,255,.4);border-left:3px solid #c9a35f;border-radius:10px;padding:9px 16px;font-size:12.5px;font-style:italic;color:#e8dcc8;letter-spacing:.5px;line-height:1.6;opacity:0;transition:opacity .8s ease;pointer-events:none;text-align:center}
+#whisper.in{opacity:1}
+#whisper .w{color:#c9a35f;font-style:normal;font-weight:700}
+/* voce del Sovereign in battaglia */
+#bossvoice{position:fixed;top:calc(env(safe-area-inset-top,0) + 40px);left:50%;transform:translateX(-50%);max-width:88vw;z-index:46;background:rgba(30,8,16,.92);border:1px solid rgba(255,95,109,.55);border-left:4px solid #ff5f6d;border-radius:10px;padding:10px 18px;font-size:13px;color:#ffb3ba;letter-spacing:.6px;line-height:1.6;opacity:0;transition:opacity .7s ease;pointer-events:none;text-align:center}
+#bossvoice.in{opacity:1}
+#bossvoice .s{color:#ff5f6d;font-weight:800;letter-spacing:2px}
+/* diario di Lina */
+#pDiary .dpage{display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,184,220,.25);border-radius:10px;padding:8px 4px 6px;cursor:pointer;transition:border-color .15s,transform .15s}
+#pDiary .dpage:hover{border-color:#ffb8dc;transform:translateY(-2px)}
+#pDiary .dpage .dn{font-size:9px;font-weight:700;color:#ffb8dc;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pDiary .dpage .ds{font-size:8.5px;color:var(--dim)}
+#pDiary .dpage canvas{width:42px;height:42px}
+#diaryDetail{display:none;background:rgba(255,248,240,.05);border:1px solid rgba(255,184,220,.3);border-radius:12px;padding:14px 16px;line-height:1.8}
+#diaryDetail.on{display:block}
+#diaryDetail .note{font-family:'Segoe Print','Comic Sans MS',cursive;font-size:13.5px;color:#ffe9f2;font-style:italic}
+#diaryDetail .pg{color:#ffb8dc;font-size:10px;letter-spacing:2px}
+#diaryDetail .st{color:var(--dim);font-size:11px}
+/* cutscene overlay — voce fuori campo */
+#cutscene{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-end;z-index:75;background:radial-gradient(ellipse at 50% 20%,rgba(20,12,40,.55),rgba(4,5,14,.94) 75%);text-align:center;padding:28px 22px calc(env(safe-area-inset-bottom,0) + 26px);cursor:pointer}
+#cutscene.on{display:flex}
+#cutscene .speaker{font-size:12px;letter-spacing:3px;font-weight:800;opacity:.92;margin-bottom:10px}
+#cutscene .line{max-width:640px;min-height:96px;font-size:clamp(15px,3.4vw,20px);line-height:1.8;letter-spacing:.4px;color:var(--text);white-space:pre-wrap}
+#cutscene .hint{margin-top:16px;font-size:10px;color:var(--dim);letter-spacing:1px;opacity:.7;animation:tin 1.2s ease infinite}
+#cutscene .speaker.LINA{color:#ffb8dc}
+#cutscene .speaker.MIRA{color:#b28dff}
+#cutscene .speaker.YOU{color:#3ee6ff}
+#cutscene .speaker.BRAM{color:#8a92c8}
+#cutscene .speaker.AVERY{color:#ffd166}
+#cutscene .speaker.NARRATOR{color:#c9a35f}
+#cutscene .speaker.SOVEREIGN{color:#ff5f6d}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<canvas id="minimap" width="120" height="120"></canvas>
+
+<div id="ui">
+  <div id="hud">
+    <div class="hudbox panel"><span>❤️</span><div id="hpbar"><i style="width:100%"></i></div><b id="hpTxt">100</b></div>
+    <div class="hudbox panel"><span>🍖</span><div id="hungbar"><i style="width:100%"></i></div><b id="hungTxt">100</b></div>
+    <div class="hudbox panel"><span>🧪</span><b id="essTxt">0</b></div>
+    <div class="hudbox panel"><span>🟢</span><b id="sphTxt">3</b></div>
+    <div class="hudbox panel"><span>📦</span><b id="resTxt">0</b></div>
+    <div class="hudbox panel"><span id="daytag">☀️ Day</span></div>
+    <div class="hudbox panel" id="srBox" style="display:none"><span>⏱️</span><b id="srTime">0:00</b></div>
+    <div class="hudbox panel"><span id="weathtag">🌤️</span></div>
+    <div class="spacer"></div>
+    <button class="tbtn" id="btnTeam">📦 Team</button>
+    <button class="tbtn" id="btnCraft">🎒 Craft</button>
+    <button class="tbtn" id="btnLab">🧬 Lab</button>
+    <button class="tbtn" id="btnBuild">🏗 Build</button>
+    <button class="tbtn" id="btnDex">📖 Paldex</button>
+    <button class="tbtn" id="btnDiary">📓</button>
+    <button class="tbtn" id="btnAch">🏆</button>
+    <button class="tbtn" id="btnQuests">📋</button>
+    <button class="tbtn" id="btnSound">🔊</button>
+    <button class="tbtn" id="btnTest">🧪 Test</button>
+    <button class="tbtn" id="btnInstall" style="display:none">📲 Install</button>
+    <button class="tbtn" id="btnSave">💾</button>
+  </div>
+
+  <div id="actions">
+    <button class="tbtn big" id="btnThrow">🔮 Throw sphere</button>
+    <button class="tbtn big" id="btnAttack" style="display:none">⚔️ Attack</button>
+    <button class="tbtn big" id="btnShoot" style="display:none">🏹 Shoot</button>
+    <button class="tbtn big" id="btnRide" style="display:none">🐎 Ride</button>
+    <button class="tbtn" id="btnInteract">🤝 Interact</button>
+  </div>
+
+  <div id="stick"><div class="base"></div><div class="knob"></div></div>
+
+  <!-- TEAM -->
+  <div class="panel panelbox" id="pTeam">
+    <div class="head">📦 YOUR PALS <span style="color:var(--dim);font-weight:400;font-size:11px">click to set active</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="teamList"></div>
+  </div>
+  <!-- CRAFT -->
+  <div class="panel panelbox" id="pCraft">
+    <div class="head">🎒 CRAFTING <span class="x" data-close>✕</span></div>
+    <div class="body" id="craftList"></div>
+  </div>
+  <!-- LAB -->
+  <div class="panel panelbox" id="pLab">
+    <div class="head">🧬 GENE LAB <span class="x" data-close>✕</span></div>
+    <div class="body" id="labBody"></div>
+  </div>
+  <!-- BUILD -->
+  <div class="panel panelbox" id="pBuild">
+    <div class="head">🏗 BUILD <span class="x" data-close>✕</span></div>
+    <div class="body" id="buildList"></div>
+  </div>
+  <!-- QUESTS -->
+  <div class="panel panelbox" id="pQuests">
+    <div class="head">📋 QUESTS <span class="x" data-close>✕</span></div>
+    <div class="body" id="questList"></div>
+  </div>
+  <!-- INVENTORY near chest -->
+  <div class="panel panelbox" id="pChest">
+    <div class="head">📦 CHEST <span class="x" data-close>✕</span></div>
+    <div class="body" id="chestList"></div>
+  </div>
+  <!-- TRADER -->
+  <div class="panel panelbox" id="pTrade">
+    <div class="head">🪙 WANDERING TRADER <span style="color:var(--dim);font-weight:400;font-size:11px" id="coinTxt">0 coins</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="tradeList"></div>
+  </div>
+  <!-- PALDEX -->
+  <div class="panel panelbox" id="pDex">
+    <div class="head">📖 PALDEX <span style="color:var(--dim);font-weight:400;font-size:11px" id="dexCountTxt">0 / 22 seen</span><span class="x" data-close>✕</span></div>
+    <div class="body"><div id="dexDetail"></div><div id="dexList"></div></div>
+  </div>
+  <!-- CUSTOM PAL LAB -->
+  <div class="panel panelbox" id="pEdit">
+    <div class="head">🎨 CUSTOM PAL LAB <span style="color:var(--dim);font-weight:400;font-size:11px">synthesize · share via URL</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="editBody"></div>
+  </div>
+  <!-- ACHIEVEMENTS -->
+  <div class="panel panelbox" id="pAch">
+    <div class="head">🏆 ACHIEVEMENTS <span style="color:var(--dim);font-weight:400;font-size:11px" id="achCountTxt">0 / 16</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="achList"></div>
+  </div>
+  <!-- PARALLEL TEST ENGINE -->
+  <div class="panel panelbox" id="pTest">
+    <div class="head">🧪 PARALLEL TEST ENGINE <span style="color:var(--dim);font-weight:400;font-size:11px">sandbox autoplay</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="testBody"></div>
+  </div>
+  <!-- LINA'S DIARY -->
+  <div class="panel panelbox" id="pDiary">
+    <div class="head">📓 LINA'S DIARY <span style="color:var(--dim);font-weight:400;font-size:11px" id="diaryCountTxt">0 / 33 pages</span><span class="x" data-close>✕</span></div>
+    <div class="body"><div id="diaryDetail"></div><div id="diaryGrid"></div></div>
+  </div>
+  <!-- BLACKSMITH -->
+  <div class="panel panelbox" id="pSmith">
+    <div class="head">🔨 BLACKSMITH BRAM <span style="color:var(--dim);font-weight:400;font-size:11px" id="smithCoins">0 coins</span><span class="x" data-close>✕</span></div>
+    <div class="body" id="smithList"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="simBadge" style="display:none;position:fixed;bottom:calc(env(safe-area-inset-bottom,0) + 64px);left:50%;transform:translateX(-50%);z-index:45;background:rgba(194,107,255,.92);color:#0b1020;font-weight:800;font-size:11px;letter-spacing:1px;padding:6px 14px;border-radius:20px;pointer-events:none">🧪 SIM RUNNING</div>
+
+<div id="start">
+  <h1>POCKET WILD</h1>
+  <p>Catch geometric creatures. Build a base. Splice their genes. Survive the night.<br>Top-down creature-capture survival — plays in your browser.</p>
+  <input id="seedInput" placeholder="World seed (optional)" maxlength="20">
+  <div class="opts">
+    <div class="optrow"><span id="modeLabel">Mode</span><div class="selrow" id="modeRow"></div></div>
+    <div class="optrow"><span id="diffLabel">Difficulty</span><div class="selrow" id="diffRow"></div></div>
+    <div class="optrow"><span id="langLabel">Language</span><div class="selrow" id="langRow"></div></div>
+    <div class="small" id="diffHelp">Enemies are stronger, catches harder, hunger faster. Rewards stay fair.</div>
+    <div class="small" id="srBest"></div>
+  </div>
+  <div class="btns">
+    <button id="btnNew">🌍 NEW WORLD</button>
+    <button id="btnCont" style="display:none">💾 CONTINUE</button>
+  </div>
+  <span class="small">💾 autosaves every 10s · WASD/arrows + E interact + SPACE throw (mobile: joystick + buttons)</span>
+</div>
+
+<div id="respawn"><h2>You fainted…</h2><p style="color:var(--dim)">Your active Pal saved you. Wake up at the bed.</p><button class="tbtn" id="btnRespawn">🌅 Wake up</button></div>
+
+<div id="story">
+  <button id="storySkip" onclick="skipStory()">⏭ Skip</button>
+  <canvas id="storyCv" width="220" height="220"></canvas>
+  <div id="storyTxt"></div>
+  <div id="storyDots"></div>
+  <div class="btns" id="storyBtns">
+    <button class="tbtn" id="btnStoryNext">Continue ▶</button>
+  </div>
+</div>
+
+<div id="cutscene">
+  <div class="speaker NARRATOR" id="cutSpeaker"></div>
+  <div class="line" id="cutLine"></div>
+  <div class="hint">tap / click to continue</div>
+</div>
+
+<div id="complete">
+  <h1>🏆 GAME COMPLETE</h1>
+  <p>The <b style="color:#c26bff">Void Sovereign</b> has fallen. The rift closes, and the wilds are at peace — for now…</p>
+  <div class="stats" id="completeStats"></div>
+  <div class="btns">
+    <button class="tbtn" id="btnCompleteCont">🌍 Keep exploring</button>
+    <button class="tbtn" id="btnCompleteNew">🔄 New world</button>
+  </div>
+</div>
+
+<script src="js/00-core.js"></script>
+<script src="js/01-world.js"></script>
+<script src="js/02-data.js"></script>
+<script src="js/03-state.js"></script>
+<script src="js/04-pals.js"></script>
+<script src="js/05-quests.js"></script>
+<script src="js/06-ach.js"></script>
+<script src="js/07-crafting.js"></script>
+<script src="js/08-spawn.js"></script>
+<script src="js/09-lab.js"></script>
+<script src="js/10-custom.js"></script>
+<script src="js/11-testlab.js"></script>
+<script src="js/12-combat.js"></script>
+<script src="js/13-sound.js"></script>
+<script src="js/14-actions.js"></script>
+<script src="js/15-economy.js"></script>
+<script src="js/16-ranch.js"></script>
+<script src="js/17-dungeon.js"></script>
+<script src="js/18-npcs.js"></script>
+<script src="js/19-boss.js"></script>
+<script src="js/20-time.js"></script>
+<script src="js/21-player.js"></script>
+<script src="js/22-panels.js"></script>
+<script src="js/23-customui.js"></script>
+<script src="js/24-render.js"></script>
+<script src="js/25-main.js"></script>
+<script src="js/26-story.js"></script>
+<script src="js/27-start.js"></script>
+</body>
+</html>

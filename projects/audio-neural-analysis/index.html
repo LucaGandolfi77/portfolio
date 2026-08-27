@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0d1a">
+<title>AUDIO NEURAL — Genre Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d1a;--panel:rgba(10,13,26,.85);--cyan:#00d4ff;--violet:#7c5cff;
+  --orange:#ff6b35;--green:#2dd4a0;--white:#f0f0f0;--dim:#8892b0;--muted:#5a6b8b;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--white);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;z-index:30;display:flex;gap:12px;align-items:center;background:var(--panel);border-bottom:1px solid var(--cyan);backdrop-filter:blur(12px)}
+#hud #logo{font-weight:800;font-size:15px;letter-spacing:1.5px;white-space:nowrap;
+  background:linear-gradient(90deg,var(--cyan),var(--violet),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+#hud #logo b{color:#fff;-webkit-text-fill-color:#fff}
+#hud #stats{display:flex;gap:16px;align-items:center;margin-left:4px}
+.hud-item .lbl{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.hud-item .val{font-size:15px;font-weight:700;color:var(--cyan);line-height:1.2;min-width:74px}
+#trainState{font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap}
+#genreGallery{position:fixed;top:64px;left:12px;z-index:20;display:flex;flex-direction:column;gap:7px;background:var(--panel);border:1px solid var(--cyan);border-radius:14px;padding:10px 12px;backdrop-filter:blur(10px);min-width:120px}
+#genreGallery .gl{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.genreItem{aspect-ratio:1.15;border:2px solid var(--muted);border-radius:9px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;background:var(--bg);padding:0}
+.genreItem:hover{border-color:var(--cyan);transform:scale(1.04)}
+.genreItem .gimg{width:100%;height:100%;object-fit:cover;display:block}
+.genreItem .nm{position:absolute;left:0;right:0;bottom:0;background:rgba(5,8,18,.75);color:var(--white);font-size:8.5px;letter-spacing:.5px;padding:2px 4px;text-align:center}
+#mainCanvas{position:fixed;top:64px;right:12px;width:min(60vw,520px);height:min(60vw,520px);border-radius:14px;background:radial-gradient(circle at 50% 40%,rgba(124,92,255,.12),rgba(10,13,26,.4));box-shadow:0 0 40px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.5)}
+#controls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:8px;background:rgba(10,13,26,.9);border:1px solid var(--cyan);border-radius:14px;padding:9px 16px;backdrop-filter:blur(12px);max-width:96vw;flex-wrap:wrap;justify-content:center}
+#controls .btn{background:transparent;border:1px solid var(--cyan);color:var(--white);border-radius:8px;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;font-weight:700;transition:all .2s}
+#controls .btn:hover{border-color:var(--orange);box-shadow:0 0 14px rgba(255,107,53,.25)}
+#controls .btn.active{background:rgba(0,212,255,.16);border-color:var(--cyan)}
+#controls .btn.danger{border-color:var(--orange);color:var(--orange)}
+#netPanel{position:fixed;left:16px;bottom:74px;width:236px;background:var(--panel);border:1px solid rgba(0,212,255,.25);border-radius:12px;padding:8px 10px;z-index:15;backdrop-filter:blur(10px)}
+#netPanel canvas{width:100%;height:auto;display:block}
+#netPanel .netLabel{font-size:9px;color:var(--muted);margin-top:4px;letter-spacing:.3px}
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,18,.72);z-index:40}
+.modal.on{display:flex}
+.modalcard{background:var(--panel);border:1px solid var(--cyan);border-radius:16px;padding:20px 24px;max-width:520px;width:calc(100vw - 36px);max-height:84vh;overflow-y:auto}
+.modalcard h2{color:var(--cyan);font-size:15px;letter-spacing:2px;margin-bottom:10px}
+.modalcard .section{margin-bottom:12px}
+.modalcard .section .title{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.modalcard .section p{font-size:12.5px;color:var(--dim);line-height:1.7}
+.modalcard .section code{color:var(--green)}
+.modalrow{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
+.okbtn{padding:9px 18px;border-radius:10px;border:1px solid var(--cyan);background:rgba(0,212,255,.12);color:var(--cyan);font:inherit;font-weight:700;cursor:pointer}
+.okbtn:hover{background:rgba(0,212,255,.24)}
+#toasts{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{background:rgba(10,13,26,.95);border:1px solid var(--cyan);border-left:3px solid var(--orange);color:var(--white);padding:7px 14px;border-radius:9px;font-size:12px;animation:tin .3s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:760px){
+  #hud{padding:8px 10px;gap:8px}
+  #hud #logo{font-size:12px}
+  #hud #stats{gap:10px}
+  .hud-item .val{min-width:auto;font-size:13px}
+  #genreGallery{top:56px;left:6px;min-width:96px;padding:6px}
+  #genreGallery .gl{font-size:8px}
+  .genreItem .nm{font-size:7px}
+  #mainCanvas{top:56px;left:50%;transform:translateX(-50%);width:min(64vw,330px);height:min(64vw,330px)}
+  #netPanel{left:6px;right:6px;bottom:62px;width:auto}
+  #controls{bottom:8px;padding:7px 10px}
+  #controls .btn{padding:5px 10px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="logo">AUDIO <b>NEURAL</b></div>
+  <div id="stats">
+    <div class="hud-item"><span class="lbl">Genre</span><div class="val" id="genreVal">—</div></div>
+    <div class="hud-item"><span class="lbl">Confidence</span><div class="val" id="confVal">0%</div></div>
+    <div class="hud-item"><span class="lbl">Time</span><div class="val" id="timeVal">00:00</div></div>
+  </div>
+  <div style="flex:1"></div>
+  <span id="trainState">🧠 training…</span>
+  <button class="btn" id="btnInfo" style="padding:5px 10px;font-size:11px;background:transparent;border:1px solid var(--cyan);border-radius:8px;color:var(--white);cursor:pointer">ℹ️</button>
+</div>
+
+<div id="genreGallery">
+  <span class="gl">Genres</span>
+  <button class="genreItem" data-genre="rock"><img class="gimg" src="examples/genre-rock.svg" alt="Rock"><span class="nm">Rock</span></button>
+  <button class="genreItem" data-genre="classical"><img class="gimg" src="examples/genre-classical.svg" alt="Classical"><span class="nm">Classical</span></button>
+  <button class="genreItem" data-genre="jazz"><img class="gimg" src="examples/genre-jazz.svg" alt="Jazz"><span class="nm">Jazz</span></button>
+  <button class="genreItem" data-genre="electronic"><img class="gimg" src="examples/genre-electronic.svg" alt="Electronic"><span class="nm">Electronic</span></button>
+</div>
+
+<canvas id="mainCanvas" width="520" height="520"></canvas>
+
+<div id="controls">
+  <button class="btn active" id="btnLive">🎙 LIVE</button>
+  <button class="btn" id="btnFile">📁 FILE</button>
+  <button class="btn danger" id="btnStop">STOP</button>
+</div>
+<input type="file" id="fileAudio" accept="audio/*" style="display:none">
+
+<div id="netPanel">
+  <canvas id="net" width="220" height="104"></canvas>
+  <div class="netLabel">🧠 network 12→16→4 · trained on synthetic genre profiles</div>
+</div>
+
+<div id="toasts"></div>
+
+<div class="modal" id="infoModal">
+  <div class="modalcard">
+    <h2>🎧 AUDIO NEURAL</h2>
+    <div class="section">
+      <div class="title">How it works</div>
+      <p>Live microphone or audio file → <strong>FFT spectrum</strong> (Web Audio AnalyserNode) → <strong>12 spectral features</strong> (band energies, centroid, rolloff, flux, zero-crossing, spread, flatness) → a <strong>tiny neural network 12→16→4</strong> (tanh hidden + softmax) that predicts <strong>rock / classical / jazz / electronic</strong>. The neural corona shows the spectrum ring + 4 genre arcs driven by confidence. All on-device.</p>
+    </div>
+    <div class="section">
+      <div class="title">Honest note</div>
+      <p>The network is trained <strong>in your browser on synthetic genre profiles</strong> (GTZAN-inspired feature distributions) — not on real recordings, so on real music it reacts to actual spectral character (bass-heavy → rock/electronic, bright/sparse → classical…) rather than memorized songs. It's a live demo of the full audio-AI pipeline.</p>
+    </div>
+    <div class="section">
+      <div class="title">Technical</div>
+      <p>FFT 512 (desktop) / 256 (mobile) · features every ~250 ms, confidences smoothed · training: cross-entropy + SGD momentum, ~250 epochs on 1000 synthetic samples.</p>
+    </div>
+    <div class="modalrow"><button class="okbtn" id="btnInfoClose">Got it</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= UTILS ================= */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function toast(msg){const d=document.createElement('div');d.className='toast';d.textContent=msg;$('toasts').appendChild(d);setTimeout(()=>{d.style.opacity='0';d.style.transition='opacity .4s';setTimeout(()=>d.remove(),420);},2600);}
+const GENRES=['rock','classical','jazz','electronic'];
+const GCOL={rock:'#ff6b35',classical:'#a855f7',jazz:'#2dd4a0',electronic:'#00d4ff'};
+const GNAME={rock:'Rock',classical:'Classical',jazz:'Jazz',electronic:'Electronic'};
+
+/* ================= FEATURES (pure, testable) ================= */
+/* db: Float32Array binCount dB values (-100..0) · prevDb: same, previous frame (for flux) · td: time domain */
+const BANDS=[[0,0.04],[0.04,0.15],[0.15,0.45],[0.45,0.8],[0.8,1.0]];
+function extractFeatures(db,prevDb,td){
+  const nb=db.length;
+  const p=new Float32Array(nb);
+  for(let i=0;i<nb;i++)p[i]=Math.pow(10,db[i]/20);
+  const en=BANDS.map(([a,b])=>{
+    let s=0;const i0=Math.floor(a*nb),i1=Math.min(nb-1,Math.floor(b*nb));
+    for(let i=i0;i<=i1;i++)s+=p[i]*p[i];
+    return s;
+  });
+  const tot=en.reduce((a,b)=>a+b,0)||1;
+  const props=en.map(e=>e/tot);
+  let cNum=0,cDen=0;
+  for(let i=0;i<nb;i++){cNum+=i*p[i];cDen+=p[i];}
+  const centroid=cDen?(cNum/cDen)/(nb-1):0;
+  const eTot=cDen||1;
+  let acc=0,roll=0;
+  for(let i=0;i<nb;i++){acc+=p[i];if(acc>=0.85*eTot){roll=i/(nb-1);break;}}
+  let flux=0;
+  if(prevDb){for(let i=0;i<nb;i++)flux+=Math.abs(p[i]-Math.pow(10,prevDb[i]/20));}
+  flux=clamp(flux/(nb*0.5),0,1);
+  let zcr=0;
+  if(td){for(let i=1;i<td.length;i++)if((td[i-1]<0)!==(td[i]<0))zcr++;zcr/=Math.max(1,td.length-1);}
+  let varNum=0;
+  for(let i=0;i<nb;i++)varNum+=((i/(nb-1))-centroid)**2*p[i];
+  const spread=clamp(varNum/(eTot||1),0,1);
+  let lg=0,la=0;
+  for(let i=0;i<nb;i++){if(p[i]>1e-6)lg+=Math.log(p[i]);la+=p[i];}
+  const flatness=clamp(Math.exp(lg/nb)/(la/nb+1e-9),0,1);
+  const hilo=clamp(props[4]/Math.max(1e-3,props[0]),0,1);
+  return [props[0],props[1],props[2],props[3],props[4],centroid,roll,flux,zcr,spread,hilo,flatness];
+}
+
+/* ================= TINY NN 12→16→4 ================= */
+const NIN=12,NH=16,NOUT=4;
+let W1=null,b1=null,W2=null,b2=null;
+function initWeights(){
+  W1=new Float32Array(NH*NIN);b1=new Float32Array(NH);
+  W2=new Float32Array(NOUT*NH);b2=new Float32Array(NOUT);
+  const s1=Math.sqrt(2/NIN),s2=Math.sqrt(2/NH);
+  for(let i=0;i<W1.length;i++)W1[i]=(Math.random()*2-1)*s1;
+  for(let i=0;i<W2.length;i++)W2[i]=(Math.random()*2-1)*s2;
+}
+function forward(x,h,logits){
+  for(let j=0;j<NH;j++){
+    let s=b1[j];
+    for(let i=0;i<NIN;i++)s+=W1[j*NIN+i]*x[i];
+    h[j]=Math.tanh(s);
+  }
+  let mx=-1e9;
+  for(let k=0;k<NOUT;k++){
+    let s=b2[k];
+    for(let j=0;j<NH;j++)s+=W2[k*NH+j]*h[j];
+    logits[k]=s;if(s>mx)mx=s;
+  }
+  let sum=0;
+  for(let k=0;k<NOUT;k++){logits[k]=Math.exp(logits[k]-mx);sum+=logits[k];}
+  for(let k=0;k<NOUT;k++)logits[k]/=sum;
+}
+function classify(x){
+  const h=new Float32Array(NH),o=new Float32Array(NOUT);
+  forward(x,h,o);
+  let best=0;
+  for(let k=1;k<NOUT;k++)if(o[k]>o[best])best=k;
+  return{genre:GENRES[best],conf:o[best],outs:o,h:h};
+}
+/* profili sintetici dei generi (12 feature, 0..1) */
+const PROFILES={
+  rock:{m:[0.30,0.25,0.22,0.13,0.10,0.45,0.55,0.25,0.12,0.10,0.35,0.35],s:[0.06,0.05,0.05,0.04,0.04,0.10,0.12,0.08,0.05,0.05,0.12,0.10]},
+  classical:{m:[0.10,0.15,0.20,0.25,0.30,0.65,0.75,0.08,0.03,0.18,0.55,0.70],s:[0.05,0.05,0.06,0.07,0.08,0.12,0.10,0.05,0.02,0.08,0.15,0.12]},
+  jazz:{m:[0.15,0.20,0.28,0.22,0.15,0.55,0.60,0.40,0.08,0.12,0.50,0.50],s:[0.06,0.05,0.06,0.06,0.06,0.12,0.12,0.10,0.04,0.05,0.15,0.12]},
+  electronic:{m:[0.35,0.28,0.20,0.10,0.07,0.40,0.50,0.06,0.20,0.08,0.20,0.45],s:[0.07,0.06,0.05,0.04,0.03,0.10,0.12,0.04,0.07,0.05,0.10,0.10]}
+};
+function genSamples(n){
+  const data=[];
+  for(let g=0;g<4;g++){
+    const p=PROFILES[GENRES[g]];
+    for(let i=0;i<n;i++){
+      const x=new Float32Array(NIN);
+      for(let k=0;k<NIN;k++)x[k]=clamp(p.m[k]+(Math.random()*2-1)*p.s[k],0.01,0.99);
+      data.push({x,label:g});
+    }
+  }
+  return data;
+}
+let vW1,vb1,vW2,vb2;
+function resetMoments(){
+  vW1=new Float32Array(NH*NIN);vb1=new Float32Array(NH);
+  vW2=new Float32Array(NOUT*NH);vb2=new Float32Array(NOUT);
+}
+function trainEpoch(data,lr,mom){
+  const gW1=new Float32Array(NH*NIN),gb1=new Float32Array(NH),gW2=new Float32Array(NOUT*NH),gb2=new Float32Array(NOUT);
+  const h=new Float32Array(NH),o=new Float32Array(NOUT);
+  let loss=0;
+  for(const d of data){
+    forward(d.x,h,o);
+    loss-=Math.log(o[d.label]+1e-9);
+    for(let k=0;k<NOUT;k++){
+      const e=o[k]-(k===d.label?1:0);
+      gb2[k]+=e;
+      for(let j=0;j<NH;j++)gW2[k*NH+j]+=e*h[j];
+    }
+    for(let j=0;j<NH;j++){
+      let acc=0;
+      for(let k=0;k<NOUT;k++)acc+=(o[k]-(k===d.label?1:0))*W2[k*NH+j];
+      const dh=acc*(1-h[j]*h[j]);
+      gb1[j]+=dh;
+      for(let i=0;i<NIN;i++)gW1[j*NIN+i]+=dh*d.x[i];
+    }
+  }
+  const m=data.length;
+  for(let i=0;i<W1.length;i++){vW1[i]=mom*vW1[i]-lr/m*gW1[i];W1[i]+=vW1[i];}
+  for(let i=0;i<b1.length;i++){vb1[i]=mom*vb1[i]-lr/m*gb1[i];b1[i]+=vb1[i];}
+  for(let i=0;i<W2.length;i++){vW2[i]=mom*vW2[i]-lr/m*gW2[i];W2[i]+=vW2[i];}
+  for(let i=0;i<b2.length;i++){vb2[i]=mom*vb2[i]-lr/m*gb2[i];b2[i]+=vb2[i];}
+  return loss/m;
+}
+function trainNN(){
+  initWeights();
+  resetMoments();
+  const data=genSamples(250);
+  let epoch=0,total=250;
+  $('trainState').textContent='🧠 training 0%';
+  (function step(){
+    const t0=performance.now();
+    while(epoch<total&&performance.now()-t0<40){trainEpoch(data,0.05,0.9);epoch++;}
+    $('trainState').textContent='🧠 training '+Math.round(epoch/total*100)+'%';
+    if(epoch<total)setTimeout(step,0);
+    else{$('trainState').textContent='🧠 ready';drawNet(true);toast('🧠 Genre network trained','var(--cyan)');}
+  })();
+}
+
+/* ================= AUDIO ================= */
+let actx=null,analyser=null,micStream=null,srcNode=null,running=false,raf=null;
+let prevDb=null,conf=[0.25,0.25,0.25,0.25],lastClassify=0,startTime=0;
+const TD=new Float32Array(1024),DB=new Float32Array(1024);
+
+function ensureCtx(){
+  if(actx)return true;
+  try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return false;}
+  analyser=actx.createAnalyser();
+  analyser.fftSize=window.innerWidth<760?256:512;
+  analyser.smoothingTimeConstant=0.6;
+  return true;
+}
+async function startLive(){
+  if(!ensureCtx()){toast('Web Audio not supported','var(--red)');return;}
+  if(actx.state==='suspended')actx.resume();
+  stop();
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    srcNode=actx.createMediaStreamSource(micStream);
+    srcNode.connect(analyser);
+    running=true;startTime=performance.now();
+    $('btnLive').classList.add('active');$('btnFile').classList.remove('active');
+    toast('🎙 Listening — play some music','var(--cyan)');
+    loop();
+  }catch(e){
+    toast(e.name==='NotAllowedError'?'Microphone permission denied':'Mic error: '+e.name,'var(--red)');
+  }
+}
+function playFile(file){
+  if(!ensureCtx())return;
+  if(actx.state==='suspended')actx.resume();
+  stop();
+  const fr=new FileReader();
+  fr.onload=()=>{
+    actx.decodeAudioData(fr.result).then(buf=>{
+      const bsrc=actx.createBufferSource();
+      bsrc.buffer=buf;
+      bsrc.connect(analyser);
+      bsrc.connect(actx.destination);
+      bsrc.start(0);
+      srcNode=bsrc;
+      running=true;startTime=performance.now();
+      $('btnFile').classList.add('active');$('btnLive').classList.remove('active');
+      toast('📁 Playing & analyzing: '+file.name,'var(--cyan)');
+      loop();
+    }).catch(()=>toast('Could not decode that audio file','var(--red)'));
+  };
+  fr.readAsArrayBuffer(file);
+}
+function stop(){
+  running=false;
+  if(raf){cancelAnimationFrame(raf);raf=null;}
+  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+  if(srcNode){try{srcNode.stop&&srcNode.stop();}catch(e){}try{srcNode.disconnect();}catch(e){}srcNode=null;}
+  prevDb=null;
+  $('btnLive').classList.remove('active');$('btnFile').classList.remove('active');
+  $('genreVal').textContent='—';$('confVal').textContent='0%';
+}
+function loop(){
+  if(!running)return;
+  raf=requestAnimationFrame(loop);
+  const binCount=analyser.frequencyBinCount;
+  analyser.getFloatTimeDomainData(TD.subarray(0,binCount*2>TD.length?TD.length:binCount*2));
+  analyser.getFloatFrequencyData(DB.subarray(0,binCount));
+  const now=performance.now();
+  if(now-lastClassify>250){
+    lastClassify=now;
+    const feats=extractFeatures(DB.subarray(0,binCount),prevDb,TD.subarray(0,Math.min(binCount*2,TD.length)));
+    prevDb=DB.slice(0,binCount);
+    const r=classify(feats);
+    for(let k=0;k<4;k++)conf[k]=lerp(conf[k],r.outs[k],0.5);
+    const best=GENRES.indexOf(r.genre);
+    $('genreVal').textContent=GNAME[r.genre];
+    $('genreVal').style.color=GCOL[r.genre];
+    $('confVal').textContent=Math.round(conf[best]*100)+'%';
+    const sec=Math.round((now-startTime)/1000);
+    $('timeVal').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+    drawNet(false,feats,r);
+  }
+  drawCorona(DB.subarray(0,binCount),conf);
+}
+
+/* ================= VISUALIZATION ================= */
+const canvas=$('mainCanvas'),ctx=canvas.getContext('2d');
+let CS=520;
+function resizeCanvas(){CS=Math.min(innerWidth,innerHeight)-90;canvas.width=canvas.height=Math.max(240,CS);}
+function drawCorona(db,confs){
+  const W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=Math.min(W,H)*0.34;
+  ctx.clearRect(0,0,W,H);
+  const t=performance.now()/1000;
+  /* centro glow */
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*1.6);
+  g.addColorStop(0,'rgba(124,92,255,.10)');g.addColorStop(1,'rgba(10,13,26,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  /* anello spettro: 64 barre */
+  const nb=db.length,bars=72;
+  for(let i=0;i<bars;i++){
+    const bi=Math.floor(i/bars*nb);
+    const amp=clamp((db[bi]+90)/90,0,1);
+    const a=i/bars*Math.PI*2;
+    const h=amp*R*0.55;
+    ctx.strokeStyle='hsla('+(190+i*1.4)+',90%,'+(55+amp*20)+'%,'+(0.25+amp*0.6)+')';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);
+    ctx.lineTo(cx+Math.cos(a)*(R+h),cy+Math.sin(a)*(R+h));
+    ctx.stroke();
+  }
+  /* corona generi: 4 archi, spessore = confidenza */
+  const seg=Math.PI/2;
+  for(let k=0;k<4;k++){
+    const a0=-Math.PI/2+k*seg;
+    const c=confs[k];
+    const w=2+c*9;
+    ctx.strokeStyle=GCOL[GENRES[k]];
+    ctx.globalAlpha=0.25+c*0.75;
+    ctx.lineWidth=w;
+    ctx.beginPath();
+    ctx.arc(cx,cy,R*1.25, a0+0.02, a0+seg-0.02);
+    ctx.stroke();
+    ctx.globalAlpha=1;
+    /* etichetta */
+    const la=a0+seg/2;
+    const lx=cx+Math.cos(la)*(R*1.55),ly=cy+Math.sin(la)*(R*1.55);
+    ctx.fillStyle=c>0.5?GCOL[GENRES[k]]:'#5a6b8b';
+    ctx.font='700 '+(10+Math.round(c*4))+'px Inter,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(GNAME[GENRES[k]],lx,ly);
+  }
+  /* centro: genere dominante */
+  let best=0;for(let k=1;k<4;k++)if(confs[k]>confs[best])best=k;
+  ctx.fillStyle=GCOL[GENRES[best]];
+  ctx.font='800 '+Math.round(R*0.3)+'px Inter,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(GNAME[GENRES[best]],cx,cy-R*0.05);
+  ctx.font='600 '+Math.round(R*0.13)+'px Inter,sans-serif';
+  ctx.fillStyle='#8892b0';
+  ctx.fillText(Math.round(confs[best]*100)+'%',cx,cy+R*0.14);
+  /* anello di rotazione */
+  ctx.strokeStyle='rgba(0,212,255,.12)';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(cx,cy,R*1.25,0,6.283);ctx.stroke();
+  ctx.strokeStyle='rgba(0,212,255,.3)';
+  ctx.beginPath();ctx.arc(cx,cy,R,0,6.283);ctx.stroke();
+}
+function drawNet(force,feats,res){
+  const cv=$('net'),cx=cv.getContext('2d');
+  const W=cv.width,Hh=cv.height;
+  cx.clearRect(0,0,W,Hh);
+  cx.fillStyle='rgba(4,7,18,.92)';cx.fillRect(0,0,W,Hh);
+  const X=[24,118,200],counts=[12,16,4];
+  const y=(l,i)=>Hh/2+(i-(counts[l]-1)/2)*5.2;
+  const t=performance.now()/1000;
+  cx.strokeStyle='rgba(0,212,255,0.07)';cx.lineWidth=1;
+  for(let l=0;l<2;l++)for(let i=0;i<counts[l];i++)for(let j=0;j<counts[l+1];j++){
+    cx.beginPath();cx.moveTo(X[l],y(l,i));cx.lineTo(X[l+1],y(l+1,j));cx.stroke();
+  }
+  for(let i=0;i<12;i++){
+    const v=feats?feats[i]:0;
+    cx.fillStyle=v>=0.5?'rgba(0,212,255,'+(0.3+v*0.6)+')':'rgba(124,92,255,'+(0.3+Math.abs(v-0.5)*0.6)+')';
+    cx.beginPath();cx.arc(X[0],y(0,i),2.4,0,6.283);cx.fill();
+  }
+  for(let j=0;j<16;j++){
+    const v=res?Math.abs(res.h[j]):0;
+    cx.fillStyle='rgba(0,212,255,'+(0.25+Math.min(1,v)*0.7)+')';
+    const r=2.2+v*1.6+Math.sin(t*2+j)*0.2;
+    cx.beginPath();cx.arc(X[1],y(1,j),r,0,6.283);cx.fill();
+  }
+  for(let k=0;k<4;k++){
+    const v=res?res.outs[k]:0;
+    cx.fillStyle=GCOL[GENRES[k]];
+    cx.globalAlpha=0.35+v*0.65;
+    cx.beginPath();cx.arc(X[2],y(2,k),3.5+v*3,0,6.283);cx.fill();
+    cx.globalAlpha=1;
+  }
+  cx.fillStyle='#5a6b8b';cx.font='7px sans-serif';cx.textAlign='center';
+  cx.fillText('FEAT 12',X[0],Hh-4);
+  cx.fillText('HIDDEN 16',X[1],Hh-4);
+  cx.fillText('GENRE 4',X[2],Hh-4);
+}
+
+/* ================= UI ================= */
+function initUI(){
+  $('btnLive').onclick=startLive;
+  $('btnFile').onclick=()=>$('fileAudio').click();
+  $('fileAudio').onchange=e=>{if(e.target.files[0])playFile(e.target.files[0]);e.target.value='';};
+  $('btnStop').onclick=stop;
+  document.querySelectorAll('.genreItem').forEach(el=>{
+    el.onclick=()=>{
+      toast('🎵 '+GNAME[el.dataset.genre]+' — spectral profile ready','var(--cyan)');
+    };
+  });
+  $('btnInfo').onclick=()=>$('infoModal').classList.add('on');
+  $('btnInfoClose').onclick=()=>$('infoModal').classList.remove('on');
+  $('infoModal').addEventListener('click',e=>{if(e.target===$('infoModal'))$('infoModal').classList.remove('on');});
+  addEventListener('resize',resizeCanvas);
+  resizeCanvas();
+  drawNet(true);
+  trainNN();
+}
+initUI();
+</script>
+</body>
+</html>

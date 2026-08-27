@@ -487,5 +487,50 @@ const PROJECTS_DATA = [
     "emoji": "📁",
     "badge": "Utility / iOS",
     "badgeColor": "#00d4ff"
+  },
+  {
+    "id": "genetic-art",
+    "title": "Genetic Art — Evoluzione Artistica",
+    "description": "Disegna creature bioluminescenti e falli evolvere: crossover, mutazioni, fitness che impara il tuo gusto, albero genealogico 3D, diorama e suoni. Three.js + algoritmi genetici puri.",
+    "href": "projects/genetic-art.html",
+    "emoji": "🧬",
+    "badge": "GA / Three.js",
+    "badgeColor": "#00ffd0"
+  },
+  {
+    "id": "tsne-3d",
+    "title": "T-SNE 3D — Dispiegamento dei Dati",
+    "description": "Carica un CSV e guarda i dati dispiegarsi in 3D: t-SNE in-browser (Web Worker), coerenza del clustering live, k-means, pianeta dei dati, export PNG/JSON/CSV. Three.js + riduzione dimensionale.",
+    "href": "projects/tsne-3d.html",
+    "emoji": "🌌",
+    "badge": "ML / 3D",
+    "badgeColor": "#3ee6ff"
+  },
+  {
+    "id": "face-lab",
+    "title": "FACE LAB — Distortion Mirror",
+    "description": "Live facial-landmark AI: 68 points trace your face in 3D with a holographic wireframe, real-time telemetry (blink, smile, head pose, emotion) and six distortion modes (giant eyes, funhouse, fish-eye, emoji, cartoon). MediaPipe + Three.js, on-device.",
+    "href": "projects/face-lab.html",
+    "emoji": "👁️",
+    "badge": "CV / AI",
+    "badgeColor": "#ff5f9e"
+  },
+  {
+    "id": "neural-flock",
+    "title": "NEURAL FLOCK — Smart Swarm",
+    "description": "A hypnotic 3D swarm of boids steered by a tiny neural network (19→28→3) trained live in your browser. Pick a target shape — heart, spiral, text, your drawing — and watch the flock learn to form it. Three.js + pure-JS AI.",
+    "href": "projects/neural-flock.html",
+    "emoji": "🕊️",
+    "badge": "NN / Particles",
+    "badgeColor": "#b28dff"
+  },
+  {
+    "id": "pocket-wild",
+    "title": "POCKET WILD — Catch. Build. Mutate.",
+    "description": "A 2D top-down creature-capture survival game à la Palworld: procedural biomes, throw spheres to catch geometric Pals, evolve, splice genes in the lab, fuse, build a base, fight Alpha bosses. Vanilla JS, zero assets, iPhone + desktop.",
+    "href": "projects/pocket-wild.html",
+    "emoji": "🐾",
+    "badge": "Game / Survival",
+    "badgeColor": "#52ff9e"
   }
 ];
