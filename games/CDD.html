@@ -2,608 +2,758 @@
 <html lang="it">
 <head>
 	<meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=yes" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+	<meta name="theme-color" content="#0f172a" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
 	<title>CDD RUN — Endless Runner</title>
 	<style>
 		:root{
-			--top-bar:0px;
 			--primary:#6366f1;
 			--secondary:#ec4899;
 			--accent:#f43f5e;
-			--bg-sky:#0f172a;
-			--bg-ground:#1e293b;
-			--card:rgba(30,32,34,0.85);
+			--bg-sky:#0b1026;
 			--text:#f1f5f9;
 		}
-		html,body{height:100%;margin:0;overflow:hidden;touch-action:none;}
-		body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-sky);color:var(--text);}
-		#top-ui{position:absolute;top:calc(var(--top-bar)+12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:1000;}
-		#score{pointer-events:auto;background:var(--card);padding:12px 20px;border-radius:12px;font-weight:700;font-size:1.2rem;margin:8px 0;transition:all 0.3s ease;}
-		#back-btn{pointer-events:auto;background:var(--primary);color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;border:2px solid rgba(255,255,255,0.2);font-size:1rem;font-weight:600;transition:all 0.3s ease;}
-		#start-screen,#game-over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.95);color:var(--text);pointer-events:auto;z-index:1001;}
-		.panel{background:var(--card);padding:28px;border-radius:16px;max-width:420px;width:90%;text-align:center;}
-		button{appearance:none;border:0;background:var(--primary);color:#fff;padding:14px 28px;border-radius:10px;font-size:1.1rem;cursor:pointer;transition:all 0.25s ease;}
-		button:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,0.4);}
-		button.alt{background:var(--secondary);}
-		/* Mobile controls */
-		#mobile-controls{position:fixed;bottom:18px;left:18px;right:18px;display:flex;justify-content:space-between;gap:14px;pointer-events:none;z-index:1002;}
-		.ctrl{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;color:var(--text);font-weight:700;pointer-events:auto;border:2px solid rgba(255,255,255,0.2);}
-		/* hide mobile controls on desktop */
-		@media(min-width:720px){#mobile-controls{display:none}}
-		#game-over{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;z-index:1002;}
-		#game-over h2{font-size:2rem;margin:0 0 12px 0;}
-		#final-score{font-size:1.5rem;color:var(--primary);margin:8px 0 24px;}
-		#level-badge{font-size:0.85rem;color:var(--text);opacity:0.8;}
-		#powerup-indicator{position:absolute;top:80px;left:12px;background:var(--card);padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);display:none;}
-		#high-score{position:absolute;top:120px;left:12px;background:var(--card);padding:8px 12px;border-radius:8px;font-size:0.8rem;color:var(--text);}
-		.particle{position:absolute;animation:floatUp 1.2s ease-out forwards;}
-		@keyframes floatUp{0%{transform:translateY(0) scale(1)}20%{transform:translateY(-40px) scale(1.2)}100%{transform:translateY(-60px) scale(0.3);opacity:0;}
+		html,body{height:100%;margin:0;overflow:hidden;touch-action:none;-webkit-tap-highlight-color:transparent;}
+		body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-sky);color:var(--text);user-select:none;-webkit-user-select:none;}
+		canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-action:none;}
+
+		/* HUD sotto la barra del sito */
+		#top-ui{position:absolute;top:calc(var(--site-top-bar-height, 0px) + 12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none;z-index:1000;}
+		#top-ui > *{pointer-events:auto;}
+		.chip{background:rgba(15,23,42,.75);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);padding:9px 14px;border-radius:12px;font-weight:700;font-size:0.95rem;white-space:nowrap;}
+		.chip b{color:var(--secondary);}
+		#score{font-size:1.15rem;}
+		#score b{color:var(--primary);}
+		#right-chips{display:flex;gap:6px;align-items:center;}
+		.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+		.icon-btn:active{transform:scale(.92);}
+		#powerup-indicator{position:absolute;top:calc(var(--site-top-bar-height, 0px) + 62px);left:12px;background:rgba(15,23,42,.8);backdrop-filter:blur(8px);padding:8px 14px;border-radius:10px;font-size:0.85rem;font-weight:700;display:none;z-index:1000;border:1px solid rgba(255,255,255,.14);}
+
+		/* Overlay schermate */
+		.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,11,25,.7);backdrop-filter:blur(10px);z-index:1001;padding:20px;}
+		.overlay.hidden{display:none;}
+		.panel{background:linear-gradient(160deg,rgba(30,34,60,.92),rgba(15,18,38,.92));border:1px solid rgba(99,102,241,.35);border-radius:22px;padding:30px 26px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.55);}
+		.panel h1{margin:0 0 6px;font-size:clamp(28px,9vw,40px);background:linear-gradient(92deg,var(--primary),var(--secondary),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.03em;}
+		.panel .sub{color:#9fb0d0;font-size:14px;line-height:1.55;margin:0 0 6px;}
+		.panel .howto{color:#7e8fb5;font-size:12.5px;line-height:1.7;margin:10px 0 18px;display:flex;flex-direction:column;gap:3px;align-items:center;}
+		.howto span{display:inline-flex;align-items:center;gap:8px;}
+		.kbd{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;}
+		.btn-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+		.btn{appearance:none;border:0;cursor:pointer;font-family:inherit;font-weight:800;font-size:1rem;padding:14px 26px;border-radius:14px;color:#fff;transition:transform .12s,box-shadow .2s;min-height:48px;}
+		.btn:active{transform:scale(.95);}
+		.btn-primary{background:linear-gradient(92deg,var(--primary),#8b5cf6);box-shadow:0 10px 28px rgba(99,102,241,.4);}
+		.btn-alt{background:linear-gradient(92deg,var(--secondary),var(--accent));box-shadow:0 10px 28px rgba(236,72,153,.35);}
+		.btn-ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);}
+		.best-line{margin-top:14px;font-size:13px;color:#ffd54a;font-weight:700;}
+
+		#game-over .panel h2{font-size:30px;margin:0 0 8px;background:linear-gradient(92deg,var(--accent),#f59e0b);-webkit-background-clip:text;background-clip:text;color:transparent;}
+		#final-score{font-size:1.4rem;font-weight:800;color:#fff;margin:6px 0 18px;}
+		#final-score b{color:var(--accent);}
+
+		/* Controlli mobile */
+		#mobile-controls{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:14px;right:14px;display:flex;justify-content:space-between;gap:12px;pointer-events:none;z-index:1002;}
+		.ctrl{width:62px;height:62px;border-radius:18px;background:rgba(255,255,255,.12);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:22px;pointer-events:auto;border:1.5px solid rgba(255,255,255,.22);touch-action:none;user-select:none;}
+		.ctrl:active{transform:scale(.92);background:rgba(99,102,241,.45);}
+		#ctrl-jump{background:rgba(236,72,153,.25);}
+		#ctrl-left{justify-self:flex-start;}
+		#ctrl-right{justify-self:flex-end;}
+		@media (hover:hover) and (pointer:fine){ #mobile-controls{display:none;} }
 	</style>
 </head>
 <body>
-		<a id="back-btn" href="../index.html#games">← Exit</a>
-		<div id="top-ui">
-			<div id="score">Score: <span id="score-val">0</span></div>
-			<div id="level-badge">Level <span id="level-num">1</span></div>
-			<div id="speed-badge">Speed <span id="speed-val">1x</span></div>
+	<div id="top-ui">
+		<div class="chip" id="score">Score <b id="score-val">0</b></div>
+		<div id="right-chips">
+			<div class="chip" id="level-badge">Liv. <b id="level-num">1</b></div>
+			<div class="chip" id="speed-badge">Vel. <b id="speed-val">1x</b></div>
+			<div class="chip" id="high-score">🏆 <b id="high-score-val">0</b></div>
+			<button class="icon-btn" id="mute-btn" aria-label="Audio">🔊</button>
 		</div>
-		<div id="powerup-indicator"></div>
-		<div id="high-score">Best: <span id="high-score-val">0</span></div>
+	</div>
+	<div id="powerup-indicator"></div>
 
-		<canvas id="c"></canvas>
+	<canvas id="c"></canvas>
 
-		<div id="start-screen">
-			<div class="panel">
-				<h1 style="margin:0 0 8px 0;color:var(--primary)">🏃 CDD RUN 🏃</h1>
-				<p style="margin:0 0 20px 0;color:var(--text)">Sposta il corridore a sinistra/destra per evitare ostacoli e raccogliere monete.</p>
-				<div style="display:flex;gap:12px;justify-content:center">
-					<button id="start" class="btn">🎮 PLAY</button>
-					<button id="demo" class="btn alt">📘 TUTORIAL</button>
-				</div>
-				<p style="margin-top:12px;color:var(--text);font-size:0.95rem">Tastiere: ← → • Mobile: swipe o bottoni</p>
+	<div id="start-screen" class="overlay">
+		<div class="panel">
+			<h1>🏃 CDD RUN 🏃</h1>
+			<p class="sub">Evita gli ostacoli, raccogli monete e potenziamenti.<br>Quanto lontano arrivi?</p>
+			<div class="howto">
+				<span>◀ ▶ &nbsp;o&nbsp; <span class="kbd">A</span><span class="kbd">D</span> &nbsp;cambia corsia</span>
+				<span>⬆ &nbsp;o&nbsp; <span class="kbd">SPAZIO</span> &nbsp;salta</span>
+				<span>📱 swipe per muoverti e saltare</span>
+			</div>
+			<div class="btn-row">
+				<button class="btn btn-primary" id="start">🎮 GIOCA</button>
+				<button class="btn btn-ghost" id="demo">📘 TUTORIAL</button>
+			</div>
+			<div class="best-line" id="start-best"></div>
+		</div>
+	</div>
+
+	<div id="game-over" class="overlay hidden">
+		<div class="panel">
+			<h2>🏁 GAME OVER</h2>
+			<div id="final-score">Punteggio: <b id="final-score-val">0</b></div>
+			<div class="btn-row">
+				<button class="btn btn-primary" id="restart">🔄 RIGIOCA</button>
+				<button class="btn btn-ghost" id="exit">❌ ESCI</button>
 			</div>
 		</div>
+	</div>
 
-		<div id="game-over" style="display:none">
-			<div class="panel">
-				<h2 style="margin:0 0 8px 0;color:var(--accent)">🏁 GAME OVER</h2>
-				<p style="margin:0 0 16px 0;color:var(--text)">Punteggio: <strong id="final-score">0</strong></p>
-				<div style="margin-top:12px;color:var(--text);font-size:1rem">
-					<button id="restart" class="btn">🔄 RIGIOCA</button>
-					<button id="exit" class="alt">❌ ESCI</button>
-				</div>
-			</div>
-		</div>
+	<div id="mobile-controls">
+		<div id="ctrl-left" class="ctrl">◀</div>
+		<div id="ctrl-jump" class="ctrl">⬆</div>
+		<div id="ctrl-right" class="ctrl">▶</div>
+	</div>
 
-		<div id="mobile-controls">
-			<div id="btn-left" class="ctrl">◀</div>
-			<div id="btn-right" class="ctrl">▶</div>
-		</div>
+	<script>
+		'use strict';
+		/* ============================================================
+		   CDD RUN — endless runner pseudo-3D (Canvas 2D, zero dipendenze)
+		   ============================================================ */
+		const canvas = document.getElementById('c');
+		const ctx = canvas.getContext('2d');
+		const els = {
+			score: document.getElementById('score-val'),
+			level: document.getElementById('level-num'),
+			speed: document.getElementById('speed-val'),
+			highScore: document.getElementById('high-score-val'),
+			powerup: document.getElementById('powerup-indicator'),
+			start: document.getElementById('start'),
+			demo: document.getElementById('demo'),
+			restart: document.getElementById('restart'),
+			exit: document.getElementById('exit'),
+			startScreen: document.getElementById('start-screen'),
+			gameOver: document.getElementById('game-over'),
+			finalScore: document.getElementById('final-score-val'),
+			mute: document.getElementById('mute-btn'),
+			startBest: document.getElementById('start-best'),
+			btnLeft: document.getElementById('ctrl-left'),
+			btnRight: document.getElementById('ctrl-right'),
+			btnJump: document.getElementById('ctrl-jump')
+		};
 
-		<script>
-			// CDD RUN - Enhanced Endless Runner
-			const canvas = document.getElementById('c');
-			const ctx = canvas.getContext('2d');
-			const scoreEl = document.getElementById('score-val');
-			const levelEl = document.getElementById('level-num');
-			const speedEl = document.getElementById('speed-val');
-			const highScoreEl = document.getElementById('high-score-val');
-			const powerupEl = document.getElementById('powerup-indicator');
-			const startBtn = document.getElementById('start');
-			const demoBtn = document.getElementById('demo');
-			const restartBtn = document.getElementById('restart');
-			const exitBtn = document.getElementById('exit');
-			const backBtn = document.getElementById('back-btn');
+		let W, H, DPR, LANE_W = 140, groundY = 0, horizonY = 0;
+		function resize() {
+			W = innerWidth; H = innerHeight;
+			DPR = Math.min(window.devicePixelRatio || 1, 2);
+			canvas.width = Math.round(W * DPR);
+			canvas.height = Math.round(H * DPR);
+			ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+			LANE_W = Math.min(150, Math.max(95, W * 0.36));
+			horizonY = H * 0.40;
+			groundY = H * 0.58;
+			buildStars();
+		}
+		window.addEventListener('resize', resize);
 
-			let W, H;
-			function resize(){
-				W = canvas.width = innerWidth;
-				H = canvas.height = innerHeight;
-				document.documentElement.style.setProperty('--top-bar', getComputedStyle(document.body).getPropertyValue('--top-bar') || '0px');
+		// ---------------- audio (lazy, sicuro su iPhone) ----------------
+		let ac = null, muted = (localStorage.getItem('cddMuted') === '1');
+		els.mute.textContent = muted ? '🔇' : '🔊';
+		function ensureAudio() {
+			if (muted) return;
+			if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+			if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+		}
+		function playSound(freq, dur, type, vol, slide) {
+			if (muted || !ac) return;
+			try {
+				const t0 = ac.currentTime;
+				const o = ac.createOscillator(), g = ac.createGain();
+				o.type = type || 'sine';
+				o.frequency.setValueAtTime(freq, t0);
+				if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(1, slide), t0 + dur);
+				g.gain.setValueAtTime(vol || 0.08, t0);
+				g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+				o.connect(g); g.connect(ac.destination);
+				o.start(t0); o.stop(t0 + dur + 0.05);
+			} catch (e) {}
+		}
+		document.addEventListener('pointerdown', ensureAudio, { once: false, passive: true });
+		els.mute.addEventListener('click', () => {
+			muted = !muted;
+			localStorage.setItem('cddMuted', muted ? '1' : '0');
+			els.mute.textContent = muted ? '🔇' : '🔊';
+			if (!muted) ensureAudio();
+		});
+
+		// ---------------- stato ----------------
+		const LANES = 3;
+		const PLAYER_W = 46, PLAYER_H = 84;
+		const player = { lane: 1, target: 1, y: 0, jumping: false, jumpVel: 0, jumpH: 0, runPhase: 0 };
+		let obstacles = [], coins = [], powerups = [], particles = [], clouds = [], hills = [];
+		let time = 0, running = false, last = 0, speed = 350, baseSpeed = 350;
+		let level = 1, levelMultiplier = 1, score = 0, spawnTimer = 0, highScore = 0;
+		let activePowerup = null, powerupTimer = 0, shieldActive = false, magnetActive = false, speedBoostActive = false;
+		let shake = 0;
+
+		try { highScore = Number(localStorage.getItem('cddHighScore')) || 0; } catch (e) {}
+		els.highScore.textContent = Math.floor(highScore);
+		els.startBest.textContent = highScore > 0 ? '🏆 Record: ' + Math.floor(highScore) : '';
+
+		// ---------------- mondo di sfondo ----------------
+		let stars = [];
+		function buildStars() {
+			stars = [];
+			const n = Math.min(70, Math.floor(W * H / 9000));
+			for (let i = 0; i < n; i++) stars.push({ x: Math.random() * W, y: Math.random() * horizonY * 0.9, r: 0.5 + Math.random() * 1.3, tw: Math.random() * 6.28 });
+		}
+		// colline lontane (parallasse)
+		for (let i = 0; i < 7; i++) hills.push({ x: Math.random(), w: 0.12 + Math.random() * 0.16, h: 0.05 + Math.random() * 0.09, layer: Math.random() < 0.5 ? 0 : 1 });
+		// nuvole
+		function spawnCloud() {
+			if (Math.random() < 0.03 && clouds.length < 8) {
+				clouds.push({ x: W + 80, y: 60 + Math.random() * (horizonY - 110), s: 30 + Math.random() * 45, v: 12 + Math.random() * 22 });
 			}
-			window.addEventListener('resize', resize);
-			resize();
+		}
 
-			// Game State
-			const LANES = 3;
-			const LANE_W = 140;
-			const PLAYER_WIDTH = 48;
-			const PLAYER_HEIGHT = 90;
+		// ---------------- logica ----------------
+		function worldToScreen(lane, depth) {
+			const persp = 1 / (1 + depth * 0.004);
+			const y = horizonY + (groundY - horizonY) * persp;
+			const scale = 0.45 + persp * 0.9;
+			return { x: W / 2 + (lane - 1) * LANE_W, y, scale };
+		}
 
-			let player = {
-				lane: 1, target: 1, x: 0, y: 0,
-				width: PLAYER_WIDTH, height: PLAYER_HEIGHT,
-				color: '#6366f1', isJumping: false, jumpVel: 0, jumpHeight: 0
-			};
+		function spawn() {
+			const z = time + 500 + Math.random() * 420;
+			const lane = Math.floor(Math.random() * LANES);
+			obstacles.push({ lane, z, type: Math.random() < 0.55 ? 'box' : 'tall' });
+			for (let i = 0; i < LANES; i++) {
+				if (i !== lane && Math.random() < 0.4) coins.push({ lane: i, z: z - 90 + Math.random() * 200 });
+			}
+			if (Math.random() < 0.15) {
+				const ptype = ['shield', 'magnet', 'speed'][Math.floor(Math.random() * 3)];
+				powerups.push({ lane: Math.floor(Math.random() * LANES), z: z + 120, type: ptype });
+			}
+		}
 
-			let obstacles = [];
-			let coins = [];
-			let powerups = [];
-			let particles = [];
-			let clouds = [];
-			let trees = [];
+		function reset() {
+			obstacles = []; coins = []; powerups = []; particles = [];
+			clouds = []; time = 0; last = 0;
+			speed = baseSpeed; score = 0; spawnTimer = 0;
+			level = 1; levelMultiplier = 1;
+			player.lane = 1; player.target = 1;
+			player.jumping = false; player.jumpVel = 0; player.jumpH = 0;
+			activePowerup = null; powerupTimer = 0;
+			shieldActive = false; magnetActive = false; speedBoostActive = false;
+			shake = 0;
+			updateUI();
+		}
 
-			let time = 0;
-			let running = false, last = 0;
-			let speed = 350, baseSpeed = 350, level = 1, levelMultiplier = 1;
-			let score = 0;
-			let highScore = localStorage.getItem('cddHighScore') || 0;
-			let spawnTimer = 0;
-			let activePowerup = null;
-			let powerupTimer = 0;
-			let shieldActive = false;
-			let magnetActive = false;
-			let speedBoostActive = false;
+		function updateUI() {
+			els.score.textContent = Math.floor(score);
+			els.level.textContent = level;
+			els.speed.textContent = Math.round(levelMultiplier * 10) / 10 + 'x';
+			els.powerup.style.display = activePowerup ? 'block' : 'none';
+			if (activePowerup) {
+				const icons = { shield: '🛡️ Scudo', magnet: '🧲 Magnete', speed: '⚡ Turbo' };
+				els.powerup.textContent = (icons[activePowerup] || activePowerup) + ' · ' + Math.max(0, powerupTimer).toFixed(1) + 's';
+			}
+		}
 
-			// Audio
-			const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-			function playSound(freq, duration, type = 'sine') {
-				try {
-					const osc = audioCtx.createOscillator();
-					const gain = audioCtx.createGain();
-					osc.connect(gain);
-					gain.connect(audioCtx.destination);
-					osc.frequency.value = freq;
-					osc.type = type;
-					gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-					gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-					osc.start();
-					osc.stop(audioCtx.currentTime + duration);
-				} catch(e) {}
+		function update(dt) {
+			if (!running) return;
+			time += dt;
+			score += dt * 1.2 + (time / 10) * dt * 0.5;
+			if (Math.floor(score / 100) > Math.floor((score - dt * 1.2) / 100)) playSound(880, 0.08, 'sine', 0.06);
+
+			// corsia
+			const diff = player.target - player.lane;
+			player.lane += diff * Math.min(1, 8 * dt);
+			player.runPhase += dt * 10;
+
+			// salto
+			if (player.jumping) {
+				player.jumpH += player.jumpVel * dt;
+				player.jumpVel += 980 * dt;
+				if (player.jumpH <= 0) { player.jumping = false; player.jumpH = 0; player.jumpVel = 0; }
 			}
 
-			function reset(){
-				obstacles = [];
-				coins = [];
-				powerups = [];
-				particles = [];
-				clouds = [];
-				trees = [];
-				running = false;
-				last = 0;
-				speed = baseSpeed;
-				score = 0;
-				time = 0;
-				spawnTimer = 0;
-				player.lane = 1;
-				player.target = 1;
-				player.isJumping = false;
-				player.jumpVel = 0;
-				player.jumpHeight = 0;
-				activePowerup = null;
-				powerupTimer = 0;
-				shieldActive = false;
-				magnetActive = false;
-				speedBoostActive = false;
-				level = 1;
-				levelMultiplier = 1;
-				updateUI();
+			// velocità e livello
+			levelMultiplier = Math.min(4, 1 + Math.log(time / 30 + 1) * 0.35);
+			level = Math.floor(1 + time / 15);
+			speed = baseSpeed * levelMultiplier;
+
+			// spawn
+			spawnTimer -= dt * 1000;
+			if (spawnTimer <= 0) { spawn(); spawnTimer = 460 + Math.random() * 580; }
+			spawnCloud();
+
+			// avanzamento ostacoli/monete/powerup — rimossi SOLO dopo il giocatore
+			for (let i = obstacles.length - 1; i >= 0; i--) {
+				obstacles[i].z -= speed * dt;
+				if (obstacles[i].z < time - 260) obstacles.splice(i, 1);
+			}
+			for (let i = coins.length - 1; i >= 0; i--) {
+				coins[i].z -= speed * dt;
+				if (coins[i].z < time - 220) coins.splice(i, 1);
+			}
+			for (let i = powerups.length - 1; i >= 0; i--) {
+				powerups[i].z -= speed * dt;
+				if (powerups[i].z < time - 220) powerups.splice(i, 1);
 			}
 
-			function updateUI(){
-				scoreEl.textContent = Math.floor(score);
-				levelEl.textContent = level;
-				speedEl.textContent = `${Math.round(baseSpeed * levelMultiplier)}x`;
-				highScoreEl.textContent = Math.floor(highScore);
-				powerupEl.style.display = activePowerup ? 'block' : 'none';
-				if(activePowerup) powerupEl.textContent = activePowerup;
+			// nuvole
+			for (let i = clouds.length - 1; i >= 0; i--) {
+				clouds[i].x -= clouds[i].v * dt;
+				if (clouds[i].x < -100) clouds.splice(i, 1);
 			}
 
-			function worldToScreen(lane, depth){
-				const centerX = W/2 + (lane - 1) * LANE_W;
-				const perspective = 1 / (1 + depth * 0.004);
-				const x = centerX;
-				const y = H * (0.5 + 0.45 * (1 - perspective));
-				const scale = perspective * 1.3;
-				return { x, y, scale };
+			// particelle
+			for (let i = particles.length - 1; i >= 0; i--) {
+				const p = particles[i];
+				p.x += p.vx * dt; p.y += p.vy * dt;
+				p.vy += 160 * dt; p.life -= dt * 1.6;
+				if (p.life <= 0) particles.splice(i, 1);
 			}
 
-			function spawn(){
-				const z = time + 500 + Math.random() * 400;
-				const lane = Math.floor(Math.random() * LANES);
-				const type = Math.random() < 0.55 ? 'box' : 'tall';
-				obstacles.push({ lane, z, type });
-
-				// Spawn coins
-				for(let i=0;i<LANES;i++) if(i!==lane && Math.random()<0.35) coins.push({ lane:i, z:z - 80 + Math.random()*180 });
-
-				// Spawn powerups occasionally
-				if(Math.random() < 0.15) {
-					const ptype = ['shield', 'magnet', 'speed'][Math.floor(Math.random()*3)];
-					powerups.push({ lane: Math.floor(Math.random()*LANES), z: z + 100, type: ptype });
-				}
+			// scia del turbo
+			if (speedBoostActive && Math.random() < 0.5) {
+				const pos = worldToScreen(player.lane, 0);
+				particles.push({ x: pos.x + (Math.random() - 0.5) * 20, y: pos.y - 10 + Math.random() * 20, vx: (Math.random() - 0.5) * 60, vy: 120 + Math.random() * 80, life: 0.7, color: '#38bdf8', size: 3 + Math.random() * 3 });
 			}
 
-			function spawnClouds(){
-				if(Math.random() < 0.02) {
-					clouds.push({
-						x: W + 100,
-						y: 80 + Math.random() * 120,
-						size: 40 + Math.random() * 60,
-						speed: 20 + Math.random() * 30
-					});
-				}
-			}
-
-			function spawnTrees(){
-				if(Math.random() < 0.01) {
-					trees.push({
-						x: W + 30,
-						y: H * 0.62,
-						size: 30 + Math.random() * 20
-					});
-				}
-			}
-
-			function update(dt){
-				if(!running) return;
-				time += dt;
-				score += dt * 1.2 + (time/10) * dt * 0.5;
-				updateUI();
-
-				// Lane interpolation
-				const laneDiff = player.target - player.lane;
-				player.lane += laneDiff * Math.min(1, 8 * dt);
-
-				// Jump physics
-				if(player.isJumping) {
-					player.jumpHeight += player.jumpVel * dt;
-					player.jumpVel += 980 * dt; // gravity
-					if(player.jumpHeight <= 0) {
-						player.isJumping = false;
-						player.jumpHeight = 0;
-						player.jumpVel = 0;
-					}
-				}
-
-				// Speed scaling
-				speed = baseSpeed * levelMultiplier;
-
-				// Spawn logic
-				spawnTimer -= dt*1000;
-				if(spawnTimer <= 0){ spawn(); spawnTimer = 500 + Math.random()*600; }
-
-				// Spawn background elements
-				spawnClouds();
-				spawnTrees();
-
-				// Move obstacles/coins
-				for(let i=obstacles.length-1;i>=0;i--){
-					obstacles[i].z -= speed * dt;
-					if(obstacles[i].z < time + 250) obstacles.splice(i,1);
-				}
-				for(let i=coins.length-1;i>=0;i--){
-					coins[i].z -= speed * dt;
-					if(coins[i].z < time + 220) coins.splice(i,1);
-				}
-				for(let i=powerups.length-1;i>=0;i--){
-					powerups[i].z -= speed * dt;
-					if(powerups[i].z < time + 220) powerups.splice(i,1);
-				}
-
-				// Move clouds and trees
-				for(let i=clouds.length-1;i>=0;i--){
-					clouds[i].x -= clouds[i].speed * dt;
-					if(clouds[i].x < -100) clouds.splice(i,1);
-				}
-				for(let i=trees.length-1;i>=0;i--){
-					trees[i].x -= speed * 0.3 * dt;
-					if(trees[i].x < -30) trees.splice(i,1);
-				}
-
-				// Update particles
-				for(let i=particles.length-1;i>=0;i--){
-					const p = particles[i];
-					p.x += p.vx * dt;
-					p.y += p.vy * dt;
-					p.life -= dt * 1.5;
-					p.vy += 150 * dt;
-					if(p.life <= 0) particles.splice(i,1);
-				}
-
-				// Collision detection
-				for(let i=obstacles.length-1;i>=0;i--){
-					const ob = obstacles[i];
-					if(Math.abs(ob.z - time) < 120 && Math.abs(ob.lane - Math.round(player.lane)) < 0.5 && !player.isJumping){
-						if(!shieldActive) {
-							running = false;
-							gameOver();
-							playSound(100, 0.3, 'square');
-							return;
-						} else {
-							// Shield absorbs hit
-							shieldActive = false;
-							activePowerup = null;
-							createParticles(W/2, H/2, 'shield', 20);
-							playSound(300, 0.2, 'sine');
-							obstacles.splice(i,1);
-						}
-					}
-				}
-
-				// Coin collection
-				for(let i=coins.length-1;i>=0;i--){
-					const c = coins[i];
-					const magnetRange = magnetActive ? 200 : 120;
-					if(Math.abs(c.z - time) < magnetRange && Math.abs(c.lane - Math.round(player.lane)) < 0.5){
-						score += 100;
-						createParticles(c.x || W/2, c.y || H/2, 'coin', 8);
-						coins.splice(i,1);
+			// collisioni ostacoli
+			const pLane = Math.round(player.lane);
+			for (let i = obstacles.length - 1; i >= 0; i--) {
+				const ob = obstacles[i];
+				if (Math.abs(ob.z - time) < 120 && Math.abs(ob.lane - pLane) < 0.5 && !player.jumping) {
+					if (!shieldActive) {
+						running = false;
+						shake = 1;
+						playSound(100, 0.3, 'square', 0.12, 40);
+						gameOver();
+						return;
+					} else {
+						shieldActive = false; activePowerup = null;
+						createParticlesAt(W / 2, groundY - 60, '#60a5fa', 22);
+						playSound(300, 0.2, 'sine', 0.1);
+						obstacles.splice(i, 1);
 						updateUI();
-						playSound(880, 0.1, 'sine');
 					}
 				}
-
-				// Powerup collection
-				for(let i=powerups.length-1;i>=0;i--){
-					const p = powerups[i];
-					if(Math.abs(p.z - time) < 120 && Math.abs(p.lane - Math.round(player.lane)) < 0.5){
-						activatePowerup(p.type);
-						powerups.splice(i,1);
-						playSound(600, 0.2, 'triangle');
-					}
-				}
-
-				// Powerup timer
-				if(activePowerup) {
-					powerupTimer -= dt;
-					if(powerupTimer <= 0) {
-						deactivatePowerup();
-					}
-				}
-
-				// Difficulty scaling
-				levelMultiplier = Math.min(4, 1 + Math.log(time/30) * 0.3);
-				level = Math.floor(1 + time / 15);
 			}
 
-			function activatePowerup(type){
-				activePowerup = type;
-				powerupTimer = 5; // 5 seconds
-
-				switch(type) {
-					case 'shield':
-						shieldActive = true;
-						player.color = '#60a5fa';
-						break;
-					case 'magnet':
-						magnetActive = true;
-						break;
-					case 'speed':
-						speedBoostActive = true;
-						levelMultiplier *= 1.5;
-						break;
-				}
-				updateUI();
-			}
-
-			function deactivatePowerup(){
-				activePowerup = null;
-				shieldActive = false;
-				magnetActive = false;
-				speedBoostActive = false;
-				player.color = '#6366f1';
-				updateUI();
-			}
-
-			function createParticles(x, y, type, count){
-				for(let i=0;i<count;i++){
-					const angle = (Math.random()*360)-90;
-					const dist = 20 + Math.random()*80;
-					particles.push({
-						x, y,
-						vx: Math.cos(angle)*0.8,
-						vy: Math.sin(angle)*0.8 - 0.5,
-						life: 1.0,
-						color: type==='box' ? '#f59e0b' : type==='coin' ? '#ffd700' : type==='shield' ? '#60a5fa' : '#f43f5e',
-						size: 4 + Math.random()*4
-					});
-				}
-			}
-
-			function draw(){
-				// Clear canvas
-				ctx.clearRect(0,0,W,H);
-
-				// Sky gradient
-				const grad = ctx.createLinearGradient(0,0,W,H);
-				grad.addColorStop(0,'#0f172a');
-				grad.addColorStop(1,'#1e293b');
-				ctx.fillStyle = grad;
-				ctx.fillRect(0,0,W,H);
-
-				// Draw clouds
-				for(const cloud of clouds){
-					ctx.fillStyle = 'rgba(255,255,255,0.3)';
-					ctx.beginPath();
-					ctx.arc(cloud.x, cloud.y, cloud.size/2, 0, Math.PI*2);
-					ctx.arc(cloud.x + cloud.size/3, cloud.y - cloud.size/4, cloud.size/3, 0, Math.PI*2);
-					ctx.arc(cloud.x - cloud.size/3, cloud.y - cloud.size/4, cloud.size/3, 0, Math.PI*2);
-					ctx.fill();
-				}
-
-				// Ground
-				ctx.fillStyle = '#1e293b';
-				ctx.fillRect(0, H*0.62, W, H*0.38);
-
-				// Draw trees
-				for(const tree of trees){
-					ctx.fillStyle = '#10b981';
-					ctx.fillRect(tree.x, tree.y, 8, tree.size);
-					ctx.beginPath();
-					ctx.arc(tree.x + 4, tree.y - tree.size/2, tree.size/2, 0, Math.PI*2);
-					ctx.fill();
-				}
-
-				// Lane lines
-				for(let l=0;l<LANES;l++){
-					const lx = W/2 + (l-1)*LANE_W;
-					ctx.strokeStyle = 'rgba(99,102,241,0.15)';
-					ctx.lineWidth = 1.5;
-					ctx.beginPath();
-					ctx.moveTo(lx, H*0.62);
-					ctx.lineTo(lx, H);
-					ctx.stroke();
-				}
-
-				// Draw obstacles
-				const sortedOb = [...obstacles].sort((a,b)=>(b.z-time)-(a.z-time));
-				for(const ob of sortedOb){
-					const pos = worldToScreen(ob.lane, ob.z - time);
-					const s = pos.scale;
-					const px = pos.x;
-					const py = pos.y - s;
-					const size = 70 * s;
-					const hue = 350 + (ob.type==='box'? 320 : 400);
-					ctx.fillStyle = `hsl(${hue}, 70%, ${50+Math.random()*30}%)`;
-					ctx.fillRect(px - size/2, py - size, size, size);
-				}
-
-				// Draw coins
-				for(const c of coins){
+			// monete
+			const magnetR = magnetActive ? 210 : 120;
+			for (let i = coins.length - 1; i >= 0; i--) {
+				const c = coins[i];
+				if (Math.abs(c.z - time) < magnetR && Math.abs(c.lane - pLane) < 0.5) {
+					score += 100;
 					const pos = worldToScreen(c.lane, c.z - time);
-					const s = pos.scale;
-					const px = pos.x;
-					const py = pos.y - s;
-					const radius = 12 * s;
-					ctx.fillStyle = '#f59e0b';
-					ctx.beginPath();
-					ctx.arc(px, py, radius, 0, Math.PI*2);
-					ctx.fill();
-				}
-
-				// Draw powerups
-				for(const p of powerups){
-					const pos = worldToScreen(p.lane, p.z - time);
-					const s = pos.scale;
-					const px = pos.x;
-					const py = pos.y - s;
-					const size = 30 * s;
-					ctx.fillStyle = p.type==='shield' ? '#60a5fa' : p.type==='magnet' ? '#a855f7' : '#f43f5e';
-					ctx.beginPath();
-					ctx.arc(px, py, size/2, 0, Math.PI*2);
-					ctx.fill();
-					ctx.strokeStyle = '#fff';
-					ctx.lineWidth = 2;
-					ctx.stroke();
-				}
-
-				// Draw player
-				const pPos = worldToScreen(player.lane, player.y);
-				const pScale = pPos.scale;
-				const jumpOffset = player.isJumping ? -player.jumpHeight * 0.5 : 0;
-				ctx.fillStyle = player.color;
-				ctx.fillRect(pPos.x - player.width/2, pPos.y - player.height + jumpOffset, player.width, player.height);
-				ctx.fillStyle = '#fff';
-				ctx.fillRect(pPos.x - player.width/2, pPos.y - player.height + 10 + jumpOffset, player.width, player.height-10);
-
-				// Draw particles
-				for(const p of particles){
-					ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
-					ctx.fillStyle = p.color;
-					ctx.beginPath();
-					ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-					ctx.fill();
-					ctx.globalAlpha = 1;
+					createParticlesAt(pos.x, pos.y, '#ffd700', 7);
+					coins.splice(i, 1);
+					playSound(880, 0.1, 'sine', 0.07, 1320);
 				}
 			}
 
-			function loop(t){
-				const dt = last ? Math.min((t-last)/1000, 0.05) : 0;
-				last = t;
-				update(dt);
-				draw();
-				requestAnimationFrame(loop);
-			}
-
-			function start(){
-				reset();
-				running = true;
-				last = 0;
-				startScreen.style.display = 'none';
-				gameOverPanel.style.display = 'none';
-				requestAnimationFrame(loop);
-			}
-
-			function gameOver(){
-				running = false;
-				gameOverPanel.style.display = 'flex';
-				finalScoreEl.textContent = Math.floor(score);
-				if(score > highScore) {
-					highScore = score;
-					localStorage.setItem('cddHighScore', highScore);
+			// powerup
+			for (let i = powerups.length - 1; i >= 0; i--) {
+				const p = powerups[i];
+				if (Math.abs(p.z - time) < 120 && Math.abs(p.lane - pLane) < 0.5) {
+					activatePowerup(p.type);
+					powerups.splice(i, 1);
+					playSound(600, 0.2, 'triangle', 0.1, 900);
 				}
 			}
 
-			// Input
-			addEventListener('keydown', e=>{
-				if(e.key==='ArrowLeft' || e.key==='a'){
-					player.target = Math.max(0, player.target-1);
-				}
-				if(e.key==='ArrowRight' || e.key==='d'){
-					player.target = Math.min(LANES-1, player.target+1);
-				}
-				if(e.key===' ' || e.key==='ArrowUp' || e.key==='w'){
-					if(!player.isJumping) {
-						player.isJumping = true;
-						player.jumpVel = -400;
-						player.jumpHeight = 0;
-					}
-				}
-			});
-
-			// Mobile touch controls
-			document.getElementById('btn-left').addEventListener('touchstart', e=>{
-				e.preventDefault();
-				player.target = Math.max(0, player.target-1);
-			});
-			document.getElementById('btn-right').addEventListener('touchstart', e=>{
-				e.preventDefault();
-				player.target = Math.min(LANES-1, player.target+1);
-			});
-			document.getElementById('btn-left').addEventListener('click', ()=> player.target = Math.max(0, player.target-1));
-			document.getElementById('btn-right').addEventListener('click', ()=> player.target = Math.min(LANES-1, player.target+1));
-
-			// Swipe gesture
-			let sx=0, sy=0;
-			addEventListener('touchstart', e=>{
-				sx = e.touches[0].clientX;
-				sy = e.touches[0].clientY;
-			});
-			addEventListener('touchend', e=>{
-				const dx = e.changedTouches[0].clientX - sx;
-				const dy = e.changedTouches[0].clientY - sy;
-				if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40){
-					if(dx > 0) player.target = Math.min(LANES-1, player.target+1);
-					else player.target = Math.max(0, player.target-1);
-				}
-				// Swipe up to jump
-				if(Math.abs(dy) > Math.abs(dx) && dy < -40 && !player.isJumping){
-					player.isJumping = true;
-					player.jumpVel = -400;
-					player.jumpHeight = 0;
-				}
-			});
-
-			// Start / restart / exit handlers
-			startBtn.addEventListener('click', start);
-			demoBtn.addEventListener('click', start);
-			restartBtn.addEventListener('click', start);
-			exitBtn.addEventListener('click', back());
-
-			// Back button behavior
-			function back(){
-				try{ sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); }catch(e){}
-				try{
-					if(window.history && window.history.length > 1) window.history.back();
-					else if(document.referrer) window.location.href = document.referrer;
-					else window.location.href = '../index.html';
-				} catch(e){ window.location.href = '../index.html'; }
+			// timer powerup
+			if (activePowerup) {
+				powerupTimer -= dt;
+				if (powerupTimer <= 0) deactivatePowerup();
+				updateUI();
 			}
-			backBtn.addEventListener('click', e=>{ e.preventDefault(); back(); });
+		}
 
-			// Initialize
-			resize();
+		function activatePowerup(type) {
+			activePowerup = type;
+			powerupTimer = 5;
+			shieldActive = type === 'shield';
+			magnetActive = type === 'magnet';
+			speedBoostActive = type === 'speed';
+			updateUI();
+		}
+		function deactivatePowerup() {
+			activePowerup = null; shieldActive = false; magnetActive = false; speedBoostActive = false;
+			updateUI();
+		}
+		function createParticlesAt(x, y, color, count) {
+			for (let i = 0; i < count; i++) {
+				const a = Math.random() * Math.PI * 2;
+				particles.push({ x, y, vx: Math.cos(a) * (40 + Math.random() * 90), vy: Math.sin(a) * (40 + Math.random() * 90) - 40, life: 1, color, size: 3 + Math.random() * 4 });
+			}
+		}
+
+		// ---------------- input ----------------
+		function moveLane(dir) {
+			if (!running) return;
+			player.target = Math.max(0, Math.min(LANES - 1, player.target + dir));
+			playSound(420, 0.05, 'square', 0.05);
+		}
+		function doJump() {
+			if (!running) return;
+			if (!player.jumping) {
+				player.jumping = true; player.jumpVel = -430; player.jumpH = 0;
+				playSound(300, 0.12, 'triangle', 0.08, 600);
+			}
+		}
+		window.addEventListener('keydown', e => {
+			if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') moveLane(-1);
+			if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') moveLane(1);
+			if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { e.preventDefault(); doJump(); }
+		});
+		function bindBtn(el, fn) {
+			el.addEventListener('pointerdown', e => { e.preventDefault(); ensureAudio(); fn(); });
+		}
+		bindBtn(els.btnLeft, () => moveLane(-1));
+		bindBtn(els.btnRight, () => moveLane(1));
+		bindBtn(els.btnJump, () => doJump());
+
+		// swipe
+		let sx = 0, sy = 0;
+		window.addEventListener('touchstart', e => {
+			sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+		}, { passive: true });
+		window.addEventListener('touchend', e => {
+			const dx = e.changedTouches[0].clientX - sx;
+			const dy = e.changedTouches[0].clientY - sy;
+			if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) moveLane(dx > 0 ? 1 : -1);
+			else if (Math.abs(dy) > Math.abs(dx) && dy < -40) doJump();
+		}, { passive: true });
+
+		// ---------------- flusso ----------------
+		function start() {
 			reset();
-		</script>
-	</body>
+			running = true;
+			last = 0;
+			els.startScreen.classList.add('hidden');
+			els.gameOver.classList.add('hidden');
+			ensureAudio();
+		}
+		function gameOver() {
+			running = false;
+			els.finalScore.textContent = Math.floor(score);
+			els.gameOver.classList.remove('hidden');
+			if (score > highScore) {
+				highScore = score;
+				try { localStorage.setItem('cddHighScore', String(highScore)); } catch (e) {}
+				els.highScore.textContent = Math.floor(highScore);
+			}
+			playSound(160, 0.4, 'sawtooth', 0.1, 40);
+		}
+		function exitGame() {
+			try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (e) {}
+			try {
+				if (window.history && window.history.length > 1) window.history.back();
+				else if (document.referrer) window.location.href = document.referrer;
+				else window.location.href = '../index.html';
+			} catch (e) { window.location.href = '../index.html'; }
+		}
+		els.start.addEventListener('click', () => { ensureAudio(); start(); });
+		els.demo.addEventListener('click', () => { ensureAudio(); start(); });
+		els.restart.addEventListener('click', () => { ensureAudio(); start(); });
+		els.exit.addEventListener('click', exitGame);
+
+		// ---------------- disegno ----------------
+		function skyGradient() {
+			const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+			g.addColorStop(0, '#0b1026');
+			g.addColorStop(0.6, '#1b1b4b');
+			g.addColorStop(1, '#3b2a5c');
+			ctx.fillStyle = g;
+			ctx.fillRect(0, 0, W, horizonY);
+		}
+		function drawHills() {
+			for (const h of hills) {
+				const layer = h.layer;
+				const offset = ((time * (layer ? 8 : 5)) % (W * 1.2));
+				const baseX = h.x * W * 1.5 - offset;
+				const hh = H * h.h;
+				const bw = W * h.w;
+				ctx.fillStyle = layer ? 'rgba(70,60,110,0.5)' : 'rgba(50,45,95,0.6)';
+				ctx.beginPath();
+				ctx.moveTo(baseX - bw, horizonY + 2);
+				ctx.quadraticCurveTo(baseX - bw / 2, horizonY - hh * 2.2, baseX + bw / 2, horizonY);
+				ctx.quadraticCurveTo(baseX + bw * 0.75, horizonY - hh * 0.8, baseX + bw, horizonY + 2);
+				ctx.closePath();
+				ctx.fill();
+				// ripeti a destra per coprire
+				ctx.beginPath();
+				ctx.moveTo(baseX + bw, horizonY + 2);
+				ctx.quadraticCurveTo(baseX + bw * 1.5, horizonY - hh * 1.8, baseX + bw * 2, horizonY);
+				ctx.quadraticCurveTo(baseX + bw * 1.75, horizonY - hh * 0.7, baseX + bw * 2, horizonY + 2);
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+		function drawGround() {
+			const g = ctx.createLinearGradient(0, horizonY, 0, H);
+			g.addColorStop(0, '#2a2350');
+			g.addColorStop(0.25, '#1c1b3a');
+			g.addColorStop(1, '#12101f');
+			ctx.fillStyle = g;
+			ctx.fillRect(0, horizonY, W, H - horizonY);
+
+			// righe corsia prospettiche
+			ctx.lineWidth = Math.max(2, W * 0.004);
+			ctx.strokeStyle = 'rgba(99,102,241,0.28)';
+			for (let l = 0; l < LANES + 1; l++) {
+				const xTop = W / 2 + (l - 1.5) * LANE_W * 0.18;
+				const xBot = W / 2 + (l - 1.5) * LANE_W;
+				ctx.beginPath();
+				ctx.moveTo(xTop, horizonY);
+				ctx.lineTo(xBot, H);
+				ctx.stroke();
+			}
+
+			// strisce orizzontali in movimento
+			const dashGap = 170;
+			const off = (time * 0.9) % dashGap;
+			ctx.fillStyle = 'rgba(255,255,255,0.06)';
+			for (let d = off; d < 1400; d += dashGap) {
+				const persp = 1 / (1 + d * 0.004);
+				const y = horizonY + (groundY - horizonY) * persp;
+				const half = 40 * persp;
+				ctx.fillRect(W / 2 - half, y, half * 2, Math.max(2, 6 * persp));
+			}
+		}
+
+		function drawCube(x, y, w, h, base) {
+			// pseudo-3D: faccia frontale + top
+			const topH = Math.max(6, h * 0.22);
+			ctx.fillStyle = base;
+			ctx.fillRect(x - w / 2, y - h, w, h);
+			ctx.fillStyle = 'rgba(255,255,255,0.18)';
+			ctx.beginPath();
+			ctx.moveTo(x - w / 2, y - h);
+			ctx.lineTo(x - w / 2 + w * 0.22, y - h - topH);
+			ctx.lineTo(x + w / 2 + w * 0.22, y - h - topH);
+			ctx.lineTo(x + w / 2, y - h);
+			ctx.closePath();
+			ctx.fill();
+			ctx.fillStyle = 'rgba(255,255,255,0.08)';
+			ctx.beginPath();
+			ctx.moveTo(x + w / 2, y - h);
+			ctx.lineTo(x + w / 2 + w * 0.22, y - h - topH);
+			ctx.lineTo(x + w / 2 + w * 0.22, y - topH * 0.6);
+			ctx.lineTo(x + w / 2, y);
+			ctx.closePath();
+			ctx.fill();
+		}
+
+		function draw() {
+			ctx.clearRect(0, 0, W, H);
+			skyGradient();
+
+			// stelle
+			ctx.fillStyle = '#e2e8ff';
+			for (const s of stars) {
+				const a = 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(time * 2 + s.tw));
+				ctx.globalAlpha = Math.max(0.1, a);
+				ctx.fillRect(s.x, s.y, s.r, s.r);
+			}
+			ctx.globalAlpha = 1;
+
+			drawHills();
+			// nuvole
+			ctx.fillStyle = 'rgba(226,232,255,0.16)';
+			for (const c of clouds) {
+				ctx.beginPath();
+				ctx.arc(c.x, c.y, c.s / 2, 0, Math.PI * 2);
+				ctx.arc(c.x + c.s / 3, c.y - c.s / 4, c.s / 3, 0, Math.PI * 2);
+				ctx.arc(c.x - c.s / 3, c.y - c.s / 4, c.s / 3, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			drawGround();
+
+			if (shake > 0.001) ctx.translate((Math.random() - 0.5) * 10 * shake, (Math.random() - 0.5) * 10 * shake);
+
+			// ostacoli (ordinati per distanza)
+			const items = [];
+			for (const ob of obstacles) items.push({ z: ob.z, draw: () => drawObstacle(ob) });
+			for (const c of coins) items.push({ z: c.z, draw: () => drawCoin(c) });
+			for (const p of powerups) items.push({ z: p.z, draw: () => drawPowerup(p) });
+			items.sort((a, b) => b.z - a.z);
+			for (const it of items) it.draw();
+
+			// giocatore
+			drawPlayer();
+
+			// particelle
+			for (const p of particles) {
+				ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+				ctx.fillStyle = p.color;
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.globalAlpha = 1;
+
+			if (shake > 0.001) { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); shake = Math.max(0, shake - 0.03); }
+		}
+
+		function drawObstacle(ob) {
+			const pos = worldToScreen(ob.lane, ob.z - time);
+			const s = pos.scale;
+			const isTall = ob.type === 'tall';
+			const w = (isTall ? 46 : 62) * s;
+			const h = (isTall ? 108 : 58) * s;
+			const hue = isTall ? 320 : 355;
+			drawCube(pos.x, pos.y, w, h, `hsl(${hue}, 75%, 48%)`);
+			// ombra al suolo
+			ctx.fillStyle = 'rgba(0,0,0,0.25)';
+			ctx.beginPath();
+			ctx.ellipse(pos.x, pos.y, w * 0.6, w * 0.18, 0, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		function drawCoin(c) {
+			const pos = worldToScreen(c.lane, c.z - time);
+			const s = pos.scale;
+			const r = 13 * s;
+			const spin = Math.sin(time * 6 + c.z * 0.01);
+			ctx.fillStyle = 'rgba(255,215,0,0.25)';
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r * 1.5, 0, Math.PI * 2);
+			ctx.fill();
+			const g = ctx.createRadialGradient(pos.x - r * 0.3, pos.y - r * 0.3, r * 0.2, pos.x, pos.y, r);
+			g.addColorStop(0, '#fff7c2');
+			g.addColorStop(0.5, '#ffd700');
+			g.addColorStop(1, '#e0a400');
+			ctx.fillStyle = g;
+			ctx.beginPath();
+			ctx.ellipse(pos.x, pos.y, r * Math.max(0.25, Math.abs(spin)), r, 0, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.strokeStyle = '#fff3b0';
+			ctx.lineWidth = 1.5;
+			ctx.beginPath();
+			ctx.ellipse(pos.x, pos.y, r * Math.max(0.25, Math.abs(spin)), r, 0, 0, Math.PI * 2);
+			ctx.stroke();
+		}
+		function drawPowerup(p) {
+			const pos = worldToScreen(p.lane, p.z - time);
+			const s = pos.scale;
+			const r = 17 * s;
+			const colors = { shield: '#60a5fa', magnet: '#a855f7', speed: '#f43f5e' };
+			const icons = { shield: '🛡️', magnet: '🧲', speed: '⚡' };
+			const col = colors[p.type];
+			ctx.fillStyle = col + '44';
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r * 1.6 + Math.sin(time * 4 + p.z) * 3 * s, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = col;
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.strokeStyle = 'rgba(255,255,255,.7)';
+			ctx.lineWidth = 2;
+			ctx.stroke();
+			ctx.font = (r * 1.4) + 'px system-ui';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(icons[p.type], pos.x, pos.y + 1);
+		}
+		function drawPlayer() {
+			const pos = worldToScreen(player.lane, 0);
+			const s = pos.scale;
+			const w = PLAYER_W * s, h = PLAYER_H * s;
+			const jumpOff = player.jumping ? -player.jumpH * 0.5 : 0;
+			const x = pos.x, baseY = pos.y + jumpOff;
+			const bob = player.jumping ? 0 : Math.sin(player.runPhase) * 2.5 * s;
+
+			// ombra
+			ctx.fillStyle = 'rgba(0,0,0,0.3)';
+			ctx.beginPath();
+			ctx.ellipse(x, pos.y, w * 0.55, w * 0.16, 0, 0, Math.PI * 2);
+			ctx.fill();
+
+			// corpo
+			const bodyGrad = ctx.createLinearGradient(x, baseY - h, x, baseY);
+			const bodyCol = shieldActive ? '#38bdf8' : '#6366f1';
+			bodyGrad.addColorStop(0, bodyCol);
+			bodyGrad.addColorStop(1, '#4338ca');
+			ctx.fillStyle = bodyGrad;
+			roundRect(x - w / 2, baseY - h + bob, w, h, w * 0.4);
+			ctx.fill();
+
+			// visiera
+			ctx.fillStyle = '#0f172a';
+			roundRect(x - w * 0.32, baseY - h * 0.72 + bob, w * 0.64, h * 0.22, w * 0.16);
+			ctx.fill();
+			ctx.fillStyle = '#7dd3fc';
+			roundRect(x - w * 0.26, baseY - h * 0.68 + bob, w * 0.52, h * 0.12, w * 0.12);
+			ctx.fill();
+
+			// gambe animate
+			const legSwing = player.jumping ? 0 : Math.sin(player.runPhase) * 0.5;
+			ctx.fillStyle = '#312e81';
+			roundRect(x - w * 0.34, baseY - h * 0.14 + bob, w * 0.22, h * 0.22, w * 0.1);
+			ctx.fill();
+			roundRect(x + w * 0.12, baseY - h * 0.14 + bob, w * 0.22, h * 0.22, w * 0.1);
+			ctx.fill();
+			ctx.fillStyle = '#1e1b4b';
+			const lx = x - w * 0.23 + legSwing * w * 0.16;
+			const rx = x + w * 0.23 - legSwing * w * 0.16;
+			roundRect(lx - w * 0.1, baseY - h * 0.02 + bob, w * 0.2, h * 0.16, w * 0.08);
+			ctx.fill();
+			roundRect(rx - w * 0.1, baseY - h * 0.02 + bob, w * 0.2, h * 0.16, w * 0.08);
+			ctx.fill();
+
+			// aura scudo
+			if (shieldActive) {
+				ctx.strokeStyle = 'rgba(56,189,248,0.7)';
+				ctx.lineWidth = 2.5;
+				ctx.setLineDash([6, 5]);
+				ctx.beginPath();
+				ctx.arc(x, baseY - h / 2 + bob, w * 0.85, 0, Math.PI * 2);
+				ctx.stroke();
+				ctx.setLineDash([]);
+			}
+			// aura turbo
+			if (speedBoostActive) {
+				ctx.strokeStyle = 'rgba(244,63,94,0.6)';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.arc(x, baseY - h / 2 + bob, w * 0.95, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+		}
+		function roundRect(x, y, w, h, r) {
+			ctx.beginPath();
+			ctx.moveTo(x + r, y);
+			ctx.arcTo(x + w, y, x + w, y + h, r);
+			ctx.arcTo(x + w, y + h, x, y + h, r);
+			ctx.arcTo(x, y + h, x, y, r);
+			ctx.arcTo(x, y, x + w, y, r);
+			ctx.closePath();
+		}
+
+		// ---------------- loop ----------------
+		function loop(t) {
+			const dt = last ? Math.min((t - last) / 1000, 0.05) : 0;
+			last = t;
+			update(dt);
+			draw();
+			requestAnimationFrame(loop);
+		}
+
+		resize();
+		reset();
+		requestAnimationFrame(loop);
+
+		// hook di debug/test
+		window.__CDD = {
+			state: () => ({
+				running, score, time, speed, levelMultiplier,
+				obstacles: obstacles.length, coins: coins.length, powerups: powerups.length,
+				shieldActive, magnetActive, speedBoostActive, activePowerup,
+				player: { lane: player.lane, target: player.target, jumping: player.jumping }
+			}),
+			moveLane, doJump, start, reset, update, spawn
+		};
+	</script>
+</body>
+</html>

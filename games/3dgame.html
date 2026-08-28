@@ -2,236 +2,140 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Character Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1026">
+  <title>Lumina — Il Cristallo dell'Alba</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; overflow: hidden; background: #0b1026; user-select: none; -webkit-user-select: none; touch-action: none; }
+    #gameCanvas { display: block; width: 100vw; height: 100vh; }
 
-    body {
-      font-family: 'Arial', sans-serif;
-      overflow: hidden;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
+    /* ---------- Overlay comuni ---------- */
+    .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 900; padding: 24px; }
+    .overlay.hidden { display: none; }
 
-    #gameCanvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
+    /* ---------- Loading ---------- */
+    #loadingScreen { background: linear-gradient(135deg, #1b2a6b 0%, #4b2a8f 60%, #7b3fa0 100%); color: white; z-index: 1200; }
+    #loadingScreen .title { font-size: 28px; font-weight: 900; letter-spacing: 4px; }
+    #loadingScreen .sub { font-size: 13px; opacity: .8; margin-top: 6px; }
+    .spinner { width: 50px; height: 50px; border: 5px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-top: 22px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    #joystickContainer {
-      position: fixed;
-      bottom: 40px;
-      left: 40px;
-      width: 140px;
-      height: 140px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      touch-action: none;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-      border: 3px solid rgba(255, 255, 255, 0.2);
-    }
+    /* ---------- Start screen ---------- */
+    #startScreen { background: radial-gradient(120% 100% at 50% 0%, #1d2c6e 0%, #141a3c 60%, #0b1026 100%); color: white; gap: 14px; }
+    #startScreen h1 { font-size: clamp(38px, 11vw, 72px); font-weight: 900; letter-spacing: .06em; margin: 0;
+      background: linear-gradient(180deg, #fff 10%, #8ec5ff 45%, #ffd54a 90%); -webkit-background-clip: text; background-clip: text; color: transparent;
+      text-shadow: 0 10px 40px rgba(80,120,255,.35); }
+    #startScreen .tag { font-size: 13px; letter-spacing: 6px; color: #9fb8ff; font-weight: 700; text-transform: uppercase; }
+    .story-box { max-width: 560px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 16px 20px; font-size: 14.5px; line-height: 1.65; color: #dbe6ff; }
+    .story-box b { color: #ffd54a; }
+    .controls-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+    .ctrl-chip { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 99px; padding: 7px 14px; font-size: 12.5px; color: #cdd9ff; }
+    .big-btn { margin-top: 10px; padding: 16px 44px; border: none; border-radius: 99px; cursor: pointer; font-size: 17px; font-weight: 800; font-family: inherit; color: #0b1026;
+      background: linear-gradient(92deg, #ffd54a, #ff9a3d); box-shadow: 0 12px 34px rgba(255,170,60,.4); }
+    .big-btn:active { transform: scale(.96); }
 
-    #joystickKnob {
-      width: 60px;
-      height: 60px;
-      background: radial-gradient(circle at 30% 30%, #fff, #ccc);
-      border-radius: 50%;
-      position: absolute;
-      cursor: grab;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      transition: transform 0.05s ease-out;
-    }
+    /* ---------- HUD ---------- */
+    #hud { position: fixed; top: 0; left: 0; right: 0; z-index: 60; display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; padding: max(10px, env(safe-area-inset-top)) 12px 0; pointer-events: none; }
+    #objective { background: rgba(8,12,30,.72); border: 1px solid rgba(124,140,255,.4); border-radius: 12px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: #dfe7ff; max-width: min(320px, 60vw); line-height: 1.4; text-align: left; backdrop-filter: blur(6px); }
+    #fragments { background: rgba(8,12,30,.72); border: 1px solid rgba(64,224,208,.45); border-radius: 99px; padding: 8px 14px; font-size: 13px; font-weight: 800; color: #7df3ff; white-space: nowrap; backdrop-filter: blur(6px); }
+    #fragments.done { border-color: #ffd54a; color: #ffd54a; }
 
-    #joystickKnob:active {
-      cursor: grabbing;
-    }
+    /* ---------- Instructions ---------- */
+    #instructions { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.6); color: white; padding: 12px 22px; border-radius: 10px; font-size: 13.5px; z-index: 70; backdrop-filter: blur(10px); text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; max-width: 92vw; }
+    #instructions.show { opacity: 1; }
 
-    #loadingScreen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      color: white;
-      font-size: 24px;
-      font-weight: bold;
-    }
+    /* ---------- Joystick / buttons ---------- */
+    #joystickContainer { position: fixed; bottom: 40px; left: 40px; width: 140px; height: 140px; background: rgba(0,0,0,.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; z-index: 100; backdrop-filter: blur(10px); border: 3px solid rgba(255,255,255,.2); }
+    #joystickKnob { width: 60px; height: 60px; background: radial-gradient(circle at 30% 30%, #fff, #ccc); border-radius: 50%; position: absolute; cursor: grab; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    .actionButton { position: fixed; bottom: 40px; width: 70px; height: 70px; background: rgba(255,255,255,.9); border: 3px solid rgba(0,0,0,.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer; user-select: none; touch-action: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.3); transition: transform .1s, opacity .2s; }
+    .actionButton:active { transform: scale(.9); }
+    .actionButton.hidden { display: none; }
+    #jumpButton { right: 40px; }
+    #interactButton { right: 130px; display: none; }
+    #interactButton.visible { display: flex; }
 
-    #loadingScreen.hidden {
-      display: none;
-    }
+    /* ---------- Dialogo ---------- */
+    #dialoguePanel { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(520px, 92vw); background: rgba(8,12,30,.92); color: white; padding: 16px 18px 14px; border-radius: 16px; display: none; z-index: 200; backdrop-filter: blur(10px); border: 2px solid rgba(124,140,255,.45); box-shadow: 0 16px 50px rgba(0,0,0,.5); }
+    #dialoguePanel.visible { display: block; animation: dlgIn .25s ease; }
+    @keyframes dlgIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    #dlgName { font-size: 14px; font-weight: 800; color: #ffd54a; margin-bottom: 6px; }
+    #dlgText { font-size: 15px; line-height: 1.55; min-height: 44px; cursor: pointer; }
+    #dlgChoices { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .dlg-opt { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: #fff; font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; text-align: left; }
+    .dlg-opt:hover { border-color: #ffd54a; background: rgba(255,213,74,.12); }
+    .dlg-opt:active { transform: scale(.98); }
+    .dlg-opt.close-opt { border-color: rgba(255,255,255,.25); opacity: .85; }
 
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 5px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-top: 20px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    #instructions {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.5);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 50;
-      backdrop-filter: blur(10px);
-      text-align: center;
-    }
+    /* ---------- Vittoria ---------- */
+    #victoryScreen { background: radial-gradient(120% 100% at 50% 0%, #ffb347 0%, #ff6b8a 55%, #1b2a6b 100%); color: white; gap: 10px; z-index: 1100; }
+    #victoryScreen h1 { font-size: clamp(40px, 12vw, 78px); font-weight: 900; letter-spacing: .05em; margin: 0; text-shadow: 0 8px 40px rgba(255,200,80,.5); }
+    #victoryScreen .msg { max-width: 500px; font-size: 15px; line-height: 1.6; }
+    #vicStats { background: rgba(0,0,0,.28); border-radius: 14px; padding: 12px 22px; font-size: 14px; font-weight: 700; line-height: 1.9; }
+    #vicStats b { color: #ffe08a; }
 
     @media (max-width: 768px) {
-      #joystickContainer {
-        width: 120px;
-        height: 120px;
-        bottom: 30px;
-        left: 30px;
-      }
-
-      #joystickKnob {
-        width: 50px;
-        height: 50px;
-      }
-    }
-
-    .actionButton {
-      position: fixed;
-      bottom: 40px;
-      width: 70px;
-      height: 70px;
-      background: rgba(255, 255, 255, 0.9);
-      border: 3px solid rgba(0, 0, 0, 0.2);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      cursor: pointer;
-      user-select: none;
-      touch-action: none;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-      transition: all 0.1s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .actionButton:active {
-      transform: scale(0.9);
-      background: rgba(255, 255, 255, 0.7);
-    }
-
-    #jumpButton {
-      right: 40px;
-    }
-
-    #interactButton {
-      right: 130px;
-      display: none;
-    }
-
-    #interactButton.visible {
-      display: flex;
-    }
-
-    #dialogBox {
-      position: fixed;
-      bottom: 150px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px 30px;
-      border-radius: 12px;
-      max-width: 500px;
-      display: none;
-      z-index: 150;
-      backdrop-filter: blur(10px);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      animation: fadeIn 0.3s ease;
-    }
-
-    #dialogBox.visible {
-      display: block;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-
-    @media (max-width: 768px) {
-      .actionButton {
-        width: 60px;
-        height: 60px;
-        bottom: 30px;
-        font-size: 24px;
-      }
-
-      #jumpButton {
-        right: 30px;
-      }
-
-      #interactButton {
-        right: 110px;
-      }
-
-      #dialogBox {
-        max-width: 80%;
-        font-size: 14px;
-      }
+      #joystickContainer { width: 120px; height: 120px; bottom: 30px; left: 30px; }
+      #joystickKnob { width: 50px; height: 50px; }
+      .actionButton { width: 60px; height: 60px; bottom: 30px; font-size: 24px; }
+      #jumpButton { right: 30px; }
+      #interactButton { right: 110px; }
+      #dialoguePanel { bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
     }
   </style>
 </head>
 <body>
-  <div id="loadingScreen">
-    <div>Caricamento...</div>
+  <div id="loadingScreen" class="overlay">
+    <div class="title">LUMINA</div>
+    <div class="sub">Il Cristallo dell'Alba</div>
     <div class="spinner"></div>
   </div>
 
-  <div id="instructions">
-    Usa lo stick in basso a sinistra per muovere il personaggio
+  <div id="startScreen" class="overlay hidden">
+    <div class="tag">Un'avventura 3D</div>
+    <h1>LUMINA</h1>
+    <div class="story-box">
+      La città di <b>Lumina</b> ha perso la sua luce: il <b>Cristallo dell'Alba</b> è stato rubato
+      e i suoi <b>5 frammenti</b> si sono dispersi nel <b>Prato dei Sogni</b>.
+      Tu sei il viandante prescelto: raccogli i frammenti, raggiungi la città oltre il cancello
+      e <b>restituisci il Cristallo alla Fontana Magica</b> per riaccendere ogni luce.
+      Parla con i cittadini: ognuno ha una storia e una scelta da offrirti.
+    </div>
+    <div class="controls-row">
+      <span class="ctrl-chip">🕹️ Stick (o WASD / frecce)</span>
+      <span class="ctrl-chip">⬆️ Salta</span>
+      <span class="ctrl-chip">💬 Parla / usa</span>
+      <span class="ctrl-chip">E interagisci</span>
+    </div>
+    <button class="big-btn" id="btnStart">▶ Inizia l'avventura</button>
   </div>
+
+  <div id="hud">
+    <div id="objective">…</div>
+    <div id="fragments">💎 0/5</div>
+  </div>
+
+  <div id="instructions">🕹️ Stick (o WASD/frecce) per muoverti · ⬆️ salta · 💬 parla con i personaggi · E interagisci</div>
 
   <canvas id="gameCanvas"></canvas>
 
-  <div id="joystickContainer">
-    <div id="joystickKnob"></div>
-  </div>
-
+  <div id="joystickContainer"><div id="joystickKnob"></div></div>
   <div id="jumpButton" class="actionButton">⬆️</div>
   <div id="interactButton" class="actionButton">💬</div>
-  <div id="dialogBox"></div>
+
+  <div id="dialoguePanel">
+    <div id="dlgName"></div>
+    <div id="dlgText"></div>
+    <div id="dlgChoices"></div>
+  </div>
+
+  <div id="victoryScreen" class="overlay hidden">
+    <h1>✨ VITTORIA!</h1>
+    <div class="msg">Hai restituito i 5 frammenti alla Fontana Magica: il Cristallo dell'Alba è tornato
+      e le luci di Lumina brillano più che mai. La città ti saluta, Eroe del Prato.</div>
+    <div id="vicStats"></div>
+    <button class="big-btn" id="btnRestart">🔄 Gioca ancora</button>
+  </div>
 
   <script type="importmap">
     {
@@ -246,184 +150,668 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // Game State
+    const $ = id => document.getElementById(id);
+
+    /* ================= AUDIO (piccoli effetti) ================= */
+    const SFX = (() => {
+      let ac = null;
+      function ensure() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (ac && ac.state === 'suspended') ac.resume(); }
+      function tone(f0, f1, dur, type, vol, delay) {
+        if (!ac) return;
+        try {
+          const t0 = ac.currentTime + (delay || 0);
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = type || 'sine';
+          o.frequency.setValueAtTime(f0, t0);
+          o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t0 + dur);
+          g.gain.setValueAtTime(vol, t0);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t0); o.stop(t0 + dur + 0.05);
+        } catch (e) {}
+      }
+      return {
+        ensure,
+        click() { ensure(); tone(620, 480, 0.06, 'square', 0.06); },
+        dialog() { ensure(); tone(440, 660, 0.1, 'triangle', 0.1); },
+        collect() { ensure(); tone(880, 1320, 0.12, 'sine', 0.12); setTimeout(() => tone(1320, 1760, 0.14, 'sine', 0.1, 0.1), 90); },
+        jump() { ensure(); tone(300, 600, 0.12, 'triangle', 0.08); },
+        fanfare() { ensure(); [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.16, i * 0.13)); }
+      };
+    })();
+
+    /* ================= STATO ================= */
     const gameState = {
+      started: false, dialogueOpen: false, victory: false,
       joystick: { active: false, x: 0, y: 0 },
-      character: null,
-      mixer: null,
-      walkAnimation: null,
-      isMoving: false,
-      isJumping: false,
-      jumpVelocity: 0,
-      gravity: -25,
-      jumpForce: 10,
-      groundY: 0,
-      interactableObjects: [],
-      nearestObject: null
+      character: null, mixer: null, walkAnimation: null,
+      isMoving: false, isJumping: false, jumpVelocity: 0,
+      gravity: -25, jumpForce: 10, groundY: 0,
+      interactables: [], nearest: null,
+      fragments: 0, totalFragments: 5,
+      dialoguesHad: 0, startedAt: 0,
+      story: { sageIntroduced: false, guardMet: false, merchantMet: false, restored: false },
+      inCity: false, lastObjective: '',
+      keys: {},
+      colliders: [],
+      lastToast: 0
     };
 
-    // Three.js Setup
-    const canvas = document.getElementById('gameCanvas');
+    const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+    const rnd = (a, b) => a + Math.random() * (b - a);
+
+    /* ================= TOAST ================= */
+    function toast(msg) {
+      const now = Date.now();
+      if (now - gameState.lastToast < 1200) return;
+      gameState.lastToast = now;
+      let el = $('toastLive');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'toastLive';
+        el.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top,0px)+64px);left:50%;transform:translateX(-50%);z-index:300;background:rgba(8,12,30,.92);color:#fff;border:1px solid rgba(124,140,255,.5);border-radius:99px;padding:9px 18px;font-size:13.5px;font-weight:700;pointer-events:none;transition:opacity .4s;';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.style.opacity = '1';
+      clearTimeout(toast.t);
+      toast.t = setTimeout(() => { el.style.opacity = '0'; }, 2600);
+    }
+
+    /* ================= OBIETTIVO ================= */
+    function currentObjective(s) {
+      if (s.story.restored) return 'La città di Lumina splende di nuovo! ✨';
+      if (s.fragments >= s.totalFragments && !s.story.guardMet) return 'Attraversa il cancello e parla con la Guardia Bruno.';
+      if (s.fragments >= s.totalFragments && s.story.guardMet && !s.story.merchantMet) return 'Parla con il Mercante Vito in piazza.';
+      if (s.fragments >= s.totalFragments && s.story.merchantMet && !s.story.restored) return 'Restituisci i 5 frammenti alla Fontana Magica.';
+      if (!s.story.sageIntroduced) return 'Parla con il Saggio Elio per iniziare.';
+      return 'Raccogli i 5 frammenti di cristallo nel prato: cercali tra gli oggetti che brillano.';
+    }
+    function updateObjective() {
+      const t = currentObjective(gameState);
+      if (t !== gameState.lastObjective) {
+        gameState.lastObjective = t;
+        $('objective').textContent = '🎯 ' + t;
+      }
+    }
+    function refreshFragments() {
+      const el = $('fragments');
+      el.textContent = '💎 ' + gameState.fragments + '/' + gameState.totalFragments;
+      el.classList.toggle('done', gameState.fragments >= gameState.totalFragments);
+    }
+
+    // ============ DIALOGUE ENGINE (logica pura — testabile) ============
+    const DIALOGUES = {
+      sage: {
+        name: 'Saggio Elio', emoji: '🧙', color: 0x8b5cf6,
+        nodes: {
+          start: {
+            text: (s) => s.fragments >= s.totalFragments
+              ? 'Incredibile: hai ricomposto il Cristallo! La città di Lumina è a nord, oltre il cancello. La Guardia ti sta aspettando.'
+              : 'Benvenuto nel Prato dei Sogni. La Città di Lumina è spenta: il Cristallo dell\'Alba è stato rubato e i suoi 5 frammenti sono sparsi qui, nascosti tra gli oggetti che brillano.',
+            choices: (s) => [
+              { label: 'Chi sei?', next: 'chiSei' },
+              { label: 'Come trovo i frammenti?', next: 'comeFrammenti' },
+              ...(s.fragments >= s.totalFragments ? [{ label: 'Vado in città!', next: 'vai' }] : []),
+              { label: 'A dopo.', next: null }
+            ]
+          },
+          chiSei: {
+            text: 'Sono Elio, l\'ultimo saggio del Prato. Custodivo i ricordi di Lumina prima che le luci si spegnessero. Ora è tutto nelle tue mani, viandante.',
+            choices: [{ label: 'Torna alle domande', next: 'start' }]
+          },
+          comeFrammenti: {
+            text: 'Cerca i bagliori azzurri tra l\'erba: scatole, sfere e pilastri che brillano di luce propria. Toccane uno con il pulsante 💬 per raccoglierlo. Ce ne sono 5.',
+            choices: [{ label: 'Grazie, vado a cercarli!', next: null }]
+          },
+          vai: {
+            text: 'Il cancello è a nord. Fai attenzione alla Guardia: è severa, ma giusta.',
+            choices: [{ label: 'Ciao, Elio!', next: null }]
+          }
+        }
+      },
+      guard: {
+        name: 'Guardia Bruno', emoji: '🛡️', color: 0x3b82f6,
+        nodes: {
+          start: {
+            text: (s) => s.fragments >= s.totalFragments
+              ? 'Fermi tutti... Ma quelli sono i frammenti del Cristallo! Eri tu il prescelto. Entra pure: il Mercante Vito, in piazza, sa come riaccendere la città.'
+              : 'Fermo lì! Finché i frammenti del Cristallo non saranno ritrovati, le porte di Lumina restano chiuse. La città non accetta forestieri senza il Cristallo.',
+            choices: (s) => s.fragments >= s.totalFragments
+              ? [{ label: 'Entro!', next: null }]
+              : [{ label: 'Come posso entrare?', next: 'come' }, { label: 'A dopo.', next: null }]
+          },
+          come: {
+            text: 'Trova i 5 frammenti nel prato: sono nascosti tra gli oggetti che brillano. Torna quando li avrai tutti.',
+            choices: [{ label: 'Ci conto!', next: 'start' }]
+          }
+        }
+      },
+      merchant: {
+        name: 'Mercante Vito', emoji: '🧑', color: 0xf59e0b,
+        nodes: {
+          start: {
+            text: (s) => s.story.merchantMet
+              ? 'Hai parlato con la Fontana? Se le restituisci i 5 frammenti, le luci torneranno. Ne sono sicuro: l\'ho letto nei vecchi rotoli della corporazione.'
+              : 'Benvenuto, forestiero! Sì, la città è spenta, ma so come si riaccende: la Fontana Magica al centro della piazza, se riceve i 5 frammenti del Cristallo, riaccende ogni lampione. E io i lampioni li vendo, se capisci cosa intendo...',
+            choices: (s) => [
+              { label: 'Qual è la leggenda?', next: 'leggenda' },
+              { label: 'Come funziona la Fontana?', next: 'fontana' },
+              ...(s.story.merchantMet ? [] : [{ label: 'Grazie dell\'aiuto!', next: null }])
+            ]
+          },
+          leggenda: {
+            text: 'Si dice che la Fontana sia il cuore della città: quando il Cristallo le fu tolto, ogni luce si spense. Solo un cuore puro può restituirlo.',
+            choices: [{ label: 'Torna alle domande', next: 'start' }]
+          },
+          fontana: {
+            text: 'Vai al centro della piazza: la Fontana è lì. Avvicinati con i 5 frammenti e toccala: deciderà lei.',
+            choices: [{ label: 'Ok!', next: 'start' }]
+          }
+        }
+      },
+      nona: {
+        name: 'Nonna Pia', emoji: '👵', color: 0xec4899,
+        nodes: {
+          start: {
+            text: 'Oh, un visitatore! Da quanto non vedo facce nuove... Eri al Prato dei Sogni, vero? Io ci sono nata, lì. Se trovi i frammenti, ricordati: la Fontana ascolta solo chi parla con il cuore.',
+            choices: [
+              { label: 'Cosa raccontano i vecchi?', next: 'storia' },
+              { label: 'Ciao, Nonna Pia!', next: null }
+            ]
+          },
+          storia: {
+            text: 'Mio nonno diceva che il Cristallo cantava all\'alba. Poi una notte d\'inverno sparì, e con lui tutte le luci. I bambini della città non hanno più giocato per strada... Fino a oggi, forse.',
+            choices: [{ label: 'Non farò deludere i bambini.', next: null }]
+          }
+        }
+      },
+      fountain: {
+        name: 'Fontana Magica', emoji: '⛲', color: 0x22d3ee,
+        nodes: {
+          start: {
+            text: (s) => s.fragments >= s.totalFragments
+              ? 'La Fontana vibra: riconosce i frammenti che porti. Il Cristallo può tornare a vivere...'
+              : 'La Fontana è spenta e silenziosa. Sembra che manchi qualcosa... forse 5 frammenti di cristallo.',
+            choices: (s) => s.fragments >= s.totalFragments
+              ? [
+                { label: '✨ Restituisci i 5 frammenti', next: null, effect: () => startVictory() },
+                { label: 'Non ancora.', next: null }
+              ]
+              : [{ label: 'Torno quando avrò i frammenti.', next: null }]
+          }
+        }
+      }
+    };
+
+    let currentDialogue = null;
+    let typeTimer = null, typeFull = '', typeEl = null;
+
+    function dialogText(node, s) { return typeof node.text === 'function' ? node.text(s) : node.text; }
+    function dialogChoices(node, s) {
+      const c = typeof node.choices === 'function' ? node.choices(s) : (node.choices || []);
+      return c.filter(o => !o.need || o.need(s));
+    }
+
+    function openDialogue(npcId, s) {
+      if (!s.started || s.victory || !DIALOGUES[npcId]) return;
+      if (npcId === 'sage' && !s.story.sageIntroduced) { s.story.sageIntroduced = true; updateObjective(); }
+      if (npcId === 'guard' && s.fragments >= s.totalFragments && !s.story.guardMet) { s.story.guardMet = true; updateObjective(); }
+      if (npcId === 'merchant' && s.fragments >= s.totalFragments && !s.story.merchantMet) { s.story.merchantMet = true; updateObjective(); }
+      s.dialoguesHad++;
+      s.dialogueOpen = true;
+      currentDialogue = { npcId, nodeId: 'start' };
+      SFX.dialog();
+      renderDialogue(s);
+    }
+
+    function renderDialogue(s) {
+      const d = DIALOGUES[currentDialogue.npcId];
+      const node = d.nodes[currentDialogue.nodeId];
+      $('dlgName').textContent = d.emoji + '  ' + d.name;
+      typewrite($('dlgText'), dialogText(node, s));
+      const box = $('dlgChoices');
+      box.innerHTML = '';
+      const choices = dialogChoices(node, s);
+      if (!choices.length) {
+        const b = document.createElement('button');
+        b.className = 'dlg-opt close-opt';
+        b.textContent = '✕ Chiudi';
+        b.onclick = () => closeDialogue(s);
+        box.appendChild(b);
+      } else {
+        choices.forEach(opt => {
+          const b = document.createElement('button');
+          b.className = 'dlg-opt';
+          b.textContent = opt.label;
+          b.onclick = () => chooseOption(opt, s);
+          box.appendChild(b);
+        });
+      }
+      $('dialoguePanel').classList.add('visible');
+    }
+
+    function chooseOption(opt, s) {
+      if (opt.effect) opt.effect(s);
+      SFX.click();
+      if (opt.next) {
+        currentDialogue.nodeId = opt.next;
+        renderDialogue(s);
+      } else {
+        closeDialogue(s);
+      }
+    }
+
+    function closeDialogue(s) {
+      s.dialogueOpen = false;
+      currentDialogue = null;
+      clearInterval(typeTimer);
+      $('dialoguePanel').classList.remove('visible');
+    }
+
+    function typewrite(el, text) {
+      clearInterval(typeTimer);
+      el.textContent = '';
+      typeFull = text; typeEl = el;
+      let i = 0;
+      typeTimer = setInterval(() => {
+        i += 2;
+        el.textContent = text.slice(0, i);
+        if (i >= text.length) clearInterval(typeTimer);
+      }, 16);
+    }
+    $('dlgText').addEventListener('click', () => {
+      clearInterval(typeTimer);
+      if (typeEl) typeEl.textContent = typeFull;
+    });
+    // ============ END DIALOGUE ENGINE ============
+
+    /* ================= THREE SETUP ================= */
+    const canvas = $('gameCanvas');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
     scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
 
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 5, 10);
     camera.lookAt(0, 1, 0);
 
-    const renderer = new THREE.WebGLRenderer({ 
-      canvas, 
-      antialias: true 
-    });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+    sun.position.set(10, 25, 10);
+    sun.castShadow = true;
+    sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+    sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+    sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 120;
+    sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+    sun.shadow.bias = -0.0001;
+    scene.add(sun);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 25, 10);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.camera.left = -30;
-    directionalLight.shadow.camera.right = 30;
-    directionalLight.shadow.camera.top = 30;
-    directionalLight.shadow.camera.bottom = -30;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 100;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.bias = -0.0001;
-    scene.add(directionalLight);
+    /* ================= MONDO ================= */
+    function addCollider(minX, maxX, minZ, maxZ) {
+      gameState.colliders.push({ minX, maxX, minZ, maxZ });
+    }
 
-    // Ground Plane
-    const groundGeometry = new THREE.PlaneGeometry(100, 100, 10, 10);
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x4a9b4a,
-      roughness: 0.8,
-      metalness: 0.2
-    });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    function buildWorld() {
+      // Prato
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshStandardMaterial({ color: 0x4a9b4a, roughness: 0.9 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
 
-    // Grid Helper
-    const gridHelper = new THREE.GridHelper(100, 50, 0x000000, 0x555555);
-    gridHelper.material.opacity = 0.2;
-    gridHelper.material.transparent = true;
-    scene.add(gridHelper);
+      const grid = new THREE.GridHelper(100, 50, 0x000000, 0x555555);
+      grid.material.opacity = 0.15;
+      grid.material.transparent = true;
+      scene.add(grid);
 
-    // Create Interactive Objects
-    function createInteractiveObject(type, position, color, message) {
-      let geometry;
-      switch(type) {
-        case 'box':
-          geometry = new THREE.BoxGeometry(2, 2, 2);
-          break;
-        case 'sphere':
-          geometry = new THREE.SphereGeometry(1, 32, 32);
-          break;
-        case 'cylinder':
-          geometry = new THREE.CylinderGeometry(1, 1, 2, 32);
-          break;
+      // Sentiero dal prato al cancello
+      const path = new THREE.Mesh(
+        new THREE.PlaneGeometry(5, 27),
+        new THREE.MeshStandardMaterial({ color: 0xc8a96a, roughness: 1 })
+      );
+      path.rotation.x = -Math.PI / 2;
+      path.position.set(0, 0.01, -11.5);
+      path.receiveShadow = true;
+      scene.add(path);
+
+      // ---- MURA della città (z -62..-22) ----
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x8d98b8, roughness: 0.85 });
+      function wall(w, d, h, x, z) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+        m.position.set(x, h / 2, z);
+        m.castShadow = true; m.receiveShadow = true;
+        scene.add(m);
       }
-      
-      const material = new THREE.MeshStandardMaterial({ 
-        color: color,
-        roughness: 0.5,
+      wall(28, 1, 3.2, -18, -22);   // sud sinistra
+      wall(28, 1, 3.2, 18, -22);    // sud destra (cancello in mezzo)
+      wall(64, 1, 3.2, 0, -62);     // nord
+      wall(1, 40, 3.2, -32, -42);   // ovest
+      wall(1, 40, 3.2, 32, -42);    // est
+      addCollider(-32, -4, -23.2, -21.8);
+      addCollider(4, 32, -23.2, -21.8);
+      addCollider(-32, 32, -63.2, -61.8);
+      addCollider(-33, -31, -63, -22);
+      addCollider(31, 33, -63, -22);
+      // Pilastri del cancello
+      const gateMat = new THREE.MeshStandardMaterial({ color: 0x5a6884, roughness: 0.7 });
+      [[-3.6, -22], [3.6, -22]].forEach(p => {
+        const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 4.6, 1.2), gateMat);
+        pillar.position.set(p[0], 2.3, p[1]);
+        pillar.castShadow = true;
+        scene.add(pillar);
+        addCollider(p[0] - 0.7, p[0] + 0.7, p[1] - 0.7, p[1] + 0.7);
+      });
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(9, 0.9, 1.2), gateMat);
+      lintel.position.set(0, 4.5, -22);
+      lintel.castShadow = true;
+      scene.add(lintel);
+
+      // Insegna del cancello
+      const sign = makeLabelSprite('CITTÀ DI LUMINA', 0xffd54a, 512, 128);
+      sign.scale.set(7, 1.8, 1);
+      sign.position.set(0, 5.6, -21.6);
+      scene.add(sign);
+
+      // ---- Edifici ----
+      function building(x, z, w, d, h, color, roof) {
+        const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        m.position.set(x, h / 2, z);
+        m.castShadow = true; m.receiveShadow = true;
+        scene.add(m);
+        if (roof) {
+          const r = new THREE.Mesh(
+            new THREE.ConeGeometry(Math.max(w, d) * 0.75, roof, 4),
+            new THREE.MeshStandardMaterial({ color: 0x6e4a8f, roughness: 0.7 })
+          );
+          r.position.set(x, h + roof / 2 - 0.1, z);
+          r.rotation.y = Math.PI / 4;
+          r.castShadow = true;
+          scene.add(r);
+        }
+        // finestre luminose
+        const winMat = new THREE.MeshStandardMaterial({ color: 0xffe082, emissive: 0xffe082, emissiveIntensity: 0.7 });
+        for (let i = 0; i < 3; i++) {
+          const win = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.05), winMat);
+          win.position.set(x - w / 2 + 0.06, h * 0.62, z + (i - 1) * (d / 3));
+          win.rotation.y = Math.PI / 2;
+          scene.add(win);
+        }
+        addCollider(x - w / 2, x + w / 2, z - d / 2, z + d / 2);
+      }
+      building(-18, -30, 8, 8, 6, 0x9aa7c7, 0);          // banca
+      building(-8, -30, 7, 7, 5, 0xb59bd4, 0);           // bottega
+      building(16, -30, 8, 8, 6, 0x8fbc8f, 2.6);         // casa col tetto
+      building(-16, -48, 9, 9, 6, 0xc78f6e, 0);          // taverna
+      building(-5, -52, 8, 8, 5, 0x9db4c0, 0);           // officina
+      building(10, -52, 7, 7, 8, 0xd6c27a, 2.8);         // cappella
+      building(20, -48, 7, 7, 6, 0xa9b8e0, 2.4);         // casa 2
+      building(12, -32, 6, 6, 5, 0xe0a9c0, 0);           // casa di Nonna Pia
+
+      // Bancarella del mercato (aperta)
+      const stall = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 4), new THREE.MeshStandardMaterial({ color: 0x8a6d3b, roughness: 0.9 }));
+      stall.position.set(7, 1.2, -42);
+      stall.castShadow = true; stall.receiveShadow = true;
+      scene.add(stall);
+      const awning = new THREE.Mesh(
+        new THREE.BoxGeometry(7, 0.15, 4.6),
+        new THREE.MeshStandardMaterial({ color: 0xff5c7a, roughness: 0.6 })
+      );
+      awning.position.set(7, 3, -42);
+      awning.castShadow = true;
+      scene.add(awning);
+      addCollider(4, 10, -44.4, -39.6);
+
+      // ---- Strade e piazza ----
+      const roadMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1 });
+      const roadH = new THREE.Mesh(new THREE.PlaneGeometry(60, 6), roadMat);
+      roadH.rotation.x = -Math.PI / 2;
+      roadH.position.set(0, 0.02, -40);
+      roadH.receiveShadow = true;
+      scene.add(roadH);
+      const roadV = new THREE.Mesh(new THREE.PlaneGeometry(6, 33), roadMat);
+      roadV.rotation.x = -Math.PI / 2;
+      roadV.position.set(0, 0.02, -41.5);
+      roadV.receiveShadow = true;
+      scene.add(roadV);
+      const plaza = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshStandardMaterial({ color: 0x7d8794, roughness: 1 }));
+      plaza.rotation.x = -Math.PI / 2;
+      plaza.position.set(0, 0.02, -40);
+      plaza.receiveShadow = true;
+      scene.add(plaza);
+
+      // ---- Lampioni (si accendono alla vittoria) ----
+      const lampPositions = [[-12, -40], [12, -40], [-20, -40], [20, -40], [0, -26], [0, -55], [-12, -52], [12, -52]];
+      lampPositions.forEach(p => {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.6, 8), new THREE.MeshStandardMaterial({ color: 0x374151, roughness: 0.7 }));
+        pole.position.set(p[0], 1.3, p[1]);
+        pole.castShadow = true;
+        scene.add(pole);
+        const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffe082, emissive: 0xffd54a, emissiveIntensity: 0.35 });
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), bulbMat);
+        bulb.position.set(p[0], 2.75, p[1]);
+        scene.add(bulb);
+        gameState.lampBulbs = gameState.lampBulbs || [];
+        gameState.lampBulbs.push(bulb);
+      });
+
+      // ---- Fontana Magica ----
+      const fountainGroup = new THREE.Group();
+      const fb = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.2, 0.7, 20), new THREE.MeshStandardMaterial({ color: 0x9aa7c7, roughness: 0.6 }));
+      fb.position.y = 0.35; fb.castShadow = true; fb.receiveShadow = true;
+      fountainGroup.add(fb);
+      const water = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.4, 2.4, 0.35, 20),
+        new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x22d3ee, emissiveIntensity: 0.35, transparent: true, opacity: 0.85 })
+      );
+      water.position.y = 0.72;
+      fountainGroup.add(water);
+      const core = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.7, 1.3, 12),
+        new THREE.MeshStandardMaterial({ color: 0x8b5cf6, emissive: 0x8b5cf6, emissiveIntensity: 0.5 })
+      );
+      core.position.y = 1.25;
+      fountainGroup.add(core);
+      [0, Math.PI / 2, Math.PI, Math.PI * 1.5].forEach(a => {
+        const spout = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), new THREE.MeshStandardMaterial({ color: 0x67e8f9, roughness: 0.3 }));
+        spout.position.set(Math.cos(a) * 2.5, 0.9, Math.sin(a) * 2.5);
+        fountainGroup.add(spout);
+      });
+      fountainGroup.position.set(0, 0, -40);
+      scene.add(fountainGroup);
+      fountainGroup.userData = { kind: 'fountain', isInteractable: true };
+      gameState.interactables.push(fountainGroup);
+      addCollider(-3.4, 3.4, -43.4, -36.6);
+
+      // ---- Parco (alberi + panchina) ----
+      function tree(x, z) {
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 1.6, 8), new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 }));
+        trunk.position.set(x, 0.8, z);
+        trunk.castShadow = true;
+        scene.add(trunk);
+        const fol = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 10), new THREE.MeshStandardMaterial({ color: 0x3f9b4f, roughness: 0.8 }));
+        fol.position.set(x, 2.4, z);
+        fol.castShadow = true;
+        scene.add(fol);
+        addCollider(x - 0.7, x + 0.7, z - 0.7, z + 0.7);
+      }
+      tree(24, -57); tree(27, -55); tree(21, -54);
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.9), new THREE.MeshStandardMaterial({ color: 0x8a6d3b, roughness: 0.9 }));
+      bench.position.set(23, 0.25, -51);
+      bench.castShadow = true;
+      scene.add(bench);
+      addCollider(21.8, 24.2, -51.5, -50.5);
+    }
+
+    function makeLabelSprite(text, color, w, h) {
+      const c = document.createElement('canvas');
+      c.width = w || 256; c.height = h || 64;
+      const x = c.getContext('2d');
+      x.fillStyle = 'rgba(8,12,30,.55)';
+      x.beginPath();
+      x.roundRect ? x.roundRect(6, 6, c.width - 12, c.height - 12, 14) : x.rect(6, 6, c.width - 12, c.height - 12);
+      x.fill();
+      x.font = 'bold ' + Math.floor(c.height * 0.5) + 'px system-ui, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = color || '#ffffff';
+      x.fillText(text, c.width / 2, c.height / 2);
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(2.6, 0.65, 1);
+      return sp;
+    }
+
+    /* ================= PERSONAGGI (NPC) ================= */
+    const NPC_DEFS = [
+      { id: 'sage', pos: [6, 0, -2] },
+      { id: 'guard', pos: [-6, 0, -24.6] },
+      { id: 'merchant', pos: [8.6, 0, -38.6] },
+      { id: 'nona', pos: [12.6, 0, -28.6] }
+    ];
+
+    function buildNPC(def) {
+      const d = DIALOGUES[def.id];
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.6 });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.65, 4, 10), mat);
+      body.position.y = 0.72;
+      body.castShadow = true;
+      g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffd9b3, roughness: 0.7 }));
+      head.position.y = 1.45;
+      head.castShadow = true;
+      g.add(head);
+      // cappello / dettaglio
+      if (def.id === 'sage') {
+        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 8), new THREE.MeshStandardMaterial({ color: 0x5b21b6, roughness: 0.7 }));
+        hat.position.y = 1.82;
+        g.add(hat);
+      } else if (def.id === 'guard') {
+        const helm = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.28, 12), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.6, roughness: 0.3 }));
+        helm.position.y = 1.72;
+        g.add(helm);
+      } else if (def.id === 'merchant') {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 12), new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.8 }));
+        cap.position.y = 1.66;
+        g.add(cap);
+      } else {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.8 }));
+        bun.position.set(0, 1.72, 0.1);
+        g.add(bun);
+      }
+      const label = makeLabelSprite(d.emoji + ' ' + d.name, '#ffe08a');
+      label.position.y = 2.15;
+      g.add(label);
+
+      g.position.set(def.pos[0], def.pos[1], def.pos[2]);
+      g.userData = { kind: 'npc', npcId: def.id, isInteractable: true };
+      scene.add(g);
+      gameState.interactables.push(g);
+      return g;
+    }
+
+    /* ================= FRAMMENTI DI CRISTALLO ================= */
+    const FRAGMENT_SPOTS = [
+      { pos: [5, 1, 5], shape: 'box', color: 0x7dd3fc },
+      { pos: [-5, 1, 8], shape: 'sphere', color: 0x67e8f9 },
+      { pos: [8, 1, -5], shape: 'cylinder', color: 0xa5f3fc },
+      { pos: [-8, 1, -8], shape: 'box', color: 0x7dd3fc },
+      { pos: [0, 1, -12], shape: 'sphere', color: 0x67e8f9 }
+    ];
+    const crystals = [];
+
+    function buildCrystal(spot, idx) {
+      let geo;
+      if (spot.shape === 'box') geo = new THREE.BoxGeometry(1.1, 1.1, 1.1);
+      else if (spot.shape === 'sphere') geo = new THREE.SphereGeometry(0.85, 20, 20);
+      else geo = new THREE.CylinderGeometry(0.7, 0.7, 1.4, 20);
+      const mat = new THREE.MeshStandardMaterial({
+        color: spot.color,
+        emissive: spot.color,
+        emissiveIntensity: 0.6,
+        roughness: 0.2,
         metalness: 0.3
       });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.copy(position);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.userData.message = message;
-      mesh.userData.isInteractable = true;
-      scene.add(mesh);
-      gameState.interactableObjects.push(mesh);
-      return mesh;
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(spot.pos[0], spot.pos[1], spot.pos[2]);
+      m.castShadow = true;
+      m.userData = { kind: 'crystal', index: idx, isInteractable: true, baseY: spot.pos[1] };
+      scene.add(m);
+      crystals.push(m);
+      gameState.interactables.push(m);
+      return m;
     }
 
-    // Add various interactive objects
-    createInteractiveObject('box', new THREE.Vector3(5, 1, 5), 0xff6b6b, '📦 Una scatola misteriosa... Chissà cosa contiene!');
-    createInteractiveObject('sphere', new THREE.Vector3(-5, 1, 8), 0x4ecdc4, '🔮 Una sfera magica che brilla di luce propria.');
-    createInteractiveObject('cylinder', new THREE.Vector3(8, 1, -5), 0xffe66d, '🎯 Un pilastro antico con strane incisioni.');
-    createInteractiveObject('box', new THREE.Vector3(-8, 1, -8), 0x95e1d3, '💎 Un cristallo che emana energia.');
-    createInteractiveObject('sphere', new THREE.Vector3(0, 1, -10), 0xf38181, '🌟 Una stella caduta dal cielo.');
+    function collectCrystal(mesh) {
+      if (mesh.userData.collected) return;
+      mesh.userData.collected = true;
+      gameState.fragments++;
+      scene.remove(mesh);
+      SFX.collect();
+      toast('💎 Frammento di cristallo trovato! (' + gameState.fragments + '/' + gameState.totalFragments + ')');
+      refreshFragments();
+      updateObjective();
+    }
 
-    // Load Character Model
-    const loader = new GLTFLoader();
-    loader.load(
-      '../assets/3d/avatar_1768519939535.glb',
-      (gltf) => {
-        gameState.character = gltf.scene;
-        gameState.character.position.set(0, 0, 0);
-        gameState.character.scale.set(1, 1, 1);
-        
-        // Enable shadows with better settings
-        gameState.character.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = false; // Character doesn't need to receive shadows
-            if (node.material) {
-              node.material.shadowSide = THREE.FrontSide;
-            }
-          }
-        });
-
-        scene.add(gameState.character);
-
-        // Setup animations if available
-        if (gltf.animations && gltf.animations.length > 0) {
-          gameState.mixer = new THREE.AnimationMixer(gameState.character);
-          
-          // Try to find walk animation
-          const walkAnim = gltf.animations.find(clip => 
-            clip.name.toLowerCase().includes('walk') || 
-            clip.name.toLowerCase().includes('run')
-          );
-          
-          if (walkAnim) {
-            gameState.walkAnimation = gameState.mixer.clipAction(walkAnim);
-            gameState.walkAnimation.loop = THREE.LoopRepeat;
-          } else if (gltf.animations[0]) {
-            // Use first animation as fallback
-            gameState.walkAnimation = gameState.mixer.clipAction(gltf.animations[0]);
-            gameState.walkAnimation.loop = THREE.LoopRepeat;
-          }
-        }
-
-        hideLoadingScreen();
-      },
-      (progress) => {
-        const percent = Math.round((progress.loaded / progress.total) * 100);
-        console.log(`Loading: ${percent}%`);
-      },
-      (error) => {
-        console.error('Error loading model:', error);
-        document.getElementById('loadingScreen').innerHTML = 
-          '<div>Errore nel caricamento del modello<br><small>Verifica che il file GLB sia presente</small></div>';
+    /* ================= FONTANA ================= */
+    function openFountain() {
+      if (gameState.fragments >= gameState.totalFragments) {
+        openDialogue('fountain', gameState);
+      } else {
+        toast('⛲ La fontana è spenta: mancano i frammenti del Cristallo.');
       }
-    );
-
-    function hideLoadingScreen() {
-      document.getElementById('loadingScreen').classList.add('hidden');
     }
 
-    // Joystick Controls
-    const joystickContainer = document.getElementById('joystickContainer');
-    const joystickKnob = document.getElementById('joystickKnob');
-    const maxDistance = 40;
+    /* ================= VITTORIA ================= */
+    let confetti = [];
+    function startVictory() {
+      gameState.victory = true;
+      gameState.story.restored = true;
+      closeDialogue(gameState);
+      SFX.fanfare();
+      // le luci si accendono
+      (gameState.lampBulbs || []).forEach(b => { b.material.emissiveIntensity = 2.6; });
+      scene.fog.color.set(0xffd9a0);
+      scene.background.set(0xffc98a);
+      // coriandoli
+      const colors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x8b5cf6, 0x4ade80, 0x22d3ee];
+      for (let i = 0; i < 90; i++) {
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(0.12, 0.12, 0.12),
+          new THREE.MeshBasicMaterial({ color: colors[i % colors.length] })
+        );
+        m.position.set(rnd(-26, 26), rnd(6, 30), rnd(-60, -18));
+        m.userData = { vy: rnd(-7, -2.5), spin: rnd(2, 9) };
+        scene.add(m);
+        confetti.push(m);
+      }
+      updateObjective();
+      setTimeout(() => {
+        const secs = Math.max(0, Math.floor((performance.now() - gameState.startedAt) / 1000));
+        const mm = Math.floor(secs / 60), ss = secs % 60;
+        $('vicStats').innerHTML =
+          '💎 Frammenti: <b>5/5</b><br>' +
+          '💬 Dialoghi: <b>' + gameState.dialoguesHad + '</b><br>' +
+          '⏱️ Tempo: <b>' + mm + ':' + String(ss).padStart(2, '0') + '</b>';
+        $('victoryScreen').classList.remove('hidden');
+      }, 1400);
+    }
+    $('btnRestart').addEventListener('click', () => { SFX.click(); location.reload(); });
 
+    /* ================= INPUT ================= */
+    const joystickContainer = $('joystickContainer');
+    const joystickKnob = $('joystickKnob');
+    const maxDistance = 40;
     let joystickCenter = { x: 0, y: 0 };
 
     function updateJoystickCenter() {
@@ -431,24 +819,21 @@
       joystickCenter.x = rect.left + rect.width / 2;
       joystickCenter.y = rect.top + rect.height / 2;
     }
-
     updateJoystickCenter();
     window.addEventListener('resize', updateJoystickCenter);
 
     function handleJoystickStart(e) {
+      if (!gameState.started || gameState.dialogueOpen || gameState.victory) return;
       gameState.joystick.active = true;
       handleJoystickMove(e);
     }
-
     function handleJoystickMove(e) {
       if (!gameState.joystick.active) return;
-
       const touch = e.touches ? e.touches[0] : e;
       const dx = touch.clientX - joystickCenter.x;
       const dy = touch.clientY - joystickCenter.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > maxDistance) {
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > maxDistance) {
         const angle = Math.atan2(dy, dx);
         gameState.joystick.x = Math.cos(angle) * maxDistance;
         gameState.joystick.y = Math.sin(angle) * maxDistance;
@@ -456,11 +841,8 @@
         gameState.joystick.x = dx;
         gameState.joystick.y = dy;
       }
-
-      joystickKnob.style.transform = 
-        `translate(${gameState.joystick.x}px, ${gameState.joystick.y}px)`;
+      joystickKnob.style.transform = `translate(${gameState.joystick.x}px, ${gameState.joystick.y}px)`;
     }
-
     function handleJoystickEnd() {
       gameState.joystick.active = false;
       gameState.joystick.x = 0;
@@ -468,204 +850,298 @@
       joystickKnob.style.transform = 'translate(0, 0)';
     }
 
-    // Touch events
     joystickContainer.addEventListener('touchstart', handleJoystickStart, { passive: false });
     document.addEventListener('touchmove', handleJoystickMove, { passive: false });
     document.addEventListener('touchend', handleJoystickEnd);
-
-    // Mouse events (for desktop testing)
     joystickContainer.addEventListener('mousedown', handleJoystickStart);
     document.addEventListener('mousemove', handleJoystickMove);
     document.addEventListener('mouseup', handleJoystickEnd);
+    joystickContainer.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', e => { if (gameState.joystick.active) e.preventDefault(); }, { passive: false });
 
-    // Prevent scrolling on touch
-    joystickContainer.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-    document.addEventListener('touchmove', (e) => {
-      if (gameState.joystick.active) e.preventDefault();
-    }, { passive: false });
+    // Tastiera (desktop)
+    window.addEventListener('keydown', e => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+      gameState.keys[e.code] = true;
+      if (gameState.dialogueOpen) {
+        if (e.code === 'Enter') { const first = document.querySelector('#dlgChoices button'); if (first) first.click(); }
+        if (e.code === 'Escape') closeDialogue(gameState);
+        return;
+      }
+      if (e.code === 'KeyE') handleInteract();
+      if (e.code === 'Space' && gameState.started) handleJump();
+    });
+    window.addEventListener('keyup', e => { gameState.keys[e.code] = false; });
 
-    // Jump Button
-    const jumpButton = document.getElementById('jumpButton');
+    const jumpButton = $('jumpButton');
     function handleJump() {
-      if (gameState.character && !gameState.isJumping && 
-          Math.abs(gameState.character.position.y - gameState.groundY) < 0.1) {
+      if (!gameState.started || gameState.dialogueOpen || gameState.victory) return;
+      if (gameState.character && !gameState.isJumping && Math.abs(gameState.character.position.y - gameState.groundY) < 0.1) {
         gameState.isJumping = true;
         gameState.jumpVelocity = gameState.jumpForce;
+        SFX.jump();
       }
     }
-    jumpButton.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      handleJump();
-    });
+    jumpButton.addEventListener('touchstart', e => { e.preventDefault(); handleJump(); });
     jumpButton.addEventListener('mousedown', handleJump);
 
-    // Interact Button
-    const interactButton = document.getElementById('interactButton');
-    const dialogBox = document.getElementById('dialogBox');
-    let dialogTimeout;
-
-    function showDialog(message) {
-      dialogBox.textContent = message;
-      dialogBox.classList.add('visible');
-      
-      clearTimeout(dialogTimeout);
-      dialogTimeout = setTimeout(() => {
-        dialogBox.classList.remove('visible');
-      }, 3000);
-    }
-
+    const interactButton = $('interactButton');
     function handleInteract() {
-      if (gameState.nearestObject && gameState.character) {
-        const message = gameState.nearestObject.userData.message;
-        showDialog(message);
-      }
+      if (!gameState.started || gameState.dialogueOpen || gameState.victory) return;
+      const n = gameState.nearest;
+      if (!n) return;
+      SFX.click();
+      const kind = n.userData.kind;
+      if (kind === 'npc') openDialogue(n.userData.npcId, gameState);
+      else if (kind === 'crystal') collectCrystal(n);
+      else if (kind === 'fountain') openFountain();
     }
-
-    interactButton.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      handleInteract();
-    });
+    interactButton.addEventListener('touchstart', e => { e.preventDefault(); handleInteract(); });
     interactButton.addEventListener('mousedown', handleInteract);
 
-    // Check proximity to interactable objects
-    function updateInteractButton() {
+    function updateInteract() {
       if (!gameState.character) return;
-
-      let nearest = null;
-      let minDistance = 3; // Interaction range
-
-      gameState.interactableObjects.forEach(obj => {
-        const distance = gameState.character.position.distanceTo(obj.position);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearest = obj;
-        }
+      let nearest = null, best = 3.2;
+      gameState.interactables.forEach(obj => {
+        if (obj.userData.collected) return;
+        const range = obj.userData.kind === 'crystal' ? 2.3 : 3.2;
+        if (range > best) return;
+        const d = gameState.character.position.distanceTo(obj.position);
+        if (d < range && d < best) { best = d; nearest = obj; }
       });
+      gameState.nearest = nearest;
+      const show = nearest && gameState.started && !gameState.dialogueOpen && !gameState.victory;
+      interactButton.classList.toggle('visible', !!show);
+      if (!show) { /* niente */ }
+    }
 
-      gameState.nearestObject = nearest;
-      
-      if (nearest) {
-        interactButton.classList.add('visible');
-      } else {
-        interactButton.classList.remove('visible');
-        dialogBox.classList.remove('visible');
+    /* ================= COLLISIONI ================= */
+    // ==== COLLISION ENGINE (logica pura — testabile) ====
+    function collides(px, pz, r) {
+      for (const c of gameState.colliders) {
+        const cx = clamp(px, c.minX, c.maxX);
+        const cz = clamp(pz, c.minZ, c.maxZ);
+        const dx = px - cx, dz = pz - cz;
+        if (dx * dx + dz * dz < r * r) return { c, cx, cz, dx, dz };
+      }
+      return null;
+    }
+    function resolveCollisions() {
+      const r = 0.55;
+      for (let i = 0; i < 3; i++) {
+        const hit = collides(gameState.character.position.x, gameState.character.position.z, r);
+        if (!hit) break;
+        const d = Math.hypot(hit.dx, hit.dz);
+        if (d < 1e-6) {
+          // centro dentro il box: spingi lungo l'asse minore
+          const px = Math.min(hit.cx - hit.c.minX, hit.c.maxX - hit.cx);
+          const pz = Math.min(hit.cz - hit.c.minZ, hit.c.maxZ - hit.cz);
+          if (px < pz) gameState.character.position.x = hit.cx > gameState.character.position.x ? hit.c.minX - r : hit.c.maxX + r;
+          else gameState.character.position.z = hit.cz > gameState.character.position.z ? hit.c.minZ - r : hit.c.maxZ + r;
+        } else {
+          const push = r - d;
+          gameState.character.position.x += (hit.dx / d) * push;
+          gameState.character.position.z += (hit.dz / d) * push;
+        }
+      }
+    }
+    // ==== END COLLISION ENGINE ====
+
+    /* ================= PERSONAGGIO GIOCATORE ================= */
+    function buildFallbackCharacter() {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.7, 4, 10), new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.6 }));
+      body.position.y = 0.75;
+      body.castShadow = true;
+      g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffd9b3, roughness: 0.7 }));
+      head.position.y = 1.5;
+      head.castShadow = true;
+      g.add(head);
+      g.userData.fallback = true;
+      return g;
+    }
+
+    const loader = new GLTFLoader();
+    loader.load(
+      '../assets/3d/avatar_1768519939535.glb',
+      (gltf) => {
+        gameState.character = gltf.scene;
+        gameState.character.traverse(node => {
+          if (node.isMesh) { node.castShadow = true; node.receiveShadow = false; }
+        });
+        scene.add(gameState.character);
+        if (gltf.animations && gltf.animations.length) {
+          gameState.mixer = new THREE.AnimationMixer(gameState.character);
+          const walk = gltf.animations.find(c => /walk|run/.test(c.name.toLowerCase())) || gltf.animations[0];
+          gameState.walkAnimation = gameState.mixer.clipAction(walk);
+          gameState.walkAnimation.loop = THREE.LoopRepeat;
+        }
+        finishSetup();
+      },
+      undefined,
+      (err) => {
+        console.error('Errore GLB, uso il personaggio di riserva:', err);
+        gameState.character = buildFallbackCharacter();
+        scene.add(gameState.character);
+        finishSetup();
+      }
+    );
+
+    function finishSetup() {
+      gameState.character.position.set(0, 0, 0);
+      $('loadingScreen').classList.add('hidden');
+      $('startScreen').classList.remove('hidden');
+    }
+
+    /* ================= AVVIO ================= */
+    $('btnStart').addEventListener('click', () => {
+      SFX.ensure(); SFX.click();
+      $('startScreen').classList.add('hidden');
+      gameState.started = true;
+      gameState.startedAt = performance.now();
+      updateObjective();
+      refreshFragments();
+      const instr = $('instructions');
+      instr.classList.add('show');
+      setTimeout(() => instr.classList.remove('show'), 6500);
+    });
+
+    /* ================= GAME LOOP ================= */
+    const clock = new THREE.Clock();
+
+    function inputVector() {
+      let x = 0, y = 0;
+      if (gameState.joystick.active) {
+        x = gameState.joystick.x / maxDistance;
+        y = gameState.joystick.y / maxDistance;
+      }
+      const k = gameState.keys;
+      if (k['ArrowUp'] || k['KeyW']) y -= 1;
+      if (k['ArrowDown'] || k['KeyS']) y += 1;
+      if (k['ArrowLeft'] || k['KeyA']) x -= 1;
+      if (k['ArrowRight'] || k['KeyD']) x += 1;
+      const m = Math.hypot(x, y);
+      if (m > 1) { x /= m; y /= m; }
+      return { x, y, mag: m };
+    }
+
+    function updateCharacter(dt) {
+      const ch = gameState.character;
+      if (!ch) return;
+
+      // fisica del salto
+      if (gameState.isJumping || ch.position.y > gameState.groundY) {
+        gameState.jumpVelocity += gameState.gravity * dt;
+        ch.position.y += gameState.jumpVelocity * dt;
+        if (ch.position.y <= gameState.groundY) {
+          ch.position.y = gameState.groundY;
+          gameState.jumpVelocity = 0;
+          gameState.isJumping = false;
+        }
+      }
+
+      const canMove = gameState.started && !gameState.dialogueOpen && !gameState.victory;
+      const iv = canMove ? inputVector() : { x: 0, y: 0, mag: 0 };
+
+      if (iv.mag > 0.1) {
+        const speed = 5 * dt;
+        ch.position.x += iv.x * speed;
+        ch.position.z += iv.y * speed;
+        ch.rotation.y = Math.atan2(iv.x, iv.y);
+        resolveCollisions();
+        if (gameState.walkAnimation && !gameState.isMoving && !gameState.isJumping) {
+          gameState.walkAnimation.play();
+          gameState.isMoving = true;
+        }
+      } else if (gameState.walkAnimation && gameState.isMoving) {
+        gameState.walkAnimation.stop();
+        gameState.isMoving = false;
+      }
+
+      // confini del mondo
+      const b = 47;
+      ch.position.x = clamp(ch.position.x, -b, b);
+      ch.position.z = clamp(ch.position.z, -b, b);
+
+      // telecamera
+      const target = new THREE.Vector3(ch.position.x, ch.position.y + 1, ch.position.z);
+      camera.position.lerp(target.clone().add(new THREE.Vector3(0, 5, 10)), 0.1);
+      camera.lookAt(target);
+
+      // zona città
+      const inCity = ch.position.z < -22;
+      if (inCity !== gameState.inCity) {
+        gameState.inCity = inCity;
+        toast(inCity ? '🏙️ Sei entrato nella Città di Lumina' : '🌿 Prato dei Sogni');
       }
     }
 
-    // Game Loop
-    const clock = new THREE.Clock();
+    const fogCity = new THREE.Color(0xa9c4e4);
+    const fogMeadow = new THREE.Color(0x87ceeb);
+    function updateFog() {
+      const target = gameState.inCity ? fogCity : fogMeadow;
+      scene.fog.color.lerp(target, 0.04);
+      scene.fog.near = gameState.inCity ? 12 : 20;
+      scene.fog.far = gameState.inCity ? 60 : 100;
+    }
+
+    function updateCrystals(dt, t) {
+      crystals.forEach((c, i) => {
+        if (c.userData.collected || c.parent !== scene) return;
+        c.rotation.y += dt * 1.2;
+        c.rotation.x += dt * 0.4;
+        c.position.y = c.userData.baseY + Math.sin(t * 2 + i) * 0.12;
+      });
+    }
+
+    function updateConfetti(dt) {
+      if (!confetti.length) return;
+      confetti.forEach(m => {
+        m.position.y += m.userData.vy * dt;
+        m.rotation.x += m.userData.spin * dt;
+        m.rotation.z += m.userData.spin * dt;
+        if (m.position.y < 0) {
+          m.position.y = rnd(8, 30);
+          m.position.x = rnd(-26, 26);
+        }
+      });
+    }
 
     function animate() {
       requestAnimationFrame(animate);
-      const delta = clock.getDelta();
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const t = clock.elapsedTime;
 
-      if (gameState.character && gameState.mixer) {
-        gameState.mixer.update(delta);
-      }
-
-      if (gameState.character) {
-        // Jump physics
-        if (gameState.isJumping || gameState.character.position.y > gameState.groundY) {
-          gameState.jumpVelocity += gameState.gravity * delta;
-          gameState.character.position.y += gameState.jumpVelocity * delta;
-          
-          if (gameState.character.position.y <= gameState.groundY) {
-            gameState.character.position.y = gameState.groundY;
-            gameState.jumpVelocity = 0;
-            gameState.isJumping = false;
-          }
-        }
-
-        const moveSpeed = 5 * delta;
-        const normalizedX = gameState.joystick.x / maxDistance;
-        const normalizedY = gameState.joystick.y / maxDistance;
-        const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-
-        if (magnitude > 0.1) {
-          // Calculate movement direction
-          const moveX = normalizedX * moveSpeed;
-          const moveZ = normalizedY * moveSpeed;
-
-          gameState.character.position.x += moveX;
-          gameState.character.position.z += moveZ;
-
-          // Rotate character to face movement direction
-          const angle = Math.atan2(normalizedX, normalizedY);
-          gameState.character.rotation.y = angle;
-
-          // Play walk animation (not during jump)
-          if (gameState.walkAnimation && !gameState.isMoving && !gameState.isJumping) {
-            gameState.walkAnimation.play();
-            gameState.isMoving = true;
-          }
-
-          // Camera follows character with offset
-          const cameraOffset = new THREE.Vector3(0, 5, 10);
-          const cameraTarget = new THREE.Vector3(
-            gameState.character.position.x,
-            gameState.character.position.y + 1,
-            gameState.character.position.z
-          );
-          
-          camera.position.lerp(
-            cameraTarget.clone().add(cameraOffset),
-            0.1
-          );
-          camera.lookAt(cameraTarget);
-        } else {
-          // Stop walk animation
-          if (gameState.walkAnimation && gameState.isMoving) {
-            gameState.walkAnimation.stop();
-            gameState.isMoving = false;
-          }
-        }
-
-        // Update camera even when not moving
-        if (magnitude <= 0.1) {
-          const cameraOffset = new THREE.Vector3(0, 5, 10);
-          const cameraTarget = new THREE.Vector3(
-            gameState.character.position.x,
-            gameState.character.position.y + 1,
-            gameState.character.position.z
-          );
-          
-          camera.position.lerp(
-            cameraTarget.clone().add(cameraOffset),
-            0.1
-          );
-          camera.lookAt(cameraTarget);
-        }
-
-        // Keep character on ground
-        const boundarySize = 48;
-        gameState.character.position.x = Math.max(-boundarySize, Math.min(boundarySize, gameState.character.position.x));
-        gameState.character.position.z = Math.max(-boundarySize, Math.min(boundarySize, gameState.character.position.z));
-        
-        // Check for nearby interactable objects
-        updateInteractButton();
-      }
-
+      if (gameState.character && gameState.mixer) gameState.mixer.update(dt);
+      updateCharacter(dt);
+      updateFog();
+      updateCrystals(dt, t);
+      updateConfetti(dt);
+      updateInteract();
       renderer.render(scene, camera);
     }
 
+    // costruisci il mondo subito; i personaggi/frammenti solo dopo il model
+    buildWorld();
+    NPC_DEFS.forEach(def => buildNPC(def));
+    FRAGMENT_SPOTS.forEach((s, i) => buildCrystal(s, i));
+
     animate();
 
-    // Handle window resize
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Hide instructions after 5 seconds
-    setTimeout(() => {
-      const instructions = document.getElementById('instructions');
-      if (instructions) {
-        instructions.style.opacity = '0';
-        instructions.style.transition = 'opacity 1s';
-        setTimeout(() => instructions.remove(), 1000);
-      }
-    }, 5000);
+    // hook di debug (utile anche per i test)
+    window.__LUMINA = {
+      gameState, DIALOGUES, crystals,
+      dialogText, dialogChoices, renderDialogue, chooseOption, closeDialogue, openDialogue,
+      currentObjective, updateObjective, collectCrystal, openFountain, startVictory,
+      collides, resolveCollisions, inputVector, buildWorld, buildNPC, buildCrystal
+    };
   </script>
 </body>
 </html>

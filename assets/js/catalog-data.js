@@ -134,7 +134,7 @@
     ['friends-tycoon', 'Friends Tycoon', 'A social management game experiment.', 'games/friends-tycoon.html', '♙', 'simulation', ['Simulation'], false],
     ['orto-magico', 'Orto Magico', 'A playful garden and growing game.', 'games/orto-magico/index.html', '✿', 'simulation', ['PWA'], false],
     ['pokopia-clone', 'Pokopia Clone', 'A browser world-building experiment.', 'games/pokopia-clone/index.html', '⌂', 'simulation', ['Canvas'], false]
-    ,['3d-game', '3D Game', 'A browser-based 3D game experiment.', 'games/3dgame.html', '◇', 'arcade', ['3D'] , false]
+    ,['3d-game', 'Lumina 3D', 'Lumina — Il Cristallo dell\'Alba: esplora il prato, raccogli i 5 frammenti del Cristallo, parla con i cittadini (dialoghi e scelte) e ridai luce alla città.', 'games/3dgame.html', '◇', 'arcade', ['3D', 'Story', 'Dialoghi'] , false]
     ,['airhockey-classic', 'Air Hockey Classic', 'A classic air hockey game entry point.', 'games/airhockey.html', '🏒', 'multiplayer', ['Touch', 'Multiplayer'], false]
     ,['animal-crossing', 'Animal Crossing Experiment', 'A playful life-simulation experiment.', 'games/animal_crossing.html', '🌿', 'simulation', ['Simulation'], false]
     ,['city-sim', 'City Sim', 'Build and observe a small city simulation.', 'games/city_sim.html', '▦', 'simulation', ['Simulation'], false]
@@ -149,6 +149,7 @@
     ,['referendum-game', 'Referendum Game', 'A multiplayer referendum and mini-game experiment.', 'games/referendum-game/index.html', '◉', 'multiplayer', ['PeerJS', 'PWA'], false]
     ,['slot-machine', 'Slot Machine', 'Spin and test your luck.', 'games/slot.html', '🎰', 'arcade', ['Casual'], false]
     ,['watermelon', 'Watermelon Game', 'A physics-inspired fruit merging game.', 'games/watermelon.html', '🍉', 'puzzle', ['Physics'], false]
+    ,['rivincita', 'RIVINCITA 2D', 'GTA 2D top-down (stile gameboy moderno): una storia su ansia, lavoro e rivincita. Mappa 3600x3600, lavori veri, furto d\'auto e polizia, armi satiriche, misuratore d\'ansia, side quest e minigiochi, satira sociale. Include un motore di test automatico (menu 🧪 o ?test=1). iPhone + desktop.', 'games/rivincita/index.html', '🏙️', 'story', ['2D', 'Story', 'Open World'], true]
     ,    ['webgl-diagnostics', 'WebGL Diagnostics', 'Inspect browser graphics capabilities.', 'games/webgl_diagnostics.html', '▣', 'tools', ['WebGL', 'Diagnostics'], false]
     ,['arcade-lab', 'Arcade Lab', 'The experimental arcade playground: prototypes and mini-games in one hub.', 'games/arcade-lab/index.html', '🕹️', 'arcade', ['Arcade', 'Hub'], false]
   ].map(([id,title,description,href,icon,category,badges,featured]) => ({ id, title, description, href, icon, category, badges, technologies: badges, featured, status: 'live', type: 'game', requirements: badges.includes('Camera') ? ['camera'] : [] }));

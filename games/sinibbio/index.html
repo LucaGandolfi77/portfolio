@@ -12,10 +12,10 @@
 <style>
   :root{--bg:#0a0f1e;--ink:#eaf6ff;--muted:#9fb8d8;--accent:#7c5cff;--gold:#ffd54a;--danger:#ff5c7a;--good:#4ade80}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
-    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overscroll-behavior:none}
-  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#000}
-  #cv{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:crosshair}
+  html,body{margin:0;padding:0;height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+  #cam{position:fixed;inset:0;width:100%;height:100%;height:100dvh;object-fit:cover;z-index:0;background:#000}
+  #cv{position:fixed;inset:0;width:100%;height:100%;height:100dvh;z-index:1;touch-action:none;cursor:crosshair}
   .ar-anchor{position:fixed;left:0;top:0;width:2px;height:2px;pointer-events:none;opacity:0;z-index:1;will-change:transform}
   .hidden{display:none !important}
 
@@ -91,7 +91,8 @@
     <button class="btn ghost" id="btnNoCam">🎧 Gioca senza fotocamera</button>
     <p class="note" id="introNote">Servono permessi: fotocamera, microfono e (su iPhone) sensore di movimento.
       Il riconoscimento vocale funziona su Chrome/Android; su Safari iPhone, al microfono si affianca il tasto "L'ho detta!".
-      Le parole sono inventate: sii generoso con te stesso.</p>
+      Le parole sono inventate: il gioco le ascolta con grammatica JSGF, risultati intermedi e doppia lingua (it-IT / en-US).
+      Su iPhone il gioco parte a schermo intero: la barra del browser si nasconde.</p>
   </div>
 
   <div id="wordOverlay" class="hidden">
@@ -238,6 +239,7 @@ const G={
   orient:{gamma:0,beta:0,ok:false},
   smO:{gamma:0,beta:0},
   overlay:null, // mostro attualmente in sfida
+  rec:null, recWatch:null, recLangIdx:0, recTries:0,
   jager:null, flash:0
 };
 (function(){ try{ G.best=Number(localStorage.getItem('sinibbio.best')||0); }catch(e){} })();
@@ -1060,25 +1062,85 @@ function chooseWord(word,btn){
     listen(m);
   }, 350);
 }
+/* Le parole sono INVENTATE: il motore vocale non le conosce e le trascrive
+   "italianizzate" (finkure→"fincure", tokozon→"tocoson"...). Per farle
+   ascoltare al microfono:
+   1) grammatica JSGF con tutte le parole del database (Chrome desktop);
+   2) risultati INTERIM + 8 alternative: il motore "corregge" meno i suoni
+      estranei, e matchWord confronta in fonetica (Levenshtein);
+   3) ciclo di lingue it-IT / en-US: parole tipo weightlighter, schiverrrr,
+      drefgolding suonano più inglesi, finkure/liskato più italiane. Se la
+      prima lingua non capisce nulla si riprova da sola con l'altra. */
+const LANG_CYCLE=['it-IT','en-US'];
+function stopRec(){
+  clearTimeout(G.recWatch);
+  if(G.rec){ try{ G.rec.onresult=null; G.rec.onerror=null; G.rec.onend=null; G.rec.abort(); }catch(e){} G.rec=null; }
+}
 function listen(m){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ $('heardTxt').textContent='Riconoscimento non supportato qui: usa "L\'ho detta!"'; return; }
+  stopRec();
+  G.recTries=(G.recTries||0)+1;
   const rec=new SR();
-  rec.lang='it-IT'; rec.interimResults=false; rec.maxAlternatives=4;
-  rec.onresult=(e)=>{
-    const texts=[];
-    for(let i=0;i<e.results.length;i++) for(let j=0;j<e.results[i].length;j++) texts.push(e.results[i][j].transcript);
-    const spoken=texts.join(' ');
-    $('heardTxt').textContent='Ho sentito: "'+spoken+'"';
-    const ok = m.reale? matchPair(spoken, m.target) : matchWord(spoken, m.target);
-    if(ok){ onWordOk(m); }
-    else { onWordFail(m, spoken); }
+  G.rec=rec;
+  const lang=LANG_CYCLE[G.recLangIdx]||'it-IT';
+  rec.continuous=true;
+  rec.interimResults=true;
+  rec.maxAlternatives=8;
+  try{ rec.lang=lang; }catch(e){}
+  try{
+    const GL=window.SpeechGrammarList||window.webkitSpeechGrammarList;
+    if(GL && !m.reale){
+      const gl=new GL();
+      gl.addFromString('#JSGF V1.0; grammar words; public <w> = '+WORDS.join(' | ')+' ;',1);
+      rec.grammars=gl;
+    }
+  }catch(e){}
+  let mismatch=0;
+  const watchdog=()=>{
+    G.rec=null;
+    try{ rec.stop(); }catch(e){}
+    if(G.recTries<2){
+      G.recLangIdx=1-(G.recLangIdx||0);
+      $('heardTxt').textContent='Non ti ho sentito: riprovo con la lingua "'+(LANG_CYCLE[G.recLangIdx]||'it-IT')+'"…';
+      listen(m);
+    } else {
+      G.recTries=0;
+      $('heardTxt').textContent='Non ti ho capito: riprova a dire "'+m.target+'" (o usa "L\'ho detta!").';
+    }
   };
-  rec.onerror=()=>{ $('heardTxt').textContent='Microfono non disponibile: usa "L\'ho detta!"'; };
-  rec.onend=()=>{ /* il riconoscimento termina da solo */ };
+  const armWatchdog=()=>{ clearTimeout(G.recWatch); G.recWatch=setTimeout(watchdog, 8000); };
+  rec.onresult=(e)=>{
+    armWatchdog(); // c'è attività vocale: il conto alla rovescia riparte
+    const texts=[]; let finalTxt='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      for(let j=0;j<r.length;j++){ texts.push(r[j].transcript); if(r.isFinal) finalTxt=r[j].transcript; }
+    }
+    const spoken=texts.join(' ');
+    if(spoken && spoken.trim()){
+      $('heardTxt').textContent='Ho sentito: "'+spoken.trim()+'"';
+      if(m.reale? matchPair(spoken,m.target) : matchWord(spoken,m.target)){
+        stopRec(); G.recTries=0; onWordOk(m); return;
+      }
+    }
+    if(finalTxt){
+      mismatch++;
+      if(mismatch>=2){ stopRec(); G.recTries=0; onWordFail(m, finalTxt); }
+    }
+  };
+  rec.onerror=(ev)=>{
+    G.rec=null;
+    if(ev && (ev.error==='no-speech'||ev.error==='aborted')) return;
+    $('heardTxt').textContent='Microfono non disponibile: usa "L\'ho detta!"';
+  };
+  rec.onend=()=>{ G.rec=null; };
   try{ rec.start(); }catch(e){}
+  $('heardTxt').textContent='🎙 In ascolto… ('+lang+') parla ora!';
+  armWatchdog();
 }
 function onWordOk(m){
+  stopRec();
   AU.ok();
   G.combo = Math.min(5, G.combo+1);
   toast('PAROLA PERFETTA! '+m.target+' → SINIBBIO distrutto! (combo x'+G.combo+')','t-good');
@@ -1096,9 +1158,9 @@ function onWordFail(m, spoken){
     $('heardTxt').textContent='Quasi! Riprova a dire "'+m.target+'" (ho sentito: "'+spoken+'")';
   }
 }
-function closeOverlay(){ G.overlay=null; $('wordOverlay').classList.add('hidden'); }
-$('btnRetryMic').addEventListener('click',()=>{ if(G.overlay){ AU.click(); $('heardTxt').textContent='🎙 In ascolto…'; listen(G.overlay); } });
-$('btnManual').addEventListener('click',()=>{ if(G.overlay){ onWordOk(G.overlay); } });
+function closeOverlay(){ stopRec(); G.overlay=null; $('wordOverlay').classList.add('hidden'); }
+$('btnRetryMic').addEventListener('click',()=>{ if(G.overlay){ AU.click(); G.recTries=0; G.recLangIdx=1-(G.recLangIdx||0); $('heardTxt').textContent='🎙 In ascolto… ('+(LANG_CYCLE[G.recLangIdx]||'it-IT')+')'; listen(G.overlay); } });
+$('btnManual').addEventListener('click',()=>{ if(G.overlay){ stopRec(); onWordOk(G.overlay); } });
 $('btnCancel').addEventListener('click',()=>{ AU.click(); closeOverlay(); toast('Il SINIBBIO ti osserva. Tornerà.','t-gold'); });
 
 /* ---------------- input ---------------- */
@@ -1162,14 +1224,23 @@ function startGame(withCam){
     render();
   })(last);
 }
+/* Schermo intero: nasconde la barra del browser in alto e quella inutile in
+   basso su iPhone (Safari 16.4+ supporta requestFullscreen; altrove ignora). */
+function goFullscreen(){
+  try{
+    const d=document.documentElement;
+    if(d && d.requestFullscreen) d.requestFullscreen().catch(()=>{});
+  }catch(e){}
+}
 $('btnStart').addEventListener('click', async ()=>{
+  goFullscreen();
   $('btnStart').disabled=true;
   await enableOrient();
   const ok=await startCam();
   if(!ok && !navigator.mediaDevices) toast('Fotocamera non disponibile: si gioca senza AR','t-bad');
   startGame(true);
 });
-$('btnNoCam').addEventListener('click', ()=>{ startGame(false); toast('Modalità senza fotocamera: i mostri vivono sul tavolo virtuale','t-good'); });
+$('btnNoCam').addEventListener('click', ()=>{ goFullscreen(); startGame(false); toast('Modalità senza fotocamera: i mostri vivono sul tavolo virtuale','t-good'); });
 $('btnCam').addEventListener('click', toggleCam);
 $('btnMute').addEventListener('click', ()=>{ G.muted=!G.muted; AU.setOn(!G.muted); $('btnMute').textContent=G.muted?'🔇':'🔊'; });
 window.addEventListener('resize', resize);

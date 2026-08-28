@@ -118,11 +118,9 @@
     font-weight:700;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;}
   .abtn .ico{font-size:20px;}
   .abtn:active{transform:scale(.94);}
-  #btnRocket{border-color:#ff8f6b;color:#ffb59c;}
-  #btnRocket .cnt{font-size:10px;color:var(--muted);}
   #btnRepair{border-color:#43d17c;color:#9fe8c8;}
 
-  #minimapwrap{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 100px);}
+  #minimapwrap{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 160px);}
   canvas#minimap{width:150px;height:auto;border:1px solid var(--line);border-radius:10px;background:rgba(6,10,22,.85);display:none;}
 
   #deskhint{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;font-size:10.5px;color:#5c6f92;white-space:nowrap;letter-spacing:.03em;}
@@ -255,10 +253,9 @@
     <div id="joystick"><div class="base"></div><div class="knob"></div></div>
     <div id="btns-right">
       <button class="abtn" id="btnRepair"><span class="ico">⚕</span><span>Repair</span></button>
-      <button class="abtn" id="btnRocket"><span class="ico">🚀</span><span>Rocket</span><span class="cnt" id="rocketCnt">0</span></button>
     </div>
     <div id="minimapwrap"><canvas id="minimap" width="150" height="94"></canvas></div>
-    <div id="deskhint">Click: move / target · WASD: fly · Space: rocket · M: minimap · Q: quests · H: hangar · double-click: autopilot</div>
+    <div id="deskhint">Click: move / target · WASD: fly · M: minimap · Q: quests · H: hangar · double-click: autopilot</div>
   </div>
 </div>
 
@@ -345,13 +342,6 @@ const AMMO = [
   {id:'UCB-100', mult:7, price:1200,  per:1000, cur:'uridium', desc:'Uridium-Charged Bullets. The premium fuel of violence.'}
 ];
 
-const ROCKETS = [
-  {id:'R-310',    dmg:1000, price:150,  cur:'credits', desc:'Short-range rocket. Causes up to 1,000 points of damage and at least 1,000 points of surprise.'},
-  {id:'PLT-2026', dmg:2000, price:500,  cur:'credits', desc:'Mid-range rocket. Ideal for when lasers feel like whispering.'},
-  {id:'PLT-2021', dmg:4000, price:1000, cur:'credits', desc:'Long-range rocket. Causes up to 4,000 points per rocket fired, and one full point of regret on the receiving end.'},
-  {id:'ECO-10',   dmg:8000, price:30,   cur:'uridium', desc:'The multi-angle damage rocket for smart spenders. Your toughest enemies won\'t see it coming. Neither will your bank balance.'}
-];
-
 const DRONE_PRICE = 500; // uridium per Gearbox drone
 const MAX_DRONES = 3;
 
@@ -411,10 +401,9 @@ function ammoMult(p){ const a=p.equip.ammo?AMMO.find(x=>x.id===p.equip.ammo):nul
 function shipDef(p){ return SHIPS.find(s=>s.id===p.ship); }
 function shieldDef(p){ return SHIELDS.find(s=>s.id===p.equip.shield); }
 function genDef(p){ return GENS.find(g=>g.id===p.equip.gen); }
-function rocketDef(p){ return ROCKETS.find(r=>r.id===p.equip.rocket); }
 function shipSpeed(p){ return shipDef(p).speed + (genDef(p)?genDef(p).speed:0); }
 function shipMaxShield(p){ return shieldDef(p)?shieldDef(p).shield:0; }
-function cargoCap(p){ return shipDef(p).cargo; }
+function cargoCap(p){ return Infinity; }
 
 /* ---------------- world / map definitions ---------------- */
 const MAP_W = 20800, MAP_H = 12800;
@@ -485,7 +474,6 @@ const AudioSys = (()=>{
   return { ensure,
     laser(){ tone(880,220,.09,'square',.10); },
     hit(){ tone(320,150,.05,'triangle',.08); },
-    rocket(){ tone(520,60,.5,'sawtooth',.22); },
     boom(s=1){ noise(.5,.45*s); tone(130,30,.5,'sine',.35*s); },
     pick(){ tone(660,990,.08,'sine',.12); },
     ur(){ tone(880,1320,.12,'sine',.16); },
@@ -507,7 +495,7 @@ const G = {
   playerEnt:null, target:null, waypoint:null,
   keys:{}, autosaveT:0,
   joystick:{active:false,id:null,ox:0,oy:0,dx:0,dy:0},
-  stats:{kills:0, boxes:0, oreMined:0, deaths:0, playTime:0, soldOre:0, rockets:0},
+  stats:{kills:0, boxes:0, oreMined:0, deaths:0, playTime:0, soldOre:0},
   gate:{wave:0,state:'idle',left:0,spawnT:0,cleared:false,msg:''},
   quests:{}, progress:{mine:0,box:0,sell:0,ores:{},gate:0,kill:{}},
   banner:null, bannerT:0, respawns:[], repairCd:0, playerFlash:0, nearStation:false
@@ -519,8 +507,8 @@ function hashString(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.char
 function newPilot(name, faction){
   return { name, faction, level:1, xp:0, credits:2000, uridium:50, honor:0,
     ship:1, owned:[1],
-    equip:{ laser:'LF-1', shield:null, gen:null, rocket:null, ammo:'MCB-25' },
-    inv:{ ammo:{'MCB-25':500}, rockets:{'R-310':10} },
+    equip:{ laser:'LF-1', shield:null, gen:null, ammo:'MCB-25' },
+    inv:{ ammo:{'MCB-25':500} },
     cargo:{ prometium:0, endurium:0, terbium:0 } };
 }
 function freshProgress(){ return { mine:0, box:0, sell:0, ores:{}, gate:0, kill:{} }; }
@@ -553,7 +541,7 @@ function exportSave(){ return STORE.get(SAVE_KEY) || ''; }
 function applySave(j){
   G.pilot = j.pilot;
   G.mapId = j.mapId || '1-1';
-  G.time = j.time||0; G.stats = Object.assign({kills:0,boxes:0,oreMined:0,deaths:0,playTime:0,soldOre:0,rockets:0}, j.stats||{});
+  G.time = j.time||0; G.stats = Object.assign({kills:0,boxes:0,oreMined:0,deaths:0,playTime:0,soldOre:0}, j.stats||{});
   G.quests = j.quests||{}; G.progress = Object.assign(freshProgress(), j.progress||{});
   G.gate.cleared = !!(j.gate&&j.gate.cleared); G.gate.wave = (j.gate&&j.gate.wave)||0;
   G._resumePos = j.pos||null;
@@ -648,7 +636,7 @@ function makePlayer(x,y){
   const p=G.pilot;
   return { id:EID++, type:'player', x,y, vx:0,vy:0, r:16,
     hp:shipDef(p).hp, maxHp:shipDef(p).hp, shield:0, maxShield:shipMaxShield(p),
-    angle:-Math.PI/2, cd:0, rocketCd:0, flame:0, dead:false, level:1 };
+    angle:-Math.PI/2, cd:0, flame:0, dead:false, level:1 };
 }
 function makeDrone(){
   return { id:EID++, type:'drone', x:0,y:0, vx:0,vy:0, r:9, angle:0, cd:rnd(0,1), dead:false, idx:0 };
@@ -658,9 +646,6 @@ function dropBox(x,y,kind){
 }
 function makeBullet(x,y,angle,speed,dmg,from,leech){
   G.bullets.push({ x,y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, dmg, from, leech:!!leech, r:from==='npc'?5:4, life:1.4 });
-}
-function makeRocket(x,y,angle,target,dmg){
-  G.bullets.push({ x,y, vx:Math.cos(angle)*620, vy:Math.sin(angle)*620, dmg:dmg||0, rocket:true, target, from:'player', r:9, life:3.5 });
 }
 function spawnPart(x,y,color,n,spd,size,life){
   for(let i=0;i<n;i++){ const a=rnd(0,6.28), s=rnd(spd*.3,spd); G.parts.push({ x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:rnd(life*.6,life), maxLife:life, color, size:rnd(size*.5,size) }); }
@@ -696,20 +681,6 @@ function onTap(cx,cy){
   }
   setWaypoint(wx,wy);
   G.target=null;
-}
-function pressRocket(){
-  if(!G.running||G.paused) return;
-  const p=G.pilot, rd=rocketDef(p);
-  if(!G.target || G.target.type!=='npc' || G.target.dead){ toast('No valid target for your rocket. Aim at something with opinions.','t-warn'); return; }
-  if(G.playerEnt.rocketCd>0) return;
-  const amt = p.inv.rockets[rd.id]||0;
-  if(amt<=0){ toast('No '+rd.id+' rockets left. The shop is always hiring (you).','t-warn'); return; }
-  p.inv.rockets[rd.id]=amt-1;
-  G.playerEnt.rocketCd = 3.5;
-  makeRocket(G.playerEnt.x,G.playerEnt.y,Math.atan2(G.target.y-G.playerEnt.y,G.target.x-G.playerEnt.x),G.target,rd.dmg);
-  G.stats.rockets++;
-  AudioSys.rocket();
-  refreshHud();
 }
 function pressRepair(){
   if(!G.running||G.paused) return;
@@ -863,7 +834,7 @@ function pickBox(b){
   toast(msg,'t-pick',2.6); AudioSys.pick();
   checkQuests(); refreshHud();
 }
-function cargoFull(p){ const used=p.cargo.prometium+p.cargo.endurium+p.cargo.terbium; return used>=cargoCap(p); }
+function cargoFull(p){ return false; }
 function sellAllOre(){
   const p=G.pilot;
   let total=0, units=0;
@@ -1051,7 +1022,6 @@ function updatePlayer(dt){
       }
     }
   }
-  if(pl.rocketCd>0) pl.rocketCd-=dt;
   // portals
   for(const e of G.ents){ if(e.type==='portal' && dist(pl.x,pl.y,e.x,e.y)<e.r-8){ tryTravel(e); break; } }
 }
@@ -1108,11 +1078,6 @@ function updateNpc(n,dt){
 function updateBullets(dt){
   for(const b of G.bullets){
     b.life-=dt;
-    if(b.rocket && b.target && !b.target.dead){
-      const a=Math.atan2(b.target.y-b.y,b.target.x-b.x);
-      b.vx=lerp(b.vx,Math.cos(a)*620,Math.min(1,dt*6)); b.vy=lerp(b.vy,Math.sin(a)*620,Math.min(1,dt*6));
-      spawnPart(b.x,b.y,'#ffb59c',1,30,2.5,.2);
-    }
     b.x+=b.vx*dt; b.y+=b.vy*dt;
     // bounds
     const m=MAPS[G.mapId];
@@ -1139,7 +1104,7 @@ function updateBullets(dt){
         if(e.type==='drone' && dist2(b.x,b.y,e.x,e.y)<(b.r+e.r)*(b.r+e.r)){ e.dead=true; hit=true; break; }
       }
     }
-    if(hit){ if(b.rocket){ spawnPart(b.x,b.y,'#ffb59c',26,190,5,.5); spawnPart(b.x,b.y,'#ffd54a',14,160,4,.5); AudioSys.boom(.8); G.shake=Math.max(G.shake,3); } else { spawnPart(b.x,b.y,b.from==='npc'?'#ff7a8a':'#9fc2ff',6,90,3,.35); } bullets.splice(i,1); }
+    if(hit){ spawnPart(b.x,b.y,b.from==='npc'?'#ff7a8a':'#9fc2ff',6,90,3,.35); bullets.splice(i,1); }
   }
 }
 function updateBoxes(dt){
@@ -1456,17 +1421,10 @@ function render(){
   }
   // bullets
   for(const b of G.bullets){
-    if(b.rocket){
-      ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(Math.atan2(b.vy,b.vx));
-      ctx.fillStyle='#ffb59c'; ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-6,-5); ctx.lineTo(-3,0); ctx.lineTo(-6,5); ctx.closePath(); ctx.fill();
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(3,0,2,0,6.29); ctx.fill();
-      ctx.restore();
-    } else {
-      const col = b.from==='npc' ? '#ff7a8a' : b.from==='drone' ? '#7df5e8' : '#9fc2ff';
-      ctx.strokeStyle=col; ctx.lineWidth= b.from==='npc'?3:2.5; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(b.x-b.vx*0.03, b.y-b.vy*0.03); ctx.lineTo(b.x,b.y); ctx.stroke();
-      ctx.lineCap='butt';
-    }
+    const col = b.from==='npc' ? '#ff7a8a' : b.from==='drone' ? '#7df5e8' : '#9fc2ff';
+    ctx.strokeStyle=col; ctx.lineWidth= b.from==='npc'?3:2.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(b.x-b.vx*0.03, b.y-b.vy*0.03); ctx.lineTo(b.x,b.y); ctx.stroke();
+    ctx.lineCap='butt';
   }
   // particles
   for(const p of G.parts){
@@ -1573,9 +1531,7 @@ function refreshHud(){
   $('curUridium').textContent=fmt(p.uridium);
   $('curHonor').textContent=fmt(p.honor);
   const used=p.cargo.prometium+p.cargo.endurium+p.cargo.terbium;
-  $('curCargo').textContent=fmt(used)+'/'+fmt(cargoCap(p));
-  const rd=rocketDef(p);
-  $('rocketCnt').textContent=(p.inv.rockets[rd?rd.id:0]||0);
+  $('curCargo').textContent=fmt(used);
   // target panel
   const tp=$('targetpanel');
   if(G.target && !G.target.dead){
@@ -1643,7 +1599,6 @@ function setupInput(){
   window.addEventListener('keydown',(e)=>{
     if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
     const k=e.key.toLowerCase();
-    if(k===' '){ e.preventDefault(); pressRocket(); return; }
     if(k==='arrowleft'||k==='a') G.keys.left=true;
     if(k==='arrowright'||k==='d') G.keys.right=true;
     if(k==='arrowup'||k==='w') G.keys.up=true;
@@ -1673,7 +1628,6 @@ function setupInput(){
     else seqI = k===seq[0]?1:0;
   });
 
-  $('btnRocket').addEventListener('click', pressRocket);
   $('btnRepair').addEventListener('click', pressRepair);
   $('btnMinimap').addEventListener('click', toggleMinimap);
   $('btnQuest').addEventListener('click', openQuests);
@@ -1773,7 +1727,7 @@ function openShop(){
   renderShop();
 }
 function renderShop(){
-  const tabs=[['ships','Ships'],['lasers','Lasers'],['gear','Shields & Gens'],['ammo','Ammo & Rockets'],['drones','Drones'],['trade','Sell & Repair']];
+  const tabs=[['ships','Ships'],['lasers','Lasers'],['gear','Shields & Gens'],['ammo','Ammo'],['drones','Drones'],['trade','Sell & Repair']];
   const tabHTML='<div class="tabs">'+tabs.map(([id,label])=>'<button class="tab'+(G.shopTab===id?' on':'')+'" data-tab="'+id+'">'+label+'</button>').join('')+'</div>';
   let body='';
   if(G.shopTab==='ships'){
@@ -1811,20 +1765,13 @@ function renderShop(){
       return '<div class="card'+(owned?' owned':'')+'"><div class="ic" style="color:#7fe0c3">⚙</div><div class="inf"><div class="nm">'+g.id+'</div><div class="ds">'+g.desc+'<br>+'+g.speed+' speed</div><div style="margin-top:4px">'+moneyHTML(g.price,g.cur)+'</div></div>'+act+'</div>';
     }).join('');
   } else if(G.shopTab==='ammo'){
-    body = '<div class="mini-note">Ammo multiplies your laser damage. Rockets are for when lasers are insufficiently dramatic.</div>';
+    body = '<div class="mini-note">Ammo multiplies your laser damage. Choose wisely.</div>';
     body += AMMO.map(a=>{
       const cur=a.cur==='uridium'?G.pilot.uridium:G.pilot.credits;
       const afford=cur>=a.price;
       const have=G.pilot.inv.ammo[a.id]||0;
       const act= afford? '<button class="act" data-buy="ammo" data-id="'+a.id+'">Buy 1,000</button>' : '<button class="act" disabled>'+moneyHTML(a.price,a.cur)+'</button>';
       return '<div class="card"><div class="ic" style="color:#c07bff">⇶</div><div class="inf"><div class="nm">'+a.id+' <span style="color:var(--muted);font-weight:400;font-size:11px">(x'+a.mult+' dmg'+(a.leech?', shield leech':'')+') · own: '+have+'</span></div><div class="ds">'+a.desc+'</div></div>'+act+'</div>';
-    }).join('');
-    body += ROCKETS.map(r=>{
-      const cur=r.cur==='uridium'?G.pilot.uridium:G.pilot.credits;
-      const afford=cur>=r.price;
-      const have=G.pilot.inv.rockets[r.id]||0;
-      const act= afford? '<button class="act" data-buy="rocket" data-id="'+r.id+'">Buy 20</button>' : '<button class="act" disabled>'+moneyHTML(r.price,r.cur)+'</button>';
-      return '<div class="card"><div class="ic" style="color:#ffb59c">🚀</div><div class="inf"><div class="nm">'+r.id+' <span style="color:var(--muted);font-weight:400;font-size:11px">(dmg '+fmt(r.dmg)+') · own: '+have+'</span></div><div class="ds">'+r.desc+'</div></div>'+act+'</div>';
     }).join('');
   } else if(G.shopTab==='drones'){
     const n=G.pilot.drones||0;
@@ -1874,12 +1821,6 @@ function buyAction(what,id){
     if(a.cur==='uridium') p.uridium-=a.price; else p.credits-=a.price;
     p.inv.ammo[a.id]=(p.inv.ammo[a.id]||0)+1000; p.equip.ammo=a.id;
     AudioSys.ur(); toast('1,000 '+a.id+' loaded and selected. The pews are now x'+a.mult+'.','t-ur'); renderShop(); refreshHud(); return; }
-  if(what==='rocket'){ const r=ROCKETS.find(x=>x.id===id);
-    const cur=r.cur==='uridium'?p.uridium:p.credits;
-    if(cur<r.price){ toast('Insufficient funds. Rockets are not cheap, but neither is regret.','t-warn'); return; }
-    if(r.cur==='uridium') p.uridium-=r.price; else p.credits-=r.price;
-    p.inv.rockets[r.id]=(p.inv.rockets[r.id]||0)+20; p.equip.rocket=r.id;
-    AudioSys.ur(); toast('20 '+r.id+' rockets. Your right thumb feels powerful.','t-ur'); renderShop(); refreshHud(); return; }
   if(what==='drone'){ if((p.drones||0)>=MAX_DRONES) return;
     if(p.uridium<DRONE_PRICE){ toast('Drones cost '+DRONE_PRICE+' uridium. They are unionized.','t-warn'); return; }
     p.uridium-=DRONE_PRICE; p.drones=(p.drones||0)+1;
@@ -1891,15 +1832,14 @@ function buyAction(what,id){
 
 function openHangar(){
   AudioSys.click();
-  const p=G.pilot, s=shipDef(p), rd=rocketDef(p), sd=shieldDef(p), gd=genDef(p), am=AMMO.find(a=>a.id===p.equip.ammo);
+  const p=G.pilot, s=shipDef(p), sd=shieldDef(p), gd=genDef(p), am=AMMO.find(a=>a.id===p.equip.ammo);
   const stats='<div class="statsgrid">'+
     '<div class="stat">Ship<b>'+s.name+'</b></div>'+
     '<div class="stat">Hull<b>'+fmt(s.hp)+'</b></div>'+
     '<div class="stat">Shield<b>'+fmt(shipMaxShield(p))+(sd?' ('+sd.id+')':' — none')+'</b></div>'+
     '<div class="stat">Speed<b>'+shipSpeed(p)+'</b></div>'+
     '<div class="stat">Laser<b>'+(p.equip.laser||'none')+(am?' ×'+am.mult:'')+'</b></div>'+
-    '<div class="stat">Rocket<b>'+(rd?rd.id+' ('+fmt(rd.dmg)+' dmg)':'none')+'</b></div>'+
-    '<div class="stat">Cargo<b>'+fmt(p.cargo.prometium+p.cargo.endurium+p.cargo.terbium)+' / '+fmt(s.cargo)+'</b></div>'+
+    '<div class="stat">Cargo<b>'+fmt(p.cargo.prometium+p.cargo.endurium+p.cargo.terbium)+'</b></div>'+
     '<div class="stat">Drones<b>'+(p.drones||0)+' / '+MAX_DRONES+'</b></div>'+
   '</div>';
   const list = SHIPS.filter(x=>p.owned.includes(x.id)).map(x=>{
@@ -1987,7 +1927,7 @@ function startNewPilot(){
   AudioSys.ensure();
   G.pilot=newPilot(name.slice(0,18), faction);
   G.quests={}; G.progress=freshProgress();
-  G.stats={kills:0,boxes:0,oreMined:0,deaths:0,playTime:0,soldOre:0,rockets:0};
+  G.stats={kills:0,boxes:0,oreMined:0,deaths:0,playTime:0,soldOre:0};
   G.gate={wave:0,state:'idle',left:0,spawnT:0,cleared:false,msg:''};
   G.mapId=homeMapId();
   clearSave(); saveGame();

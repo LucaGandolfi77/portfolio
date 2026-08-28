@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="it">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+	<meta name="theme-color" content="#0f172a" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="description" content="RIVINCITA — un GTA 2D top-down su ansia, lavoro e rivincita. iPhone + desktop." />
+	<title>RIVINCITA — GTA 2D</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+		html, body { height: 100%; overflow: hidden; touch-action: none; }
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			background: #0f172a; color: #e2e8f0; user-select: none; -webkit-user-select: none;
+		}
+		canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; touch-action: none; }
+
+		/* ---- HUD ---- */
+		#hud {
+			position: fixed; top: 0; left: 0; right: 0; z-index: 50; pointer-events: none;
+			padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 0;
+			display: flex; flex-direction: column; gap: 6px;
+		}
+		#hud > * { pointer-events: auto; }
+		.hrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+		.chip {
+			background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(8px);
+			border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px;
+			padding: 7px 12px; font-size: 13px; font-weight: 800; white-space: nowrap;
+		}
+		#money { color: #4ade80; }
+		#wanted { color: #fbbf24; }
+		.anxWrap { flex: 1; min-width: 120px; }
+		.anxRow { display: flex; align-items: center; gap: 8px; }
+		#anxTrack { flex: 1; height: 12px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden; }
+		#anxBar { height: 100%; width: 40%; background: #38a169; transition: width .4s, background .4s; border-radius: 99px; }
+		#anxVal { font-size: 12px; font-weight: 800; color: #cbd5e1; min-width: 34px; text-align: right; }
+		#objective {
+			background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(8px);
+			border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 12px;
+			padding: 7px 12px; font-size: 12.5px; line-height: 1.4; max-width: min(92vw, 460px);
+		}
+		#jobTag { display: none; background: rgba(234, 88, 12, 0.85); border-radius: 99px; padding: 5px 12px; font-size: 12px; font-weight: 800; }
+		#weapon { color: #93c5fd; }
+		#sideLine { display: none; background: rgba(139, 92, 246, 0.85); border-radius: 99px; padding: 5px 12px; font-size: 12px; font-weight: 800; }
+		#stageName { color: #93c5fd; }
+
+		#toast {
+			position: fixed; left: 50%; transform: translateX(-50%); top: calc(var(--site-top-bar-height, 0px) + 96px);
+			background: rgba(15, 23, 42, 0.94); border: 1px solid rgba(148, 163, 184, 0.35);
+			border-radius: 99px; padding: 9px 18px; font-size: 13px; font-weight: 700; z-index: 300;
+			opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 92vw; text-align: center;
+		}
+		#toast.on { opacity: 1; }
+
+		/* ---- Dialoghi ---- */
+		#dlg {
+			position: fixed; left: 50%; bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+			transform: translateX(-50%); width: min(520px, 94vw);
+			background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(96, 165, 250, 0.4);
+			border-radius: 16px; padding: 14px 16px 12px; z-index: 200; display: none;
+		}
+		#dlg.on { display: block; animation: up .25s ease; }
+		@keyframes up { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+		#dlgName { color: #93c5fd; font-weight: 800; font-size: 13px; margin-bottom: 4px; }
+		#dlgText { font-size: 14.5px; line-height: 1.55; min-height: 44px; }
+		#dlgNext { position: absolute; right: 14px; bottom: 10px; color: #93c5fd; font-size: 16px; }
+
+		/* ---- Menu ---- */
+		#menuOverlay {
+			position: fixed; inset: 0; z-index: 400; background: rgba(2, 6, 23, 0.8);
+			backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; padding: 20px;
+		}
+		#menuOverlay.open { display: flex; }
+		.menuPanel {
+			background: linear-gradient(160deg, #1e293b, #0f172a); border: 1px solid rgba(148,163,184,.25);
+			border-radius: 20px; padding: 26px 22px; max-width: 360px; width: 100%; text-align: center;
+			box-shadow: 0 24px 80px rgba(0,0,0,.6);
+		}
+		.menuPanel h2 { font-size: 24px; margin-bottom: 4px; background: linear-gradient(92deg, #38bdf8, #4ade80); -webkit-background-clip: text; background-clip: text; color: transparent; }
+		.menuPanel .sub { color: #94a3b8; font-size: 12px; margin-bottom: 16px; }
+		.mbtn {
+			display: block; width: 100%; padding: 13px; margin: 8px 0; border: none; border-radius: 12px;
+			font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+		}
+		.mbtn.primary { background: linear-gradient(92deg, #38bdf8, #4ade80); color: #052e16; }
+		.mbtn.ghost { background: #1e293b; color: #e2e8f0; border: 1px solid rgba(148,163,184,.25); }
+		.mbtn.danger { background: #b91c1c; color: #fff; }
+		.controlsLine { color: #64748b; font-size: 11.5px; line-height: 1.8; margin-top: 12px; }
+
+		/* ---- Minigiochi ---- */
+		.miniBox {
+			position: fixed; inset: 0; z-index: 300; background: rgba(2, 6, 23, 0.9);
+			display: flex; align-items: center; justify-content: center; padding: 20px;
+		}
+		.miniBox.hidden { display: none; }
+		.miniCard {
+			background: #1e293b; border: 1px solid rgba(148,163,184,.3); border-radius: 18px;
+			padding: 20px; max-width: 440px; width: 100%; text-align: center; max-height: 90vh; overflow-y: auto;
+		}
+		.miniCard h3 { margin-bottom: 10px; color: #93c5fd; }
+		#cashierOrder, #cashierPicked { min-height: 40px; display: flex; gap: 6px; justify-content: center; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+		#cashierOrder .ci, #cashierPicked .ci { font-size: 26px; }
+		#cashierItems { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
+		.shopItem { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(148,163,184,.3); background: #334155; color: #e2e8f0; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+		.shopItem:active { transform: scale(.94); }
+		.mbtn.small { padding: 10px; font-size: 13px; margin: 6px auto; width: 60%; }
+		#arcadeC { background: #0f172a; border-radius: 8px; margin: 10px auto; display: block; }
+		#raceInfo { font-weight: 800; color: #fbbf24; margin: 6px 0; }
+
+		/* ---- Finale ---- */
+		#finaleBox {
+			position: fixed; inset: 0; z-index: 500; background: radial-gradient(120% 100% at 50% 0%, #0c4a6e, #0f172a 70%);
+			display: flex; align-items: center; justify-content: center; padding: 24px;
+		}
+		#finaleBox.hidden { display: none; }
+		#finaleCard { max-width: 560px; width: 100%; text-align: center; }
+		#finaleCard h1 { font-size: clamp(28px, 9vw, 44px); color: #fbbf24; margin-bottom: 18px; letter-spacing: .03em; }
+		#finaleText { text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(148,163,184,.2); border-radius: 16px; padding: 18px 20px; margin-bottom: 20px; }
+		#finaleText p { font-size: 14.5px; line-height: 1.7; margin-bottom: 12px; }
+		#finaleText p:last-child { color: #fbbf24; font-weight: 800; margin-bottom: 0; }
+
+		/* ---- Controlli touch ---- */
+		#joy {
+			position: fixed; left: 20px; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+			width: 120px; height: 120px; border-radius: 50%; z-index: 60;
+			background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.25);
+			backdrop-filter: blur(6px); touch-action: none;
+		}
+		#joyKnob {
+			position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+			border-radius: 50%; background: radial-gradient(circle at 30% 30%, #e2e8f0, #94a3b8);
+			box-shadow: 0 4px 12px rgba(0,0,0,.35);
+		}
+		#actBtn {
+			position: fixed; right: 22px; bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+			width: 66px; height: 66px; border-radius: 50%; z-index: 60; border: none;
+			background: linear-gradient(145deg, #38bdf8, #0284c7); color: #fff; font-size: 26px;
+			box-shadow: 0 6px 18px rgba(2,132,199,.4); touch-action: none;
+		}
+		#actBtn:active { transform: scale(.92); }
+		.quickBtns {
+			position: fixed; right: 20px; top: calc(env(safe-area-inset-top, 0px) + 110px);
+			display: flex; flex-direction: column; gap: 8px; z-index: 55;
+		}
+		.qb { width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2); background: rgba(15,23,42,.7); color: #fff; font-size: 19px; cursor: pointer; }
+		.qb:active { transform: scale(.9); }
+		@media (hover: hover) and (pointer: fine) { #joy, #actBtn, .quickBtns { display: none; } }
+	</style>
+</head>
+<body>
+	<canvas id="c"></canvas>
+
+	<div id="hud">
+		<div class="hrow">
+			<span class="chip" id="money">€80</span>
+			<span class="chip" id="wanted">🚨 ☆☆☆</span>
+			<span class="chip anxWrap">
+				<div class="anxRow"><span>😰</span><span id="anxTrack"><span id="anxBar"></span></span><span id="anxVal">40%</span></div>
+			</span>
+			<span class="chip" id="stageName">Cap. 1</span>
+			<span class="chip" id="weapon">🪀 Fionda · Q</span>
+		</div>
+		<div class="hrow">
+			<div id="objective">🎯 —</div>
+			<span id="jobTag"></span>
+			<span id="sideLine"></span>
+		</div>
+	</div>
+
+	<div id="toast"></div>
+
+	<div id="dlg">
+		<div id="dlgName"></div>
+		<div id="dlgText"></div>
+		<span id="dlgNext">▼</span>
+	</div>
+
+	<div class="quickBtns">
+		<button class="qb" id="musicBtn" title="Musica">🎵</button>
+		<button class="qb" id="btnPhoto" title="Fotocamera (V)">📸</button>
+		<button class="qb" id="btnArcade" title="Arcade al bar">🎮</button>
+		<button class="qb" id="btnRace" title="Corsa clandestina">🏁</button>
+		<button class="qb" id="btnCycle" title="Cambia arma (Q)">🔁</button>
+		<button class="qb" id="btnFire" title="Spara (Spazio)">💥</button>
+	</div>
+
+	<div id="joy"><div id="joyKnob"></div></div>
+	<button id="actBtn">✋</button>
+
+	<!-- Menu -->
+	<div id="menuOverlay">
+		<div class="menuPanel">
+			<h2>RIVINCITA</h2>
+			<div class="sub">Ansia · Lavoro · Rivincita</div>
+			<button class="mbtn primary" id="menuResume">▶ Riprendi</button>
+			<button class="mbtn ghost" id="menuTest">🧪 Test automatico</button>
+			<button class="mbtn ghost" id="menuRestart">🔄 Ricomincia</button>
+			<button class="mbtn danger" id="menuExit">🚪 Esci</button>
+			<div class="controlsLine">
+				🕹️ Joystick o WASD · ✋/E interagisci · M musica · V foto<br>
+				In auto: joystick avanti/indietro + sinistra/destra per sterzare<br>
+				ESC = menu
+			</div>
+		</div>
+	</div>
+
+	<!-- Cassa -->
+	<div class="miniBox hidden" id="cashierBox">
+		<div class="miniCard">
+			<h3 id="miniTitle">🏪 Turno di cassa</h3>
+			<div id="cashierClient">Cliente 1</div>
+			<div>Ordine del cliente:</div>
+			<div id="cashierOrder"></div>
+			<div>Il tuo sacchetto:</div>
+			<div id="cashierPicked"></div>
+			<div id="cashierItems"></div>
+			<button class="mbtn primary small" id="cashierOk">🧾 FATTURA</button>
+		</div>
+	</div>
+
+	<!-- Arcade -->
+	<div class="miniBox hidden" id="arcadeBox">
+		<div class="miniCard">
+			<h3>🎮 ARCADE "SERPE VELENOSA"</h3>
+			<div id="arcadeScore">Punti: 0</div>
+			<canvas id="arcadeC" width="288" height="288"></canvas>
+			<div class="controlsLine">Frecce / WASD per muoverti · costa €2</div>
+		</div>
+	</div>
+
+	<!-- Pacchi (side quest Agente Conti) -->
+	<div class="miniBox hidden" id="pacchiBox">
+		<div class="miniCard">
+			<h3>📦 SMISTA PACCHI</h3>
+			<div id="pacchiCall" style="font-weight:800;color:#fbbf24;margin:6px 0;">📢 Pacco numero 1!</div>
+			<div id="pacchiList" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;"></div>
+			<button class="mbtn ghost small" id="pacchiClose">Molla la fila</button>
+		</div>
+	</div>
+
+	<!-- Corsa -->
+	<div class="miniBox hidden" id="raceBox">
+		<div class="miniCard">
+			<h3>🏁 CORSIA CLANDESTINA</h3>
+			<div id="raceInfo">Giro 1/2</div>
+			<div class="controlsLine">Passa i 4 checkpoint blu con la tua auto! (E per uscire dall'auto, M per il brivido)</div>
+		</div>
+	</div>
+
+	<!-- Finale -->
+	<div id="finaleBox" class="hidden">
+		<div id="finaleCard">
+			<h1>✨ LA RIVINCITA</h1>
+			<div id="finaleText"></div>
+			<button class="mbtn primary" id="finaleRestart">🔄 Ricomincia la storia</button>
+		</div>
+	</div>
+
+	<script src="js/data.js"></script>
+	<script src="js/game.js"></script>
+	<script src="js/test.js"></script>
+	<script>
+		window.addEventListener('load', function () {
+			init();
+			document.getElementById('menuTest').addEventListener('click', function () {
+				toggleMenu(); // chiude il menu
+				window.__TEST__.run();
+			});
+		});
+	</script>
+</body>
+</html>

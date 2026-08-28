@@ -166,6 +166,18 @@ SAVE.listAccounts = function () {
 SAVE.loadAccount = function (name) {
   var all = SAVE.getAccounts();
   var acc = all[name];
+  if (!acc && name === DATA.ADMIN_NAME) {
+    // migrazione: account "Admin"/"ADMIN" creati prima della normalizzazione case-insensitive
+    var k;
+    for (k in all) {
+      if (all.hasOwnProperty(k) && k.toLowerCase() === DATA.ADMIN_NAME) {
+        acc = all[k];
+        delete all[k];
+        break;
+      }
+    }
+    if (acc) { acc.name = DATA.ADMIN_NAME; all[DATA.ADMIN_NAME] = acc; SAVE.rawSet(SAVE.LS_ACCOUNTS, all); }
+  }
   if (!acc) { acc = SAVE.defaultAccount(name); all[name] = acc; SAVE.rawSet(SAVE.LS_ACCOUNTS, all); }
   else acc.admin = (name.toLowerCase() === DATA.ADMIN_NAME);
   SAVE.ensureFields(acc);

@@ -475,6 +475,55 @@
 		}
 		.toast.good { background: rgba(22, 163, 74, 0.94); }
 		.toast.show { opacity: 1; transform: translate(-50%, 0); }
+		.modal-backdrop {
+			position: fixed;
+			inset: 0;
+			z-index: 200;
+			background: rgba(0, 0, 0, 0.62);
+			-webkit-backdrop-filter: blur(4px);
+			backdrop-filter: blur(4px);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 0.25s;
+		}
+		.modal-backdrop.show { opacity: 1; pointer-events: all; }
+		.modal {
+			position: relative;
+			background: linear-gradient(160deg, #123f2a 0%, #0a2f1e 100%);
+			border: 1px solid rgba(255,255,255,0.14);
+			border-radius: 18px;
+			max-width: 440px;
+			width: 100%;
+			padding: 24px 22px 20px;
+			box-shadow: 0 18px 50px rgba(0,0,0,0.5);
+			transform: translateY(12px) scale(0.97);
+			transition: transform 0.25s;
+			max-height: 80vh;
+			overflow-y: auto;
+			text-align: center;
+		}
+		.modal-backdrop.show .modal { transform: translateY(0) scale(1); }
+		.modal h2 { font-size: 1.15rem; margin-bottom: 10px; color: #fff; }
+		.modal p { font-size: 0.9rem; color: #d9e7de; line-height: 1.55; }
+		.modal .modal-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+		.modal .btn { min-height: 44px; padding: 9px 22px; }
+		.modal .btn-reload { background: var(--green); }
+		.modal-close {
+			position: absolute;
+			top: 10px;
+			right: 14px;
+			background: none;
+			border: none;
+			color: rgba(255,255,255,0.6);
+			font-size: 1.35rem;
+			line-height: 1;
+			cursor: pointer;
+			padding: 4px;
+		}
 		@media (max-width: 480px) {
 			.card { width: 51px; height: 71px; }
 			.card-rank { font-size: 15px; }
@@ -589,6 +638,13 @@
 
 	<div class="toast" id="toast"></div>
 
+	<div class="modal-backdrop" id="modal-backdrop">
+		<div class="modal" id="modal">
+			<button class="modal-close" id="modal-close" aria-label="Close">&#215;</button>
+			<div id="modal-body"></div>
+		</div>
+	</div>
+
 	<script>
 		(function () {
 			'use strict';
@@ -605,6 +661,9 @@
 			var youChipsEl = document.getElementById('you-chips');
 			var messageEl = document.getElementById('message');
 			var toastEl = document.getElementById('toast');
+			var modalBackdrop = document.getElementById('modal-backdrop');
+			var modalBody = document.getElementById('modal-body');
+			var modalClose = document.getElementById('modal-close');
 			var soundBtn = document.getElementById('soundBtn');
 			var deckVisual = document.getElementById('deck');
 			var betSpot = document.getElementById('bet-spot');
@@ -726,6 +785,39 @@
 				messageEl.style.animation = 'none';
 				void messageEl.offsetHeight;
 				messageEl.style.animation = '';
+			}
+
+			// ---- Modal (reload) ----
+			function openModal(html) {
+				modalBody.innerHTML = html;
+				modalBackdrop.classList.add('show');
+			}
+			function closeModal() {
+				modalBackdrop.classList.remove('show');
+			}
+			function doRebuy() {
+				reloadGains += 1000 - balance;
+				balance = 1000;
+				saveState();
+				updateChipsUI();
+				closeModal();
+				showToast('New $1000 bankroll', true);
+			}
+			function maybeRebuy() {
+				if (balance < MIN_ANTE) {
+					openModal(
+						'<h2>Out of chips!</h2>' +
+						'<p>Your balance is below the $' + MIN_ANTE + ' ante. Reload your bankroll to keep playing.</p>' +
+						'<div class="modal-actions">' +
+						'<button class="btn btn-reload" id="btn-reload">Reload $1000</button>' +
+						'<button class="btn btn-ghost" id="btn-no-reload">Not now</button>' +
+						'</div>'
+					);
+					var rb = document.getElementById('btn-reload');
+					if (rb) rb.addEventListener('click', function () { ensureAudio(); doRebuy(); });
+					var nr = document.getElementById('btn-no-reload');
+					if (nr) nr.addEventListener('click', closeModal);
+				}
 			}
 
 			function newDeck() {
@@ -1499,11 +1591,7 @@
 				setBettingVisible(true);
 				refreshBetUI();
 				if (balance < MIN_ANTE) {
-					reloadGains += 1000 - balance;
-					balance = 1000;
-					saveState();
-					updateChipsUI();
-					showToast('Out of chips! New $1000 bankroll', true);
+					maybeRebuy();
 				} else if (aiStack < MIN_ANTE) {
 					reloadGains += 1000 - aiStack;
 					aiStack = 1000;
@@ -1528,6 +1616,8 @@
 			undoBtn.addEventListener('click', function () { ensureAudio(); undoChip(true); });
 			clearBtn.addEventListener('click', function () { ensureAudio(); clearBet(); });
 			betSpot.addEventListener('click', function () { ensureAudio(); undoChip(true); });
+			modalClose.addEventListener('click', closeModal);
+			modalBackdrop.addEventListener('click', function (e) { if (e.target === modalBackdrop) closeModal(); });
 			foldBtn.addEventListener('click', function () { ensureAudio(); sfxClick(); actFold(); });
 			callBtn.addEventListener('click', function () { ensureAudio(); actCheckCall(); });
 			raiseBtn.addEventListener('click', function () { ensureAudio(); actRaise(); });
@@ -1549,6 +1639,7 @@
 			soundBtn.classList.toggle('muted', muted);
 			updateChipsUI();
 			refreshBetUI();
+			maybeRebuy();
 
 			window.__pk = {
 				eval5: eval5,

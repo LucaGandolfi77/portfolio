@@ -318,6 +318,107 @@
       margin-top: 6px;
       font-size: 12px;
     }
+
+    /* ===== Menu / pausa ===== */
+    #menuBtn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      background: #333;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      flex: none;
+      transition: transform 0.15s;
+    }
+    #menuBtn:active { transform: scale(0.9); }
+
+    #menuOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      padding: 20px;
+    }
+    #menuOverlay.open { display: flex; }
+    .menuPanel {
+      background: rgba(20, 22, 40, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 26px 24px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+    .menuPanel h2 { color: #fff; margin: 0 0 16px; font-size: 22px; }
+    .menuBig {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(92deg, #4ecdc4, #2fbfa8);
+      color: #063a33;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-bottom: 14px;
+      font-family: inherit;
+    }
+    .menuBig:active { transform: scale(0.97); }
+    .menuSection {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .menuLabel {
+      color: #9fb0c9;
+      font-size: 11px;
+      font-weight: 700;
+      margin: 10px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .menuLabel:first-child { margin-top: 0; }
+    .segRow { display: flex; gap: 8px; }
+    .segRow .speedBtn,
+    .segRow .segBtn {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      border-radius: 10px;
+      background: #2a2f45;
+      color: #dfe7f5;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .segRow .speedBtn.active,
+    .segRow .segBtn.active { background: #4ecdc4; color: #063a33; }
+    .menuActions { display: flex; flex-direction: column; gap: 8px; }
+    .menuBtn2 {
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      background: #2a2f45;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .menuBtn2:active { transform: scale(0.97); }
+    .menuBtn2.danger { background: #c0392b; color: #fff; }
   </style>
 </head>
 <body>
@@ -332,6 +433,7 @@
         <button class="speedBtn" data-speed="2">2x</button>
         <button class="speedBtn" data-speed="5">5x</button>
       </div>
+      <button id="menuBtn" title="Menu">☰</button>
     </div>
     <div id="countersRow">
       <div class="counter"><span class="icon">🛏️</span><span class="value" id="countSleep">0</span></div>
@@ -371,6 +473,37 @@
   <div id="statsPanel">
     <h2>📊 Statistiche Sims</h2>
     <div id="statsContent"></div>
+  </div>
+
+  <!-- Menu / pausa -->
+  <div id="menuOverlay">
+    <div class="menuPanel">
+      <h2>⏸️ PAUSA</h2>
+      <button class="menuBig" id="menuResume">▶ Riprendi</button>
+      <div class="menuSection">
+        <div class="menuLabel">⚡ Velocità</div>
+        <div class="segRow">
+          <button class="speedBtn active" data-speed="1">1x</button>
+          <button class="speedBtn" data-speed="2">2x</button>
+          <button class="speedBtn" data-speed="5">5x</button>
+        </div>
+        <div class="menuLabel">🚶 Aspetto degli NPC</div>
+        <div class="segRow">
+          <button class="segBtn active" id="styleDots">🔴 Puntini</button>
+          <button class="segBtn" id="styleEmoji">🚶 Emoji</button>
+        </div>
+        <div class="menuLabel">🏷️ Nomi degli NPC</div>
+        <div class="segRow">
+          <button class="segBtn active" id="namesOn">Sì</button>
+          <button class="segBtn" id="namesOff">No</button>
+        </div>
+      </div>
+      <div class="menuActions">
+        <button class="menuBtn2" id="menuStats">📊 Statistiche</button>
+        <button class="menuBtn2" id="menuRegen">🔄 Rigenera città</button>
+        <button class="menuBtn2 danger" id="menuExit">🚪 Esci</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -431,7 +564,12 @@
       },
 
       // Selected sim
-      selectedSim: null
+      selectedSim: null,
+
+      // Menu / opzioni
+      paused: false,
+      renderStyle: 'dots',   // 'dots' | 'emoji'
+      showNames: true
     };
 
     // ==================== CANVAS SETUP ====================
@@ -767,8 +905,55 @@
 
       draw(ctx) {
         ctx.save();
-        
-        // Use emoji for simplicity and visibility
+
+        // Stile "puntini": cerchi colorati autonomi (default)
+        if (gameState.renderStyle === 'dots') {
+          const r = this.inCar ? 9 : 6.5;
+          // ombra
+          ctx.beginPath();
+          ctx.arc(this.x, this.y + 2, r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fill();
+          // corpo
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = this.inCar ? '#4a6fa5' : this.color;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.stroke();
+          // cane al guinzaglio
+          if (this.hasDog && (this.state === 'DOG' || this.state === 'WALK')) {
+            ctx.beginPath();
+            ctx.arc(this.x + r + 5, this.y + 3, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#b08d57';
+            ctx.fill();
+          }
+          // selezione
+          if (gameState.selectedSim === this) {
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#ffd54a';
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+          // nome
+          if (gameState.showNames) {
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.strokeText(this.name, this.x, this.y - r - 6);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(this.name, this.x, this.y - r - 6);
+          }
+          ctx.restore();
+          return;
+        }
+
+        // Stile emoji (originale)
         ctx.font = `${this.inCar ? '40' : '32'}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1256,12 +1441,83 @@
     });
 
     // ==================== SPEED CONTROLS ====================
+    function setSpeed(v) {
+      gameState.speed = parseInt(v, 10) || 1;
+      document.querySelectorAll('.speedBtn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.speed) === gameState.speed));
+    }
     document.querySelectorAll('.speedBtn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.speedBtn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        gameState.speed = parseInt(btn.dataset.speed);
-      });
+      btn.addEventListener('click', () => setSpeed(btn.dataset.speed));
+    });
+
+    // ==================== MENU / PAUSA ====================
+    function openMenu() {
+      gameState.paused = true;
+      document.getElementById('menuOverlay').classList.add('open');
+      document.getElementById('simPopup').classList.remove('visible');
+      gameState.selectedSim = null;
+      // sincronizza lo stato delle opzioni
+      document.querySelectorAll('.speedBtn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.speed) === gameState.speed));
+      document.getElementById('styleDots').classList.toggle('active', gameState.renderStyle === 'dots');
+      document.getElementById('styleEmoji').classList.toggle('active', gameState.renderStyle === 'emoji');
+      document.getElementById('namesOn').classList.toggle('active', !!gameState.showNames);
+      document.getElementById('namesOff').classList.toggle('active', !gameState.showNames);
+    }
+    function closeMenu() {
+      gameState.paused = false;
+      document.getElementById('menuOverlay').classList.remove('open');
+    }
+    function setNpcStyle(style) {
+      gameState.renderStyle = style;
+      document.getElementById('styleDots').classList.toggle('active', style === 'dots');
+      document.getElementById('styleEmoji').classList.toggle('active', style === 'emoji');
+    }
+    function setShowNames(v) {
+      gameState.showNames = !!v;
+      document.getElementById('namesOn').classList.toggle('active', !!v);
+      document.getElementById('namesOff').classList.toggle('active', !v);
+    }
+    function regenerateWorld() {
+      gameState.buildings = [];
+      gameState.roads = [];
+      gameState.sims = [];
+      gameState.selectedSim = null;
+      gameState.counters = { SLEEP: 0, EAT: 0, WORK: 0, MALL: 0, SCHOOL: 0, WALK: 0, DOG: 0, PIZZA: 0 };
+      generateCity();
+      for (let i = 0; i < 5; i++) {
+        const sim = new Sim(i);
+        sim.startActivity('SLEEP');
+        gameState.sims.push(sim);
+      }
+      document.getElementById('simPopup').classList.remove('visible');
+      updateCounters();
+      closeMenu();
+    }
+    function exitCitySim() {
+      try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (e) {}
+      try {
+        if (window.history && window.history.length > 1) window.history.back();
+        else if (document.referrer) window.location.href = document.referrer;
+        else window.location.href = '../index.html#games';
+      } catch (e) { window.location.href = '../index.html#games'; }
+    }
+    document.getElementById('menuBtn').addEventListener('click', openMenu);
+    document.getElementById('menuResume').addEventListener('click', closeMenu);
+    document.getElementById('menuStats').addEventListener('click', () => {
+      closeMenu();
+      const panel = document.getElementById('statsPanel');
+      if (!panel.classList.contains('open')) { panel.classList.add('open'); updateStatsPanel(); }
+    });
+    document.getElementById('menuRegen').addEventListener('click', regenerateWorld);
+    document.getElementById('menuExit').addEventListener('click', exitCitySim);
+    document.getElementById('styleDots').addEventListener('click', () => setNpcStyle('dots'));
+    document.getElementById('styleEmoji').addEventListener('click', () => setNpcStyle('emoji'));
+    document.getElementById('namesOn').addEventListener('click', () => setShowNames(true));
+    document.getElementById('namesOff').addEventListener('click', () => setShowNames(false));
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const menu = document.getElementById('menuOverlay');
+        if (menu.classList.contains('open')) closeMenu(); else openMenu();
+      }
     });
 
     // ==================== GAME LOOP ====================
@@ -1271,34 +1527,36 @@
       const realDelta = (timestamp - gameState.lastRealTime) / 1000; // seconds
       gameState.lastRealTime = timestamp;
 
-      // 1 real second = 1 game minute
-      const gameMinutes = realDelta * 1 * gameState.speed;
-      
-      // Update game time
-      gameState.gameTime += gameMinutes;
-      if (gameState.gameTime >= 1440) {
-        gameState.gameTime -= 1440;
-        gameState.day++;
-      }
+      if (!gameState.paused) {
+        // 1 real second = 1 game minute
+        const gameMinutes = realDelta * 1 * gameState.speed;
+        
+        // Update game time
+        gameState.gameTime += gameMinutes;
+        if (gameState.gameTime >= 1440) {
+          gameState.gameTime -= 1440;
+          gameState.day++;
+        }
 
-      // Update sims
-      gameState.sims.forEach(sim => sim.update(gameMinutes));
+        // Update sims
+        gameState.sims.forEach(sim => sim.update(gameMinutes));
 
-      // Update popup if a sim is selected
-      if (gameState.selectedSim) {
-        const sim = gameState.selectedSim;
-        document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
-        document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
-        document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
-      }
+        // Update popup if a sim is selected
+        if (gameState.selectedSim) {
+          const sim = gameState.selectedSim;
+          document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
+          document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
+          document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
+        }
 
-      // Update UI
-      updateClock();
-      
-      // Update stats panel if open
-      const statsPanel = document.getElementById('statsPanel');
-      if (statsPanel && statsPanel.classList.contains('open')) {
-        updateStatsPanel();
+        // Update UI
+        updateClock();
+        
+        // Update stats panel if open
+        const statsPanel = document.getElementById('statsPanel');
+        if (statsPanel && statsPanel.classList.contains('open')) {
+          updateStatsPanel();
+        }
       }
       
       // Render

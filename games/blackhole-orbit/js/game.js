@@ -275,6 +275,9 @@ GAME.setAmmo = function (type) {
 
 // ── Accesso ───────────────────────────────────────────────────────
 GAME.enter = function (name) {
+  // "Admin"/"ADMIN"/"ADMIN " → account canonico "admin" (case-insensitive)
+  name = String(name || '').trim();
+  if (name.toLowerCase() === DATA.ADMIN_NAME) name = DATA.ADMIN_NAME;
   var acc = SAVE.loadAccount(name);
   GAME.player = acc;
   if (acc.admin) { acc.credits = DATA.ADMIN_CAP; acc.voidium = DATA.ADMIN_CAP; }

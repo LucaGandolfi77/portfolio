@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="it">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+	<meta name="theme-color" content="#05070c" />
+	<meta name="description" content="Apollo 11 — Apollo Guidance Computer: wrapper educativo con simulatore DSKY interattivo, browser dei sorgenti originali (Luminary099 / Comanche055) e casi d'uso." />
+	<title>Apollo 11 — AGC Source &amp; Simulator</title>
+	<style>
+		:root{
+			--bg:#05070c; --panel:#0a0f18; --panel2:#0d1522;
+			--green:#33ff66; --green-dim:#1c9e44; --amber:#ffb347; --red:#ff5c5c;
+			--ink:#c9d6e8; --muted:#7f8fa6; --line:#1c2a3f;
+		}
+		*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+		body{
+			font-family:'SFMono-Regular',ui-monospace,Menlo,Consolas,'Roboto Mono',monospace;
+			background:radial-gradient(120% 90% at 50% 0%, #0b1120 0%, var(--bg) 60%);
+			color:var(--ink);min-height:100vh;padding-bottom:env(safe-area-inset-bottom,0px);
+			user-select:none;-webkit-user-select:none;
+		}
+		.wrap{max-width:760px;margin:0 auto;padding:calc(var(--site-top-bar-height,0px) + 18px) 16px 40px;}
+		header{text-align:center;margin-bottom:22px;}
+		.eyebrow{color:var(--muted);font-size:11px;letter-spacing:.28em;text-transform:uppercase;}
+		h1{font-size:clamp(26px,7vw,40px);color:var(--green);text-shadow:0 0 18px rgba(51,255,102,.35);letter-spacing:.03em;margin:6px 0 4px;}
+		.sub{color:var(--muted);font-size:13.5px;line-height:1.6;max-width:560px;margin:0 auto;}
+		.sub a{color:var(--amber);}
+		.back{display:inline-block;margin-top:10px;color:var(--muted);font-size:12px;text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:7px 14px;}
+		.back:hover{color:var(--green);border-color:var(--green-dim);}
+
+		/* Tabs */
+		.tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:18px 0;}
+		.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:12px;padding:10px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+		.tab.active{color:var(--green);border-color:var(--green-dim);box-shadow:0 0 14px rgba(51,255,102,.15);}
+		.pane{display:none;}
+		.pane.active{display:block;animation:fade .25s ease;}
+		@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+		/* ---- DSKY ---- */
+		.dsky{background:linear-gradient(180deg,#10151f,#0a0e15);border:1px solid var(--line);border-radius:18px;padding:16px;max-width:520px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);}
+		.regs{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+		.reg{background:#02040a;border:1px solid #1a2836;border-radius:10px;padding:8px 10px;text-align:center;}
+		.reg .lbl{color:var(--muted);font-size:10px;letter-spacing:.2em;text-transform:uppercase;}
+		.reg .val{font-size:clamp(22px,7vw,30px);font-weight:800;color:var(--green);text-shadow:0 0 12px rgba(51,255,102,.6);font-variant-numeric:tabular-nums;min-height:1.2em;letter-spacing:.08em;}
+		.lamps{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px;}
+		.lamp{font-size:9.5px;color:#3a4a5e;border:1px solid #1c2a3f;border-radius:6px;padding:3px 8px;letter-spacing:.08em;font-weight:700;}
+		.lamp.on{color:#0a0f18;background:var(--amber);border-color:var(--amber);box-shadow:0 0 10px rgba(255,179,71,.6);}
+		.lamp.on.red{background:var(--red);border-color:var(--red);box-shadow:0 0 10px rgba(255,92,92,.6);}
+		.lamp.on.green{background:var(--green);border-color:var(--green);box-shadow:0 0 10px rgba(51,255,102,.6);}
+
+		.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:300px;margin:0 auto;}
+		.key{min-height:52px;border-radius:12px;border:1px solid #24334a;background:linear-gradient(180deg,#1a2332,#131a28);color:#e8f0fa;font-family:inherit;font-size:17px;font-weight:800;cursor:pointer;touch-action:manipulation;}
+		.key:active{transform:scale(.93);background:#22314a;}
+		.key.fn{background:linear-gradient(180deg,#202b3f,#182132);font-size:12px;letter-spacing:.05em;}
+		.key.warn{color:var(--amber);}
+		.key.acc{color:var(--green);}
+		.extra{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+		.extra .key{min-width:88px;}
+
+		/* Telemetria + log */
+		.tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:14px;}
+		.tm{background:#02040a;border:1px solid #1a2836;border-radius:10px;padding:8px 10px;}
+		.tm .lbl{color:var(--muted);font-size:10px;letter-spacing:.14em;text-transform:uppercase;}
+		.tm .val{font-size:15px;color:var(--green);font-weight:700;font-variant-numeric:tabular-nums;}
+		.log{background:#02040a;border:1px solid #1a2836;border-radius:10px;margin-top:12px;padding:10px 12px;height:150px;overflow-y:auto;font-size:11.5px;line-height:1.7;}
+		.log .t{color:#3a4a5e;margin-right:8px;}
+		.log .phr{color:var(--amber);font-weight:800;}
+		.log .ok{color:var(--green);}
+		.log .err{color:var(--red);}
+		.presets{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+		.preset{border:1px solid var(--line);background:var(--panel2);color:var(--green);border-radius:10px;padding:8px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+		.preset:active{transform:scale(.94);}
+		.preset.auto{color:var(--amber);border-color:var(--amber);}
+
+		/* Codice */
+		.code-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;}
+		.code-card h3{color:var(--amber);font-size:14px;margin-bottom:4px;word-break:break-all;}
+		.code-card .src{color:var(--muted);font-size:11px;margin-bottom:10px;}
+		pre{background:#02040a;border:1px solid #182334;border-radius:10px;padding:12px;overflow-x:auto;font-size:11.5px;line-height:1.6;color:#cfe6d8;user-select:text;-webkit-user-select:text;}
+		pre .cm{color:#4d6b57;}
+		.file-select{width:100%;margin-bottom:12px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-family:inherit;font-size:13px;}
+
+		/* Casi d'uso / info */
+		.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px;}
+		.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;}
+		.card .ic{font-size:26px;}
+		.card h4{color:var(--green);font-size:14px;margin:8px 0 6px;}
+		.card p{color:var(--muted);font-size:12.5px;line-height:1.6;}
+		.facts{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;}
+		.facts h4{color:var(--green);margin-bottom:8px;}
+		.facts li{color:var(--muted);font-size:12.5px;line-height:1.8;margin-left:18px;}
+		.note{font-size:11px;color:#5a6a80;line-height:1.6;margin-top:14px;text-align:center;}
+
+		@media (max-width:480px){
+			.key{min-height:48px;font-size:16px;}
+			.reg .val{font-size:22px;}
+		}
+	</style>
+</head>
+<body>
+	<script src="../../top_buttons.js"></script>
+	<div class="wrap">
+		<header>
+			<div class="eyebrow">Portfolio · Engineering</div>
+			<h1>🚀 APOLLO 11 — AGC</h1>
+			<p class="sub">Il <b>codice sorgente originale</b> del <b>Apollo Guidance Computer</b> che portò l'Apollo 11 sulla Luna: <b>Comanche055</b> (modulo di comando) e <b>Luminary099</b> (modulo lunare), resi pubblici dal repository <a href="https://github.com/chrislgarry/apollo-11" target="_blank" rel="noopener">github.com/chrislgarry/apollo-11</a>.
+			Questa pagina è un <b>wrapper educativo</b>: un <b>simulatore DSKY</b> interattivo, un browser dei sorgenti e i casi d'uso.</p>
+			<a class="back" href="../../projects.html">← Torna ai progetti</a>
+		</header>
+
+		<div class="tabs">
+			<button class="tab active" data-tab="sim">🖥️ Simulatore DSKY</button>
+			<button class="tab" data-tab="code">📟 Codice Sorgente</button>
+			<button class="tab" data-tab="uses">🎯 Casi d'Uso</button>
+			<button class="tab" data-tab="about">ℹ️ Cos'è</button>
+		</div>
+
+		<!-- ============ SIMULATORE DSKY ============ -->
+		<section class="pane active" id="pane-sim">
+			<div class="dsky">
+				<div class="regs">
+					<div class="reg"><div class="lbl">PROG</div><div class="val" id="reg-prog">00</div></div>
+					<div class="reg"><div class="lbl">VERB</div><div class="val" id="reg-verb">00</div></div>
+					<div class="reg"><div class="lbl">NOUN</div><div class="val" id="reg-noun">00</div></div>
+				</div>
+				<div class="lamps">
+					<span class="lamp" id="lmp-oprerr">OPR ERR</span>
+					<span class="lamp" id="lmp-noatt">NO ATT</span>
+					<span class="lamp" id="lmp-gimbal">GIMBAL LOCK</span>
+					<span class="lamp" id="lmp-stby">STBY</span>
+					<span class="lamp" id="lmp-prog">PROG</span>
+					<span class="lamp" id="lmp-temp">TEMP</span>
+					<span class="lamp" id="lmp-prio">PRIO DISP</span>
+				</div>
+				<div class="kp" id="keypad"></div>
+				<div class="extra">
+					<button class="key fn warn" id="k-clear">CLEAR</button>
+					<button class="key fn acc" id="k-enter">ENTR</button>
+					<button class="key fn" id="k-verb">VERB</button>
+					<button class="key fn" id="k-noun">NOUN</button>
+					<button class="key fn acc" id="k-pro">PRO</button>
+				</div>
+				<div class="tele">
+					<div class="tm"><div class="lbl">Altitudine</div><div class="val" id="tm-alt">—</div></div>
+					<div class="tm"><div class="lbl">Velocità</div><div class="val" id="tm-vel">—</div></div>
+					<div class="tm"><div class="lbl">ΔV</div><div class="val" id="tm-dv">—</div></div>
+					<div class="tm"><div class="lbl">T- / TIG</div><div class="val" id="tm-tig">—</div></div>
+				</div>
+				<div class="log" id="log"></div>
+				<div class="presets">
+					<button class="preset auto" data-prog="auto">▶ MISSIONE AUTOMATICA</button>
+					<button class="preset" data-prog="1">P01 Prelaunch</button>
+					<button class="preset" data-prog="2">P02 Launch</button>
+					<button class="preset" data-prog="6">P06 Align</button>
+					<button class="preset" data-prog="20">P20 SPS Burn</button>
+					<button class="preset" data-prog="21">P21 APS Burn</button>
+					<button class="preset" data-prog="47">P47 Refresh</button>
+					<button class="preset" data-prog="63">P63 Landing</button>
+					<button class="preset" data-prog="64">P64 Approach</button>
+				</div>
+			</div>
+			<p class="note">Simulatore didattico non affiliato alla NASA: riproduce interfaccia (DSKY) e frasi celebri del software reale a scopo dimostrativo. Verbi reali: 37=carica programma · 06=allineamento IMU · 21=display · 05/25=blank · 99=reset.</p>
+		</section>
+
+		<!-- ============ CODICE SORGENTE ============ -->
+		<section class="pane" id="pane-code">
+			<select class="file-select" id="file-select"></select>
+			<div class="code-card">
+				<h3 id="code-file"></h3>
+				<div class="src" id="code-src"></div>
+				<pre id="code-body"></pre>
+			</div>
+			<p class="note">Estratti dal repository <a href="https://github.com/chrislgarry/apollo-11" target="_blank" rel="noopener">chrislgarry/apollo-11</a> (pubblico dominio, trascrizione dal MIT Museum).</p>
+		</section>
+
+		<!-- ============ CASI D'USO ============ -->
+		<section class="pane" id="pane-uses">
+			<div class="grid">
+				<div class="card"><div class="ic">🧭</div><h4>Guidance &amp; Navigazione</h4><p>Il software risolveva in tempo reale le equazioni di guida (es. Kalman filter) per mantenere rotta e traiettoria verso la Luna con un computer da 2KB di RAM.</p></div>
+				<div class="card"><div class="ic">🖥️</div><h4>Interfaccia DSKY</h4><p>Gli astronauti interagivano con verbi e nomi: VERB 37 NOUN 01 carica un programma, il pinball game. Questa pagina ne simula l'uso.</p></div>
+				<div class="card"><div class="ic">🌕</div><h4>Discesa lunare (Luminary099)</h4><p>I programmi P63/P64/P66 guidavano il modulo lunare nella braking phase fino al contatto, con pilotaggio manuale opzionale dell'Eagle.</p></div>
+				<div class="card"><div class="ic">🚀</div><h4>Lancio e boost (Comanche055)</h4><p>Il software del modulo di comando gestiva lancio, rendezvous e rientro: la MASTER IGNITION ROUTINE accendeva i motori SPS/APS.</p></div>
+				<div class="card"><div class="ic">⚠️</div><h4>Allarmi e abort</h4><p>I programmi 1201/1202 (executive overflow) e le routine di abort (A12/A16) proteggevano la missione: sulla discesa dell'Apollo 11 il computer si riavviò più volte senza perdere il controllo.</p></div>
+				<div class="card"><div class="ic">📚</div><h4>Artefatto storico &amp; didattico</h4><p>Il sorgente (assembly AGC, parole da 15 bit, memoria a corde) è una delle prime opere di "software open source" al mondo: perfetto per studiare programmazione real-time embedded.</p></div>
+			</div>
+		</section>
+
+		<!-- ============ COS'E' ============ -->
+		<section class="pane" id="pane-about">
+			<div class="facts">
+				<h4>🧮 L'Apollo Guidance Computer</h4>
+				<ul>
+					<li><b>Parole da 15 bit</b> (bit di parità), istruzioni binarie in assembly AGC.</li>
+					<li><b>2.048 parole</b> di RAM (erasable) + <b>36.864 parole</b> di ROM a memoria a corde (core rope).</li>
+					<li>Frequenza ~1 MHz (2 MHz clock), peso ~32 kg, consumo ~70 W.</li>
+					<li>Il repository contiene <b>Comanche055</b> (modulo di comando, ~36K parole) e <b>Luminary099</b> (modulo lunare): il volo dell'Apollo 11.</li>
+					<li>Scritto da MIT Instrumentation Lab (Charles Stark Draper), codice pubblico dominio, trascritto da digitizzazioni del MIT Museum.</li>
+				</ul>
+			</div>
+			<div class="facts" style="margin-top:12px">
+				<h4>📂 Cosa contiene questa pagina</h4>
+				<ul>
+					<li><b>Wrapper</b>: una pagina che presenta il progetto, i suoi componenti e i casi d'uso.</li>
+					<li><b>Simulatore DSKY</b>: tastiera e registri PROG/VERB/NOUN funzionanti + programmi di esempio con telemetria animata.</li>
+					<li><b>Browser dei sorgenti</b>: estratti autentici dei file più celebri.</li>
+					<li><b>README</b>: `README.md` nella stessa cartella con funzionalità e struttura.</li>
+				</ul>
+			</div>
+			<div class="facts" style="margin-top:12px">
+				<h4>🔗 Riferimenti</h4>
+				<ul>
+					<li><a style="color:var(--amber)" href="https://github.com/chrislgarry/apollo-11" target="_blank" rel="noopener">Repository originale — chrislgarry/apollo-11</a></li>
+					<li><a style="color:var(--amber)" href="https://www.ibiblio.org/apollo/" target="_blank" rel="noopener">Virtual AGC — www.ibiblio.org/apollo</a> (emulatori e documentazione)</li>
+					<li><a style="color:var(--amber)" href="https://en.wikipedia.org/wiki/Apollo_Guidance_Computer" target="_blank" rel="noopener">Apollo Guidance Computer — Wikipedia</a></li>
+				</ul>
+			</div>
+		</section>
+	</div>
+
+	<script>
+	'use strict';
+	/* ============================================================
+	   APOLLO 11 — AGC WRAPPER & DSKY SIMULATOR
+	   Educativo, zero dipendenze. I testi dei sorgenti sono estratti
+	   autentici dal repository (pubblico dominio).
+	   ============================================================ */
+
+	// ---------- tab ----------
+	document.querySelectorAll('.tab').forEach(btn => {
+		btn.addEventListener('click', () => {
+			document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+			document.querySelectorAll('.pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + btn.dataset.tab));
+		});
+	});
+
+	// ---------- sorgenti (estratto autentico) ----------
+	const FILES = [
+		{ name: 'Luminary099/BURN_BABY_BURN--MASTER_IGNITION_ROUTINE.agc', src: 'Modulo lunare · P40/P61/P63 ignition — il commento più famoso dell\'era spaziale.', body: `# Copyright:\tPublic domain.
+# Filename:\tBURN_BABY_BURN--MASTER_IGNITION_ROUTINE.agc
+# Purpose: \tPart of the source code for Luminary 1A build 099.
+#\t\tIt is part of the source code for the Lunar Module's (LM)
+#\t\tApollo Guidance Computer (AGC), for Apollo 11.
+
+# BURN, BABY, BURN -- MASTER IGNITION ROUTINE
+
+\t\tBANK\t36
+\t\tSETLOC\tP40S
+\t\tBANK
+\t\tEBANK=\tWHICH
+\t\tCOUNT*\t$$/P40
+
+# THE MASTER IGNITION ROUTINE IS DESIGNED FOR USE BY THE FOLLOWING LEM PROGRAMS:  P12, P40, P42, P61, P63.
+# IT PERFORMS ALL FUNCTIONS IMMEDIATELY ASSOCIATED WITH APS OR DPS IGNITION:  IN PARTICULAR, EVERYTHING LYING
+# BETWEEN THE PRE-IGNITION TIME CHECK -- ARE WE WITHIN 45 SECONDS OF TIG? -- AND TIG + 26 SECONDS, WHEN DPS
+# PROGRAMS THROTTLE UP.
+
+# THE MASTER IGNITION ROUTINE WAS CONCEIVED AND EXECUTED, AND (NOTA BENE) IS MAINTAINED BY ADLER AND EYLES.
+#
+# \t\t   HONI SOIT QUI MAL Y PENSE` },
+		{ name: 'Luminary099/THE_LUNAR_LANDING.agc', src: 'Modulo lunare · P63: la braking phase della discesa.', body: `# Page 785
+\t\tBANK\t32
+\t\tSETLOC\tF2DPS*32
+\t\tBANK
+
+\t\tEBANK=\tE2DPS
+
+#\t*************************************
+#\tP63: THE LUNAR LANDING, BRAKING PHASE
+#\t*************************************
+
+\t\tCOUNT*\t$$/P63
+
+P63LM\t\tTC\tPHASCHNG
+\t\tOCT\t04024
+
+\t\tTC\tBANKCALL\t# DO IMU STATUS CHECK ROUTINE R02
+\t\tCADR\tR02BOTH
+
+\t\tCAF\tP63ADRES\t# INITIALIZE WHICH FOR BURNBABY
+\t\tTS\tWHICH
+
+\t\tCAF\tDPSTHRSH\t# INITIALIZE DVMON
+\t\tTS\tDVTHRUSH
+\t\tCAF\tFOUR
+\t\tTS\tDVCNTR
+
+\t\tCS\tONE\t\t# INITIALIZE WCHPHASE AND FLPASS0
+\t\tTS\tWCHPHASE
+
+\t\tCA\tZERO
+\t\tTS\tFLPASS0` },
+		{ name: 'Luminary099/KALMAN_FILTER.agc', src: 'Modulo lunare · il filtro di Kalman per il rate damping (DAP).', body: `# Page 1470
+\t\tEBANK=\tNO.UJETS
+\t\tBANK\t16
+\t\tSETLOC\tDAPS1
+\t\tBANK
+
+\t\tCOUNT*\t$$/DAP
+
+RATELOOP\tCA\tTWO
+\t\tTS\tDAPTEMP6
+\t\tDOUBLE
+\t\tTS\tQ
+\t\tINDEX\tDAPTEMP6
+\t\tCCS\tTJP
+\t\tTCF\t+2
+\t\tTCF\tLOOPRATE
+\t\tAD\t-100MST6
+\t\tEXTEND
+\t\tBZMF\tSMALLTJU
+\t\tINDEX\tDAPTEMP6
+\t\tCCS\tTJP
+\t\tCA\t-100MST6
+\t\tTCF\t+2
+\t\tCS\t-100MST6
+\t\tINDEX\tDAPTEMP6
+\t\tADS\tTJP
+\t\tINDEX\tDAPTEMP6
+\t\tCCS\tTJP
+\t\tCS\t-100MS\t\t# 0.1 AT 1
+\t\tTCF\t+2
+\t\tCA\t-100MS
+LOOPRATE\tEXTEND
+\t\tINDEX\tDAPTEMP6
+\t\tMP\tNO.PJETS
+\t\tCA\tL
+\t\tINDEX\tDAPTEMP6
+\t\tTS\tDAPTEMP1\t# SIGNED TORQUE AT 1 JET-SEC FOR FILTER` },
+		{ name: 'Comanche055/PINBALL_GAME_BUTTONS_AND_LIGHTS.agc', src: 'Modulo di comando · il "pinball game": tastiera e display (DSKY).', body: `# Copyright:\tPublic domain.
+# Filename:\tPINBALL_GAME_BUTTONS_AND_LIGHTS.agc
+# Purpose:\tPart of the source code for Colossus 2A, AKA Comanche 055.
+#\t\tIt is part of the source code for the Command Module's (CM)
+#\t\tApollo Guidance Computer (AGC), for Apollo 11.
+
+# Page 307
+# PROGRAM NAME -- KEYBOARD AND DISPLAY PROGRAM
+# MOD NO -- 4\t\tDATE -- 27 APRIL 1967\t\tASSEMBLY -- PINDISK REV 17
+# MOD BY -- FILENE
+# LOG SECTION -- PINBALL GAME BUTTONS AND LIGHTS
+
+# INTERNAL PROGRAMS CALL PINBALL AT \`NVSUB\` WITH THE DESIRED VERB/NOUN
+# \t...
+#\t\tIF PINBALL WAS CALLED BY EXTERNAL ACTION, THERE ARE FOUR EXITS:
+
+#\t\t\tPINBALL EXECUTIVE JOB WITH PRIORITY 30000.  IT IS THE
+#\t\t\tALSO PINBALL IS A NOVAC JOB.  EBANK SET FOR COMMON.
+#\t\t\tSERVICE ROUTINES AS PART OF THE PINBALL EXEC JOB WITH PRIO` }
+	];
+
+	// ---------- DSKY ----------
+	const $ = id => document.getElementById(id);
+	const regs = { prog: $('reg-prog'), verb: $('reg-verb'), noun: $('reg-noun') };
+	const lamps = {
+		oprerr: $('lmp-oprerr'), noatt: $('lmp-noatt'), gimbal: $('lmp-gimbal'),
+		stby: $('lmp-stby'), prog: $('lmp-prog'), temp: $('lmp-temp'), prio: $('lmp-prio')
+	};
+	const tele = { alt: $('tm-alt'), vel: $('tm-vel'), dv: $('tm-dv'), tig: $('tm-tig') };
+	const logEl = $('log');
+
+	const S = {
+		prog: 0, verb: 0, noun: 0,
+		active: null,          // 'verb' | 'noun' | 'prog' | null
+		buffer: '',
+		program: null,         // programma corrente
+		phase: [],             // [{t, msg, cls}]
+		phaseI: 0,
+		runT: 0,
+		tick: null,
+		mission: null,
+		missionI: 0,
+		tel: { alt: 100000, vel: 0, dv: 0, tig: 0 }
+	};
+
+	function setLamp(name, on, cls) {
+		const l = lamps[name];
+		if (!l) return;
+		l.classList.toggle('on', !!on);
+		if (cls) { l.classList.remove('green', 'red'); l.classList.add(cls); }
+	}
+	function blinkLamp(name, cls, times) {
+		let n = 0;
+		const iv = setInterval(() => {
+			setLamp(name, n % 2 === 0, cls);
+			if (++n > times * 2) { clearInterval(iv); setLamp(name, false); }
+		}, 260);
+	}
+	function pad2(n) { return String(Math.max(0, Math.min(99, Math.floor(n)))).padStart(2, '0'); }
+	function pad3(n) { return String(Math.max(0, Math.min(999, Math.floor(n)))).padStart(3, '0'); }
+	function renderRegs() {
+		regs.prog.textContent = pad3(S.prog);
+		regs.verb.textContent = pad2(S.active === 'verb' && S.buffer !== '' ? parseInt(S.buffer, 10) : S.verb);
+		regs.noun.textContent = pad2(S.active === 'noun' && S.buffer !== '' ? parseInt(S.buffer, 10) : S.noun);
+	}
+	function log(msg, cls) {
+		const d = document.createElement('div');
+		const t = new Date().toISOString().slice(11, 19);
+		d.innerHTML = '<span class="t">' + t + '</span>' + '<span class="' + (cls || '') + '">' + msg + '</span>';
+		logEl.appendChild(d);
+		logEl.scrollTop = logEl.scrollHeight;
+		while (logEl.children.length > 80) logEl.removeChild(logEl.firstChild);
+	}
+
+	function keyDigit(n) {
+		if (S.active === null) return;
+		if (S.buffer.length >= 2) return;
+		S.buffer += n;
+		renderRegs();
+	}
+	function pressVerb() { S.active = 'verb'; S.buffer = ''; }
+	function pressNoun() { S.active = 'noun'; S.buffer = ''; }
+	function pressEnter() {
+		if (S.active === null || S.buffer === '') return;
+		const v = parseInt(S.buffer, 10);
+		if (S.active === 'verb') S.verb = v;
+		else if (S.active === 'noun') S.noun = v;
+		else S.prog = v;
+		S.buffer = ''; S.active = null;
+		renderRegs();
+	}
+	function pressClear() { S.buffer = ''; S.active = null; renderRegs(); }
+
+	function execute() {
+		const v = S.verb, n = S.noun;
+		log('PRO: VERB ' + pad2(v) + ' NOUN ' + pad2(n), 'ok');
+		if (v === 37) { startProgram(n); return; }
+		if (v === 99) { resetDSKY(); log('RESET — FRESH START', 'ok'); return; }
+		if (v === 6) { log('IMU ALIGNMENT — STAR TRACKER OK', 'ok'); blinkLamp('noatt', 'green', 3); return; }
+		if (v === 21) { log('DISPLAY REQUEST — TELEMETRY SENT', 'ok'); return; }
+		if (v === 5 || v === 25) { log('BLANK — REGISTERS CLEARED', 'ok'); S.verb = 0; S.noun = 0; renderRegs(); return; }
+		blinkLamp('oprerr', 'red', 3);
+		log('OPERATOR ERROR — VERB NOT IN TABLE (V' + pad2(v) + 'N' + pad2(n) + ')', 'err');
+	}
+
+	// ---------- programmi ----------
+	const PROGRAMS = {
+		1: { name: 'P01 PRELAUNCH', tel: { alt: 0, vel: 0, dv: 0, tig: 0 }, start: 'P01 PRELAUNCH — PRELIMINARY CHECKS COMPLETE', phase: [
+			{ t: 1, msg: 'GUIDANCE REFERENCE RELEASE', cls: 'ok' },
+			{ t: 3, msg: 'T-15:00 — COUNTDOWN RUNNING', cls: '' },
+			{ t: 8, msg: 'ALL SYSTEMS GO FOR LAUNCH', cls: 'ok' }
+		] },
+		2: { name: 'P02 LAUNCH / BOOST', tel: { alt: 0, vel: 0, dv: 0, tig: 0 }, start: 'P02 LAUNCH — SEQ COMMANDED', phase: [
+			{ t: 1.5, msg: 'T-10 SECONDS', cls: '' },
+			{ t: 3, msg: '3... 2... 1...', cls: '' },
+			{ t: 4.2, msg: 'MASTER IGNITION ROUTINE', cls: 'phr' },
+			{ t: 5, msg: 'LIFTOFF! — ALT ' + '0 FT', cls: 'ok' },
+			{ t: 9, msg: 'STAGE SEPARATION — S-II TO S-IVB', cls: '' },
+			{ t: 13, msg: 'ORBITAL INSERTION COMPLETE', cls: 'ok' }
+		], profile: p => { p.tel.alt = Math.min(620000, p.tel.alt + 5200); p.tel.vel = Math.min(25900, p.tel.vel + 320); p.tel.dv += 260; } },
+		6: { name: 'P06 IMU ALIGNMENT', tel: { alt: 0, vel: 0, dv: 0, tig: 0 }, start: 'P06 IMU ALIGNMENT — STAR SELECTED', phase: [
+			{ t: 2, msg: 'STAR TRACKER LOCKED ON', cls: 'ok' },
+			{ t: 5, msg: 'GIMBAL DRIVE COMPLETE — ANGLES VERIFIED', cls: 'ok' }
+		] },
+		20: { name: 'P20 SPS BURN', tel: { alt: 200000, vel: 15500, dv: 0, tig: -45 }, start: 'P20 SPS BURN — TIG -45s', phase: [
+			{ t: 2, msg: 'PRE-IGNITION CHECK: WITHIN 45 SECONDS OF TIG', cls: '' },
+			{ t: 5, msg: 'T-10 SECONDS TO IGNITION', cls: '' },
+			{ t: 7, msg: 'BURN, BABY, BURN', cls: 'phr' },
+			{ t: 8, msg: 'MASTER IGNITION ROUTINE — DPS THROTTLE UP', cls: 'phr' },
+			{ t: 12, msg: 'BURN COMPLETE — DELTA-V ACHIEVED', cls: 'ok' }
+		], profile: p => { p.tel.tig = Math.max(0, p.tel.tig - 6); p.tel.dv = Math.min(3100, p.tel.dv + 310); p.tel.vel += 190; } },
+		21: { name: 'P21 APS BURN (ASCENT)', tel: { alt: 0, vel: 0, dv: 0, tig: -20 }, start: 'P21 APS BURN — ASCENT ENGINE ARMED', phase: [
+			{ t: 2, msg: 'T-5 SECONDS', cls: '' },
+			{ t: 3.5, msg: 'BURN, BABY, BURN', cls: 'phr' },
+			{ t: 7, msg: 'ASCENT COMPLETE — ORBIT ACHIEVED', cls: 'ok' }
+		], profile: p => { p.tel.tig = Math.max(0, p.tel.tig - 4); p.tel.dv = Math.min(1800, p.tel.dv + 220); p.tel.alt += 8000; } },
+		47: { name: 'P47 REFRESH', tel: { alt: 0, vel: 0, dv: 0, tig: 0 }, start: 'P47 REFRESH — PROGRAM REFRESHED', phase: [], profile: null },
+		63: { name: 'P63 LANDING BRAKING', tel: { alt: 76000, vel: 5900, dv: 0, tig: 0 }, start: 'P63 THE LUNAR LANDING, BRAKING PHASE', phase: [
+			{ t: 2, msg: 'MASTER IGNITION ROUTINE — P63 TABLE', cls: 'phr' },
+			{ t: 5, msg: 'ALTITUDE 25,000 FT — VEL 1,200 FPS', cls: '' },
+			{ t: 8, msg: 'PROGRAM ALARM 1202 (EXECUTIVE OVERFLOW) — GO', cls: 'phr' },
+			{ t: 10, msg: 'BRANCHING TO P64 — FINAL APPROACH', cls: 'ok' }
+		], profile: p => { p.tel.alt = Math.max(0, p.tel.alt - 9000); p.tel.vel = Math.max(0, p.tel.vel - 750); } },
+		64: { name: 'P64 FINAL APPROACH', tel: { alt: 5000, vel: 320, dv: 0, tig: 0 }, start: 'P64 FINAL APPROACH — LANDING RADAR ON', phase: [
+			{ t: 2, msg: 'LUNAR CONTACT LIGHT — ENGINE OFF', cls: 'phr' },
+			{ t: 3.5, msg: 'EAGLE HAS LANDED — VELOCITY ZERO', cls: 'ok' },
+			{ t: 5, msg: 'P00 — PROGRAM IDLE. GOOD LUCK, ASTRONAUTS.', cls: 'ok' }
+		], profile: p => { p.tel.alt = Math.max(0, p.tel.alt - 1400); p.tel.vel = Math.max(0, p.tel.vel - 90); } }
+	};
+
+	function stopProgram() {
+		if (S.tick) { clearInterval(S.tick); S.tick = null; }
+		S.phase = []; S.phaseI = 0; S.runT = 0;
+		setLamp('prog', false);
+		if (S.program && PROGRAMS[S.program] && PROGRAMS[S.program].tel) {
+			const t = PROGRAMS[S.program].tel;
+			tele.alt.textContent = '—'; tele.vel.textContent = '—'; tele.dv.textContent = '—'; tele.tig.textContent = '—';
+		}
+	}
+	function startProgram(n) {
+		if (n === 0) { stopProgram(); S.program = 0; S.prog = 0; renderRegs(); log('P00 — IDLE', 'ok'); return; }
+		const pr = PROGRAMS[n];
+		if (!pr) { blinkLamp('oprerr', 'red', 2); log('PROGRAM ' + pad3(n) + ' NOT IN TABLE', 'err'); return; }
+		stopProgram();
+		S.program = n; S.prog = n;
+		S.tel = Object.assign({}, pr.tel);
+		S.phase = pr.phase.slice(); S.phaseI = 0; S.runT = 0;
+		renderRegs();
+		setLamp('prog', true, 'green');
+		log(pr.start, 'phr');
+		renderTele();
+		if (pr.profile || pr.phase.length) {
+			S.tick = setInterval(() => {
+				S.runT += 0.2;
+				if (pr.profile) pr.profile(S);
+				if (S.phaseI < S.phase.length && S.runT >= S.phase[S.phaseI].t) {
+					log(S.phase[S.phaseI].msg, S.phase[S.phaseI].cls || '');
+					S.phaseI++;
+				}
+				renderTele();
+			}, 200);
+		}
+	}
+	function renderTele() {
+		const t = S.tel;
+		tele.alt.textContent = t.alt > 0 ? Math.round(t.alt).toLocaleString('it-IT') + ' FT' : '—';
+		tele.vel.textContent = t.vel > 0 ? Math.round(t.vel).toLocaleString('it-IT') + ' FPS' : '—';
+		tele.dv.textContent = t.dv > 0 ? Math.round(t.dv) + ' FPS' : '—';
+		tele.tig.textContent = t.tig < 0 ? 'T-' + (-t.tig) + 's' : (t.tig > 0 ? t.tig + 's' : '—');
+	}
+	function resetDSKY() {
+		stopProgram();
+		S.program = 0; S.prog = 0; S.verb = 0; S.noun = 0; S.active = null; S.buffer = '';
+		S.tel = { alt: 100000, vel: 0, dv: 0, tig: 0 };
+		Object.keys(lamps).forEach(k => setLamp(k, false));
+		tele.alt.textContent = '—'; tele.vel.textContent = '—'; tele.dv.textContent = '—'; tele.tig.textContent = '—';
+		renderRegs();
+	}
+
+	// ---------- tastiera DSKY ----------
+	const keypad = $('keypad');
+	for (let i = 0; i <= 9; i++) {
+		const b = document.createElement('button');
+		b.className = 'key';
+		b.textContent = i;
+		b.addEventListener('click', () => keyDigit(i));
+		keypad.appendChild(b);
+	}
+	$('k-verb').addEventListener('click', pressVerb);
+	$('k-noun').addEventListener('click', pressNoun);
+	$('k-enter').addEventListener('click', pressEnter);
+	$('k-clear').addEventListener('click', pressClear);
+	$('k-pro').addEventListener('click', execute);
+
+	// ---------- preset ----------
+	document.querySelectorAll('.preset').forEach(b => {
+		b.addEventListener('click', () => {
+			const p = b.dataset.prog;
+			if (p === 'auto') { autoMission(); return; }
+			startProgram(parseInt(p, 10));
+		});
+	});
+
+	// ---------- missione automatica ----------
+	const MISSION = [
+		{ prog: 1, wait: 8 }, { prog: 2, wait: 12 }, { prog: 6, wait: 6 },
+		{ prog: 20, wait: 11 }, { prog: 63, wait: 9 }, { prog: 64, wait: 5 }
+	];
+	function autoMission() {
+		S.missionI = 0;
+		log('▶ MISSIONE AUTOMATICA — SIMULAZIONE COMPLETA', 'phr');
+		runMissionStep();
+	}
+	function runMissionStep() {
+		if (S.missionI >= MISSION.length) {
+			log('MISSIONE COMPLETA — WELCOME HOME, ASTRONAUTS.', 'ok');
+			return;
+		}
+		const step = MISSION[S.missionI++];
+		startProgram(step.prog);
+		const maxRun = (step.wait * 1000) + 3000;
+		const iv = setInterval(() => {
+			// aspetta che il programma finisca le fasi, poi avanza
+		}, 100);
+		setTimeout(() => { clearInterval(iv); runMissionStep(); }, maxRun);
+	}
+
+	// ---------- codice ----------
+	const sel = $('file-select');
+	FILES.forEach((f, i) => {
+		const o = document.createElement('option');
+		o.value = i;
+		o.textContent = f.name;
+		sel.appendChild(o);
+	});
+	function showFile(i) {
+		const f = FILES[i];
+		$('code-file').textContent = '📄 ' + f.name;
+		$('code-src').textContent = f.src;
+		$('code-body').textContent = f.body;
+	}
+	sel.addEventListener('change', () => showFile(parseInt(sel.value, 10) || 0));
+	showFile(0);
+
+	// ---------- avvio ----------
+	log('AGC POWER ON — PROGRAM P00. WELCOME TO THE MOON.', 'ok');
+	log('PROVA: VERB 37 · NOUN 02 · PRO  →  lancia il modulo lunare.', '');
+	renderRegs();
+	</script>
+</body>
+</html>

@@ -532,5 +532,14 @@ const PROJECTS_DATA = [
     "emoji": "🐾",
     "badge": "Game / Survival",
     "badgeColor": "#52ff9e"
+  },
+  {
+    "id": "apollo-11-agc",
+    "title": "APOLLO 11 — AGC Source & Simulator",
+    "description": "Il codice sorgente originale del computer di guida dell'Apollo 11 (Apollo Guidance Computer): simulatore DSKY interattivo (verbi/nomi, programmi P01-P64 con telemetria), browser degli estratti autentici (Luminary099 / Comanche055) e casi d'uso. Wrapper educativo dal repository chrislgarry/apollo-11.",
+    "href": "projects/apollo-11/index.html",
+    "emoji": "🚀",
+    "badge": "Engineering / Sim",
+    "badgeColor": "#ff9f43"
   }
 ];

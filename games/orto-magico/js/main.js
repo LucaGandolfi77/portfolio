@@ -1,17 +1,20 @@
 // ==== ORTO MAGICO - Gioco Giardinaggio Statico ====
 // Tutto il gioco funziona in frontend, nessun backend richiesto.
 // Stato persistito su localStorage. Ottimizzato iPhone + GitHub Pages.
+//
+// NOTE: il gioco costruisce da solo le sue sezioni dentro #app, quindi
+// index.html resta uno shell minimale (loader + contenitore).
 
 const STORAGE_KEY = 'orto-magico-state-v1';
 
-// Seed definitions (12 varieties, matching original)
+// Seed definitions (11 varietà disponibili)
 const SEEDS = {
   lettuce: {
     id: 'lettuce',
     name: 'Lattuga',
     emoji: '🥬',
     cost: 5,
-    growTime: 30, // secondi (original: 3 ticks = ~9s ma rallentato per giocabilità)
+    growTime: 30, // secondi
     thirstPerTick: 8,
     minWater: 20,
     maxWater: 100,
@@ -136,7 +139,7 @@ const SEEDS = {
     rewardGems: 2,
     description: 'Piccante, sete media-alta'
   },
-  lettuce2: {  // variety 2
+  lettuce2: {  // varietà 2
     id: 'lettuce2',
     name: 'Lattuga Rossa',
     emoji: '🥬',
@@ -151,7 +154,7 @@ const SEEDS = {
   }
 };
 
-// 8 Achievements (matching original)
+// 8 Achievements
 const ACHIEVEMENTS = [
   { id: 'first-sprout', name: 'Primo Germoglio', desc: 'Raccogli la tua prima carota', goal: 1, rewardCoins: 50, rewardGems: 0, final: false, emoji: '🥕' },
   { id: 'green-thumb', name: 'Mani di Terra', desc: 'Pianta 10 semi totali', goal: 10, rewardCoins: 100, rewardGems: 1, final: false, emoji: '🌱' },
@@ -163,89 +166,87 @@ const ACHIEVEMENTS = [
   { id: 'hero-gardener', name: 'Giardiniere Eroico', desc: 'Cresci la leggendaria Rosa Arcobaleno (7 giorni)', goal: -1, rewardCoins: 500, rewardGems: 15, final: true, emoji: '👑' }
 ];
 
-// Initial state
+// Stato iniziale
 const DEFAULT_STATE = {
   coins: 500,
   gems: 5,
   level: 1,
   xp: 0,
   xpNext: 100,
-  plots: [],  // array of plot objects
+  plots: [],  // array di appezzamenti
   nextPlotCost: 30,
   maxPlots: 2,
   selectedSeed: null,
+  collection: {},
   collectionKnown: 0,
   collectionTotal: 0,
+  achievements: {},
+  totalPlanted: 0,
+  totalHarvests: 0,
   actionsThisSession: 0,
-  lastTick: 0,
-  timerInterval: null
+  lastTick: 0
 };
 
-// Seed emoji mapping for display
+// Emoji per seme (display)
 const SEED_EMOJIS = {
   lettuce: '🥬', carrot: '🥕', strawberry: '🍓', tomato: '🍅',
   sunflower: '🌻', rose: '🌹', mushroom: '🍄', cactus: '🌵',
   orchid: '🧡', pepper: '🌶️', lettuce2: '🥬'
 };
 
-// Initialize state from localStorage or default
-let gameState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { ...DEFAULT_STATE };
+// Inizializza stato da localStorage (con migrazione sicura)
+let gameState;
+try {
+  gameState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+} catch (e) {
+  gameState = {};
+}
+gameState = Object.assign({}, DEFAULT_STATE, gameState);
+if (!gameState.collection) gameState.collection = {};
+if (!gameState.achievements) gameState.achievements = {};
+
 let gameTickInterval = null;
 
-// Helper: format number with Italian locale
-function fmt(n) { return n.toLocaleString('it-IT'); }
+// Helper: formatta numero con locale italiano
+function fmt(n) { return (n || 0).toLocaleString('it-IT'); }
 
-// Helper: random element from array
+// Helper: elemento casuale da array
 function randElem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-// Render all UI
-function render() {
-  const app = document.getElementById('app');
-  if (!gameState) { app.innerHTML = '<div class="loading">Errore stato gioco</div>'; return; }
-
-  // Update header
-  const pct = gameState.xp_next ? Math.min(100, (gameState.xp / gameState.xpNext) * 100) : 0;
+// ---- Header ----
+function renderHeader() {
   const header = document.querySelector('.app-header');
-  if (header) {
-    header.innerHTML = `
-      <div class="header">
-        <div class="header-left">
-          <span class="header-logo">Orto Magico</span>
-        </div>
-        <div class="header-stats">
-          <span class="stat" title="Monete">💰 ${fmt(gameState.coins)}</span>
-          <span class="stat gems" title="Gemme">💎 ${fmt(gameState.gems)}</span>
-          <span class="stat" title="Album">📚 ${fmt(gameState.collectionKnown)}/${fmt(gameState.collectionTotal)}</span>
-        </div>
-        <div class="header-level">
-          <div class="lvl-badge">Liv. ${fmt(gameState.level)}</div>
-          <div class="lvl-bar"><div class="lvl-fill" style="width: ${pct}%"></div></div>
-        </div>
+  if (!header) return;
+
+  const pct = gameState.xpNext ? Math.min(100, (gameState.xp / gameState.xpNext) * 100) : 0;
+  header.innerHTML = `
+    <div class="header">
+      <div class="header-left">
+        <span class="header-logo">🌿 Orto Magico</span>
       </div>
-    `;
-  }
-
-  // Main content based on tab
-  const tab = document.getElementById('tab-seeds') ? 'seeds' : 'garden';  // simplified
-  const garden = document.getElementById('garden-section');
-  if (garden) {
-    renderGarden(garden);
-  }
-
-  // Render goals
-  renderGoals();
-
-  // Render album
-  renderAlbum();
+      <div class="header-stats">
+        <span class="stat" title="Monete">💰 ${fmt(gameState.coins)}</span>
+        <span class="stat gems" title="Gemme">💎 ${fmt(gameState.gems)}</span>
+        <span class="stat" title="Album">📚 ${fmt(gameState.collectionKnown)}/${fmt(gameState.collectionTotal)}</span>
+      </div>
+      <div class="header-level">
+        <div class="lvl-badge">Liv. ${fmt(gameState.level)}</div>
+        <div class="lvl-bar"><div class="lvl-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+  `;
 }
 
-// Render garden plots
+// ---- Giardino ----
 function renderGarden(container) {
   if (!container || !gameState.plots) return;
-  
+
   container.innerHTML = '';
-  
-  // Plot buy button
+  const grid = document.createElement('div');
+  grid.className = 'garden-soil';
+  container.appendChild(grid);
+
+  // Bottone per comprare un nuovo campo
   if (gameState.coins >= gameState.nextPlotCost && gameState.plots.length < gameState.maxPlots) {
     const buyBtn = document.createElement('button');
     buyBtn.className = 'plot plot-buy';
@@ -255,142 +256,131 @@ function renderGarden(container) {
       <span class="plot-buy-cost">${fmt(gameState.nextPlotCost)} 💰</span>
     `;
     buyBtn.onclick = () => buyNewPlot();
-    container.appendChild(buyBtn);
+    grid.appendChild(buyBtn);
   }
 
-  // Render each plot
+  // Ogni appezzamento
   gameState.plots.forEach((plot, pIdx) => {
+    const seed = plot.seedId ? SEEDS[plot.seedId] : null;
+    const isEmpty = !plot.seedId;
+    const thirstPct = plot.maxWater ? Math.max(0, Math.min(100, (plot.water / plot.maxWater) * 100)) : 100;
+    const isReady = !!seed && plot.progress >= seed.growTime && plot.water > 0;
+    const isThirsty = !!seed && plot.water <= seed.minWater;
+
     const plotDiv = document.createElement('div');
-    plotDiv.className = 'plot';
-    
-    // Fertilized class
-    if (plot.fertilized) plotDiv.classList.add('f-fertilized');
-    
-    const thirstPct = plot.water / plot.maxWater * 100;
-    const isReady = plot.progress >= (plot.fertilized ? gameState.selectedSeed?.growTime / 2 : gameState.selectedSeed?.growTime) && plot.water > 0;
-    const isEmpty = plot.seedId === null;
-    const isThirsty = plot.water <= plot.minWater;
-    
-    // Action buttons
+    plotDiv.className = 'plot' + (plot.fertilized ? ' f-fertilized' : '');
+
+    // Azioni
     let actions = '';
-    if (!isEmpty && !plot.harvested) {
+    if (isEmpty) {
       actions = `
         <div class="plot-actions">
-          ${!plot.fertilized ? '<button class="btn-harvest" title="Raccogli senza fertilizzante">Raccogli</button>' : ''}
-          <button class="btn-clear" title="Rimuovi pianta">X</button>
-        </div>
-      `;
-    } else if (isEmpty) {
-      actions = `
-        <div class="plot-actions">
-          <select onchange="selectSeed('${plot.id}')">
-            <option value="">Seleziona seme</option>
-            ${Object.keys(SEEDS).map(sid => `<option value="${sid}" ${gameState.selectedSeed === sid ? 'selected' : ''}>${SEEDS[sid].emoji} ${SEEDS[sid].name} (${fmt(SEEDS[sid].cost)} 💰)</option>`).join('')}
+          <select class="plot-seed-select" onchange="plantSeed('${plot.id}', this.value)">
+            <option value="">Scegli seme...</option>
+            ${Object.keys(SEEDS).map(sid => `<option value="${sid}">${SEEDS[sid].emoji} ${SEEDS[sid].name} (${fmt(SEEDS[sid].cost)}💰)</option>`).join('')}
           </select>
         </div>
       `;
-    } else if (isReady) {
+    } else if (seed) {
       actions = `
         <div class="plot-actions">
-          <button class="btn-harvest" onclick="harvestPlot(${pIdx})">Raccogli</button>
-        </div>
-      `;
-    } else if (isThirsty) {
-      actions = `
-        <div class="plot-actions">
-          <button onclick="waterPlot(${pIdx})">Annaffia</button>
+          ${isReady
+            ? `<button class="btn-harvest" onclick="harvestPlot(${pIdx})">Raccogli</button>`
+            : `<button onclick="waterPlot(${pIdx})">Annaffia 💧</button>`}
+          <button class="btn-clear" onclick="clearPlot(${pIdx})">X</button>
         </div>
       `;
     }
 
     plotDiv.innerHTML = `
-      <div class="plot-emoji">${SEED_EMOJIS[plot.seedId] || '🌱'}</div>
+      <div class="plot-emoji ${isReady ? 'plot-ready-glow' : ''}">${seed ? seed.emoji : '🌱'}</div>
       <div class="plot-bars">
-        <div class="bar"><div class="bar-fill" style="width: ${thirstPct}%"></div></div>
-        ${thirstPct < 30 ? '<div class="plot-thirsty-label">Sete!</div>' : ''}
-        ${isReady ? '<div class="plot-ready-label">Pronto!</div>' : ''}
-        ${isThirsty ? '<div class="plot-thirsty-label">Troppo poca acqua</div>' : ''}
+        <div class="bar"><div class="bar-fill" style="width:${thirstPct}%"></div></div>
+        ${seed ? `<div class="plot-timer">${Math.max(0, Math.ceil(seed.growTime - plot.progress))}s</div>` : ''}
       </div>
-      ${isReady ? '<div class="plot-ready-label">Raccolta disponibile</div>' : ''}
+      ${isReady ? '<div class="plot-ready-label">Pronto!</div>' : ''}
+      ${isThirsty && !isReady ? '<div class="plot-thirsty-label">Sete! Annaffia</div>' : ''}
       ${actions}
     `;
-    
-    // Click handlers
+
+    // Click sull'appezzamento (ignora click su bottoni/select)
     plotDiv.onclick = (e) => {
-      if (isEmpty) return;  // select seed instead
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
+      if (isEmpty) return;
       if (isReady) harvestPlot(pIdx);
-      if (isThirsty) waterPlot(pIdx);
+      else if (isThirsty || plot.water < plot.maxWater) waterPlot(pIdx);
     };
-    
-    container.appendChild(plotDiv);
+
+    grid.appendChild(plotDiv);
   });
 }
 
-// Render goals
+// ---- Obiettivi ----
 function renderGoals() {
   const container = document.getElementById('goals-section');
   if (!container) return;
-  
-  container.innerHTML = `
-    <div class="goals">
-      <p class="panel-hint">Obiettivi a lungo termine. Riscuoti i premi quando completi!</p>
-    `;
-  
-  ACHIEVEMENTS.forEach(ach => {
+
+  const goalsHtml = ACHIEVEMENTS.map(ach => {
+    const claimed = !!(gameState.achievements && gameState.achievements[ach.id]);
+    const goal = ach.goal > 0 ? ach.goal : 1;
     let progress = 0;
-    let done = false;
-    
+
     switch (ach.id) {
-      case 'first-sprout': progress = gameState.plots.some(p => p.harvested) ? 1 : 0; done = progress >= 1; break;
-      case 'green-thumb': progress = gameState.actionsThisSession; done = progress >= ach.goal; break;
-      case 'watering-can': progress = (gameState.actionsThisSession % 50) || 0; done = progress >= ach.goal; break;
-      case 'pumpkin-mania': progress = gameState.plots.filter(p => p.seedId === 'pumpkin').length; done = progress >= ach.goal; break;
-      case 'christmas': progress = gameState.plots.filter(p => p.seedId === 'christmas-tree').length; done = progress >= ach.goal; break;
-      case 'latifondista': done = gameState.maxPlots >= 8; break;
-      case 'botanist': progress = Object.keys(gameState.collection || {}).length; done = progress >= ach.goal; break;
-      case 'hero-gardener': 
-        // Special: check if rainbow rose grown after 7 days
+      case 'first-sprout': progress = Math.min(1, gameState.totalHarvests || 0); break;
+      case 'green-thumb': progress = gameState.totalPlanted || 0; break;
+      case 'watering-can': progress = gameState.actionsThisSession || 0; break;
+      case 'pumpkin-mania': progress = gameState.plots.filter(p => p.seedId === 'pumpkin').length; break;
+      case 'christmas': progress = gameState.plots.filter(p => p.seedId === 'christmas-tree').length; break;
+      case 'latifondista': progress = Math.min(goal, gameState.maxPlots); break;
+      case 'botanist': progress = Object.keys(gameState.collection || {}).length; break;
+      case 'hero-gardener': {
         const rainbowRose = gameState.plots.find(p => p.seedId === 'rainbow-rose');
-        done = rainbowRose && rainbowRose.plantedAt && (Date.now() - rainbowRose.plantedAt) >= 7 * 24 * 60 * 60 * 1000;
+        progress = (rainbowRose && rainbowRose.plantedAt && (Date.now() - rainbowRose.plantedAt) >= 7 * 24 * 60 * 60 * 1000) ? 1 : 0;
         break;
+      }
     }
-    
-    const reward = `${fmt(ach.rewardCoins)} 💰 ${ach.rewardGems > 0 ? `+ ${fmt(ach.rewardGems)} 💎` : ''}`;
-    const claimBtn = done && !ach.claimed 
-      ? `<button class="goal-claim" onclick="claimAchievement('${ach.id}')">Riscuoti!</button>` 
-      : (ach.claimed ? 'Riscosso' : 'In corso');
-    
-    container.innerHTML += `
+
+    const done = progress >= goal;
+    const pct = Math.min(100, (progress / goal) * 100);
+
+    return `
       <div class="goal ${ach.final ? 'goal-final' : ''}">
         <span class="goal-emoji">${ach.emoji}</span>
         <div class="goal-body">
-          <div class="goal-name">${ach.name} ${ach.final && '<span class="final-tag">FINALE</span>'}</div>
+          <div class="goal-name">${ach.name} ${ach.final ? '<span class="final-tag">FINALE</span>' : ''}</div>
           <div class="goal-desc">${ach.desc}</div>
           <div class="goal-prog">
-            <div class="goal-bar"><div class="goal-fill" style="width: ${Math.min(100, (progress / ach.goal) * 100)}%"></div></div>
-            <span class="goal-count">${fmt(progress)}/${fmt(ach.goal)}</span>
+            <div class="goal-bar"><div class="goal-fill" style="width:${pct}%"></div></div>
+            <span class="goal-count">${fmt(progress)}/${fmt(goal)}</span>
           </div>
-          <div class="goal-reward">Premio: ${reward}</div>
-          <button class="goal-claim ${ach.claimed ? 'disabled' : ''}" ${ach.claimed ? 'disabled' : ''}>${claimBtn}</button>
+          <div class="goal-reward">Premio: ${fmt(ach.rewardCoins)} 💰${ach.rewardGems > 0 ? ` + ${fmt(ach.rewardGems)} 💎` : ''}</div>
+          ${done && !claimed
+            ? `<button class="goal-claim" onclick="claimAchievement('${ach.id}')">Riscuoti!</button>`
+            : `<button class="goal-claim" disabled>${claimed ? 'Riscosso' : 'In corso'}</button>`}
         </div>
       </div>
     `;
-  });
+  }).join('');
+
+  container.innerHTML = `
+    <p class="panel-hint">Obiettivi a lungo termine. Riscuoti i premi quando completi!</p>
+    <div class="goals">${goalsHtml}</div>
+  `;
 }
 
-// Render album
+// ---- Album ----
 function renderAlbum() {
   const container = document.getElementById('album-section');
   if (!container) return;
-  
+
   const collected = Object.keys(gameState.collection || {}).length;
   container.innerHTML = `
     <div class="album-grid">
       ${Object.entries(SEEDS).map(([sid, seed]) => `
-        <div class="album-card ${gameState.collection && gameState.collection[sid] ? 'album-found' : 'album-locked'}">
+        <div class="album-card ${gameState.collection[sid] ? 'album-found' : 'album-locked'}">
           <span class="album-emoji">${seed.emoji}</span>
           <span class="album-name">${seed.name}</span>
-          <span class="album-collected">${gameState.collection && gameState.collection[sid] ? 'Riscoperto' : 'Bloccato'}</span>
+          <span class="album-collected">${gameState.collection[sid] ? 'Scoperto' : 'Bloccato'}</span>
         </div>
       `).join('')}
     </div>
@@ -400,13 +390,23 @@ function renderAlbum() {
   `;
 }
 
-// Game actions
+// Render completo
+function render() {
+  renderHeader();
+  renderGarden(document.getElementById('garden-section'));
+  renderGoals();
+  renderAlbum();
+}
+
+// ---- Azioni di gioco ----
+
+// Compra un nuovo appezzamento
 function buyNewPlot() {
   if (gameState.coins < gameState.nextPlotCost || gameState.plots.length >= gameState.maxPlots) return;
-  
+
   gameState.coins -= gameState.nextPlotCost;
   gameState.plots.push({
-    id: `plot-${Date.now()}`,
+    id: `plot-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     seedId: null,
     water: 100,
     maxWater: 100,
@@ -415,170 +415,189 @@ function buyNewPlot() {
     harvested: false,
     plantedAt: null
   });
-  
-  // Increase max plots every 2 new plots
+
+  // Ogni 2 campi aumenta il limite e il costo
   if (gameState.plots.length % 2 === 0) {
     gameState.maxPlots += 1;
-    // Increase next cost exponentially
     gameState.nextPlotCost = Math.round(30 * Math.pow(1.5, Math.floor(gameState.plots.length / 2)));
   }
-  
+
   saveState();
   render();
   showToast('Nuovo campo sbloccato!');
 }
 
-function selectSeed(seedId) {
+// Pianta un seme in un appezzamento vuoto
+function plantSeed(plotId, seedId) {
+  const plot = gameState.plots.find(p => p.id === plotId);
+  if (!plot || !seedId) return;
+  const seed = SEEDS[seedId];
+  if (!seed) return;
+
+  if (gameState.coins < seed.cost) {
+    showToast('Monete insufficienti!');
+    return;
+  }
+
+  gameState.coins -= seed.cost;
+  plot.seedId = seedId;
+  plot.water = plot.maxWater;
+  plot.progress = 0;
+  plot.harvested = false;
+  plot.plantedAt = Date.now();
   gameState.selectedSeed = seedId;
+  gameState.totalPlanted = (gameState.totalPlanted || 0) + 1;
+
   saveState();
   render();
+  showToast(`Piantato ${seed.name} 🌱`);
 }
 
+// Annaffia (aumenta l'acqua dell'appezzamento)
 function waterPlot(plotIdx) {
   const plot = gameState.plots[plotIdx];
-  if (!plot || plot.water <= 0 || plot.harvested) return;
-  
-  const seed = SEEDS[plot.seedId];
-  if (seed) {
-    plot.water = Math.max(0, plot.water - seed.thirstPerTick);
-    plot.actionsThisSession = (gameState.actionsThisSession || 0) + 1;
-  }
-  saveState();
-  render();
-  showToast('Pianta annaffiata');
-}
-
-function harvestPlot(plotIdx) {
-  const plot = gameState.plots[plotIdx];
-  if (!plot || plot.harvested) return;
-  
+  if (!plot || !plot.seedId || plot.harvested) return;
   const seed = SEEDS[plot.seedId];
   if (!seed) return;
-  
-  // Grant rewards
+
+  plot.water = Math.min(plot.maxWater, plot.water + 30);
+  gameState.actionsThisSession = (gameState.actionsThisSession || 0) + 1;
+
+  saveState();
+  render();
+  showToast('Pianta annaffiata 💧');
+}
+
+// Raccogli (sblocca ricompense e libera il campo)
+function harvestPlot(plotIdx) {
+  const plot = gameState.plots[plotIdx];
+  if (!plot || !plot.seedId || plot.harvested) return;
+  const seed = SEEDS[plot.seedId];
+  if (!seed) return;
+
+  const harvestedSeedId = plot.seedId;
+
+  // Ricompense
   gameState.coins += seed.rewardCoins;
   if (seed.rewardGems > 0 && Math.random() > 0.5) {
     gameState.gems += seed.rewardGems;
   }
-  
-  // Mark harvested
-  plot.harvested = true;
-  plot.progress = 0;
-  
-  // Add to collection if new variety
-  if (gameState.collection) {
-    if (!gameState.collection[plot.seedId]) {
-      gameState.collection[plot.seedId] = true;
-      gameState.collectionKnown = Object.keys(gameState.collection).length;
-      if (gameState.collectionKnown > gameState.collectionTotal) {
-        gameState.collectionTotal = gameState.collectionKnown;
-      }
+  gameState.totalHarvests = (gameState.totalHarvests || 0) + 1;
+
+  // Collezione (nuova varietà)
+  if (!gameState.collection[harvestedSeedId]) {
+    gameState.collection[harvestedSeedId] = true;
+    gameState.collectionKnown = Object.keys(gameState.collection).length;
+    if (gameState.collectionKnown > gameState.collectionTotal) {
+      gameState.collectionTotal = gameState.collectionKnown;
     }
   }
-  
-  // XP gain
-  const xpGain = 10;
-  gameState.xp += xpGain;
-  if (gameState.xp >= gameState.xpNext) {
-    gameState.level += 1;
+
+  // XP
+  gameState.xp += 10;
+  while (gameState.xp >= gameState.xpNext) {
     gameState.xp -= gameState.xpNext;
+    gameState.level += 1;
     gameState.xpNext = Math.round(100 * Math.pow(1.5, gameState.level));
   }
-  
+
+  // Libera il campo per ripiantare
+  plot.seedId = null;
+  plot.harvested = false;
+  plot.progress = 0;
+  plot.water = plot.maxWater;
+  plot.plantedAt = null;
+
   saveState();
   render();
   showToast(`Raccolto ${seed.name}! +${fmt(seed.rewardCoins)} monete`);
 }
 
+// Rimuovi la pianta da un campo
+function clearPlot(plotIdx) {
+  const plot = gameState.plots[plotIdx];
+  if (!plot) return;
+  plot.seedId = null;
+  plot.progress = 0;
+  plot.water = plot.maxWater;
+  plot.harvested = false;
+  plot.plantedAt = null;
+  saveState();
+  render();
+}
+
+// Riscuoti un obiettivo completato
 function claimAchievement(achId) {
   const ach = ACHIEVEMENTS.find(a => a.id === achId);
-  if (!ach || ach.claimed) return;
-  
-  // Grant rewards
+  if (!ach || (gameState.achievements && gameState.achievements[achId])) return;
+
   gameState.coins += ach.rewardCoins;
   gameState.gems += ach.rewardGems;
-  
-  // Mark claimed
-  ach.claimed = true;
-  
+  gameState.achievements[achId] = true;
+
   saveState();
   render();
   showToast(`Premio riscosso: ${fmt(ach.rewardCoins)} monete + ${fmt(ach.rewardGems)} gemme!`);
 }
 
-// Show toast
+// ---- Toast ----
 function showToast(msg) {
   const container = document.getElementById('toasts');
   if (!container) return;
-  
+
   const toast = document.createElement('div');
   toast.className = 'toast';
   toast.textContent = msg;
   container.appendChild(toast);
-  
+
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transform = 'translateX(-50%) translateY(10px)';
     setTimeout(() => toast.remove(), 300);
   }, 2500);
 }
 
-// Start game loop (tick-based growth)
+// ---- Game loop (crescita a tick) ----
 function startGameLoop() {
   if (gameTickInterval) clearInterval(gameTickInterval);
-  
+
   gameTickInterval = setInterval(() => {
     if (!gameState || !gameState.plots) return;
-    
+
     const now = Date.now();
-    const delta = now - (gameState.lastTick || now);
+    const delta = Math.min(60000, now - (gameState.lastTick || now));
     gameState.lastTick = now;
-    
-    // Water decay per tick
+
+    // Crescita + sete per ogni campo
     gameState.plots.forEach(plot => {
-      if (plot.seedId && !plot.harvested && !plot.fertilized) {
-        const seed = SEEDS[plot.seedId];
-        if (seed) {
-          plot.water = Math.max(0, plot.water - seed.thirstPerTick * (delta / 1000));
-        }
-      }
-    });
-    
-    // Check readiness
-    gameState.plots.forEach(plot => {
-      if (plot.harvested || !plot.seedId) return;
-      
+      if (!plot.seedId || plot.harvested) return;
       const seed = SEEDS[plot.seedId];
       if (!seed) return;
-      
-      const growthPerTick = seed.growTime / 100;  // scaled for playability
-      plot.progress = Math.min(seed.growTime, plot.progress + growthPerTick);
-      plot.water = Math.min(plot.maxWater, plot.water + 1);  // tiny refill
-      
-      // Level up effect
-      if (plot.progress >= seed.growTime && !plot.harvested) {
-        // Already harvested in click handler
-      }
+
+      // L'acqua scende nel tempo
+      plot.water = Math.max(0, plot.water - seed.thirstPerTick * (delta / 1000));
+      // Crescita
+      plot.progress = Math.min(seed.growTime, plot.progress + (seed.growTime / 100) * (delta / 1000));
+      // Piccolo rifornimento passivo
+      plot.water = Math.min(plot.maxWater, plot.water + 0.2 * (delta / 1000));
     });
-    
-    // Level up check
+
+    // XP passiva
     if (gameState.xp < gameState.xpNext) {
-      const tinyXp = 1;
-      gameState.xp += tinyXp;
+      gameState.xp += 1;
       if (gameState.xp >= gameState.xpNext) {
-        gameState.level += 1;
         gameState.xp -= gameState.xpNext;
+        gameState.level += 1;
         gameState.xpNext = Math.round(100 * Math.pow(1.5, gameState.level));
         showToast('Livello up! Sei ora al Livello ' + gameState.level);
       }
     }
-    
+
     saveState();
     render();
-  }, 1000); // 1 second tick
+  }, 1000); // tick ogni secondo
 }
 
-// Save state to localStorage
+// ---- Salvataggio ----
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
@@ -587,14 +606,28 @@ function saveState() {
   }
 }
 
-// Initialize game
+// ---- Avvio ----
 function init() {
+  const app = document.getElementById('app');
+  if (app) {
+    app.style.display = 'block';
+    // Costruisce le sezioni una sola volta; render() ne aggiorna solo il contenuto
+    app.innerHTML = `
+      <div id="garden-section" class="garden"></div>
+      <div id="goals-section" class="panel"></div>
+      <div id="album-section" class="panel"></div>
+      <div id="toasts" class="toasts"></div>
+    `;
+  }
+
+  const loading = document.getElementById('loading');
+  if (loading) loading.style.display = 'none';
+
+  const error = document.getElementById('error');
+  if (error) error.style.display = 'none';
+
   render();
   startGameLoop();
 }
 
-// Auto-save every 30 seconds
-setInterval(saveState, 30000);
-
-// Initial render
-render();
+init();

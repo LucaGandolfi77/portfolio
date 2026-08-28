@@ -536,7 +536,7 @@ RND.buildEntities = function () {
 
   var portal = SPRITE.makePortal();
   portal.position.set(DATA.GATE.portal.x, DATA.GATE.portal.y);
-  L.basePortal.appendChild(portal);
+  L.basePortal.addChild(portal);   // Pixi: i Container usano addChild, non appendChild
   SPRITE._portalSpr = portal;
 
   // asteroidi

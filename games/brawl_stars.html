@@ -253,6 +253,8 @@
 		function startGame(mode) {
 			console.log('Starting game in mode:', mode);
 			gameMode = mode;
+			score = 0;
+			document.getElementById('scoreVal').innerText = '0';
 			document.getElementById('startScreen').style.display = 'none';
 			
 			// Initialize Player
@@ -268,14 +270,30 @@
 			// Spawn Random Crates
 			const w = (typeof MAP_WIDTH !== 'undefined') ? MAP_WIDTH : 5000;
 			const h = (typeof MAP_HEIGHT !== 'undefined') ? MAP_HEIGHT : 5000;
-			for(let i=0; i<40; i++) {
+
+			// Crates vicino al player (garanzia loot iniziale)
+			for (let i = 0; i < 10; i++) {
+				const angle = Math.random() * Math.PI * 2;
+				const dist = 200 + Math.random() * 400;
+				const cx = player.x + Math.cos(angle) * dist;
+				const cy = player.y + Math.sin(angle) * dist;
+				if (!checkCollisionMap(cx, cy, 25)) {
+					const isSupply = Math.random() < 0.15;
+					crates.push({ x: cx - 20, y: cy - 20, w: 40, h: 40, hp: isSupply ? 120 : 60, type: isSupply ? 'supply' : 'normal' });
+				}
+			}
+
+			// Crates casuali sul map
+			for(let i=0; i<35; i++) {
 				let cx = Math.random() * w;
 				let cy = Math.random() * h;
-				if(!checkCollisionMap(cx, cy, 20)) {
+				if(!checkCollisionMap(cx, cy, 25)) {
 					const isSupply = Math.random() < 0.1;
 					crates.push({ x: cx, y: cy, w: 40, h: 40, hp: isSupply ? 120 : 60, type: isSupply ? 'supply' : 'normal' });
 				}
 			}
+
+			spawnFloorLoot();
 
 			running = true;
 			requestAnimationFrame(loop);
@@ -320,16 +338,20 @@
 				let dx = player.x - p.x;
 				let dy = player.y - p.y;
 				if (Math.sqrt(dx*dx + dy*dy) < player.radius + p.r) {
-					// Collect
 					if (p.type === 'shield') {
 						player.shield = player.maxShield;
+					} else if (p.type === 'health') {
+						player.hp = Math.min(player.hp + 30, player.maxHp);
+					} else if (p.type === 'ammo') {
+						if (player.weapon !== 'fists' && player.ammo !== Infinity) {
+							player.ammo = Math.min(player.ammo + 15, player.maxAmmo || 999);
+						}
 					} else if (p.type === 'weapon' && p.weaponKey) {
 						player.weapon = p.weaponKey;
 						const w = WEAPONS[p.weaponKey];
 						player.ammo = w.ammo || Infinity;
 						player.maxAmmo = w.ammo || Infinity;
 						
-						// Notification
 						const notif = document.createElement('div');
 						notif.style.position = 'absolute'; 
 						notif.style.top = '20%'; notif.style.left = '50%'; 
@@ -427,6 +449,23 @@
 				}
 				if(hit) bullets.splice(i, 1);
 			}
+
+			// Enemy bullets hit player
+			for (let i = bullets.length - 1; i >= 0; i--) {
+				let b = bullets[i];
+				if (b.owner === 'player') continue;
+				const dx = b.x - player.x;
+				const dy = b.y - player.y;
+				if (dx * dx + dy * dy < (player.radius + 5) * (player.radius + 5)) {
+					if (b.explosive) {
+						explode(b.x, b.y, b.radius, b.dmgMin);
+					} else {
+						const dmg = Math.floor(b.dmgMin + Math.random() * (b.dmgMax - b.dmgMin + 1));
+						takeDamage(dmg);
+					}
+					bullets.splice(i, 1);
+				}
+			}
 			
 			// Update Enemies
 			if (gameMode === 'npc' && enemies.length < 15 && Math.random() < 0.03) {
@@ -437,16 +476,110 @@
 			
 			for (let i = enemies.length - 1; i >= 0; i--) {
 				let e = enemies[i];
-				const dx = player.x - e.x;
-				const dy = player.y - e.y;
-				const dist = Math.sqrt(dx*dx + dy*dy);
-				if (dist > 0) {
-					let mx = (dx/dist) * e.speed;
-					let my = (dy/dist) * e.speed;
-					if (!checkCollisionMap(e.x + mx, e.y, 20)) e.x += mx;
-					if (!checkCollisionMap(e.x, e.y + my, 20)) e.y += my;
+				if (e.coolDown > 0) e.coolDown--;
+
+				const dxP = player.x - e.x;
+				const dyP = player.y - e.y;
+				const distToPlayer = Math.sqrt(dxP * dxP + dyP * dyP);
+				const angleToPlayer = Math.atan2(dyP, dxP);
+
+				const hasGun = e.weapon !== null;
+				const hasAmmo = e.ammo > 0;
+				const shootRange = hasGun ? (WEAPONS[e.weapon].range * 50) : 0;
+
+				// Trova pickup arma/ammo più vicina
+				let nearestLoot = null;
+				let nearestLootDist = Infinity;
+				if (pickups.length > 0) {
+					for (let k = 0; k < pickups.length; k++) {
+						const pk = pickups[k];
+						const needWeapon = !hasGun && (pk.type === 'weapon');
+						const needAmmo = hasGun && !hasAmmo && (pk.type === 'ammo' || pk.type === 'weapon');
+						if (!needWeapon && !needAmmo) continue;
+						const ddx = pk.x - e.x;
+						const ddy = pk.y - e.y;
+						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+						if (dd < nearestLootDist) { nearestLootDist = dd; nearestLoot = pk; }
+					}
 				}
-				if (dist < player.radius + 20) {
+
+				// State machine
+				if (!hasAmmo && !hasGun) {
+					// No weapon: seek loot
+					e.aiState = 'seek_loot';
+				} else if (!hasAmmo && hasGun) {
+					// Has weapon but no ammo: flee to ammo
+					e.aiState = nearestLoot ? 'flee_ammo' : 'chase';
+				} else if (distToPlayer < shootRange && hasGun && hasAmmo) {
+					e.aiState = 'shoot';
+				} else if (distToPlayer < 300) {
+					e.aiState = hasGun ? 'shoot' : 'chase';
+				} else {
+					e.aiState = nearestLoot && nearestLootDist < 600 ? 'seek_loot' : 'chase';
+				}
+
+				let mx = 0, my = 0;
+				const sp = e.speed;
+
+				if (e.aiState === 'seek_loot' && nearestLoot) {
+					const ldx = nearestLoot.x - e.x;
+					const ldy = nearestLoot.y - e.y;
+					const ld = Math.sqrt(ldx * ldx + ldy * ldy);
+					if (ld > 0) { mx = (ldx / ld) * sp; my = (ldy / ld) * sp; }
+					// Raccolta diretta
+					if (ld < 25) {
+						if (nearestLoot.type === 'weapon' && nearestLoot.weaponKey) {
+							e.weapon = nearestLoot.weaponKey;
+							const ww = WEAPONS[nearestLoot.weaponKey];
+							e.ammo = ww.ammo || Infinity;
+							e.maxAmmo = ww.ammo || Infinity;
+						} else if (nearestLoot.type === 'ammo' && hasGun && e.ammo !== Infinity) {
+							e.ammo = Math.min(e.ammo + 15, e.maxAmmo || 999);
+						} else if (nearestLoot.type === 'health') {
+							e.hp = Math.min(e.hp + 30, e.maxHp);
+						} else if (nearestLoot.type === 'shield') {
+							// I bot non hanno scudo, curano vita
+							e.hp = Math.min(e.hp + 20, e.maxHp);
+						}
+						pickups.splice(pickups.indexOf(nearestLoot), 1);
+					}
+				} else if (e.aiState === 'flee_ammo' && nearestLoot) {
+					const ldx = nearestLoot.x - e.x;
+					const ldy = nearestLoot.y - e.y;
+					const ld = Math.sqrt(ldx * ldx + ldy * ldy);
+					if (ld > 0) { mx = (ldx / ld) * sp * 1.2; my = (ldy / ld) * sp * 1.2; }
+					if (ld < 25) {
+						if (nearestLoot.type === 'ammo' && e.ammo !== Infinity) {
+							e.ammo = Math.min(e.ammo + 15, e.maxAmmo || 999);
+						} else if (nearestLoot.type === 'weapon' && nearestLoot.weaponKey) {
+							e.weapon = nearestLoot.weaponKey;
+							const ww = WEAPONS[nearestLoot.weaponKey];
+							e.ammo = ww.ammo || Infinity;
+							e.maxAmmo = ww.ammo || Infinity;
+						}
+						pickups.splice(pickups.indexOf(nearestLoot), 1);
+					}
+				} else if (e.aiState === 'shoot' && hasGun && hasAmmo) {
+					if (distToPlayer > shootRange * 0.3) {
+						mx = (dxP / distToPlayer) * sp * 0.6;
+						my = (dyP / distToPlayer) * sp * 0.6;
+					}
+					if (e.coolDown <= 0 && distToPlayer <= shootRange) {
+						shootEnemy(e, angleToPlayer);
+					}
+				} else {
+					// chase
+					if (distToPlayer > 0) {
+						mx = (dxP / distToPlayer) * sp;
+						my = (dyP / distToPlayer) * sp;
+					}
+				}
+
+				if (mx !== 0 && !checkCollisionMap(e.x + mx, e.y, 20)) e.x += mx;
+				if (my !== 0 && !checkCollisionMap(e.x, e.y + my, 20)) e.y += my;
+
+				// Contatto melee
+				if (distToPlayer < player.radius + 20) {
 					takeDamage(0.5);
 				}
 			}
@@ -474,25 +607,58 @@
 		function spawnEnemy(type) {
 			const angle = Math.random() * Math.PI * 2;
 			const dist = 700;
-			let e = {
+			const e = {
 				x: player.x + Math.cos(angle) * dist,
 				y: player.y + Math.sin(angle) * dist,
-				hp: 30,
-				speed: 1.5 + Math.random(),
+				hp: 30, maxHp: 30,
+				speed: 1.5,
 				color: '#e74c3c',
-				type: type
+				type: type,
+				weapon: null,
+				ammo: 0,
+				maxAmmo: 0,
+				coolDown: 0,
+				aiState: 'wander',
+				wanderAngle: Math.random() * Math.PI * 2,
+				wanderTimer: 0,
+				targetPickup: null
 			};
-
 			if (type === 'bot') {
-				e.hp = 60;
+				e.hp = 60; e.maxHp = 60;
 				e.speed = 2.5 + Math.random();
-				e.color = '#9b59b6'; 
+				e.color = '#9b59b6';
 			} else {
-				e.hp = 30;
+				e.hp = 30; e.maxHp = 30;
 				e.speed = 1.0 + Math.random();
-				e.color = '#e74c3c'; 
+				e.color = '#e74c3c';
 			}
 			enemies.push(e);
+		}
+
+		function shootEnemy(e, angle) {
+			const w = WEAPONS[e.weapon];
+			const count = w.count || 1;
+			const spread = w.spread || 0;
+			for (let i = 0; i < count; i++) {
+				const finalAngle = angle + (Math.random() - 0.5) * spread;
+				bullets.push({
+					x: e.x, y: e.y, angle: finalAngle,
+					speed: w.speed,
+					life: w.range * 4,
+					owner: e,
+					dmgMin: w.dmgMin, dmgMax: w.dmgMax,
+					explosive: w.explosive,
+					radius: w.radius
+				});
+			}
+			if (e.ammo !== Infinity) {
+				e.ammo--;
+				if (e.ammo <= 0) {
+					e.weapon = null;
+					e.ammo = 0;
+				}
+			}
+			e.coolDown = w.period;
 		}
 
 		function spawnLoot(x, y, crateType = 'normal') {
@@ -505,7 +671,11 @@
 				const keys = Object.keys(WEAPONS).filter(k => WEAPONS[k].label === 'Supply' || WEAPONS[k].label === 'Legendary');
 				weaponKey = keys[Math.floor(Math.random() * keys.length)];
 			} else {
-				if (rand < 0.3) {
+				if (rand < 0.2) {
+					type = 'health';
+				} else if (rand < 0.4) {
+					type = 'ammo';
+				} else if (rand < 0.55) {
 					type = 'shield';
 				} else {
 					type = 'weapon';
@@ -514,6 +684,24 @@
 				}
 			}
 			pickups.push({ x, y, type, weaponKey, r: 15 });
+		}
+
+		function spawnFloorLoot() {
+			const w = (typeof MAP_WIDTH !== 'undefined') ? MAP_WIDTH : 5000;
+			const h = (typeof MAP_HEIGHT !== 'undefined') ? MAP_HEIGHT : 5000;
+			const weaponKeys = Object.keys(WEAPONS).filter(k => WEAPONS[k].label !== 'Supply' && k !== 'fists');
+			for (let i = 0; i < 70; i++) {
+				const px = Math.random() * (w - 100) + 50;
+				const py = Math.random() * (h - 100) + 50;
+				if (checkCollisionMap(px, py, 15)) continue;
+				const r = Math.random();
+				let type, weaponKey = null;
+				if (r < 0.25) type = 'health';
+				else if (r < 0.50) type = 'shield';
+				else if (r < 0.80) type = 'ammo';
+				else { type = 'weapon'; weaponKey = weaponKeys[Math.floor(Math.random() * weaponKeys.length)]; }
+				pickups.push({ x: px, y: py, type, weaponKey, r: 15 });
+			}
 		}
 
 		function explode(x, y, radius, dmg) {
@@ -574,8 +762,6 @@
 						player.maxAmmo = Infinity;
 					}
 				}
-			} else {
-				bullets.push({ x, y, angle, speed: 10, life: 60, owner, dmgMin: 10, dmgMax: 10 });
 			}
 		}
 
@@ -649,21 +835,25 @@
 			pickups.forEach(p => {
 				ctx.beginPath();
 				ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-				if (p.type === 'shield') ctx.fillStyle = '#3498db'; 
+				if (p.type === 'shield') ctx.fillStyle = '#3498db';
+				else if (p.type === 'health') ctx.fillStyle = '#2ecc71';
+				else if (p.type === 'ammo') ctx.fillStyle = '#f39c12';
 				else if (p.weaponKey && WEAPONS[p.weaponKey]) {
                     const w = WEAPONS[p.weaponKey];
                     ctx.fillStyle = w.label === 'Legendary' ? '#f1c40f' : '#e74c3c';
-                } else ctx.fillStyle = '#e74c3c'; // Red
+                } else ctx.fillStyle = '#e74c3c';
 				ctx.fill();
 				ctx.strokeStyle = 'white';
 				ctx.lineWidth = 2;
 				ctx.stroke();
-				// Icon text
 				ctx.fillStyle = 'white';
-				ctx.font = '12px Arial';
+				ctx.font = 'bold 12px Arial';
 				ctx.textAlign = 'center';
 				ctx.textBaseline = 'middle';
-				ctx.fillText(p.type === 'shield' ? 'S' : 'W', p.x, p.y);
+				if (p.type === 'shield') ctx.fillText('S', p.x, p.y);
+				else if (p.type === 'health') ctx.fillText('+', p.x, p.y);
+				else if (p.type === 'ammo') ctx.fillText('A', p.x, p.y);
+				else ctx.fillText('W', p.x, p.y);
 			});
 
 			// Draw Player
@@ -689,11 +879,36 @@
 				ctx.arc(e.x, e.y, 20, 0, Math.PI * 2);
 				ctx.fillStyle = e.color;
 				ctx.fill();
-				// Health bar for enemy
-				ctx.fillStyle = 'red';
-				ctx.fillRect(e.x - 20, e.y - 35, 40, 5);
-				ctx.fillStyle = '#0f0';
-				ctx.fillRect(e.x - 20, e.y - 35, Math.max(0, 40 * (e.hp/30)), 5);
+				ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+				ctx.lineWidth = 2;
+				ctx.stroke();
+				// Health bar (fixed: usa maxHp)
+				const hpPct = Math.max(0, e.hp / e.maxHp);
+				ctx.fillStyle = 'rgba(0,0,0,0.6)';
+				ctx.fillRect(e.x - 20, e.y - 38, 40, 6);
+				ctx.fillStyle = hpPct > 0.5 ? '#2ecc71' : hpPct > 0.25 ? '#f39c12' : '#e74c3c';
+				ctx.fillRect(e.x - 20, e.y - 38, 40 * hpPct, 6);
+				// Weapon icon
+				if (e.weapon) {
+					const ww = WEAPONS[e.weapon];
+					ctx.fillStyle = ww.label === 'Legendary' ? '#f1c40f' : '#ecf0f1';
+					ctx.font = 'bold 10px Arial';
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'top';
+					ctx.fillText(ww.name.split(' ')[0], e.x, e.y + 22);
+				}
+				// AI state indicator
+				if (e.aiState === 'shoot') {
+					ctx.fillStyle = '#e74c3c';
+					ctx.font = 'bold 14px Arial';
+					ctx.textAlign = 'center';
+					ctx.fillText('!', e.x, e.y - 48);
+				} else if (e.aiState === 'seek_loot' || e.aiState === 'flee_ammo') {
+					ctx.fillStyle = '#f39c12';
+					ctx.font = '12px Arial';
+					ctx.textAlign = 'center';
+					ctx.fillText(e.aiState === 'flee_ammo' ? 'Ammo' : 'Loot', e.x, e.y - 46);
+				}
 			});
 			
 			// Draw Bullets

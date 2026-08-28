@@ -85,8 +85,22 @@ designato ti ringrazia).*
 
 - **iOS Safari**: il riconoscimento vocale (Web Speech API) non è disponibile;
   compare il tasto **"✅ L'ho detta!"** per confermare la parola. Su
-  Chrome/Android il microfono funziona davvero (lingua it-IT, tolleranza
-  fonetica via distanza di Levenshtein).
+  Chrome/Android il microfono funziona davvero. Le parole sono **inventate**,
+  quindi il motore vocale non le conosce: per farsele ascoltare il gioco
+  1) le dichiara in una **grammatica JSGF** (Chrome desktop),
+  2) ascolta i **risultati intermedi** con **8 alternative** (il motore
+     "corregge" meno i suoni estranei) e confronta in fonetica con distanza
+     di Levenshtein,
+  3) riprova automaticamente con la **lingua alternativa (it-IT ↔ en-US)**:
+     *finkure/liskato/tokozon* suonano più italiane, *weightlighter,
+     schiverrrr, drefgolding* più inglesi. Il tasto **🔁 Riprova** cambia
+     lingua a ogni pressione.
+  Se il riconoscimento non capisce nulla dopo 8 secondi di silenzio, passa
+  all'altra lingua; dopo entrambe, invita a riprovare (o a usare "L'ho detta!").
+- **iPhone (layout)**: all'avvio il gioco va a **schermo intero**
+  (`requestFullscreen`, Safari 16.4+) così la barra del browser in alto e
+  quella in basso spariscono; gli strati full-screen usano `100dvh` e
+  `env(safe-area-inset-*)` per non finire dietro la tacca.
 - L'ancoraggio AR è basato sul **giroscopio** (compensazione dell'inclinazione),
   non su SLAM: è l'illusione di profondità, non la realtà aumentata dei
   sistemi professionisti. Funziona senza marker, ovunque, offline.
