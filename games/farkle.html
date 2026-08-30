@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Farkle</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a1628;
+      --bg2: #0f1f3a;
+      --card: rgba(15, 25, 50, 0.85);
+      --glass: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.08);
+      --accent: #00d4ff;
+      --accent2: #0ea5e9;
+      --accent-glow: rgba(0, 212, 255, 0.25);
+      --gold: #fbbf24;
+      --red: #ef4444;
+      --green: #10b981;
+      --text: #e2e8f0;
+      --text-dim: rgba(226, 232, 240, 0.5);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh; min-height: 100dvh;
+      overflow: hidden; overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none; -webkit-user-select: none;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 20% 0%, rgba(0,212,255,0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 100%, rgba(14,165,233,0.06) 0%, transparent 50%);
+      pointer-events: none; z-index: 0;
+    }
+    .screen { display: none; flex-direction: column; position: fixed; inset: 0; z-index: 1; }
+    .screen.active { display: flex; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top));
+      background: rgba(10, 22, 40, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border); z-index: 100; flex-shrink: 0;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 8px; }
+    .topbar-title {
+      font-size: 1rem; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 6px; }
+    .top-btn {
+      background: var(--glass); border: 1px solid var(--glass-border); border-radius: 50%;
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+      color: var(--text); cursor: pointer; font-size: 1rem; transition: all 0.2s;
+    }
+    .top-btn:active { background: rgba(255,255,255,0.12); transform: scale(0.92); }
+
+    /* ── Start Screen ── */
+    #start-screen { align-items: center; justify-content: center; gap: 32px; padding: 24px; }
+    .logo-area { text-align: center; }
+    .logo-dice { font-size: 4rem; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .logo-title {
+      font-size: 2.5rem; font-weight: 900; letter-spacing: 6px; text-transform: uppercase;
+      background: linear-gradient(135deg, var(--accent), #818cf8, var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .logo-sub { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; letter-spacing: 1px; }
+    .rules-toggle {
+      background: none; border: 1px solid var(--glass-border); border-radius: 10px;
+      padding: 10px 18px; color: var(--accent); font-size: .82rem; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .rules-toggle:active { background: var(--glass); }
+    .rules-box {
+      background: var(--card); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 18px; width: 100%; max-width: 380px; display: none; text-align: left;
+      max-height: 45vh; overflow-y: auto; font-size: .78rem; line-height: 1.6;
+    }
+    .rules-box.open { display: block; animation: slideDown .3s ease; }
+    .rules-box h3 { color: var(--gold); margin: 12px 0 6px; font-size: .85rem; }
+    .rules-box h3:first-child { margin-top: 0; }
+    .rules-box b { color: var(--accent); }
+    .rules-box table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+    .rules-box th { text-align: left; color: var(--accent); padding: 3px 6px; border-bottom: 1px solid var(--glass-border); font-size: .72rem; }
+    .rules-box td { padding: 3px 6px; font-size: .72rem; }
+    .rules-box .step { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+    .rules-box .step-num { color: var(--gold); font-weight: 800; min-width: 18px; }
+    .faq-toggle {
+      background: none; border: 1px solid var(--glass-border); border-radius: 10px;
+      padding: 10px 18px; color: var(--gold); font-size: .82rem; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .faq-toggle:active { background: var(--glass); }
+    .faq-box {
+      background: var(--card); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 18px; width: 100%; max-width: 380px; display: none; text-align: left;
+      max-height: 45vh; overflow-y: auto; font-size: .78rem; line-height: 1.6;
+    }
+    .faq-box.open { display: block; animation: slideDown .3s ease; }
+    .faq-box h3 { color: var(--accent); margin: 12px 0 6px; font-size: .82rem; }
+    .faq-box h3:first-child { margin-top: 0; }
+    .faq-q { color: var(--gold); font-weight: 700; margin-top: 8px; }
+    .faq-a { color: var(--text-dim); }
+    .mode-cards { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 340px; }
+    .mode-card {
+      background: var(--card); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 20px; cursor: pointer; transition: all 0.25s; text-align: left; position: relative; overflow: hidden;
+    }
+    .mode-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent, rgba(0,212,255,0.05));
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .mode-card:hover::before, .mode-card:active::before { opacity: 1; }
+    .mode-card:active { transform: scale(0.97); }
+    .mode-card-icon { font-size: 1.8rem; margin-bottom: 8px; }
+    .mode-card-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; }
+    .mode-card-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+
+    /* ── Game Screen ── */
+    .game-body {
+      flex: 1; display: flex; flex-direction: column; padding: 12px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom)); gap: 10px; overflow-y: auto;
+    }
+    .scoreboard { display: flex; gap: 10px; }
+    .player-panel {
+      flex: 1; background: var(--card); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); padding: 12px; text-align: center;
+      transition: all 0.3s; position: relative; overflow: hidden;
+    }
+    .player-panel.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow), inset 0 0 20px rgba(0,212,255,0.05);
+    }
+    .player-panel.active::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .player-name {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px;
+    }
+    .player-panel.active .player-name { color: var(--accent); }
+    .player-score { font-size: 1.6rem; font-weight: 900; color: var(--gold); }
+    .player-badge {
+      display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 8px; background: rgba(0,212,255,0.15); color: var(--accent); margin-top: 4px;
+    }
+
+    .turn-info {
+      background: var(--card); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); padding: 10px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .turn-label {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--text-dim);
+    }
+    .turn-score { font-size: 1.2rem; font-weight: 900; color: var(--accent); }
+    .turn-score.farkle { color: var(--red); animation: shake 0.5s ease; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)}
+      40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+    }
+    .dice-count-badge {
+      font-size: 0.65rem; font-weight: 700; padding: 3px 10px; border-radius: 8px;
+      background: var(--glass); border: 1px solid var(--glass-border); color: var(--text-dim);
+    }
+
+    /* ── Dice Area ── */
+    .dice-area {
+      background: var(--card); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 20px 12px; display: flex; flex-direction: column; align-items: center;
+      gap: 16px; flex-shrink: 0;
+    }
+    .dice-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+    /* 3D Dice */
+    .die {
+      width: 54px; height: 54px; perspective: 300px;
+      cursor: pointer; transition: transform 0.2s;
+    }
+    .die:active { transform: scale(0.93); }
+    .die-inner {
+      width: 100%; height: 100%; position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    .die.rolling .die-inner { animation: diceRoll 0.6s ease-out; }
+    @keyframes diceRoll {
+      0%{transform:rotateX(0) rotateY(0)} 25%{transform:rotateX(180deg) rotateY(90deg)}
+      50%{transform:rotateX(360deg) rotateY(180deg)} 75%{transform:rotateX(540deg) rotateY(270deg)}
+      100%{transform:rotateX(720deg) rotateY(360deg)}
+    }
+    .die-face {
+      width: 100%; height: 100%; background: linear-gradient(145deg, #ffffff, #e8ecf2);
+      border-radius: 10px; display: grid;
+      grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+      padding: 9px;
+      box-shadow: 3px 3px 8px rgba(0,0,0,0.35), -1px -1px 3px rgba(255,255,255,0.08),
+                  inset 0 1px 0 rgba(255,255,255,0.6);
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .die.selected .die-face {
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.3), 0 0 16px var(--accent-glow),
+                  inset 0 0 0 2.5px var(--accent);
+      transform: translateY(3px) scale(0.95);
+    }
+    .die.locked .die-face {
+      background: linear-gradient(145deg, #d1d5db, #c4c9d2);
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+    .die.locked .dot { background: #6b7280; }
+    .dot {
+      width: 10px; height: 10px; background: #1a1a2e; border-radius: 50%;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); justify-self: center; align-self: center;
+    }
+    .dot.hidden { visibility: hidden; }
+
+    .message-area {
+      min-height: 48px; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 0 8px; gap: 4px;
+    }
+    .message {
+      font-size: clamp(0.95rem, 3.5vw, 1.15rem); font-weight: 800; text-align: center;
+      animation: popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    .message.farkle-msg { color: var(--red); text-shadow: 0 0 20px rgba(239,68,68,0.5); }
+    .message.bank-msg { color: var(--green); text-shadow: 0 0 20px rgba(16,185,129,0.5); }
+    .message.hot-msg { color: var(--gold); text-shadow: 0 0 20px rgba(251,191,36,0.5); }
+    @keyframes popIn { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+
+    .guide-toggle {
+      background: none; border: 1px solid var(--glass-border); border-radius: 8px;
+      padding: 6px 14px; color: var(--text-dim); font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 1px; cursor: pointer; font-family: inherit;
+    }
+    .guide-toggle:active { background: var(--glass); }
+    .guide-panel {
+      background: var(--card); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); padding: 12px; display: none;
+      animation: slideDown 0.3s ease;
+    }
+    .guide-panel.open { display: block; }
+    @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .guide-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 8px; border-radius: 6px; background: var(--glass); font-size: 0.7rem;
+    }
+    .guide-item-name { color: var(--text-dim); font-weight: 600; }
+    .guide-item-score { color: var(--gold); font-weight: 800; }
+
+    /* ── Action Buttons ── */
+    .actions {
+      display: flex; gap: 10px; padding: 12px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom)); flex-shrink: 0;
+    }
+    .action-btn {
+      flex: 1; border: none; border-radius: var(--radius-sm); padding: 14px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 800; letter-spacing: 1px;
+      text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .action-btn:active { transform: scale(0.96); }
+    .action-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn-roll {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    .btn-bank {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff; box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+    }
+
+    /* ── Game Over ── */
+    #gameover-screen { align-items: center; justify-content: center; gap: 28px; padding: 24px; }
+    .winner-trophy { font-size: 4rem; animation: float 2s ease-in-out infinite; }
+    .winner-text { font-size: 1.6rem; font-weight: 900; text-align: center; }
+    .winner-score {
+      font-size: 2.5rem; font-weight: 900; color: var(--gold);
+      text-shadow: 0 0 30px rgba(251,191,36,0.3);
+    }
+    .final-scores { display: flex; gap: 16px; width: 100%; max-width: 340px; }
+    .final-player {
+      flex: 1; background: var(--card); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); padding: 16px; text-align: center;
+    }
+    .final-player.winner {
+      border-color: var(--gold); box-shadow: 0 0 20px rgba(251,191,36,0.15);
+    }
+    .gameover-actions {
+      display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px;
+    }
+    .go-btn {
+      border: none; border-radius: var(--radius-sm); padding: 14px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 800; letter-spacing: 1px;
+      text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+    }
+    .go-btn:active { transform: scale(0.96); }
+    .go-btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .go-btn.secondary { background: var(--glass); border: 1px solid var(--glass-border); color: var(--text); }
+
+    /* ── Pause Overlay ── */
+    .overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .overlay.active { display: flex; }
+    .overlay-bg {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .overlay-content {
+      position: relative; z-index: 1; background: var(--bg2);
+      border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 28px 24px; width: 90%; max-width: 320px; text-align: center;
+      animation: popIn 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    .overlay-title { font-size: 1.3rem; font-weight: 900; margin-bottom: 20px; letter-spacing: 2px; }
+    .overlay-btn {
+      display: block; width: 100%; border: none; border-radius: var(--radius-sm);
+      padding: 13px; margin-bottom: 10px; font-family: inherit; font-size: 0.85rem;
+      font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .overlay-btn:active { transform: scale(0.96); }
+    .overlay-btn.resume { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .overlay-btn.setting { background: var(--glass); border: 1px solid var(--glass-border); color: var(--text); }
+    .overlay-btn.danger { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.2); color: var(--red); }
+
+    /* ── Settings Panel ── */
+    .settings-panel {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 300px; max-width: 85vw;
+      background: var(--bg2); border-left: 1px solid var(--glass-border); z-index: 300;
+      transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column; padding: 20px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+    .settings-panel.open { transform: translateX(0); }
+    .settings-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 299; }
+    .settings-backdrop.open { display: block; }
+    .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .settings-title { font-size: 1.1rem; font-weight: 900; letter-spacing: 2px; }
+    .settings-close {
+      background: var(--glass); border: 1px solid var(--glass-border); border-radius: 50%;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      color: var(--text); cursor: pointer; font-size: 1rem;
+    }
+    .setting-group { margin-bottom: 20px; }
+    .setting-label {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .setting-options { display: flex; gap: 6px; flex-wrap: wrap; }
+    .setting-opt {
+      flex: 1; min-width: 60px; border: 1px solid var(--glass-border); border-radius: 8px;
+      padding: 8px 6px; background: var(--glass); color: var(--text-dim); font-family: inherit;
+      font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .setting-opt.selected { border-color: var(--accent); background: rgba(0,212,255,0.15); color: var(--accent); }
+    .setting-opt:active { transform: scale(0.95); }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+    .toggle-label { font-size: 0.85rem; font-weight: 600; }
+    .toggle {
+      width: 48px; height: 28px; border-radius: 14px; background: rgba(255,255,255,0.1);
+      border: none; cursor: pointer; position: relative; transition: background 0.3s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+      border-radius: 50%; background: #fff; transition: transform 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .toggle.on::after { transform: translateX(20px); }
+
+    .bot-thinking {
+      display: none; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px; color: var(--text-dim); font-size: 0.85rem; font-weight: 600;
+    }
+    .bot-thinking.active { display: flex; }
+    .dots span {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); animation: dotBounce 1.2s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotBounce { 0%,80%,100%{transform:translateY(0);opacity:0.4} 40%{transform:translateY(-6px);opacity:1} }
+
+    @media (min-width: 600px) {
+      .die { width: 62px; height: 62px; }
+      .dice-row { gap: 14px; }
+      .game-body { padding: 16px 24px; max-width: 600px; margin: 0 auto; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════ START SCREEN ═══════ -->
+  <div id="start-screen" class="screen active">
+    <div class="logo-area">
+      <div class="logo-dice">🎲</div>
+      <div class="logo-title">Farkle</div>
+      <div class="logo-sub">Roll the dice. Risk it all.</div>
+    </div>
+    <button class="rules-toggle" onclick="document.querySelector('.rules-box').classList.toggle('open')">📜 How to Play</button>
+    <div class="rules-box">
+      <h3>Goal</h3>
+      Be the first to reach the winning score (default 10,000) by rolling dice and banking points.
+      <h3>Each Turn</h3>
+      <div class="step"><span class="step-num">1.</span><span><b>Roll</b> all 6 dice.</span></div>
+      <div class="step"><span class="step-num">2.</span><span><b>Select</b> scoring dice by tapping them. Selected dice glow blue.</span></div>
+      <div class="step"><span class="step-num">3.</span><span><b>Roll again</b> with the remaining dice, or <b>Bank</b> your turn score.</span></div>
+      <div class="step"><span class="step-num">4.</span><span>If you score ALL 6 dice (<b>Hot Dice</b>), you keep all points and roll all 6 again!</span></div>
+      <div class="step"><span class="step-num">5.</span><span>If you roll and get <b>no scoring dice</b> (<b>Farkle</b>), you lose your turn score!</span></div>
+      <h3>Scoring</h3>
+      <table>
+        <tr><th>Combination</th><th>Points</th></tr>
+        <tr><td>Each ⚀ (1)</td><td>100</td></tr>
+        <tr><td>Each ⚄ (5)</td><td>50</td></tr>
+        <tr><td>Three ⚀ (1s)</td><td>1,000</td></tr>
+        <tr><td>Three of a kind</td><td>Face × 100</td></tr>
+        <tr><td>Three pairs</td><td>1,500</td></tr>
+        <tr><td>Straight (1-2-3-4-5-6)</td><td>3,000</td></tr>
+        <tr><td>4 / 5 / 6 of a kind</td><td>Face × 200 / 300 / 400</td></tr>
+      </table>
+      <h3>Key Rules</h3>
+      You must score <b>at least 500</b> in a single turn before you can bank. You can keep rolling as long as you score at least one die each roll. Strategy: know when to push your luck and when to bank!
+    </div>
+
+    <button class="faq-toggle" onclick="document.querySelector('.faq-box').classList.toggle('open')">❓ FAQ</button>
+    <div class="faq-box">
+      <h3>General</h3>
+      <div class="faq-q">What is Farkle?</div>
+      <div class="faq-a">Farkle is a dice game where you roll 6 dice, select scoring combinations, and decide whether to bank your points or keep rolling for more. First to the winning score (default 10,000) wins!</div>
+      <div class="faq-q">What does "Farkle" mean?</div>
+      <div class="faq-a">A Farkle happens when you roll and get no scoring dice at all. You lose your entire turn score for that round!</div>
+      <h3>Scoring</h3>
+      <div class="faq-q">How do I score points?</div>
+      <div class="faq-a">Tap dice to select them. Only certain combinations score: each 1 = 100pts, each 5 = 50pts, three of a kind = face × 100 (three 1s = 1,000), three pairs = 1,500, straight = 3,000.</div>
+      <div class="faq-q">What is Hot Dice?</div>
+      <div class="faq-a">If you select ALL 6 dice as scoring, you keep the points and get to roll all 6 dice again for free!</div>
+      <div class="faq-q">Why is the Bank button greyed out?</div>
+      <div class="faq-a">You need to score at least 500 points in a single turn before you can bank. Select scoring dice until your turn score reaches 500+.</div>
+      <h3>Tips</h3>
+      <div class="faq-q">When should I bank?</div>
+      <div class="faq-a">It depends on risk! Banking early secures points. Rolling more dice has a higher Farkle risk. Generally, bank when you have 500+ and few dice left to roll.</div>
+      <div class="faq-q">What's the best strategy?</div>
+      <div class="faq-a">Always select 1s and 5s first. If you have 3+ dice left, it's usually safe to roll again. With 1-2 dice left, the Farkle risk is high — consider banking.</div>
+    </div>
+
+    <div class="mode-cards">
+      <div class="mode-card" onclick="startGame('bot')">
+        <div class="mode-card-icon">🤖</div>
+        <div class="mode-card-title">vs Smart Bot</div>
+        <div class="mode-card-desc">Challenge an AI that calculates risk and adapts to your playstyle.</div>
+      </div>
+      <div class="mode-card" onclick="startGame('local')">
+        <div class="mode-card-icon">👥</div>
+        <div class="mode-card-title">Local Multiplayer</div>
+        <div class="mode-card-desc">Pass and play with a friend on the same device.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ GAME SCREEN ═══════ -->
+  <div id="game-screen" class="screen">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="top-btn" onclick="goHome()" aria-label="Home">←</button>
+        <span class="topbar-title">Farkle</span>
+      </div>
+      <div class="topbar-right">
+        <button class="top-btn" onclick="toggleSettings()" aria-label="Settings">⚙</button>
+        <button class="top-btn" onclick="togglePause()" aria-label="Pause">⏸</button>
+      </div>
+    </div>
+
+    <div class="game-body">
+      <div class="scoreboard" id="scoreboard"></div>
+
+      <div class="turn-info">
+        <div>
+          <div class="turn-label">Turn Score</div>
+          <div class="turn-score" id="turn-score">0</div>
+        </div>
+        <div class="dice-count-badge" id="dice-count">6 dice left</div>
+      </div>
+
+      <div class="dice-area">
+        <div class="dice-row" id="dice-row"></div>
+        <div class="message-area">
+          <div class="message" id="game-message"></div>
+          <div id="game-hint" style="display:none; font-size:.72rem; color:var(--text-dim); margin-top:4px; font-weight:600;"></div>
+        </div>
+        <div class="bot-thinking" id="bot-thinking">
+          Bot is thinking<span class="dots"><span></span><span></span><span></span></span>
+        </div>
+        <button class="guide-toggle" onclick="toggleGuide()">📜 Scoring Guide</button>
+        <div class="guide-panel" id="guide-panel">
+          <div class="guide-grid">
+            <div class="guide-item"><span class="guide-item-name">Each 1</span><span class="guide-item-score">100</span></div>
+            <div class="guide-item"><span class="guide-item-name">Each 5</span><span class="guide-item-score">50</span></div>
+            <div class="guide-item"><span class="guide-item-name">Three 1s</span><span class="guide-item-score">1,000</span></div>
+            <div class="guide-item"><span class="guide-item-name">Three of a kind</span><span class="guide-item-score">Face x100</span></div>
+            <div class="guide-item"><span class="guide-item-name">Three pairs</span><span class="guide-item-score">1,500</span></div>
+            <div class="guide-item"><span class="guide-item-name">Straight (1-6)</span><span class="guide-item-score">3,000</span></div>
+            <div class="guide-item"><span class="guide-item-name">Four of a kind</span><span class="guide-item-score">Face x200</span></div>
+            <div class="guide-item"><span class="guide-item-name">Five of a kind</span><span class="guide-item-score">Face x300</span></div>
+            <div class="guide-item"><span class="guide-item-name">Six of a kind</span><span class="guide-item-score">Face x400</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="action-btn btn-roll" id="btn-roll" onclick="rollDice()">🎲 Roll Dice</button>
+      <button class="action-btn btn-bank" id="btn-bank" onclick="bankScore()" disabled>💰 Bank 0</button>
+    </div>
+  </div>
+
+  <!-- ═══════ GAME OVER SCREEN ═══════ -->
+  <div id="gameover-screen" class="screen">
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-text" id="winner-text">Player Wins!</div>
+    <div class="winner-score" id="winner-score">10,000</div>
+    <div class="final-scores" id="final-scores"></div>
+    <div class="gameover-actions">
+      <button class="go-btn primary" onclick="restartGame()">Play Again</button>
+      <button class="go-btn secondary" onclick="goHome()">Back to Menu</button>
+    </div>
+  </div>
+
+  <!-- ═══════ PAUSE OVERLAY ═══════ -->
+  <div class="overlay" id="pause-overlay">
+    <div class="overlay-bg" onclick="togglePause()"></div>
+    <div class="overlay-content">
+      <div class="overlay-title">⏸ Paused</div>
+      <button class="overlay-btn resume" onclick="togglePause()">▶ Resume</button>
+      <button class="overlay-btn setting" onclick="toggleSettings();togglePause();">⚙ Settings</button>
+      <button class="overlay-btn setting" onclick="restartGame();togglePause();">🔄 Restart</button>
+      <button class="overlay-btn danger" onclick="goHome()">✕ Quit</button>
+    </div>
+  </div>
+
+  <!-- ═══════ SETTINGS PANEL ═══════ -->
+  <div class="settings-backdrop" id="settings-backdrop" onclick="toggleSettings()"></div>
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title">⚙ Settings</span>
+      <button class="settings-close" onclick="toggleSettings()">✕</button>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Winning Score</div>
+      <div class="setting-options" id="opt-score">
+        <button class="setting-opt" data-val="5000" onclick="setSetting('score',5000)">5K</button>
+        <button class="setting-opt selected" data-val="10000" onclick="setSetting('score',10000)">10K</button>
+        <button class="setting-opt" data-val="15000" onclick="setSetting('score',15000)">15K</button>
+        <button class="setting-opt" data-val="20000" onclick="setSetting('score',20000)">20K</button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Bot Difficulty</div>
+      <div class="setting-options" id="opt-difficulty">
+        <button class="setting-opt" data-val="easy" onclick="setSetting('difficulty','easy')">Easy</button>
+        <button class="setting-opt selected" data-val="smart" onclick="setSetting('difficulty','smart')">Smart</button>
+        <button class="setting-opt" data-val="aggressive" onclick="setSetting('difficulty','aggressive')">Hard</button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Animation Speed</div>
+      <div class="setting-options" id="opt-speed">
+        <button class="setting-opt" data-val="fast" onclick="setSetting('speed','fast')">Fast</button>
+        <button class="setting-opt selected" data-val="normal" onclick="setSetting('speed','normal')">Normal</button>
+        <button class="setting-opt" data-val="slow" onclick="setSetting('speed','slow')">Slow</button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="toggle-row">
+        <span class="toggle-label">Sound Effects</span>
+        <button class="toggle on" id="toggle-sound" onclick="toggleSound()"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Haptic Feedback</span>
+        <button class="toggle on" id="toggle-haptic" onclick="toggleHaptic()"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ GAME LOGIC ═══════ -->
+  <script>
+  (function() {
+    'use strict';
+
+    let settings = { score: 10000, difficulty: 'smart', speed: 'normal', sound: true, haptic: true };
+    let gameMode = 'bot';
+    let players = [];
+    let currentPlayer = 0;
+    let dice = [];
+    let selectedDice = [];
+    let turnScore = 0;
+    let hasScoredThisTurn = false;
+    let gameOver = false;
+    let paused = false;
+    let rolling = false;
+
+    const DICE_COUNT = 6;
+    const SPEED_MS = { fast: 350, normal: 600, slow: 900 };
+
+    const screens = {
+      start: document.getElementById('start-screen'),
+      game: document.getElementById('game-screen'),
+      gameover: document.getElementById('gameover-screen')
+    };
+    const scoreboardEl = document.getElementById('scoreboard');
+    const diceRow = document.getElementById('dice-row');
+    const turnScoreEl = document.getElementById('turn-score');
+    const diceCountEl = document.getElementById('dice-count');
+    const messageEl = document.getElementById('game-message');
+    const botThinkingEl = document.getElementById('bot-thinking');
+    const btnRoll = document.getElementById('btn-roll');
+    const btnBank = document.getElementById('btn-bank');
+
+    function showScreen(name) {
+      Object.values(screens).forEach(s => s.classList.remove('active'));
+      screens[name].classList.add('active');
+    }
+    function haptic(ms) { if (settings.haptic && navigator.vibrate) navigator.vibrate(ms || 10); }
+    function fmt(n) { return n.toLocaleString(); }
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function rollOne() { return Math.floor(Math.random() * 6) + 1; }
+    function rollAll(c) { const a = []; for (let i = 0; i < (c || DICE_COUNT); i++) a.push(rollOne()); return a; }
+
+    /* ── Scoring ── */
+    function findScoringCombinations(dv) {
+      const counts = [0,0,0,0,0,0];
+      dv.forEach(d => counts[d - 1]++);
+      const combos = [];
+
+      if (dv.length === 6 && counts.every(c => c === 1)) {
+        combos.push({ indices: [0,1,2,3,4,5], score: 3000, label: 'Straight!' });
+        return combos;
+      }
+      if (dv.length === 6) {
+        const pairs = counts.filter(c => c === 2).length;
+        if (pairs === 3) {
+          const idxs = []; const used = new Set();
+          for (let f = 0; f < 6; f++) {
+            let cnt = 0;
+            for (let i = 0; i < dv.length && cnt < 2; i++) {
+              if (dv[i] === f + 1 && !used.has(i)) { idxs.push(i); used.add(i); cnt++; }
+            }
+          }
+          combos.push({ indices: idxs, score: 1500, label: 'Three Pairs' });
+        }
+      }
+      for (let f = 0; f < 6; f++) {
+        if (counts[f] >= 3) {
+          const bv = f === 0 ? 1000 : (f + 1) * 100;
+          const m = counts[f] === 3 ? 1 : counts[f] === 4 ? 2 : counts[f] === 5 ? 3 : 4;
+          const idxs = [];
+          for (let i = 0; i < dv.length && idxs.length < counts[f]; i++) {
+            if (dv[i] === f + 1) idxs.push(i);
+          }
+          combos.push({ indices: idxs, score: bv * m, label: counts[f] + 'x' + (f + 1) });
+        }
+      }
+      if (counts[0] > 0 && counts[0] < 3) {
+        const idxs = [];
+        for (let i = 0; i < dv.length && idxs.length < counts[0]; i++) {
+          if (dv[i] === 1) idxs.push(i);
+        }
+        combos.push({ indices: idxs, score: counts[0] * 100, label: counts[0] + 'x1' });
+      }
+      if (counts[4] > 0 && counts[4] < 3) {
+        const idxs = [];
+        for (let i = 0; i < dv.length && idxs.length < counts[4]; i++) {
+          if (dv[i] === 5) idxs.push(i);
+        }
+        combos.push({ indices: idxs, score: counts[4] * 50, label: counts[4] + 'x5' });
+      }
+      return combos;
+    }
+
+    function bestScoringCombo(dv) {
+      const c = findScoringCombinations(dv);
+      if (!c.length) return null;
+      c.sort((a, b) => b.score - a.score);
+      return c[0];
+    }
+    function hasAnyScore(dv) { return findScoringCombinations(dv).length > 0; }
+
+    /* ── Rendering ── */
+    function renderScoreboard() {
+      scoreboardEl.innerHTML = players.map(function(p, i) {
+        return '<div class="player-panel ' + (i === currentPlayer ? 'active' : '') + '">' +
+          '<div class="player-name">' + p.name + '</div>' +
+          '<div class="player-score">' + fmt(p.score) + '</div>' +
+          (p.onBoard ? '' : '<div class="player-badge">Need 500</div>') +
+          '</div>';
+      }).join('');
+    }
+
+    function dieDotsHTML(val) {
+      var grids = [
+        [0,0,0,0,1,0,0,0,0],
+        [0,0,1,0,0,0,1,0,0],
+        [0,0,1,0,1,0,1,0,0],
+        [1,0,1,0,0,0,1,0,1],
+        [1,0,1,0,1,0,1,0,1],
+        [1,0,1,1,0,1,1,0,1]
+      ];
+      var g = grids[val - 1];
+      return g.map(function(on) {
+        return '<div class="dot' + (on ? '' : ' hidden') + '"></div>';
+      }).join('');
+    }
+
+    function renderDice() {
+      diceRow.innerHTML = dice.map(function(val, i) {
+        var sel = selectedDice.indexOf(i) >= 0;
+        var cls = 'die';
+        if (sel) cls += ' selected';
+        if (rolling) cls += ' rolling';
+        return '<div class="' + cls + '" onclick="selectDie(' + i + ')">' +
+          '<div class="die-inner"><div class="die-face">' + dieDotsHTML(val) + '</div></div></div>';
+      }).join('');
+    }
+
+    function updateTurnInfo() {
+      turnScoreEl.textContent = fmt(turnScore);
+      var rem = DICE_COUNT - selectedDice.length;
+      diceCountEl.textContent = rem === 0 ? 'Hot Dice!' : rem + ' dice left';
+    }
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = 'message' + (type ? ' ' + type + '-msg' : '');
+    }
+    function clearMessage() { messageEl.textContent = ''; messageEl.className = 'message'; }
+
+    function showHint(text) {
+      var hintEl = document.getElementById('game-hint');
+      if (hintEl) { hintEl.textContent = text; hintEl.style.display = text ? 'block' : 'none'; }
+    }
+    function clearHint() { showHint(''); }
+
+    function updateButtons() {
+      var rem = DICE_COUNT - selectedDice.length;
+      var isBotTurn = gameMode === 'bot' && currentPlayer === 1;
+      var canRoll = rem > 0 && !rolling && !gameOver && !isBotTurn;
+      var canBank = turnScore >= 500 && hasScoredThisTurn && !rolling && !gameOver && !isBotTurn;
+
+      btnRoll.disabled = !canRoll;
+      btnBank.disabled = !canBank;
+
+      // Dynamic button text
+      if (rem === 0 && !rolling) {
+        btnRoll.textContent = '🎲 Hot Dice!';
+      } else if (canRoll) {
+        btnRoll.textContent = '🎲 Roll ' + rem;
+      } else {
+        btnRoll.textContent = '🎲 Roll';
+      }
+
+      if (canBank) {
+        btnBank.textContent = '💰 Bank ' + fmt(turnScore);
+      } else if (turnScore > 0 && !hasScoredThisTurn) {
+        btnBank.textContent = '💰 Need 500';
+      } else {
+        btnBank.textContent = '💰 Bank 0';
+      }
+    }
+
+    /* ── Die Selection ── */
+    window.selectDie = function(idx) {
+      if (rolling || gameOver || paused || (gameMode === 'bot' && currentPlayer === 1)) return;
+      var i = selectedDice.indexOf(idx);
+      if (i >= 0) selectedDice.splice(i, 1); else selectedDice.push(idx);
+      haptic(8);
+      recalcTurnScore();
+      renderDice();
+      updateTurnInfo();
+      updateButtons();
+    };
+
+    function recalcTurnScore() {
+      if (!selectedDice.length) { turnScore = 0; hasScoredThisTurn = false; return; }
+      var sv = selectedDice.map(function(i) { return dice[i]; });
+      var combo = bestScoringCombo(sv);
+      if (combo && combo.indices.length === sv.length) {
+        turnScore = combo.score;
+        hasScoredThisTurn = true;
+      } else if (combo) {
+        var valid = selectedDice.filter(function(di, si) { return combo.indices.indexOf(si) >= 0; });
+        var vv = valid.map(function(i) { return dice[i]; });
+        var sc = bestScoringCombo(vv);
+        turnScore = sc ? sc.score : 0;
+        hasScoredThisTurn = turnScore > 0;
+      } else {
+        turnScore = 0;
+        hasScoredThisTurn = false;
+      }
+    }
+
+    /* ── Roll ── */
+    window.rollDice = async function() {
+      if (rolling || gameOver || paused || (gameMode === 'bot' && currentPlayer === 1)) return;
+      rolling = true;
+      updateButtons();
+      haptic(15);
+
+      var rem = DICE_COUNT - selectedDice.length;
+      if (rem === 0) {
+        selectedDice = [];
+        showMessage('\uD83D\uDD25 Hot Dice! Roll all 6!', 'hot');
+        await delay(800);
+        clearMessage();
+      }
+
+      var nd = rollAll(DICE_COUNT - selectedDice.length);
+      var ni = 0;
+      for (var i = 0; i < DICE_COUNT; i++) {
+        if (selectedDice.indexOf(i) < 0) dice[i] = nd[ni++];
+      }
+      renderDice();
+      await delay(SPEED_MS[settings.speed]);
+      rolling = false;
+      renderDice();
+
+      var unselected = dice.filter(function(_, i) { return selectedDice.indexOf(i) < 0; });
+      if (!hasAnyScore(unselected)) {
+        showMessage('\uD83D\uDC80 FARKLE! No scoring dice!', 'farkle');
+        haptic(100);
+        turnScore = 0;
+        hasScoredThisTurn = false;
+        selectedDice = [];
+        clearHint();
+        updateTurnInfo();
+        updateButtons();
+        await delay(1500);
+        nextTurn();
+        return;
+      }
+      clearMessage();
+      updateButtons();
+      updateTurnInfo();
+      showHint('Tap scoring dice to select them, then Roll again or Bank');
+
+      if (gameMode === 'bot' && currentPlayer === 1) await botTurn();
+    };
+
+    /* ── Bank ── */
+    window.bankScore = async function() {
+      if (rolling || gameOver || paused || (gameMode === 'bot' && currentPlayer === 1)) return;
+      haptic(20);
+      var s = turnScore;
+      players[currentPlayer].score += s;
+      if (!players[currentPlayer].onBoard && s >= 500) players[currentPlayer].onBoard = true;
+      showMessage('\uD83D\uDCB0 Banked ' + fmt(s) + '!', 'bank');
+      clearHint();
+      await delay(1200);
+      if (players[currentPlayer].score >= settings.score) { endGame(); return; }
+      nextTurn();
+    };
+
+    /* ── Turn Management ── */
+    function nextTurn() {
+      currentPlayer = (currentPlayer + 1) % players.length;
+      turnScore = 0;
+      hasScoredThisTurn = false;
+      selectedDice = [];
+      dice = rollAll(DICE_COUNT);
+      clearMessage();
+      clearHint();
+      renderScoreboard();
+      renderDice();
+      updateTurnInfo();
+      updateButtons();
+      if (gameMode === 'bot' && currentPlayer === 1) {
+        setTimeout(function() { botTurn(); }, 800);
+      } else {
+        showHint('Tap Roll to start your turn');
+      }
+    }
+
+    /* ── Bot AI ── */
+    async function botTurn() {
+      if (gameOver || paused) return;
+      botThinkingEl.classList.add('active');
+      updateButtons();
+      await delay(1000 + Math.random() * 800);
+
+      var iter = 0;
+      while (!gameOver && iter < 10) {
+        iter++;
+        var rem = DICE_COUNT - selectedDice.length;
+
+        if (rem === 0) {
+          selectedDice = [];
+          dice = rollAll(DICE_COUNT);
+          renderDice();
+          await delay(SPEED_MS[settings.speed]);
+          var u = dice.filter(function(_, i) { return selectedDice.indexOf(i) < 0; });
+          if (!hasAnyScore(u)) {
+            showMessage('\uD83D\uDC80 FARKLE!', 'farkle');
+            haptic(100);
+            turnScore = 0; hasScoredThisTurn = false; selectedDice = [];
+            updateTurnInfo();
+            await delay(1200);
+            break;
+          }
+          continue;
+        }
+
+        var nd = rollAll(rem);
+        var ni = 0;
+        for (var i = 0; i < DICE_COUNT; i++) {
+          if (selectedDice.indexOf(i) < 0) dice[i] = nd[ni++];
+        }
+        renderDice();
+        await delay(SPEED_MS[settings.speed]);
+
+        var ui = [];
+        for (var j = 0; j < DICE_COUNT; j++) {
+          if (selectedDice.indexOf(j) < 0) ui.push(j);
+        }
+        var uv = ui.map(function(x) { return dice[x]; });
+
+        if (!hasAnyScore(uv)) {
+          showMessage('\uD83D\uDC80 FARKLE!', 'farkle');
+          haptic(100);
+          turnScore = 0; hasScoredThisTurn = false; selectedDice = [];
+          updateTurnInfo();
+          await delay(1200);
+          break;
+        }
+
+        var combo = bestScoringCombo(uv);
+        if (combo) {
+          combo.indices.forEach(function(si) { selectedDice.push(ui[si]); });
+        }
+        recalcTurnScore();
+        renderDice();
+        updateTurnInfo();
+
+        if (botDecide() === 'bank') { await delay(400); break; }
+      }
+
+      botThinkingEl.classList.remove('active');
+
+      if (turnScore >= 500 && hasScoredThisTurn) {
+        showMessage('\uD83E\uDD16 Bot banks ' + fmt(turnScore) + '!', 'bank');
+        haptic(20);
+        players[currentPlayer].score += turnScore;
+        players[currentPlayer].onBoard = true;
+        await delay(1200);
+        if (players[currentPlayer].score >= settings.score) { endGame(); return; }
+      } else {
+        showMessage('\uD83E\uDD16 Bot passes', 'farkle');
+        await delay(800);
+      }
+      nextTurn();
+    }
+
+    function botDecide() {
+      var rem = DICE_COUNT - selectedDice.length;
+      var ps = players[currentPlayer].score;
+      var os = players[0].score;
+      var gap = os - ps;
+
+      if (settings.difficulty === 'easy') {
+        if (turnScore >= 500 && Math.random() < 0.4) return 'bank';
+        if (rem <= 2 && turnScore >= 300 && Math.random() < 0.6) return 'bank';
+        return 'roll';
+      }
+      if (settings.difficulty === 'aggressive') {
+        if (turnScore >= 1500) return 'bank';
+        if (rem <= 1 && turnScore >= 800) return 'bank';
+        return 'roll';
+      }
+
+      var farkleProbs = [0, 0, 0.03, 0.08, 0.16, 0.28, 0.42];
+      var fp = farkleProbs[rem] || 0.5;
+      var eg = rem * 80;
+      var ag = 1.0;
+      if (gap > 3000) ag = 1.6;
+      else if (gap > 1500) ag = 1.3;
+      else if (gap > 500) ag = 1.1;
+
+      if (ps + turnScore >= settings.score - 500) return 'bank';
+
+      var thresholds = { 6: 300, 5: 400, 4: 500, 3: 600, 2: 800, 1: 1000 };
+      var th = (thresholds[rem] || 500) / ag;
+
+      if (turnScore >= th && turnScore >= 500) return 'bank';
+      if (rem <= 2 && turnScore >= 600) return 'bank';
+      if (rem === 1 && turnScore >= 400) return 'bank';
+
+      if (eg * (1 - fp) * ag > turnScore * 0.5) return 'roll';
+      return turnScore >= 500 ? 'bank' : 'roll';
+    }
+
+    /* ── Game Flow ── */
+    window.startGame = function(mode) {
+      gameMode = mode;
+      players = [
+        { name: 'Player 1', score: 0, onBoard: false },
+        { name: mode === 'bot' ? 'Smart Bot' : 'Player 2', score: 0, onBoard: false }
+      ];
+      currentPlayer = 0;
+      turnScore = 0;
+      hasScoredThisTurn = false;
+      selectedDice = [];
+      gameOver = false;
+      paused = false;
+      rolling = false;
+      dice = rollAll(DICE_COUNT);
+      renderScoreboard();
+      renderDice();
+      updateTurnInfo();
+      updateButtons();
+      clearMessage();
+      showHint('Tap Roll to start your turn');
+      showScreen('game');
+    };
+
+    window.restartGame = function() {
+      startGame(gameMode);
+      document.getElementById('pause-overlay').classList.remove('active');
+    };
+
+    function endGame() {
+      gameOver = true;
+      var w = players.reduce(function(a, b) { return a.score > b.score ? a : b; });
+      document.getElementById('winner-text').textContent = w.name + ' Wins!';
+      document.getElementById('winner-score').textContent = fmt(w.score);
+      document.getElementById('final-scores').innerHTML = players.map(function(p) {
+        return '<div class="final-player ' + (p === w ? 'winner' : '') + '">' +
+          '<div class="player-name">' + p.name + '</div>' +
+          '<div class="player-score" style="font-size:1.3rem;margin-top:6px;">' + fmt(p.score) + '</div></div>';
+      }).join('');
+      showScreen('gameover');
+    }
+
+    window.togglePause = function() {
+      if (gameOver) return;
+      paused = !paused;
+      document.getElementById('pause-overlay').classList.toggle('active', paused);
+    };
+
+    window.toggleSettings = function() {
+      var p = document.getElementById('settings-panel');
+      var b = document.getElementById('settings-backdrop');
+      var o = p.classList.contains('open');
+      p.classList.toggle('open', !o);
+      b.classList.toggle('open', !o);
+    };
+
+    window.setSetting = function(k, v) {
+      settings[k] = v;
+      var g = k === 'score' ? 'opt-score' : k === 'difficulty' ? 'opt-difficulty' : 'opt-speed';
+      document.querySelectorAll('#' + g + ' .setting-opt').forEach(function(btn) {
+        btn.classList.toggle('selected', String(btn.dataset.val) === String(v));
+      });
+      haptic(8);
+    };
+
+    window.toggleSound = function() {
+      settings.sound = !settings.sound;
+      document.getElementById('toggle-sound').classList.toggle('on', settings.sound);
+      haptic(8);
+    };
+
+    window.toggleHaptic = function() {
+      settings.haptic = !settings.haptic;
+      document.getElementById('toggle-haptic').classList.toggle('on', settings.haptic);
+    };
+
+    window.toggleGuide = function() {
+      document.getElementById('guide-panel').classList.toggle('open');
+    };
+
+    window.goHome = function() {
+      document.getElementById('pause-overlay').classList.remove('active');
+      document.getElementById('settings-panel').classList.remove('open');
+      document.getElementById('settings-backdrop').classList.remove('open');
+      showScreen('start');
+    };
+
+    document.addEventListener('keydown', function(e) {
+      if (gameOver || paused || !screens.game.classList.contains('active')) return;
+      if (gameMode === 'bot' && currentPlayer === 1) return;
+      if (e.key === 'r' || e.key === 'R' || e.key === ' ') { e.preventDefault(); rollDice(); }
+      else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); bankScore(); }
+      else if (e.key === 'Escape') togglePause();
+    });
+
+    dice = [1,2,3,4,5,6];
+    renderDice();
+    diceRow.innerHTML = '';
+  })();
+  </script>
+  <script src="top_buttons.js"></script>
+</body>
+</html>

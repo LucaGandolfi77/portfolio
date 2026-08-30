@@ -1,207 +1,277 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Camera – JPEG Compression Preview</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Camera — JPEG Compression Preview</title>
 <style>
-  :root { --bar-offset: 36px; }
-  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#06121a; color:#e6eef9; -webkit-font-smoothing:antialiased; }
-  .wrap { padding-top: var(--bar-offset); display:flex; min-height:100vh; align-items:center; justify-content:center; box-sizing:border-box; }
-  .stage { width:100%; max-width:940px; margin:20px; background:#071920; border-radius:12px; box-shadow:0 6px 30px rgba(0,0,0,0.6); overflow:hidden; }
-  .preview, .results { padding:16px; display:flex; flex-direction:column; gap:12px; }
-  .video-wrap { position:relative; width:100%; aspect-ratio:16/9; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
-  video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); } /* mirrored for user camera */
-  canvas { display:none; }
-  .controls { display:flex; gap:8px; align-items:center; justify-content:center; }
-  .btn { background:#0b66d7; color:#fff; border:0; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
-  .btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); }
-  .results-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
-  .card { background:#081b23; padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:8px; align-items:center; }
-  .thumb { width:100%; height:160px; object-fit:cover; border-radius:6px; background:#000; }
-  .meta { font-size:0.85rem; color:#cfefff; }
-  .small { font-size:0.8rem; color:#9fbecf; }
-  .top-actions { display:flex; justify-content:space-between; gap:8px; align-items:center; }
-  .note { font-size:0.85rem; color:#9fbecf; text-align:center; }
-  @media (max-width:600px){ .thumb{height:120px} .controls{flex-wrap:wrap} }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #0a1628; color: #e2e8f0;
+    height: 100dvh; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  .stage {
+    position: fixed; inset: 0; opacity: 0; pointer-events: none;
+    transition: opacity 0.35s ease; z-index: 1;
+  }
+  .stage.active { opacity: 1; pointer-events: all; z-index: 10; }
+
+  #cameraStage { background: #000; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .float-top {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+    z-index: 50; pointer-events: none;
+  }
+  .float-top > * { pointer-events: all; }
+  .float-bottom {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+    z-index: 50; pointer-events: none;
+  }
+  .float-bottom > * { pointer-events: all; }
+
+  .glass-icon {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(10,22,40,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 1.15rem; transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .glass-icon:active { transform: scale(0.9); background: rgba(10,22,40,0.7); }
+
+  .glass-pill {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(10,22,40,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; padding: 8px 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+  .glass-btn {
+    border: none; border-radius: 20px; padding: 10px 20px;
+    font-family: inherit; font-size: 0.85rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.3px; white-space: nowrap;
+  }
+  .glass-btn:active { transform: scale(0.94); }
+  .glass-btn.primary {
+    background: linear-gradient(135deg, #00d4ff, #0ea5e9); color: #fff;
+    box-shadow: 0 4px 16px rgba(0,212,255,0.25);
+  }
+  .glass-btn.ghost {
+    background: rgba(255,255,255,0.08); color: #e2e8f0;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .glass-btn.small { padding: 7px 14px; font-size: 0.78rem; border-radius: 14px; }
+  .glass-badge {
+    background: rgba(10,22,40,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 6px 14px;
+    font-size: 0.78rem; font-weight: 600; color: rgba(226,232,240,0.7); letter-spacing: 0.3px;
+  }
+
+  #resultsStage { background: #0a1628; }
+  .results-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .results-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(10,22,40,0.4) 0%, rgba(10,22,40,0.15) 30%, rgba(10,22,40,0.3) 70%, rgba(10,22,40,0.85) 100%);
+  }
+  .results-top {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px; z-index: 60;
+  }
+  .results-top-center { display: flex; align-items: center; gap: 8px; }
+
+  .variant-strip {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; gap: 12px; padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    z-index: 60; scrollbar-width: none;
+  }
+  .variant-strip::-webkit-scrollbar { display: none; }
+
+  .variant-card {
+    flex: 0 0 155px; scroll-snap-align: start;
+    background: rgba(10,22,40,0.65); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3); transition: transform 0.2s;
+  }
+  .variant-card:active { transform: scale(0.96); }
+  .variant-thumb { width: 100%; height: 110px; object-fit: cover; display: block; background: #000; }
+  .variant-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .variant-quality { font-size: 0.8rem; font-weight: 700; color: #00d4ff; letter-spacing: 0.5px; }
+  .variant-size { font-size: 0.72rem; color: rgba(226,232,240,0.5); font-weight: 500; }
+  .variant-dl {
+    display: block; margin: 0 12px 12px; padding: 8px; border: none; border-radius: 10px;
+    background: rgba(0,212,255,0.12); color: #00d4ff; font-family: inherit;
+    font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center;
+    text-decoration: none; transition: all 0.2s;
+  }
+  .variant-dl:active { background: rgba(0,212,255,0.25); transform: scale(0.96); }
+
+  .orig-preview {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -55%);
+    max-width: 70vw; max-height: 45vh; border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5); z-index: 55;
+    border: 2px solid rgba(255,255,255,0.08);
+  }
+
+  .spinner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: #00d4ff; border-radius: 50%;
+    animation: spin 0.7s linear infinite; z-index: 100; display: none;
+  }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+  @media (max-width: 400px) {
+    .glass-btn { padding: 9px 16px; font-size: 0.8rem; }
+    .variant-card { flex: 0 0 140px; }
+    .variant-thumb { height: 95px; }
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="stage" id="stage">
-      <div class="preview" id="captureStage">
-        <div class="top-actions">
-          <div class="note">Point your camera and tap Capture</div>
-          <div>
-            <button class="btn ghost" id="flipBtn">Flip</button>
-            <button class="btn" id="exitBtn">Exit</button>
-          </div>
-        </div>
 
-        <div class="video-wrap" id="videoWrap">
-          <video id="video" autoplay playsinline muted></video>
-          <canvas id="hiddenCanvas"></canvas>
-        </div>
-
-        <div class="controls">
-          <button class="btn" id="captureBtn">Capture</button>
-          <button class="btn ghost" id="pauseBtn">Pause</button>
-        </div>
-      </div>
-
-      <div class="results" id="resultsStage" style="display:none;">
-        <div class="top-actions">
-          <div class="note">Captured image — compare JPEG sizes and download the preferred one</div>
-          <div>
-            <button class="btn ghost" id="retakeBtn">Retake</button>
-            <button class="btn" id="doneExitBtn">Done</button>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-          <img id="capturedPreview" style="width:260px;border-radius:8px;background:#000" alt="Captured preview"/>
-          <div style="flex:1">
-            <div class="small">Original dimensions: <span id="origDim">—</span></div>
-            <div class="small">Original format: JPEG</div>
-          </div>
-        </div>
-
-        <h3 style="margin:6px 0;color:#cfefff">Compression variants</h3>
-        <div class="results-grid" id="variantsGrid"></div>
-      </div>
+<div id="cameraStage" class="stage active">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="hiddenCanvas" style="display:none"></canvas>
+  <div class="float-top">
+    <button class="glass-icon" id="homeBtn" aria-label="Home">←</button>
+    <button class="glass-icon" id="flipBtn" aria-label="Flip camera">↻</button>
+  </div>
+  <div class="float-bottom">
+    <div class="glass-pill">
+      <button class="glass-btn ghost" id="pauseBtn">⏸ Pause</button>
+      <button class="glass-btn primary" id="captureBtn">📸 Capture</button>
     </div>
   </div>
+</div>
+
+<div id="resultsStage" class="stage">
+  <div class="results-bg" id="resultsBg"></div>
+  <div class="results-overlay"></div>
+  <img class="orig-preview" id="capturedPreview" alt="Captured">
+  <div class="results-top">
+    <button class="glass-icon" id="retakeBtn" aria-label="Retake">↩</button>
+    <div class="results-top-center">
+      <div class="glass-badge" id="origDim">—</div>
+      <button class="glass-btn primary small" id="doneBtn">Done</button>
+    </div>
+  </div>
+  <div class="variant-strip" id="variantsStrip"></div>
+</div>
+
+<div class="spinner" id="spinner"></div>
 
 <script>
-(async ()=> {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('hiddenCanvas');
-  const captureBtn = document.getElementById('captureBtn');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const flipBtn = document.getElementById('flipBtn');
-  const exitBtn = document.getElementById('exitBtn');
-  const retakeBtn = document.getElementById('retakeBtn');
-  const doneExitBtn = document.getElementById('doneExitBtn');
-  const captureStage = document.getElementById('captureStage');
-  const resultsStage = document.getElementById('resultsStage');
-  const variantsGrid = document.getElementById('variantsGrid');
-  const capturedPreview = document.getElementById('capturedPreview');
-  const origDim = document.getElementById('origDim');
-
-  let stream = null;
-  let usingFront = false; // default environment
-  let trackSettings = null;
-
-  const qualities = [0.92,0.85,0.75,0.6,0.45,0.3,0.15,0.05];
+(async function() {
+  'use strict';
+  var video = document.getElementById('video');
+  var canvas = document.getElementById('hiddenCanvas');
+  var captureBtn = document.getElementById('captureBtn');
+  var pauseBtn = document.getElementById('pauseBtn');
+  var flipBtn = document.getElementById('flipBtn');
+  var homeBtn = document.getElementById('homeBtn');
+  var retakeBtn = document.getElementById('retakeBtn');
+  var doneBtn = document.getElementById('doneBtn');
+  var cameraStage = document.getElementById('cameraStage');
+  var resultsStage = document.getElementById('resultsStage');
+  var variantsStrip = document.getElementById('variantsStrip');
+  var capturedPreview = document.getElementById('capturedPreview');
+  var resultsBg = document.getElementById('resultsBg');
+  var origDim = document.getElementById('origDim');
+  var spinner = document.getElementById('spinner');
+  var stream = null;
+  var usingFront = false;
+  var qualities = [0.92,0.85,0.75,0.6,0.45,0.3,0.15,0.05];
 
   async function startCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t=>t.stop());
-      stream = null;
-    }
-    const constraints = {
-      video: { facingMode: usingFront ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    await video.play();
-    const [t] = stream.getVideoTracks();
-    trackSettings = t.getSettings ? t.getSettings() : {};
-    video.style.transform = usingFront ? 'scaleX(-1)' : 'scaleX(1)';
-  }
-
-  function stopCamera(){
-    if(stream) stream.getTracks().forEach(t=>t.stop());
-    stream = null;
-  }
-
-  flipBtn.addEventListener('click', async ()=> {
-    usingFront = !usingFront;
-    await startCamera();
-  });
-
-  exitBtn.addEventListener('click', ()=> { stopCamera(); window.location.href='../index.html#projects'; });
-
-  pauseBtn.addEventListener('click', ()=> {
-    if (!stream) return;
-    const [t] = stream.getVideoTracks();
-    if (t.enabled) { t.enabled = false; pauseBtn.textContent = 'Resume'; }
-    else { t.enabled = true; pauseBtn.textContent = 'Pause'; }
-  });
-
-  captureBtn.addEventListener('click', async ()=> {
-    if(!video.videoWidth || !video.videoHeight) return alert('Camera not ready');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    // mirror for user-facing camera so preview matches user expectation
-    if (usingFront) {
-      ctx.save();
-      ctx.scale(-1,1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-      ctx.restore();
-    } else {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    }
-
-    // show preview
-    capturedPreview.src = canvas.toDataURL('image/jpeg', 0.92);
-    origDim.textContent = `${canvas.width}×${canvas.height}`;
-
-    // generate compressed variants
-    variantsGrid.innerHTML = '';
-    const timestamp = new Date().toISOString().replace(/[:.]/g,'-');
-    for (const q of qualities) {
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', q));
-      const url = URL.createObjectURL(blob);
-      const sizeKB = (blob.size/1024).toFixed(1);
-      const card = document.createElement('div');
-      card.className = 'card';
-      const img = document.createElement('img');
-      img.className = 'thumb';
-      img.src = url;
-      img.alt = `q=${q}`;
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = `quality ${q} · ${sizeKB} KB`;
-      const dl = document.createElement('a');
-      dl.className = 'btn';
-      dl.href = url;
-      dl.download = `capture_${timestamp}_q${String(q).replace('.','-')}.jpeg`;
-      dl.textContent = 'Download';
-      dl.addEventListener('click', ()=> {
-        // revoke after a short timeout to allow download to start
-        setTimeout(()=>{ URL.revokeObjectURL(url); }, 2000);
+    if (stream) { stream.getTracks().forEach(function(t){t.stop();}); stream = null; }
+    pauseBtn.textContent = '⏸ Pause';
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: usingFront ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
       });
-      card.appendChild(img);
-      card.appendChild(meta);
-      card.appendChild(dl);
-      variantsGrid.appendChild(card);
+      video.srcObject = stream;
+      await video.play();
+      video.style.transform = usingFront ? 'scaleX(-1)' : 'scaleX(1)';
+    } catch(e) { alert('Could not start camera: ' + (e.message || e)); }
+  }
+  function stopCamera() { if (stream) stream.getTracks().forEach(function(t){t.stop();}); stream = null; }
+
+  flipBtn.addEventListener('click', async function() { usingFront = !usingFront; await startCamera(); });
+  homeBtn.addEventListener('click', function() { stopCamera(); window.location.href = '../index.html#projects'; });
+  pauseBtn.addEventListener('click', function() {
+    if (!stream) return;
+    var t = stream.getVideoTracks()[0];
+    if (t.enabled) { t.enabled = false; pauseBtn.textContent = '▶ Resume'; }
+    else { t.enabled = true; pauseBtn.textContent = '⏸ Pause'; }
+  });
+
+  captureBtn.addEventListener('click', async function() {
+    if (!video.videoWidth || !video.videoHeight) { alert('Camera not ready'); return; }
+    spinner.classList.add('visible');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    if (usingFront) { ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore(); }
+    else { ctx.drawImage(video,0,0,canvas.width,canvas.height); }
+
+    var capturedDataURL = canvas.toDataURL('image/jpeg',0.92);
+    capturedPreview.src = capturedDataURL;
+    resultsBg.style.backgroundImage = 'url('+capturedDataURL+')';
+    origDim.textContent = canvas.width+'×'+canvas.height;
+
+    variantsStrip.innerHTML = '';
+    var timestamp = new Date().toISOString().replace(/[:.]/g,'-');
+    for (var qi = 0; qi < qualities.length; qi++) {
+      var q = qualities[qi];
+      var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',q);});
+      var url = URL.createObjectURL(blob);
+      var sizeKB = (blob.size/1024).toFixed(1);
+      var sizeMB = (blob.size/(1024*1024)).toFixed(2);
+      var sizeStr = blob.size > 1024*1024 ? sizeMB+' MB' : sizeKB+' KB';
+      var card = document.createElement('div'); card.className = 'variant-card';
+      var img = document.createElement('img'); img.className = 'variant-thumb'; img.src = url; img.alt = 'q='+q;
+      var info = document.createElement('div'); info.className = 'variant-info';
+      var qual = document.createElement('div'); qual.className = 'variant-quality'; qual.textContent = Math.round(q*100)+'%';
+      var size = document.createElement('div'); size.className = 'variant-size'; size.textContent = sizeStr;
+      info.appendChild(qual); info.appendChild(size);
+      var dl = document.createElement('a'); dl.className = 'variant-dl'; dl.href = url;
+      dl.download = 'capture_'+timestamp+'_q'+String(q).replace('.','-')+'.jpeg'; dl.textContent = '⬇ Download';
+      (function(u){dl.addEventListener('click',function(){setTimeout(function(){URL.revokeObjectURL(u);},2000);});})(url);
+      card.appendChild(img); card.appendChild(info); card.appendChild(dl);
+      variantsStrip.appendChild(card);
     }
-
-    // switch UI
-    captureStage.style.display = 'none';
-    resultsStage.style.display = 'block';
-    stopCamera(); // free camera while inspecting
+    spinner.classList.remove('visible');
+    stopCamera();
+    cameraStage.classList.remove('active');
+    resultsStage.classList.add('active');
   });
 
-  retakeBtn.addEventListener('click', async ()=> {
-    resultsStage.style.display = 'none';
-    captureStage.style.display = 'block';
-    await startCamera();
+  retakeBtn.addEventListener('click', async function() {
+    resultsStage.classList.remove('active'); cameraStage.classList.add('active'); await startCamera();
   });
+  doneBtn.addEventListener('click', function() { stopCamera(); window.location.href = '../index.html#projects'; });
 
-  doneExitBtn.addEventListener('click', ()=> { stopCamera(); window.location.href='../index.html#projects'; });
-
-  // init
-  try { await startCamera(); } catch(e) { console.error(e); alert('Could not start camera: '+(e.message||e)); }
-
-  // cleanup on unload
-  window.addEventListener('beforeunload', ()=> stopCamera());
+  await startCamera();
+  window.addEventListener('beforeunload', function(){stopCamera();});
 })();
 </script>
-
-<script src="top_buttons.js"></script>
 </body>
 </html>

@@ -20,6 +20,20 @@ bar, posta, sede Merloni, parco, discoteca, banca, palestra, biblioteca, **autof
 ospedale, stazione, cinema, serra**), strade, cartelloni satirici, **16 auto rubabili**,
 **26 passanti** e 3 personaggi con nome.
 
+## 🗺️ Minimappa
+
+Una **minimappa** in basso a sinistra mostra l'intera città: edifici colorati, strade,
+il tuo puntino bianco con direzione, auto, polizia, personaggi, la destinazione del lavoro,
+i checkpoint della corsa e l'anello della side quest. Zoom telecamera più ampio di default
+(0.35) con pulsanti **＋/−** e **rotella del mouse** per regolarlo a piacere.
+
+## 🎮 Pulsanti azione dedicati (mobile)
+
+Sotto a destra tre pulsanti tondi:
+- **✋ Interagisci** (porte, lavori, caffè, personaggi)
+- **🚗 Auto** — contestuale: entra nell'auto vicina oppure **esci** quando sei a bordo (cambia in 🚪)
+- **💥 Attacca** — spara con l'arma equipaggiata (equivalente di Spazio)
+
 ## 🚗 Auto: 7 modelli, 16 colori
 
 Ogni auto ha un **modello** (disegnato diversamente: dimensioni, tettuccio, alettone,

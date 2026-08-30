@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+	<meta name="theme-color" content="#04060f" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="description" content="WAR ORBIT — a top-down space MMO clone (inspired by the War Universe wiki): 3 factions, ships, laser guns, shield/speed generators, extensions, resources, events. iPhone + desktop." />
+	<title>WAR ORBIT — Space MMO</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+		html, body { height: 100%; overflow: hidden; touch-action: none; }
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			background: #04060f; color: #e2e8f0; user-select: none; -webkit-user-select: none;
+		}
+		canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; touch-action: none; }
+
+		/* HUD */
+		#hud {
+			position: fixed; top: 0; left: 0; right: 0; z-index: 50; pointer-events: none;
+			padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 0;
+			display: flex; flex-direction: column; gap: 5px;
+		}
+		#hud > * { pointer-events: auto; }
+		.hrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+		.chip {
+			background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(8px);
+			border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 10px;
+			padding: 5px 10px; font-size: 11.5px; font-weight: 800; white-space: nowrap;
+		}
+		#hudBt { color: #f59e0b; }
+		#hudPt { color: #a78bfa; }
+		#hudLv { color: #4ade80; }
+		.bars { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 160px; }
+		.barWrap { flex: 1; }
+		.barLbl { font-size: 9px; color: #94a3b8; letter-spacing: .08em; }
+		.bar { height: 8px; background: rgba(255,255,255,.12); border-radius: 99px; overflow: hidden; }
+		#hpBar { height: 100%; background: #ef4444; width: 100%; }
+		#shBar { height: 100%; background: #38bdf8; width: 100%; }
+
+		#toast {
+			position: fixed; left: 50%; transform: translateX(-50%);
+			top: calc(var(--site-top-bar-height, 0px) + 92px);
+			background: rgba(2, 6, 23, 0.94); border: 1px solid rgba(148,163,184,.4);
+			border-radius: 99px; padding: 9px 18px; font-size: 13px; font-weight: 700; z-index: 300;
+			opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 92vw; text-align: center;
+		}
+		#toast.on { opacity: 1; }
+
+		/* Minimap */
+		#minimap {
+			position: fixed; right: 14px;
+			top: calc(env(safe-area-inset-top, 0px) + 118px);
+			width: 120px; height: 120px; border: 1.5px solid rgba(255,255,255,.3);
+			border-radius: 12px; background: rgba(2,6,23,.55); opacity: .9; z-index: 55;
+		}
+
+		/* Action buttons */
+		#actionCluster {
+			position: fixed; right: 16px;
+			bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+			display: flex; flex-direction: column; align-items: center; gap: 9px; z-index: 60;
+		}
+		.bigBtn {
+			width: 60px; height: 60px; border-radius: 50%; border: none; color: #fff;
+			font-size: 19px; font-weight: 800; box-shadow: 0 6px 18px rgba(0,0,0,.45); touch-action: none;
+		}
+		.bigBtn:active { transform: scale(.92); }
+		#actBtn { background: linear-gradient(145deg, #38bdf8, #0284c7); font-size: 20px; }
+		#extBtn { background: linear-gradient(145deg, #a78bfa, #7c3aed); }
+		#rocketBtn { background: linear-gradient(145deg, #f59e0b, #b45309); font-size: 15px; }
+		#ammoBtn { width: auto; min-width: 96px; padding: 0 12px; border-radius: 30px; background: linear-gradient(145deg,#334155,#1e293b); font-size: 12px; }
+		#fireBtn { background: linear-gradient(145deg, #f87171, #dc2626); font-size: 12px; }
+		#fireBtn.on { box-shadow: 0 0 18px rgba(248,113,113,.7); }
+
+		#joy {
+			position: fixed; left: 20px; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+			width: 120px; height: 120px; border-radius: 50%; z-index: 60;
+			background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25);
+			backdrop-filter: blur(6px); touch-action: none;
+		}
+		#joyKnob {
+			position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+			border-radius: 50%; background: radial-gradient(circle at 30% 30%, #e2e8f0, #94a3b8);
+			box-shadow: 0 4px 12px rgba(0,0,0,.35);
+		}
+		@media (hover: hover) and (pointer: fine) { #joy, #actionCluster { display: none; } }
+
+		/* Overlay schermate */
+		.overlay {
+			position: fixed; inset: 0; z-index: 400; background: rgba(2, 6, 23, 0.88);
+			backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px;
+		}
+		.overlay.hidden { display: none; }
+		.panel {
+			background: linear-gradient(160deg, #0f172a, #0a0f1e); border: 1px solid rgba(148,163,184,.3);
+			border-radius: 18px; padding: 24px; max-width: 440px; width: 100%; text-align: center;
+			box-shadow: 0 24px 80px rgba(0,0,0,.6); max-height: 88vh; overflow-y: auto;
+		}
+		.panel h1 { font-size: 30px; letter-spacing: .06em; background: linear-gradient(92deg, #38bdf8, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+		.panel .sub { color: #94a3b8; font-size: 12.5px; margin: 6px 0 16px; line-height: 1.5; }
+		.inp, select.inp {
+			width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(148,163,184,.3);
+			background: #1e293b; color: #fff; font-size: 14px; font-family: inherit; margin: 6px 0;
+		}
+		.mbtn {
+			display: block; width: 100%; padding: 13px; margin: 8px 0; border: none; border-radius: 12px;
+			font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+		}
+		.mbtn.primary { background: linear-gradient(92deg, #38bdf8, #4ade80); color: #052e16; }
+		.mbtn.ghost { background: #1e293b; color: #e2e8f0; border: 1px solid rgba(148,163,184,.25); }
+		.mbtn.danger { background: #b91c1c; color: #fff; }
+		.hint { color: #64748b; font-size: 11px; line-height: 1.7; margin-top: 10px; }
+
+		/* Base / shop */
+		#baseOverlay { z-index: 300; }
+		#baseOverlay .panel { max-width: 480px; text-align: left; }
+		#baseOverlay h3 { color: #93c5fd; font-size: 14px; margin: 12px 0 6px; border-bottom: 1px solid rgba(148,163,184,.2); padding-bottom: 4px; }
+		.row { font-size: 12px; color: #cbd5e1; line-height: 1.5; padding: 6px 0; border-bottom: 1px solid rgba(148,163,184,.1); }
+		.row small { color: #64748b; }
+		.mini { border: none; border-radius: 8px; background: #334155; color: #fff; padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 6px; }
+		.mini:active { transform: scale(.94); }
+		#baseClose { display: block; margin: 14px auto 0; }
+
+		/* Menu / death */
+		#menuOverlay { z-index: 500; }
+		#deathBox { z-index: 450; }
+		#deathBox h1 { color: #f87171; }
+	</style>
+</head>
+<body>
+	<canvas id="c"></canvas>
+
+	<div id="hud">
+		<div class="hrow">
+			<span class="chip" id="hudBt">BTC 0</span>
+			<span class="chip" id="hudPt">PLT 0</span>
+			<span class="chip" id="hudLv">Lv 1</span>
+			<span class="chip" id="hudMap">Map X-1</span>
+		</div>
+		<div class="hrow">
+			<div class="bars">
+				<div class="barWrap"><div class="barLbl">HULL</div><div class="bar"><div id="hpBar"></div></div></div>
+				<div class="barWrap"><div class="barLbl">SHIELD</div><div class="bar"><div id="shBar"></div></div></div>
+			</div>
+		</div>
+	</div>
+
+	<div id="toast"></div>
+	<canvas id="minimap" width="120" height="120"></canvas>
+
+	<div id="actionCluster">
+		<button id="ammoBtn" class="bigBtn">RLX-1</button>
+		<button id="rocketBtn" class="bigBtn">🚀 0</button>
+		<button id="extBtn" class="bigBtn" title="Extension">🔧</button>
+		<button id="fireBtn" class="bigBtn on" title="Auto-fire">AUTO</button>
+		<button id="actBtn" class="bigBtn" title="Interact (base/portal)">✋</button>
+	</div>
+
+	<div id="joy"><div id="joyKnob"></div></div>
+
+	<!-- Start screen -->
+	<div id="startScreen" class="overlay">
+		<div class="panel">
+			<h1>WAR ORBIT</h1>
+			<div class="sub">A top-down space MMO inspired by the War Universe wiki.<br>Three factions fight for the galaxy. Choose yours.</div>
+			<input id="pilotName" class="inp" maxlength="14" placeholder="Pilot name" autocomplete="off">
+			<select id="factionSel" class="inp"></select>
+			<button class="mbtn primary" id="btnStart">▶ New Flight</button>
+			<button class="mbtn ghost" id="btnContinue">↩ Continue (save)</button>
+			<div class="hint">
+				🕹️ Joystick / WASD to fly · auto-fire at enemies · ✋ at base: shop &amp; hangar · ✋ at portals: warp<br>
+				Q extension · R rockets · 1-4 ammo · SPACE auto-fire toggle · ESC menu
+			</div>
+		</div>
+	</div>
+
+	<!-- Base / shop -->
+	<div id="baseOverlay" class="overlay hidden">
+		<div class="panel">
+			<h3 style="color:#4ade80;border:none;margin-top:0">⛽ ORBITAL BASE</h3>
+			<div id="shopList"></div>
+			<button class="mbtn ghost" id="baseClose">✕ Close (resume flight)</button>
+		</div>
+	</div>
+
+	<!-- Menu -->
+	<div id="menuOverlay" class="overlay hidden">
+		<div class="panel">
+			<h1>⏸️ PAUSE</h1>
+			<button class="mbtn primary" id="menuResume">▶ Resume</button>
+			<button class="mbtn ghost" id="menuTest">🧪 Run automatic tests</button>
+			<button class="mbtn ghost" id="menuRestart">🔄 New Pilot (wipe save)</button>
+			<button class="mbtn danger" id="menuExit">🚪 Exit</button>
+		</div>
+	</div>
+
+	<!-- Death -->
+	<div id="deathBox" class="overlay hidden">
+		<div class="panel">
+			<h1>☠️ DESTROYED</h1>
+			<div class="sub">Your ship was lost. Don't worry — the base repairs it for free.<br>Faction change, if you ever need it, costs 10,000 PLT.</div>
+			<button class="mbtn primary" id="respawnBtn">🔧 Respawn at base</button>
+		</div>
+	</div>
+
+	<script src="js/data.js"></script>
+	<script src="js/game.js"></script>
+	<script src="js/test.js"></script>
+	<script>
+		window.addEventListener('load', function () {
+			document.getElementById('menuTest').addEventListener('click', function () {
+				toggleMenu(); // chiude la pausa
+				window.__TEST__.run();
+			});
+		});
+	</script>
+</body>
+</html>

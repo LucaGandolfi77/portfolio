@@ -6,7 +6,8 @@
     'Camera / Tools': 'computer-vision', 'Audio / Streaming': 'audio', 'Audio / Tool': 'audio',
     Crypto: 'engineering', Data: 'data', Math: 'engineering', Sim: 'simulation',
     Utility: 'tools', 'Utility / iOS': 'tools', Game: 'games', Emu: 'games', Quiz: 'games',
-    Creative: 'creative', Music: 'audio', Accessibility: 'accessibility', Tool: 'tools'
+    Creative: 'creative', Music: 'audio', Accessibility: 'accessibility', Tool: 'tools',
+    'Health / Tool': 'tools', Health: 'tools'
   };
 
   const baseProjects = (typeof PROJECTS_DATA === 'undefined' ? [] : PROJECTS_DATA).map((project) => ({
@@ -114,6 +115,7 @@
     ['tamagotchi', 'Tamagotchi', 'Care for a small digital companion.', 'games/tamagotchi.html', '♥', 'simulation', ['Casual'], false],
     ['coloring-book', 'Coloring Book', 'Relax and color figures in the browser.', 'games/coloring_book.html', '✎', 'creative', ['Canvas'], false],
     ['quantum-tictactoe', 'Quantum Tic-Tac-Toe', 'Play with superposition and entanglement.', 'games/quantum_tictactoe.html', '⚛', 'strategy', ['Quantum'], false],
+    ['quantum-forge', 'QUANTUM FORGE', 'Impara la fisica delle particelle giocando: combina quark (u/d/s) con cariche frazionarie +2/3 e −1/3 per forgiare protoni, neutroni, iperoni e mesoni (confinamento, carica conservata); costruisci nuclei (elio-4, carbonio-12) e atomi neutri con i gusci elettronici; fondi 4 protoni in elio con E=mc². Capitoli sul Modello Standard (fermioni, bosoni, le 4 forze: fotone, gluoni, W/Z, gravitone) e sul Bosone di Higgs col campo che dà la massa (125 GeV, scoperta CERN 2012). Pulsante ⏭️ per saltare i minigiochi e seguire solo la storia. Quiz finale a 9 domande, ricettario quantistico, ottimizzato per iPhone.', 'games/quantum-forge/index.html', '⚛️', 'puzzle', ['Physics', 'Story', 'iPhone'], true],
     ['tokyo', 'TOKYO', 'Classic dice game. Roll for Tokyo.', 'games/tokyo.html', '🎲', 'party', ['Dice'], false],
     ['pinball', 'Space Cadet Pinball', 'Launch, bounce, and chase a score.', 'pages/main/pinball.html', '🚀', 'arcade', ['Retro'], false],
     ['clash-royale', 'Royale Battle', 'Deploy troops and destroy enemy towers.', 'games/clash_royale.html', '♛', 'strategy', ['Strategy'], false],
@@ -121,6 +123,7 @@
     ['pokemon', 'Pokémon Adventure', 'Explore the world as a Pokémon trainer.', 'pages/main/pokemon.html', '⚡', 'story', ['Adventure'], false],
     ['yatzee', 'Yatzee', 'Classic dice game for local players.', 'games/yatzee.html', '🎲', 'party', ['Dice'], false],
     ['yatzee-solo', 'Yatzee Solo', 'Challenge a browser opponent in a classic dice game.', 'games/yatzee_solo.html', '🤖', 'strategy', ['AI', 'Dice'], false],
+    ['orlog', 'Orlog', 'Viking dice duel from Assassin\'s Creed Valhalla. Roll dice, invoke God Favors, crush your enemy.', 'games/orlog.html', '⚔️', 'strategy', ['Dice', 'Strategy', 'iPhone'], true],
     ['taboo', 'Taboo', 'Describe the word without using the forbidden ones.', 'games/taboo.html', '🚫', 'party', ['Party'], false],
     ['visual-novels', 'Visual Novels', 'Interactive stories and adventures.', 'pages/main/visualnovels.html', '📖', 'story', ['Story'], false],
     ['bros-karamazov', 'I Fratelli Karamazov', 'Visual novel interattiva sul capolavoro di Dostoevskij: scelte, sottotrame e molteplici percorsi.', 'pages/content/karamazov.html', '🕯️', 'story', ['Story', 'Italiano'], false],
@@ -136,7 +139,7 @@
     ['pokopia-clone', 'Pokopia Clone', 'A browser world-building experiment.', 'games/pokopia-clone/index.html', '⌂', 'simulation', ['Canvas'], false]
     ,['3d-game', 'Lumina 3D', 'Lumina — Il Cristallo dell\'Alba: esplora il prato, raccogli i 5 frammenti del Cristallo, parla con i cittadini (dialoghi e scelte) e ridai luce alla città.', 'games/3dgame.html', '◇', 'arcade', ['3D', 'Story', 'Dialoghi'] , false]
     ,['airhockey-classic', 'Air Hockey Classic', 'A classic air hockey game entry point.', 'games/airhockey.html', '🏒', 'multiplayer', ['Touch', 'Multiplayer'], false]
-    ,['animal-crossing', 'Animal Crossing Experiment', 'A playful life-simulation experiment.', 'games/animal_crossing.html', '🌿', 'simulation', ['Simulation'], false]
+    ,['animal-crossing', 'Animal Crossing Experiment', 'Sandbox 3D stile Animal Crossing: raccogli legno/pietra/sabbia, costruisci panchine/pozzi/fontane, cattura creature nei biomi, ciclo giorno/notte. Controlli touch a sticker (joystick 🐾, azione ✋, rotazione camera ↺↻), box info impaginati per iPhone (bottom-sheet) e modalità landscape automatica quando inclini il telefono: la visuale si allarga e icone/box si riadattano. Salvataggio progressi.', 'games/animal_crossing.html', '🌿', 'simulation', ['Simulation', '3D', 'iPhone'], false]
     ,['city-sim', 'City Sim', 'Build and observe a small city simulation.', 'games/city_sim.html', '▦', 'simulation', ['Simulation'], false]
     ,['coop-game-wrapper', 'Slips & Catastrophes Launcher', 'Launcher page for the cooperative narrative game.', 'games/coop-game.html', '✦', 'multiplayer', ['Co-op', 'Launcher'], false]
     ,['echoes-wrapper', 'Echoes of the Last Dawn Launcher', 'Launcher page for the low-poly story game.', 'games/echoes-of-the-last-dawn.html', '☼', 'story', ['Three.js', 'Launcher'], false]
@@ -148,10 +151,13 @@
     ,['pokopia-wrapper', 'Pokopia Clone Launcher', 'Launcher page for the world-building game.', 'games/pokopia-clone.html', '⌂', 'simulation', ['Canvas', 'Launcher'], false]
     ,['referendum-game', 'Referendum Game', 'A multiplayer referendum and mini-game experiment.', 'games/referendum-game/index.html', '◉', 'multiplayer', ['PeerJS', 'PWA'], false]
     ,['slot-machine', 'Slot Machine', 'Spin and test your luck.', 'games/slot.html', '🎰', 'arcade', ['Casual'], false]
+    ,['warorbit', 'War Orbit', 'Clone 2D in stile arcade di War Universe: 3 fazioni (Solar/Orion/Vega), 5 navi con abilità passive, laser (LG-1..4) e munizioni speciali, scudi e generatori di velocità, estensioni (nuke, invulnerabilità, riparazione, invisibilità), risorse da raccogliere e raffinare, potenziamenti, ranghi e onori, minimappa, squadra di 3 wingmen, eventi Battle Royale e Convoy. Ottimizzato per iPhone (joystick virtuale, safe-area). Include motore di test automatico (menu 🧪 o ?test=1). UI in inglese.', 'games/warorbit/index.html', '🛰️', 'story', ['2D', 'Arcade', 'Space'], true]
     ,['watermelon', 'Watermelon Game', 'A physics-inspired fruit merging game.', 'games/watermelon.html', '🍉', 'puzzle', ['Physics'], false]
+    ,['watermelon-fall', 'Watermelon Fall', 'Fruit merging puzzle with improved physics: better collisions, natural settling, and wake-up mechanics.', 'games/watermelon-fall.html', '🍈', 'puzzle', ['Physics', 'iPhone'], false]
     ,['rivincita', 'RIVINCITA 2D', 'GTA 2D top-down (stile gameboy moderno): una storia su ansia, lavoro e rivincita. Mappa 3600x3600, lavori veri, furto d\'auto e polizia, armi satiriche, misuratore d\'ansia, side quest e minigiochi, satira sociale. Include un motore di test automatico (menu 🧪 o ?test=1). iPhone + desktop.', 'games/rivincita/index.html', '🏙️', 'story', ['2D', 'Story', 'Open World'], true]
     ,    ['webgl-diagnostics', 'WebGL Diagnostics', 'Inspect browser graphics capabilities.', 'games/webgl_diagnostics.html', '▣', 'tools', ['WebGL', 'Diagnostics'], false]
     ,['arcade-lab', 'Arcade Lab', 'The experimental arcade playground: prototypes and mini-games in one hub.', 'games/arcade-lab/index.html', '🕹️', 'arcade', ['Arcade', 'Hub'], false]
+    ,['farkle', 'Farkle', 'Classic dice risk game: roll for points, avoid farkling. Play vs smart bot or friends locally.', 'games/farkle.html', '🎲', 'party', ['Dice', 'AI', 'iPhone'], false]
   ].map(([id,title,description,href,icon,category,badges,featured]) => ({ id, title, description, href, icon, category, badges, technologies: badges, featured, status: 'live', type: 'game', requirements: badges.includes('Camera') ? ['camera'] : [] }));
 
   root.PORTFOLIO_CATALOG = { projects, games, categories: ['ai', 'audio', 'accessibility', 'computer-vision', 'creative', 'data', 'engineering', 'games', 'simulation', 'tools', 'quiz', 'arcade', 'action', 'multiplayer', 'cards', 'party', 'strategy', 'puzzle', 'story'] };

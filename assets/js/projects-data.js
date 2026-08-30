@@ -23,7 +23,7 @@ const PROJECTS_DATA = [
   {
     "id": "tiny-local-ai",
     "title": "Tiny Local AI",
-    "description": "Small text-generation demo (runs locally). Follow README to install a tiny model on your machine.",
+    "description": "Chat con modelli AI piccoli e allo stato dell'arte che girano DAVVERO nel browser: Transformers.js con 18 modelli verificati, inclusi i ⚡ ultra-tiny per iPhone (TinyStories 1M ≈ 15 MB, TinyStories 3M ≈ 22 MB, DistilGPT2 82M, SmolLM2 135M, Qwen 2.5 0.5B…) su WebGPU con fallback WASM — zero chiavi, zero server. In più Web-LLM/WebGPU (SmolLM2, Qwen 2.5/3/3.5, Llama 3.2, Phi, Gemma, DeepSeek R1…), OpenRouter cloud e server Flask locale.",
     "href": "projects/tiny_ai.html",
     "emoji": "🤖",
     "badge": "Local AI",
@@ -127,6 +127,15 @@ const PROJECTS_DATA = [
     "emoji": "📷",
     "badge": "Camera / Tools",
     "badgeColor": "#00d4ff"
+  },
+  {
+    "id": "camera-sentinel",
+    "title": "CAM//SENTINEL — chi ti sta guardando?",
+    "description": "Accende la fotocamera del dispositivo e analizza in tempo reale ciò che vede: LED a infrarossi e riflessi di lenti delle telecamere di sorveglianza attive, lampeggio dei LED di stato, e AI on-device (COCO-SSD) per i dispositivi che possono nascondere una camera. Rileva anche se la tua camera è già in uso da un'altra app (NotReadableError) ed elenca tutte le telecamere collegate. Spiega perché il browser NON può vedere le telecamere sulla rete e come lo farebbe un'app nativa.",
+    "href": "projects/camera-sentinel.html",
+    "emoji": "🕵️",
+    "badge": "Camera / Tools",
+    "badgeColor": "#ff5c7a"
   },
   {
     "id": "face-compare-ai",
@@ -365,7 +374,7 @@ const PROJECTS_DATA = [
   {
     "id": "royal-derby-sim",
     "title": "Royal Derby Sim",
-    "description": "Horse racing simulator with live track view.",
+    "description": "Simulatore di corse di cavalli con scommesse: porta€500 virtuali, punta sui cavalli (evidenziati in oro) con quote live, vincite e perdite sul portafoglio. Cavalli rinomina-bili con colori della casacca, statistiche (velocità, scatto, stamina, forma), record di carriera (corse, vittorie, podi, guadagni), commento live con sorpassi e scatti, grafica canvas curata. Ottimizzato per iPhone.",
     "href": "projects/horse_simulator.html",
     "emoji": "🏇",
     "badge": "Sim",
@@ -374,7 +383,7 @@ const PROJECTS_DATA = [
   {
     "id": "serie-a-simulator",
     "title": "Serie A Simulator",
-    "description": "Live text commentary match engine.",
+    "description": "Simulatore di partite di Serie A 2025/26 con commento live, statistiche avanzate (xG, possesso, tiri, parate, falli, corner, fuorigioco), VAR, rigori, cartellini, legni, voti dei giocatori, migliore in campo, formazioni e risultato condivisibile. Rose e squadre aggiornate alla stagione 2025/26 (promosse: Sassuolo, Pisa, Cremonese). Ottimizzato per iPhone.",
     "href": "projects/seriea_simulator.html",
     "emoji": "⚽",
     "badge": "Sim",
@@ -509,7 +518,7 @@ const PROJECTS_DATA = [
   {
     "id": "face-lab",
     "title": "FACE LAB — Distortion Mirror",
-    "description": "Live facial-landmark AI: 68 points trace your face in 3D with a holographic wireframe, real-time telemetry (blink, smile, head pose, emotion) and six distortion modes (giant eyes, funhouse, fish-eye, emoji, cartoon). MediaPipe + Three.js, on-device.",
+    "description": "Live facial-landmark AI: 68 points trace your face in 3D with a holographic wireframe, real-time telemetry (blink, smile, head pose, emotion) and ten distortion modes (giant eyes, funhouse, fish-eye, emoji, cartoon, swirl, chromatic, pixelate, neon, squash) plus seven props (glasses, crown, mustache, hat, blush, beard, halo). MediaPipe + Three.js, on-device.",
     "href": "projects/face-lab.html",
     "emoji": "👁️",
     "badge": "CV / AI",
@@ -523,6 +532,15 @@ const PROJECTS_DATA = [
     "emoji": "🕊️",
     "badge": "NN / Particles",
     "badgeColor": "#b28dff"
+  },
+  {
+    "id": "alcohol-tracker",
+    "title": "🍺 AlcoTracker — Tasso Alcolemico",
+    "description": "Calcola il tuo tasso alcolemico con la formula di Widmark: inserisci sesso, peso, altezza ed età, aggiungi bevande e pasti con l'orario, e il grafico mostra la curva alcolica con picco, tempo per tornare sotto il limite di 0.5 g/L (quando puoi guidare) e ora in cui sarai completamente sobrio. Doppia visuale: classica con grafico dettagliato e timeline -12h/+12h dove trascini cibo e bevande sull'orario (con ⭐ preferiti sempre in vista). Timeline zoomabile (-12h/+12h, +/− o rotella) con selezione ed eliminazione degli elementi inseriti e cibo che influenza l'alcol SOLO dal momento del pasto in poi. Metabolismo regolabile (0.10/0.15/0.20 g/L/h), unità alcoliche, ottimizzato per iPhone. ⚠️ Vietato ai minori di 18 anni.",
+    "href": "projects/alcohol_tracker.html",
+    "emoji": "🍺",
+    "badge": "Health / Tool",
+    "badgeColor": "#ffb84d"
   },
   {
     "id": "pocket-wild",

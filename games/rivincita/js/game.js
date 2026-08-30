@@ -52,13 +52,19 @@ function resize() {
   canvas.height = Math.round(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
-var ZOOM = 0.45, targetZoom = 0.45;
+var ZOOM = 0.35, targetZoom = 0.35;
+function setZoom(z) { targetZoom = Math.max(0.2, Math.min(0.85, z)); }
+function zoomBy(f) { setZoom(targetZoom * f); }
 
 function initCanvas() {
   canvas = $('c');
   ctx = canvas.getContext('2d');
   resize();
   window.addEventListener('resize', resize);
+  // zoom con la rotella (desktop)
+  canvas.addEventListener('wheel', function (e) { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
+  $('zoomIn').addEventListener('click', function () { zoomBy(1.25); });
+  $('zoomOut').addEventListener('click', function () { zoomBy(1 / 1.25); });
 }
 
 // ══════════ CITTÀ ══════════
@@ -171,8 +177,19 @@ function bindInput() {
   });
   $('actBtn').addEventListener('touchstart', function (e) { e.preventDefault(); tryInteract(); }, { passive: false });
   $('actBtn').addEventListener('mousedown', tryInteract);
-  $('btnFire').addEventListener('touchstart', function (e) { e.preventDefault(); fireWeapon(); }, { passive: false });
-  $('btnFire').addEventListener('mousedown', fireWeapon);
+  $('attackBtn').addEventListener('touchstart', function (e) { e.preventDefault(); fireWeapon(); }, { passive: false });
+  $('attackBtn').addEventListener('mousedown', fireWeapon);
+  $('carBtn').addEventListener('touchstart', function (e) { e.preventDefault(); toggleCarAction(); }, { passive: false });
+  $('carBtn').addEventListener('mousedown', toggleCarAction);
+}
+
+// pulsante auto: entra/esci
+function toggleCarAction() {
+  if (G.paused || G.over || G.dialogue || G.minigame) return;
+  if (G.player.inCar) { exitCar(); return; }
+  var a = nearestInteractable();
+  if (a && a.act === 'car') enterCar(a.car);
+  else toast('Nessuna auto vicina.');
 }
 
 function moveVector() {
@@ -229,6 +246,10 @@ function hud() {
   if (G.job) $('jobTag').textContent = G.job.kind === 'pizza' ? '🍕 ' + G.job.left + ' consegne' : G.job.kind === 'taxi' ? '🚕 ' + G.job.left + ' corse' : '';
   var w = weaponCurrent();
   $('weapon').textContent = (w ? w.emoji + ' ' + w.name : '🔧') + ' · Q';
+  // pulsante auto contestuale
+  var cb = $('carBtn');
+  cb.textContent = G.player.inCar ? '🚪' : '🚗';
+  cb.title = G.player.inCar ? 'Esci dall\'auto' : 'Entra in auto';
   // sblocco urlo per capitolo
   for (var ui = 0; ui < G.weapon.items.length; ui++) {
     if (G.weapon.items[ui].id === 'urlo') {
@@ -1288,9 +1309,86 @@ function update(dt) {
 function loop(t) {
   var dt = G.lastT ? Math.min((t - G.lastT) / 1000, 0.05) : 0;
   G.lastT = t;
+  ZOOM += (targetZoom - ZOOM) * Math.min(1, 8 * dt);
   update(dt);
   render();
+  renderMinimap();
   requestAnimationFrame(loop);
+}
+
+
+// ══════════ MINIMAPPA ══════════
+var mm = $('minimap');
+var mmCtx = mm.getContext('2d');
+var MM = 130;
+function renderMinimap() {
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (mm.width !== Math.round(MM * dpr)) { mm.width = Math.round(MM * dpr); mm.height = Math.round(MM * dpr); }
+  mmCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  mmCtx.clearRect(0, 0, MM, MM);
+  var f = MM / DATA.WORLD;
+  var tx = function (wx) { return (wx + DATA.WORLD / 2) * f; };
+  var ty = function (wy) { return (wy + DATA.WORLD / 2) * f; };
+  // prato
+  mmCtx.fillStyle = '#a7c896';
+  mmCtx.fillRect(0, 0, MM, MM);
+  // strade
+  var rw = Math.max(2, DATA.ROAD * f);
+  mmCtx.fillStyle = '#e8ecf1';
+  var i;
+  for (i = 0; i <= DATA.GRID; i++) {
+    var cx = (i * DATA.CELL + DATA.ROAD / 2) * f;
+    mmCtx.fillRect(cx - rw / 2, 0, rw, MM);
+    var cy = (i * DATA.CELL + DATA.ROAD / 2) * f;
+    mmCtx.fillRect(0, cy - rw / 2, MM, rw);
+  }
+  // edifici e parco
+  buildings.forEach(function (b) {
+    mmCtx.fillStyle = b.kind === 'park' ? '#9ae6b4' : b.color;
+    mmCtx.fillRect(tx(b.x), ty(b.y), Math.max(2, b.w * f), Math.max(2, b.h * f));
+  });
+  // destinazione lavoro
+  if (G.job) {
+    var t = jobTarget();
+    mmCtx.fillStyle = '#ef4444';
+    mmCtx.beginPath(); mmCtx.arc(tx(t.x), ty(t.y), 4, 0, 6.28); mmCtx.fill();
+  }
+  // checkpoint corsa
+  if (G.minigame === 'race' && race) {
+    race.checkpoints.forEach(function (cp, i) {
+      mmCtx.fillStyle = i === race.cp ? '#38bdf8' : 'rgba(56,189,248,0.5)';
+      mmCtx.beginPath(); mmCtx.arc(tx(cp.x), ty(cp.y), 3, 0, 6.28); mmCtx.fill();
+    });
+  }
+  // auto e polizia
+  G.cars.forEach(function (c) {
+    if (c === G.player.inCar) return;
+    mmCtx.fillStyle = c.color;
+    mmCtx.fillRect(tx(c.x) - 2, ty(c.y) - 2, 4, 4);
+  });
+  G.police.forEach(function (cop) {
+    mmCtx.fillStyle = '#1d4ed8';
+    mmCtx.fillRect(tx(cop.x) - 2, ty(cop.y) - 2, 4, 4);
+  });
+  // personaggi e anello
+  G.chars.forEach(function (ch) {
+    mmCtx.fillStyle = ch.color;
+    mmCtx.beginPath(); mmCtx.arc(tx(ch.x), ty(ch.y), 3, 0, 6.28); mmCtx.fill();
+  });
+  if (G.side && G.side.id === 'anello') {
+    G.ring.forEach(function (r) {
+      if (r.has && !r.found) {
+        mmCtx.fillStyle = '#f59e0b';
+        mmCtx.beginPath(); mmCtx.arc(tx(r.x), ty(r.y), 3, 0, 6.28); mmCtx.fill();
+      }
+    });
+  }
+  // giocatore
+  var p = G.player;
+  mmCtx.fillStyle = '#fff';
+  mmCtx.strokeStyle = '#3b82f6';
+  mmCtx.lineWidth = 2;
+  mmCtx.beginPath(); mmCtx.arc(tx(p.x), ty(p.y), 4, 0, 6.28); mmCtx.fill(); mmCtx.stroke();
 }
 
 // ══════════ AVVIO ══════════

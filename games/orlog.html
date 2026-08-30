@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Orlog — Viking Dice Duel</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a1628;
+      --bg2: #0f1f3a;
+      --glass: rgba(15,25,50,.85);
+      --glass-border: rgba(255,255,255,.08);
+      --accent: #00d4ff;
+      --accent2: #0ea5e9;
+      --accent-glow: rgba(0,212,255,.25);
+      --gold: #fbbf24;
+      --gold-dim: rgba(251,191,36,.3);
+      --red: #ef4444;
+      --red-glow: rgba(239,68,68,.3);
+      --green: #10b981;
+      --green-glow: rgba(16,185,129,.3);
+      --text: #e2e8f0;
+      --text-dim: rgba(226,232,240,.5);
+      --faint: #5f7f9f;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --safe-t: env(safe-area-inset-top);
+      --safe-b: env(safe-area-inset-bottom);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; overflow:hidden; }
+    body {
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+      color:var(--text); background:var(--bg);
+      -webkit-font-smoothing:antialiased; user-select:none;
+      overscroll-behavior:none;
+    }
+
+    /* ── Screens ── */
+    .screen { display:none; flex-direction:column; height:100dvh; position:fixed; inset:0; }
+    .screen.active { display:flex; }
+
+    /* ── Start Screen ── */
+    #start-screen {
+      align-items:center; justify-content:center; gap:24px;
+      background: radial-gradient(800px 400px at 50% 30%, rgba(0,212,255,.08), transparent 60%), var(--bg);
+      padding:24px; text-align:center;
+    }
+    .logo-viking { font-size:4rem; filter:drop-shadow(0 4px 20px rgba(0,212,255,.4)); }
+    .title-orlog {
+      font-size:2.8rem; font-weight:900; letter-spacing:2px;
+      background:linear-gradient(135deg,var(--accent),var(--gold));
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+    }
+    .subtitle { color:var(--faint); font-size:.9rem; font-weight:600; letter-spacing:1px; }
+    .rules-toggle {
+      background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--radius-sm);
+      padding:12px 20px; color:var(--accent); font-size:.85rem; font-weight:600;
+      cursor:pointer; transition:all .2s;
+    }
+    .rules-toggle:hover { border-color:var(--accent); }
+    .rules-box {
+      background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--radius);
+      padding:20px; max-width:420px; text-align:left; display:none;
+      max-height:50vh; overflow-y:auto; font-size:.82rem; line-height:1.6;
+    }
+    .rules-box.open { display:block; }
+    .rules-box h3 { color:var(--gold); margin:12px 0 6px; font-size:.9rem; }
+    .rules-box h3:first-child { margin-top:0; }
+    .rules-box table { width:100%; border-collapse:collapse; margin:8px 0; }
+    .rules-box th { text-align:left; color:var(--accent); padding:4px 8px; border-bottom:1px solid var(--glass-border); font-size:.78rem; }
+    .rules-box td { padding:4px 8px; font-size:.78rem; }
+    .btn-play {
+      padding:16px 48px; border-radius:14px; border:none; cursor:pointer;
+      font-family:inherit; font-size:1.1rem; font-weight:800; letter-spacing:.5px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#001018; box-shadow:0 6px 24px var(--accent-glow);
+      transition:all .2s;
+    }
+    .btn-play:hover { transform:translateY(-2px); box-shadow:0 10px 32px var(--accent-glow); }
+    .btn-play:active { transform:scale(.97); }
+
+    /* ── Game Screen ── */
+    #game-screen { background:var(--bg); }
+
+    .topbar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:calc(8px + var(--safe-t)) 16px 8px;
+      background:rgba(7,13,26,.88); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+      border-bottom:1px solid var(--glass-border); z-index:10; flex-shrink:0;
+    }
+    .topbar-btn {
+      background:rgba(255,255,255,.06); border:1px solid var(--glass-border); border-radius:10px;
+      padding:8px 14px; color:var(--text); font-size:.8rem; font-weight:600;
+      cursor:pointer; transition:all .15s; min-height:36px; display:flex; align-items:center; gap:6px;
+    }
+    .topbar-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .round-badge {
+      background:var(--glass); border:1px solid var(--glass-border); border-radius:10px;
+      padding:6px 14px; font-size:.78rem; font-weight:700; color:var(--gold);
+    }
+    .phase-badge {
+      font-size:.72rem; font-weight:700; color:var(--accent); letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    /* ── Player Areas ── */
+    .player-area {
+      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:8px 16px; gap:8px; position:relative;
+    }
+    .player-area.ai { justify-content:flex-start; padding-top:12px; }
+    .player-area.human { justify-content:flex-end; padding-bottom:calc(12px + var(--safe-b)); }
+
+    .hp-row {
+      display:flex; align-items:center; gap:10px; width:100%; max-width:360px;
+    }
+    .hp-label { font-size:.72rem; font-weight:700; color:var(--faint); width:32px; text-align:right; }
+    .hp-bar-outer {
+      flex:1; height:12px; background:rgba(255,255,255,.06); border-radius:99px;
+      border:1px solid var(--glass-border); overflow:hidden; position:relative;
+    }
+    .hp-bar-inner {
+      height:100%; border-radius:99px; transition:width .4s ease;
+    }
+    .hp-bar-inner.player { background:linear-gradient(90deg,var(--green),var(--accent)); }
+    .hp-bar-inner.ai { background:linear-gradient(90deg,var(--red),#ff8c42); }
+    .hp-val { font-size:.82rem; font-weight:800; min-width:28px; }
+
+    .token-row {
+      display:flex; align-items:center; gap:6px; font-size:.82rem; font-weight:700;
+    }
+    .token-icon { color:var(--gold); font-size:1rem; }
+
+    .dice-row {
+      display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+    }
+
+    /* ── Dice ── */
+    .die {
+      width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+      font-size:1.6rem; cursor:pointer; position:relative;
+      background:var(--glass); border:2px solid var(--glass-border);
+      transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,.3);
+    }
+    .die.locked { border-color:var(--gold); box-shadow:0 0 12px var(--gold-dim); }
+    .die.locked::after {
+      content:'🔒'; position:absolute; top:-6px; right:-6px; font-size:.65rem;
+      background:var(--bg); border-radius:50%; width:18px; height:18px;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid var(--gold);
+    }
+    .die.face-down {
+      background:repeating-linear-gradient(45deg,var(--glass),var(--glass) 4px,rgba(0,212,255,.06) 4px,rgba(0,212,255,.06) 8px);
+      font-size:0;
+    }
+    .die.face-down::after { content:''; }
+    .die.rolling { animation:dieRoll .4s ease; }
+    @keyframes dieRoll {
+      0% { transform:rotate(0) scale(.8); }
+      25% { transform:rotate(90deg) scale(1.1); }
+      50% { transform:rotate(180deg) scale(.9); }
+      75% { transform:rotate(270deg) scale(1.05); }
+      100% { transform:rotate(360deg) scale(1); }
+    }
+    .die.dmg { border-color:var(--red); box-shadow:0 0 10px var(--red-glow); }
+    .die.block { border-color:var(--accent); box-shadow:0 0 10px var(--accent-glow); }
+    .die.token-face { border-color:var(--gold); box-shadow:0 0 10px var(--gold-dim); }
+
+    /* ── Center Panel ── */
+    .center-panel {
+      flex-shrink:0; padding:8px 16px;
+      display:flex; flex-direction:column; align-items:center; gap:8px;
+      background:rgba(7,13,26,.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border-top:1px solid var(--glass-border); border-bottom:1px solid var(--glass-border);
+    }
+    .roll-info { font-size:.78rem; color:var(--faint); font-weight:600; }
+    .btn-roll {
+      padding:12px 36px; border-radius:12px; border:none; cursor:pointer;
+      font-family:inherit; font-size:.95rem; font-weight:800;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#001018; box-shadow:0 4px 16px var(--accent-glow);
+      transition:all .18s; min-height:44px;
+    }
+    .btn-roll:hover { transform:translateY(-1px); }
+    .btn-roll:active { transform:scale(.97); }
+    .btn-roll:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+
+    .btn-skip {
+      padding:8px 20px; border-radius:10px; border:1px solid var(--glass-border);
+      background:rgba(255,255,255,.05); color:var(--faint); font-size:.8rem; font-weight:600;
+      cursor:pointer; transition:all .15s;
+    }
+    .btn-skip:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── God Favor Panel ── */
+    .gf-panel {
+      display:none; width:100%; max-width:360px;
+      background:var(--glass); border:1px solid var(--gold-dim); border-radius:var(--radius-sm);
+      padding:12px; gap:8px; flex-direction:column;
+    }
+    .gf-panel.open { display:flex; }
+    .gf-title { font-size:.78rem; font-weight:700; color:var(--gold); text-align:center; margin-bottom:4px; }
+    .gf-grid { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+    .gf-btn {
+      padding:8px 12px; border-radius:8px; border:1px solid var(--glass-border);
+      background:rgba(255,255,255,.04); color:var(--text); font-size:.72rem; font-weight:600;
+      cursor:pointer; transition:all .15s; text-align:center; min-width:90px;
+    }
+    .gf-btn:hover { border-color:var(--gold); color:var(--gold); }
+    .gf-btn.selected { border-color:var(--gold); background:rgba(251,191,36,.12); color:var(--gold); }
+    .gf-btn:disabled { opacity:.3; cursor:not-allowed; }
+    .gf-cost { color:var(--gold); font-size:.68rem; }
+
+    /* ── Resolution Log ── */
+    .res-log {
+      width:100%; max-width:360px; max-height:80px; overflow-y:auto;
+      background:rgba(255,255,255,.03); border-radius:8px; padding:8px;
+      font-size:.72rem; color:var(--dim); line-height:1.5;
+    }
+    .res-log .entry { padding:2px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+    .res-log .dmg { color:var(--red); }
+    .res-log .heal { color:var(--green); }
+    .res-log .token { color:var(--gold); }
+    .res-log .favor { color:#c084fc; }
+
+    /* ── Game Over ── */
+    #gameover-screen {
+      align-items:center; justify-content:center; gap:20px; text-align:center;
+      background: radial-gradient(800px 400px at 50% 40%, rgba(0,212,255,.08), transparent 60%), var(--bg);
+      padding:24px;
+    }
+    .go-trophy { font-size:4rem; }
+    .go-title { font-size:1.8rem; font-weight:900; }
+    .go-stats { color:var(--faint); font-size:.9rem; line-height:1.8; }
+    .go-btns { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+
+    /* ── Toast ── */
+    #toast {
+      position:fixed;left:50%;bottom:calc(24px + var(--safe-b));
+      transform:translateX(-50%) translateY(16px);
+      background:rgba(8,18,34,.92);border:1px solid var(--accent);color:#fff;
+      padding:11px 20px;border-radius:999px;font-size:.84rem;font-weight:600;z-index:1200;
+      opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      box-shadow:0 10px 30px rgba(0,0,0,.5);
+    }
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* ── Back Button ── */
+    .back-link {
+      position:fixed; top:calc(8px + var(--safe-t)); left:12px; z-index:100;
+      background:var(--glass); border:1px solid var(--glass-border); border-radius:10px;
+      padding:8px 14px; color:var(--text); font-size:.8rem; font-weight:600;
+      text-decoration:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      transition:all .15s;
+    }
+    .back-link:hover { border-color:var(--accent); color:var(--accent); }
+
+    @media(max-width:400px){
+      .die { width:48px; height:48px; font-size:1.3rem; border-radius:10px; }
+      .dice-row { gap:6px; }
+      .title-orlog { font-size:2rem; }
+    }
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ START SCREEN ═══ -->
+  <div id="start-screen" class="screen active">
+    <div class="logo-viking">⚔️</div>
+    <div class="title-orlog">ORLOG</div>
+    <div class="subtitle">VIKING DICE DUEL</div>
+
+    <button class="rules-toggle" onclick="document.querySelector('.rules-box').classList.toggle('open')">
+      How to Play ▾
+    </button>
+    <div class="rules-box">
+      <h3>Goal</h3>
+      Reduce your opponent's health from <b>15 HP</b> to 0.
+      <h3>Dice Faces</h3>
+      <table>
+        <tr><th>Face</th><th>Effect</th></tr>
+        <tr><td>⚔️ Melee</td><td>Deal 1 melee damage</td></tr>
+        <tr><td>🛡️ Block</td><td>Block 1 melee damage</td></tr>
+        <tr><td>🏹 Ranged</td><td>Deal 1 ranged damage</td></tr>
+        <tr><td>🛡️ Shield</td><td>Block 1 ranged damage</td></tr>
+        <tr><td>🪙 Steal</td><td>Steal 1 token from opponent</td></tr>
+        <tr><td>✨ Token</td><td>Gain 1 favor token</td></tr>
+      </table>
+      <h3>Round Flow</h3>
+      1. <b>Roll Phase</b> — Roll 6 dice (up to 3 rolls). Click to lock dice between rolls.<br>
+      2. <b>God Favor Phase</b> — Spend tokens to invoke a God Favor (optional).<br>
+      3. <b>Resolution Phase</b> — All dice resolve: damage dealt/blocked, tokens gained/stolen.
+      <h3>God Favors</h3>
+      <table>
+        <tr><th>Name</th><th>Cost</th><th>Effect</th></tr>
+        <tr><td>⚡ Thor</td><td>4 ⌘</td><td>Deal 3 damage</td></tr>
+        <tr><td>🌿 Idun</td><td>4 ⌘</td><td>Heal 3 HP</td></tr>
+        <tr><td>👁 Odin</td><td>3 ⌘</td><td>Steal 3 tokens</td></tr>
+        <tr><td>⚔️ Tyr</td><td>5 ⌘</td><td>Deal 2 dmg + steal 2 tokens</td></tr>
+        <tr><td>🌸 Freya</td><td>3 ⌘</td><td>Block all melee this round</td></tr>
+      </table>
+    </div>
+
+    <button class="btn-play" onclick="startGame()">⚔️ Start Battle</button>
+  </div>
+
+  <!-- ═══ GAME SCREEN ═══ -->
+  <div id="game-screen" class="screen">
+    <div class="topbar">
+      <button class="topbar-btn" onclick="showScreen('start')">← Menu</button>
+      <span class="round-badge" id="roundBadge">Round 1</span>
+      <span class="phase-badge" id="phaseBadge">ROLL</span>
+    </div>
+
+    <!-- AI AREA -->
+    <div class="player-area ai">
+      <div class="hp-row">
+        <span class="hp-label">AI</span>
+        <div class="hp-bar-outer"><div class="hp-bar-inner ai" id="aiHpBar" style="width:100%"></div></div>
+        <span class="hp-val" id="aiHpVal">15</span>
+      </div>
+      <div class="token-row">
+        <span class="token-icon">⌘</span>
+        <span id="aiTokens">0</span>
+      </div>
+      <div class="dice-row" id="aiDice"></div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center-panel">
+      <div class="roll-info" id="rollInfo">Tap dice to lock, then roll</div>
+      <button class="btn-roll" id="rollBtn" onclick="handleRoll()">🎲 Roll Dice</button>
+      <button class="btn-skip" id="skipBtn" onclick="handleSkipGodFavor()" style="display:none">Skip God Favor</button>
+
+      <div class="gf-panel" id="gfPanel">
+        <div class="gf-title">Choose a God Favor (⌘ <span id="gfTokens">0</span>)</div>
+        <div class="gf-grid" id="gfGrid"></div>
+      </div>
+
+      <div class="res-log" id="resLog" style="display:none"></div>
+    </div>
+
+    <!-- PLAYER AREA -->
+    <div class="player-area human">
+      <div class="hp-row">
+        <span class="hp-label">You</span>
+        <div class="hp-bar-outer"><div class="hp-bar-inner player" id="playerHpBar" style="width:100%"></div></div>
+        <span class="hp-val" id="playerHpVal">15</span>
+      </div>
+      <div class="token-row">
+        <span class="token-icon">⌘</span>
+        <span id="playerTokens">0</span>
+      </div>
+      <div class="dice-row" id="playerDice"></div>
+    </div>
+  </div>
+
+  <!-- ═══ GAME OVER SCREEN ═══ -->
+  <div id="gameover-screen" class="screen">
+    <div class="go-trophy" id="goTrophy">🏆</div>
+    <div class="go-title" id="goTitle">Victory!</div>
+    <div class="go-stats" id="goStats"></div>
+    <div class="go-btns">
+      <button class="btn-play" onclick="startGame()">⚔️ Play Again</button>
+      <button class="topbar-btn" onclick="showScreen('start')">← Menu</button>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <script>
+  (() => {
+    "use strict";
+
+    /* ── Constants ── */
+    const FACES = ['melee','block','ranged','shield','steal','token'];
+    const FACE_ICONS = { melee:'⚔️', block:'🛡️', ranged:'🏹', shield:'🛡️', steal:'🪙', token:'✨' };
+    const FACE_CLASSES = { melee:'dmg', block:'block', ranged:'dmg', shield:'block', steal:'token-face', token:'token-face' };
+    const STARTING_HP = 15;
+    const NUM_DICE = 6;
+    const MAX_ROLLS = 3;
+    const GOD_FAVORS = [
+      { id:'thor',   name:"Thor's Strike",     icon:'⚡', cost:4, desc:'Deal 3 damage' },
+      { id:'idun',   name:"Idun's Rejuvenation",icon:'🌿', cost:4, desc:'Heal 3 HP' },
+      { id:'odin',   name:"Odin's Sacrifice",   icon:'👁', cost:3, desc:'Steal 3 tokens' },
+      { id:'tyr',    name:"Tyr's Challenge",     icon:'⚔️', cost:5, desc:'Deal 2 dmg + steal 2 tokens' },
+      { id:'freya',  name:"Freya's Blessing",    icon:'🌸', cost:3, desc:'Block all melee this round' },
+    ];
+
+    /* ── State ── */
+    let G = {};
+
+    function resetState() {
+      G = {
+        phase: 'roll',        // roll | godfavor | resolution | done
+        turn: 'player',       // player | ai
+        rollsLeft: MAX_ROLLS,
+        round: 1,
+        firstPlayer: 'player',
+        player: { hp: STARTING_HP, tokens:0, dice:[], locked:[], gfChoice:null },
+        ai:     { hp: STARTING_HP, tokens:0, dice:[], locked:[], gfChoice:null },
+      };
+    }
+
+    /* ── DOM helpers ── */
+    const $ = id => document.getElementById(id);
+    function toast(msg) {
+      const el=$('toast'); if(!el) return;
+      el.textContent=msg; el.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t=setTimeout(()=>el.classList.remove('show'),2200);
+    }
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+      $(name+'-screen').classList.add('active');
+    }
+
+    /* ── Dice helpers ── */
+    function rollDie() { return FACES[Math.floor(Math.random()*FACES.length)]; }
+    function rollDice(count) { return Array.from({length:count}, rollDie); }
+
+    function renderDice(containerId, dice, locked, clickable, isAI) {
+      const el = $(containerId);
+      el.innerHTML = '';
+      dice.forEach((face, i) => {
+        const d = document.createElement('div');
+        d.className = 'die';
+        if (isAI && G.phase !== 'resolution' && G.phase !== 'done') {
+          d.classList.add('face-down');
+        } else {
+          d.textContent = FACE_ICONS[face];
+          d.classList.add(FACE_CLASSES[face]);
+        }
+        if (locked[i]) d.classList.add('locked');
+        if (clickable && !isAI) {
+          d.addEventListener('click', () => toggleLock(i));
+        }
+        el.appendChild(d);
+      });
+    }
+
+    function toggleLock(i) {
+      if (G.phase !== 'roll' || G.turn !== 'player') return;
+      if (G.rollsLeft >= MAX_ROLLS) return; // haven't rolled yet
+      G.player.locked[i] = !G.player.locked[i];
+      renderPlayerDice();
+    }
+
+    function renderPlayerDice() {
+      renderDice('playerDice', G.player.dice, G.player.locked, true, false);
+    }
+    function renderAiDice(revealed) {
+      if (revealed) renderDice('aiDice', G.ai.dice, G.ai.locked, false, false);
+      else renderDice('aiDice', G.ai.dice, G.ai.locked, false, true);
+    }
+
+    function updateUI() {
+      $('playerHpVal').textContent = G.player.hp;
+      $('aiHpVal').textContent = G.ai.hp;
+      $('playerHpBar').style.width = (G.player.hp/STARTING_HP*100)+'%';
+      $('aiHpBar').style.width = (G.ai.hp/STARTING_HP*100)+'%';
+      $('playerTokens').textContent = G.player.tokens;
+      $('aiTokens').textContent = G.ai.tokens;
+      $('roundBadge').textContent = 'Round '+G.round;
+      const phaseLabels = {roll:'ROLL',godfavor:'GOD FAVOR',resolution:'RESOLUTION',done:'DONE'};
+      $('phaseBadge').textContent = phaseLabels[G.phase]||'';
+    }
+
+    /* ── Start Game ── */
+    window.startGame = function() {
+      resetState();
+      showScreen('game');
+      initDice();
+      updateUI();
+      startRollPhase();
+    };
+
+    function initDice() {
+      G.player.dice = rollDice(NUM_DICE);
+      G.player.locked = Array(NUM_DICE).fill(false);
+      G.ai.dice = rollDice(NUM_DICE);
+      G.ai.locked = Array(NUM_DICE).fill(false);
+    }
+
+    /* ── Roll Phase ── */
+    function startRollPhase() {
+      G.phase = 'roll';
+      G.turn = G.firstPlayer;
+      G.rollsLeft = MAX_ROLLS;
+      G.player.locked = Array(NUM_DICE).fill(false);
+      G.ai.locked = Array(NUM_DICE).fill(false);
+      G.player.gfChoice = null;
+      G.ai.gfChoice = null;
+
+      // AI rolls first if it's AI's turn
+      if (G.turn === 'ai') {
+        aiRoll();
+      } else {
+        enablePlayerRoll();
+      }
+      updateUI();
+      renderPlayerDice();
+      renderAiDice(false);
+    }
+
+    function enablePlayerRoll() {
+      $('rollBtn').disabled = false;
+      $('rollInfo').textContent = 'Roll '+G.rollsLeft+' left — tap dice to lock';
+      $('skipBtn').style.display = 'none';
+      $('gfPanel').classList.remove('open');
+      $('resLog').style.display = 'none';
+    }
+
+    window.handleRoll = function() {
+      if (G.phase !== 'roll' || G.turn !== 'player' || G.rollsLeft <= 0) return;
+      G.rollsLeft--;
+
+      // Roll unlocked dice
+      for (let i=0; i<NUM_DICE; i++) {
+        if (!G.player.locked[i]) G.player.dice[i] = rollDie();
+      }
+
+      // Animate
+      document.querySelectorAll('#playerDice .die').forEach(d => {
+        d.classList.add('rolling');
+        setTimeout(()=>d.classList.remove('rolling'), 400);
+      });
+
+      renderPlayerDice();
+
+      if (G.rollsLeft <= 0) {
+        $('rollBtn').disabled = true;
+        $('rollInfo').textContent = 'Turn passed to AI...';
+        setTimeout(()=> {
+          G.turn = 'ai';
+          aiRoll();
+        }, 600);
+      } else {
+        $('rollInfo').textContent = 'Roll '+G.rollsLeft+' left — tap dice to lock';
+      }
+      updateUI();
+    };
+
+    function aiRoll() {
+      // AI: keep damage/token faces, reroll blocks (unless low HP)
+      let rollsLeft = MAX_ROLLS;
+      G.ai.locked = Array(NUM_DICE).fill(false);
+
+      function doAiRoll() {
+        if (rollsLeft <= 0) { endRollPhase(); return; }
+
+        // Decide which to lock
+        for (let i=0; i<NUM_DICE; i++) {
+          if (G.ai.locked[i]) continue;
+          const f = G.ai.dice[i];
+          // Keep: melee, ranged, steal, token
+          if (f==='melee'||f==='ranged'||f==='steal'||f==='token') {
+            G.ai.locked[i] = true;
+          }
+          // Keep block if low HP
+          else if ((f==='block'||f==='shield') && G.ai.hp <= 7) {
+            G.ai.locked[i] = true;
+          }
+        }
+
+        // Roll unlocked
+        for (let i=0; i<NUM_DICE; i++) {
+          if (!G.ai.locked[i]) G.ai.dice[i] = rollDie();
+        }
+
+        // Animate AI dice
+        document.querySelectorAll('#aiDice .die').forEach(d => {
+          d.classList.add('rolling');
+          setTimeout(()=>d.classList.remove('rolling'), 400);
+        });
+
+        renderAiDice(false);
+        rollsLeft--;
+        updateUI();
+
+        if (rollsLeft > 0) {
+          setTimeout(doAiRoll, 500);
+        } else {
+          setTimeout(endRollPhase, 600);
+        }
+      }
+
+      setTimeout(doAiRoll, 400);
+    }
+
+    function endRollPhase() {
+      G.phase = 'godfavor';
+      G.turn = G.firstPlayer === 'player' ? 'ai' : 'player'; // other player goes first in GF phase
+
+      // Build God Favor UI
+      buildGFPanel();
+
+      if (G.turn === 'player') {
+        $('gfPanel').classList.add('open');
+        $('skipBtn').style.display = '';
+        $('rollBtn').disabled = true;
+        $('rollInfo').textContent = 'Choose a God Favor or skip';
+      } else {
+        // AI chooses first
+        aiChooseGF();
+        $('rollBtn').disabled = true;
+        $('rollInfo').textContent = 'AI is choosing a God Favor...';
+        setTimeout(()=>{
+          G.turn = 'player';
+          $('gfPanel').classList.add('open');
+          $('skipBtn').style.display = '';
+          $('rollInfo').textContent = 'Choose a God Favor or skip';
+        }, 800);
+      }
+      updateUI();
+    }
+
+    function buildGFPanel() {
+      const grid = $('gfGrid');
+      grid.innerHTML = '';
+      GOD_FAVORS.forEach(gf => {
+        const btn = document.createElement('button');
+        btn.className = 'gf-btn';
+        btn.disabled = G.player.tokens < gf.cost;
+        btn.innerHTML = `${gf.icon} ${gf.name}<br><span class="gf-cost">${gf.cost} ⌘</span>`;
+        btn.addEventListener('click', () => {
+          G.player.gfChoice = gf.id;
+          grid.querySelectorAll('.gf-btn').forEach(b=>b.classList.remove('selected'));
+          btn.classList.add('selected');
+          resolveGodFavors();
+        });
+        grid.appendChild(btn);
+      });
+      $('gfTokens').textContent = G.player.tokens;
+    }
+
+    function aiChooseGF() {
+      // AI logic: prioritize based on state
+      const hpRatio = G.ai.hp / STARTING_HP;
+      let chosen = null;
+
+      if (hpRatio <= 0.35 && G.ai.tokens >= GOD_FAVORS[1].cost) {
+        chosen = 'idun'; // heal when low
+      } else if (G.player.hp <= 6 && G.ai.tokens >= GOD_FAVORS[0].cost) {
+        chosen = 'thor'; // finish them
+      } else if (G.ai.tokens >= GOD_FAVORS[2].cost && G.player.tokens >= 3) {
+        chosen = 'odin'; // steal if opponent has tokens
+      } else if (G.ai.tokens >= GOD_FAVORS[3].cost && G.player.hp <= 8) {
+        chosen = 'tyr'; // big combo
+      } else if (G.ai.tokens >= GOD_FAVORS[0].cost) {
+        chosen = 'thor'; // default damage
+      }
+      G.ai.gfChoice = chosen;
+    }
+
+    window.handleSkipGodFavor = function() {
+      G.player.gfChoice = null;
+      resolveGodFavors();
+    };
+
+    /* ── Resolution ── */
+    function resolveGodFavors() {
+      G.phase = 'resolution';
+      $('gfPanel').classList.remove('open');
+      $('skipBtn').style.display = 'none';
+      $('rollBtn').disabled = true;
+      $('rollInfo').textContent = 'Resolving...';
+      $('resLog').style.display = 'block';
+      $('resLog').innerHTML = '';
+
+      renderAiDice(true);
+      updateUI();
+
+      const log = (msg, cls) => {
+        const e = document.createElement('div');
+        e.className = 'entry ' + (cls||'');
+        e.textContent = msg;
+        $('resLog').appendChild(e);
+        $('resLog').scrollTop = $('resLog').scrollHeight;
+      };
+
+      let pMelee=0, pRanged=0, pBlockM=0, pBlockR=0, pSteal=0, pGain=0;
+      let aMelee=0, aRanged=0, aBlockM=0, aBlockR=0, aSteal=0, aGain=0;
+
+      // Count dice
+      G.player.dice.forEach(f => {
+        if(f==='melee') pMelee++;
+        else if(f==='ranged') pRanged++;
+        else if(f==='block') pBlockM++;
+        else if(f==='shield') pBlockR++;
+        else if(f==='steal') pSteal++;
+        else if(f==='token') pGain++;
+      });
+      G.ai.dice.forEach(f => {
+        if(f==='melee') aMelee++;
+        else if(f==='ranged') aRanged++;
+        else if(f==='block') aBlockM++;
+        else if(f==='shield') aBlockR++;
+        else if(f==='steal') aSteal++;
+        else if(f==='token') aGain++;
+      });
+
+      log(`You rolled: ${pMelee}⚔️ ${pRanged}🏹 ${pBlockM}🛡️ ${pBlockR}🛡️ ${pSteal}🪙 ${pGain}✨`);
+      log(`AI rolled: ${aMelee}⚔️ ${aRanged}🏹 ${aBlockM}🛡️ ${aBlockR}🛡️ ${aSteal}🪙 ${aGain}✨`);
+
+      // Apply God Favors BEFORE dice resolution
+      let freyaPlayer = false, freyaAi = false;
+
+      if (G.player.gfChoice) {
+        const gf = GOD_FAVORS.find(g=>g.id===G.player.gfChoice);
+        if (gf) {
+          log(`You invoked ${gf.name}!`, 'favor');
+          G.player.tokens -= gf.cost;
+          if (gf.id==='thor') { aMelee = Math.max(0, aMelee - 0); log('Thor deals 3 damage to AI!', 'dmg'); G.ai.hp -= 3; }
+          else if (gf.id==='idun') { G.player.hp = Math.min(STARTING_HP, G.player.hp + 3); log('Idun heals you for 3 HP!', 'heal'); }
+          else if (gf.id==='odin') { const s=Math.min(3,G.ai.tokens); G.ai.tokens-=s; G.player.tokens+=s; log(`Odin steals ${s} tokens!`, 'token'); }
+          else if (gf.id==='tyr') { G.ai.hp -= 2; const s=Math.min(2,G.ai.tokens); G.ai.tokens-=s; G.player.tokens+=s; log(`Tyr deals 2 dmg and steals ${s} tokens!`, 'dmg'); }
+          else if (gf.id==='freya') { freyaPlayer = true; log('Freya blocks all melee this round!', 'favor'); }
+        }
+      }
+      if (G.ai.gfChoice) {
+        const gf = GOD_FAVORS.find(g=>g.id===G.ai.gfChoice);
+        if (gf) {
+          log(`AI invoked ${gf.name}!`, 'favor');
+          G.ai.tokens -= gf.cost;
+          if (gf.id==='thor') { log('Thor deals 3 damage to you!', 'dmg'); G.player.hp -= 3; }
+          else if (gf.id==='idun') { G.ai.hp = Math.min(STARTING_HP, G.ai.hp + 3); log('Idun heals AI for 3 HP!', 'heal'); }
+          else if (gf.id==='odin') { const s=Math.min(3,G.player.tokens); G.player.tokens-=s; G.ai.tokens+=s; log(`Odin steals ${s} tokens!`, 'token'); }
+          else if (gf.id==='tyr') { G.player.hp -= 2; const s=Math.min(2,G.player.tokens); G.player.tokens-=s; G.ai.tokens+=s; log(`Tyr deals 2 dmg and steals ${s} tokens!`, 'dmg'); }
+          else if (gf.id==='freya') { freyaAi = true; log('Freya blocks all melee for AI!', 'favor'); }
+        }
+      }
+
+      // Dice resolution
+      // Player attacks AI
+      let pDmgMelee = freyaAi ? 0 : Math.max(0, pMelee - aBlockM);
+      let pDmgRanged = Math.max(0, pRanged - aBlockR);
+      if (pDmgMelee > 0) { G.ai.hp -= pDmgMelee; log(`Your melee deals ${pDmgMelee} damage!`, 'dmg'); }
+      if (pDmgRanged > 0) { G.ai.hp -= pDmgRanged; log(`Your ranged deals ${pDmgRanged} damage!`, 'dmg'); }
+
+      // AI attacks Player
+      let aDmgMelee = freyaPlayer ? 0 : Math.max(0, aMelee - pBlockM);
+      let aDmgRanged = Math.max(0, aRanged - pBlockR);
+      if (aDmgMelee > 0) { G.player.hp -= aDmgMelee; log(`AI melee deals ${aDmgMelee} damage!`, 'dmg'); }
+      if (aDmgRanged > 0) { G.player.hp -= aDmgRanged; log(`AI ranged deals ${aDmgRanged} damage!`, 'dmg'); }
+
+      // Token steal
+      const pStealed = Math.min(pSteal, G.ai.tokens);
+      G.ai.tokens -= pStealed; G.player.tokens += pStealed;
+      if (pStealed > 0) log(`You steal ${pStealed} tokens!`, 'token');
+
+      const aStealed = Math.min(aSteal, G.player.tokens);
+      G.player.tokens -= aStealed; G.ai.tokens += aStealed;
+      if (aStealed > 0) log(`AI steals ${aStealed} tokens!`, 'token');
+
+      // Token gain
+      if (pGain > 0) { G.player.tokens += pGain; log(`You gain ${pGain} tokens!`, 'token'); }
+      if (aGain > 0) { G.ai.tokens += aGain; log(`AI gains ${aGain} tokens!`, 'token'); }
+
+      // Clamp
+      G.player.hp = Math.max(0, G.player.hp);
+      G.ai.hp = Math.max(0, G.ai.hp);
+
+      updateUI();
+
+      // Check win
+      setTimeout(()=>{
+        if (G.player.hp <= 0 || G.ai.hp <= 0) {
+          endGame();
+        } else {
+          // Next round
+          G.round++;
+          G.firstPlayer = G.firstPlayer === 'player' ? 'ai' : 'player';
+          toast('Round '+G.round);
+          setTimeout(startRollPhase, 1000);
+        }
+      }, 1500);
+    }
+
+    function endGame() {
+      G.phase = 'done';
+      const playerWon = G.ai.hp <= 0;
+      $('goTrophy').textContent = playerWon ? '🏆' : '💀';
+      $('goTitle').textContent = playerWon ? 'Victory!' : 'Defeat';
+      $('goTitle').style.background = playerWon
+        ? 'linear-gradient(135deg,var(--accent),var(--gold))'
+        : 'linear-gradient(135deg,var(--red),#ff8c42)';
+      $('goTitle').style.webkitBackgroundClip = 'text';
+      $('goTitle').style.backgroundClip = 'text';
+      $('goTitle').style.color = 'transparent';
+      $('goStats').innerHTML = `
+        Rounds played: <b>${G.round}</b><br>
+        Your HP: <b>${G.player.hp}</b> / ${STARTING_HP}<br>
+        AI HP: <b>${G.ai.hp}</b> / ${STARTING_HP}
+      `;
+      showScreen('gameover');
+    }
+
+    // Init
+    resetState();
+  })();
+  </script>
+  <script src="top_buttons.js"></script>
+</body>
+</html>

@@ -1,599 +1,714 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horse Racing Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0c1a12">
+    <meta name="description" content="ROYAL DERBY — simulatore di corse di cavalli: scommesse con quote, cavalli rinomina-bili con statistiche e carriera, commento live, grafica curata e ottimizzato per iPhone.">
+    <title>ROYAL DERBY — Simulatore di Corse</title>
     <style>
-        :root {
-            --bg-color: #1e272e;
-            --panel-color: #2f3640;
-            --accent-color: #4cd137;
-            --text-color: #f5f6fa;
-            --track-color: #2F4F4F;
-            --grass-color: #0b6623;
+        :root{
+            --bg:#0c1a12; --bg2:#0f2017; --card:#14241a; --card2:#1a2f21;
+            --line:rgba(255,255,255,.10); --txt:#f2f7f0; --dim:#9db8a4;
+            --gold:#ffd166; --green:#52ff9e; --red:#ff5f6d; --cyan:#3ee6ff;
+            --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
         }
-
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        header {
-            width: 100%;
-            background: rgba(0,0,0,0.2);
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
-        }
-
-        .container {
-            flex: 1;
-            display: flex;
-            width: 100%;
-            max-width: 1400px;
-            padding: 20px;
-            gap: 20px;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
-
-        /* LEFT: Track Visualization */
-        .track-view {
-            flex: 2;
-            background: #abce8a; /* Grass */
-            border-radius: 15px;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: inset 0 0 50px rgba(0,0,0,0.3);
-            border: 5px solid #5a4b41; /* Fence */
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        /* RIGHT: Info Panel */
-        .info-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            min-width: 300px;
-        }
-
-        .box {
-            background: var(--panel-color);
-            border-radius: 10px;
-            padding: 15px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* Leaderboard */
-        .leaderboard {
-            flex: 1;
-            overflow-y: auto;
-        }
-        
-        .horse-row {
-            display: flex;
-            align-items: center;
-            padding: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            transition: background 0.2s;
-        }
-        .horse-row:last-child { border-bottom: none; }
-        
-        .rank-badge {
-            width: 25px;
-            height: 25px;
-            border-radius: 50%;
-            background: #444;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 0.8rem;
-            margin-right: 10px;
-            font-weight: bold;
-        }
-        .rank-1 { background: #ffd700; color: black; }
-        .rank-2 { background: #c0c0c0; color: black; }
-        .rank-3 { background: #cd7f32; color: black; }
-
-        .horse-color-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-            border: 1px solid white;
-        }
-
-        .horse-name { flex: 1; font-weight: bold; }
-        .splits {font-family: monospace; font-size: 0.9rem; color: #aaa;}
-
-        /* Commentary */
-        .commentary-box {
-            height: 250px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .feed-content {
-            flex: 1;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            padding-right: 5px;
-        }
-
-        .feed-msg {
-            margin-bottom: 8px;
-            padding-left: 10px;
-            border-left: 3px solid #555;
-            line-height: 1.3;
-        }
-        .feed-msg.important { border-left-color: #e94560; color: #ff9f43; }
-        .feed-msg.lap { border-left-color: #4cd137; color: #4cd137; }
-
-        /* Controls */
-        .controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .btn {
-            background: var(--accent-color);
-            color: #fff;
-            border: none;
-            padding: 10px 25px;
-            border-radius: 5px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        .btn:hover { opacity: 0.9; }
-        .btn.secondary { background: #57606f; }
-
-        .back-link {
-            text-decoration: none;
-            color: #a0c0e0;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.9rem;
-        }
-
-        /* Stats Modal/Overlay if needed, skipping for now */
-
-        @media (max-width: 900px) {
-            .container { flex-direction: column; overflow-y: auto; }
-            .track-view { height: 300px; flex: none; }
-            .info-panel { height: auto; }
-            .commentary-box { height: 200px; }
+        *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+        body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;touch-action:manipulation;overflow-x:hidden}
+        body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+            radial-gradient(700px 320px at 15% -8%,rgba(82,255,158,.10),transparent 60%),
+            radial-gradient(600px 300px at 90% 0%,rgba(255,209,102,.09),transparent 60%)}
+        .wrap{width:100%;max-width:1100px;margin:0 auto;padding:calc(8px + var(--safe-t)) 12px calc(96px + var(--safe-b));display:flex;flex-direction:column;gap:12px}
+        header{display:flex;align-items:center;gap:10px;padding:4px 2px;flex-wrap:wrap}
+        .logo{font-size:clamp(17px,4.6vw,24px);font-weight:800;letter-spacing:2px;
+            background:linear-gradient(90deg,var(--gold),var(--green));-webkit-background-clip:text;background-clip:text;color:transparent}
+        .logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--dim);-webkit-text-fill-color:var(--dim);font-weight:600}
+        .wallet{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 14px;font-size:13px;color:var(--dim);display:flex;gap:8px;align-items:center}
+        .wallet b{color:var(--gold);font-size:15px;font-family:ui-monospace,Menlo,monospace}
+        /* layout */
+        .layout{display:flex;flex-direction:column;gap:12px}
+        @media(min-width:900px){ .layout{flex-direction:row} .track-wrap{flex:1.4} .side{flex:1} }
+        /* track */
+        .track-wrap{position:relative;background:linear-gradient(160deg,#1d3a24,#142b1c);border:1px solid var(--line);border-radius:18px;
+            overflow:hidden;aspect-ratio:16/10;box-shadow:0 14px 44px rgba(0,0,0,.5)}
+        canvas{width:100%;height:100%;display:block;touch-action:none}
+        #countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:clamp(64px,18vw,140px);font-weight:800;color:#fff;
+            text-shadow:0 4px 24px rgba(0,0,0,.8);z-index:5;letter-spacing:6px;background:rgba(0,0,0,.25)}
+        #banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:none;z-index:6;background:linear-gradient(90deg,rgba(255,209,102,.92),rgba(255,95,109,.92));
+            color:#1a1000;font-weight:800;font-size:13px;letter-spacing:2px;padding:8px 18px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,.45);white-space:nowrap}
+        /* side */
+        .side{display:flex;flex-direction:column;gap:10px;min-width:0}
+        .tabs{display:flex;gap:6px}
+        .tab{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--dim);padding:11px 6px;font-size:12.5px;font-weight:700;
+            letter-spacing:.5px;cursor:pointer;font-family:inherit;transition:all .2s}
+        .tab.on{background:linear-gradient(90deg,rgba(255,209,102,.16),rgba(82,255,158,.14));color:var(--txt);border-color:rgba(255,209,102,.45)}
+        .panel{display:none;flex-direction:column;gap:10px}
+        .panel.on{display:flex}
+        .box{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:12px}
+        .box h3{font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px}
+        /* leaderboard rows */
+        .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.03);margin-bottom:6px;transition:all .2s}
+        .row.bet{background:linear-gradient(90deg,rgba(255,209,102,.16),rgba(255,209,102,.04));border-color:rgba(255,209,102,.5);box-shadow:0 0 14px rgba(255,209,102,.15)}
+        .rank{width:26px;height:26px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#243;color:var(--txt)}
+        .rank.r1{background:linear-gradient(135deg,#ffd700,#ff9f43);color:#1a1000}
+        .rank.r2{background:linear-gradient(135deg,#e8e8e8,#9aa0a6);color:#111}
+        .rank.r3{background:linear-gradient(135deg,#e8a25c,#b06a2a);color:#1a1000}
+        .dot{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.5);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+        .nm{flex:1;min-width:0;font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .nm .tag{font-size:9px;color:var(--dim);font-weight:600;display:block;letter-spacing:1px}
+        .sp{font-size:12px;color:var(--dim);font-family:ui-monospace,Menlo,monospace;flex:none;text-align:right}
+        .sp.b{color:var(--gold);font-weight:700}
+        .betbtn{flex:none;border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:10px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s;min-height:34px}
+        .betbtn:active{transform:scale(.95)}
+        .betbtn:hover{color:var(--txt);border-color:var(--gold)}
+        .betbtn.on{background:var(--gold);color:#1a1000;border-color:var(--gold)}
+        .betbtn:disabled{opacity:.3;cursor:not-allowed}
+        /* stake chips */
+        .stakes{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+        .stake{min-width:52px;padding:9px 6px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);border-radius:12px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s}
+        .stake.on{background:linear-gradient(90deg,#0ea5e9,#6366f1);border-color:transparent;box-shadow:0 4px 14px rgba(14,165,233,.35)}
+        /* feed */
+        .feed{height:min(40vh,320px);overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
+        .feed::-webkit-scrollbar{width:5px}.feed::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+        .fm{font-size:13px;line-height:1.45;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.03);border-left:3px solid var(--dim);animation:in .3s ease}
+        @keyframes in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+        .fm .tm{font-size:10px;color:var(--dim);font-family:ui-monospace,Menlo,monospace;margin-right:6px}
+        .fm.imp{border-left-color:var(--red);color:#ffd9dd;background:rgba(255,95,109,.07)}
+        .fm.gold{border-left-color:var(--gold);color:#fff3d1;background:rgba(255,209,102,.07)}
+        .fm.info{color:var(--dim);font-style:italic;border-left-color:var(--cyan)}
+        /* stable / horse cards */
+        .hcard{display:flex;gap:10px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:10px}
+        .hcard .info{flex:1;min-width:0}
+        .hcard input.rename{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:8px;color:var(--txt);font:inherit;font-weight:700;font-size:13px;padding:6px 8px}
+        .hcard .swatches{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+        .hcard .sw{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+        .hcard .sw.on{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.4)}
+        .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:12px}
+        .stats .srow{display:flex;justify-content:space-between;color:var(--dim)}
+        .stats .srow b{color:var(--txt);font-family:ui-monospace,Menlo,monospace}
+        .sbar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:3px}
+        .sbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--green))}
+        /* controls */
+        .controls{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(12,26,18,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+            border-top:1px solid var(--line);padding:10px 14px calc(10px + var(--safe-b));display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+        .btn{appearance:none;border:none;cursor:pointer;font-family:inherit;font-weight:800;border-radius:50px;min-height:46px;padding:12px 22px;font-size:14px;letter-spacing:1px;transition:transform .15s,box-shadow .2s,opacity .2s}
+        .btn:active{transform:scale(.97)}
+        .btn.primary{color:#fff;background:linear-gradient(90deg,#e8a13c,#d62839);box-shadow:0 6px 22px rgba(214,40,57,.4)}
+        .btn.primary:disabled{opacity:.4;box-shadow:none;cursor:not-allowed}
+        .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+        .btn.ghost:hover{color:var(--txt);border-color:var(--gold)}
+        /* modal */
+        .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50;background:rgba(4,10,6,.88);backdrop-filter:blur(8px);padding:20px}
+        .modal.on{display:flex}
+        .modal .box{max-width:430px;width:100%;text-align:center;animation:in .4s ease}
+        .modal h2{font-size:22px;letter-spacing:1px;color:var(--gold)}
+        .modal .final{font-size:26px;font-weight:800;margin:10px 0 4px}
+        .modal .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
+        .result-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;background:rgba(255,255,255,.04);margin-bottom:5px;font-size:13px}
+        .result-row .nm{font-size:13px}
+        .payout{font-weight:800;color:var(--green);font-family:ui-monospace,Menlo,monospace}
+        .payout.loss{color:var(--red)}
+        .net{font-size:15px;font-weight:800;margin:10px 0}
+        .net.win{color:var(--green)} .net.loss{color:var(--red)}
+        .modal .actions{display:flex;gap:10px;margin-top:14px;justify-content:center;flex-wrap:wrap}
+        .hint{font-size:11px;color:var(--dim);text-align:center;padding:2px 0}
+        @media(max-width:560px){
+            .feed{height:min(34vh,280px)}
+            .track-wrap{aspect-ratio:4/3}
+            .wallet{font-size:12px;padding:5px 10px}
         }
     </style>
 </head>
 <body>
-
+<div class="wrap">
     <header>
-        <a href="../index.html" class="back-link">← Back to Portfolio</a>
-        <h2 style="margin:0">Royal Derby Simulator</h2>
-        <div style="width: 100px"><!-- Spacer --></div>
+        <div class="logo">ROYAL DERBY <small>SIMULATORE · STAGIONE LIVE</small></div>
+        <div style="flex:1"></div>
+        <div class="wallet">💰 <b id="walletAmt">€500</b></div>
     </header>
 
-    <div class="container">
-        <!-- Race Track -->
-        <div class="track-view" id="track-container">
+    <div class="layout">
+        <div class="track-wrap" id="trackWrap">
             <canvas id="trackCanvas"></canvas>
-            <div id="countdown" style="position: absolute; font-size: 5rem; font-weight: bold; color: white; text-shadow: 2px 2px 4px black; display: none;">3</div>
+            <div id="countdown">3</div>
+            <div id="banner">🏁 FINAL STRETCH</div>
         </div>
 
-        <!-- Sidebar -->
-        <div class="info-panel">
-            
-            <div class="box controls">
-                <button class="btn" id="startBtn" onclick="prepareRace()">Start Race</button>
-                <button class="btn secondary" onclick="resetRace()">Reset</button>
+        <div class="side">
+            <div class="tabs">
+                <button class="tab on" data-tab="race">🏇 CORSA</button>
+                <button class="tab" data-tab="feed">💬 COMMENTO</button>
+                <button class="tab" data-tab="stable">🐎 STALLA</button>
             </div>
 
-            <div class="box leaderboard">
-                <h3 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:5px;">Leaderboard</h3>
-                <div id="leaderboard-list">
-                    <!-- Rows injected here -->
+            <div class="panel on" id="tab-race">
+                <div class="box">
+                    <h3>Leaderboard</h3>
+                    <div id="lb-list"></div>
+                </div>
+                <div class="box">
+                    <h3>💸 Puntata</h3>
+                    <div class="stakes" id="stakeChips">
+                        <button class="stake" data-v="5">€5</button>
+                        <button class="stake" data-v="10">€10</button>
+                        <button class="stake" data-v="25">€25</button>
+                        <button class="stake on" data-v="50">€50</button>
+                        <button class="stake" data-v="100">€100</button>
+                    </div>
+                    <div class="hint">Tocca "🎯" sulla riga di un cavallo per puntare su di lui (evidenziato in oro).</div>
                 </div>
             </div>
 
-            <div class="box commentary-box">
-                <h3 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:5px;">Live Commentary</h3>
-                <div class="feed-content" id="comm-feed">
-                    <div class="feed-msg">Welcome to the Royal Derby! Press Start to begin.</div>
+            <div class="panel" id="tab-feed">
+                <div class="box">
+                    <h3>Live Commentary</h3>
+                    <div class="feed" id="feed"></div>
+                </div>
+            </div>
+
+            <div class="panel" id="tab-stable">
+                <div class="box">
+                    <h3>🐎 La Stalla — statistiche & rinomina</h3>
+                    <div id="stable-list"></div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // --- CONFIG & DATA ---
-        const TRACK_LAPS = 2;
-        const TRACK_LENGTH_M = 1000; // meters per lap approx for logic
-        
-        // Horses Generation
-        const HORSE_VARS = [
-            { name: "Thunder Bolt", color: "#e74c3c" },
-            { name: "Shadowfax", color: "#ecf0f1" },
-            { name: "Black Pearl", color: "#2d3436" },
-            { name: "Secretariat", color: "#e67e22" },
-            { name: "Pegasus", color: "#3498db" },
-            { name: "Golden Wind", color: "#f1c40f" },
-            { name: "Comet", color: "#9b59b6" },
-            { name: "Biscuit", color: "#95a5a6" }
-        ];
+<div class="controls">
+    <button class="btn primary" id="startBtn">🏇 START RACE</button>
+    <button class="btn ghost" id="resetBtn">🔄 Reset</button>
+    <button class="btn ghost" id="newBetsBtn">🧹 Azzera puntate</button>
+</div>
 
-        let horses = [];
-        let raceActive = false;
-        let raceFinished = false;
-        let timer = 0;
-        let lastCommentaryTime = 0;
+<div class="modal" id="resultModal">
+    <div class="box">
+        <h2>🏆 RISULTATO</h2>
+        <div class="final" id="resFinal">—</div>
+        <div class="sub" id="resTime">—</div>
+        <div id="resList"></div>
+        <div class="net" id="resNet"></div>
+        <div class="actions">
+            <button class="btn primary" id="againBtn">🔁 Nuova corsa</button>
+        </div>
+    </div>
+</div>
 
-        // Canvas
-        const canvas = document.getElementById('trackCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Resize handling
-        let cvsW, cvsH;
-        function resize() {
-            const container = document.getElementById('track-container');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            cvsW = canvas.width;
-            cvsH = canvas.height;
-            draw();
+<script>
+(function(){
+'use strict';
+/* ═══════════ DATABASE & PERSISTENZA ═══════════ */
+const LS='royalderby_v1';
+const SILKS=['#e74c3c','#f1c40f','#3498db','#2ecc71','#9b59b6','#e67e22','#1abc9c','#e84393','#f5f6fa','#95a5a6'];
+const DEFAULT_HORSES=[
+    {name:'Thunder Bolt',   color:'#e74c3c'},
+    {name:'Shadowfax',      color:'#f1c40f'},
+    {name:'Black Pearl',    color:'#34495e'},
+    {name:'Secretariat',    color:'#e67e22'},
+    {name:'Pegasus',        color:'#3498db'},
+    {name:'Golden Wind',    color:'#d4ac0d'},
+    {name:'Comet',          color:'#9b59b6'},
+    {name:'Biscuit',        color:'#aab7b8'}
+];
+const LAPS=2, LAP_M=1100, RACE_M=LAPS*LAP_M;
+
+let saved=null;
+try{saved=JSON.parse(localStorage.getItem(LS));}catch(e){}
+const P={
+    wallet: (saved&&typeof saved.wallet==='number')?saved.wallet:500,
+    names: (saved&&saved.names)?saved.names:{},
+    colors:(saved&&saved.colors)?saved.colors:{},
+    career:(saved&&saved.career)?saved.career:{}
+};
+function persist(){try{localStorage.setItem(LS,JSON.stringify({wallet:P.wallet,names:P.names,colors:P.colors,career:P.career}));}catch(e){}}
+function careerOf(id){return P.career[id]||(P.career[id]={races:0,wins:0,places:0,best:null,earned:0});}
+
+/* ═══════════ CAVALLI ═══════════ */
+class Horse{
+    constructor(def,i){
+        this.id=def.id||('h'+i); this.defName=def.name;
+        this.name=P.names[this.id]||def.name;
+        this.color=P.colors[this.id]||def.color;
+        this.baseSpeed=88+Math.random()*11;   // 88-99
+        this.accel=18+Math.random()*10;       // 18-28
+        this.stamina=0.35+Math.random()*0.6;  // 0.35-0.95
+        this.form=0.5+Math.random()*0.5;      // 0.5-1.0 (recency form)
+        this.distance=0; this.progress=0; this.currentSpeed=0; this.lane=i;
+        this.laps=0; this.finishTime=null; this.place=null;
+        this.surge=0; this.stateTimer=0; this.stride=Math.random()*6.28;
+        this.lastLapAt=0; this.splitTimes=[]; this.maxSpeedSeen=0;
+        this.rating=Math.round((this.baseSpeed*0.5+this.accel*1.2+this.stamina*100*0.35+this.form*30));
+    }
+    update(dt, raceT){
+        this.stateTimer-=dt;
+        if(this.stateTimer<=0){
+            const r=Math.random();
+            if(r<0.28){this.surge=1;this.stateTimer=1+Math.random()*2;}
+            else if(r<0.48){this.surge=-1;this.stateTimer=1+Math.random()*2;}
+            else{this.surge=0;this.stateTimer=2+Math.random()*3;}
         }
-        window.addEventListener('resize', resize);
-        
-        // --- CLASS ---
-        class Horse {
-            constructor(def) {
-                this.name = def.name;
-                this.color = def.color;
-                
-                // Stats - Tightened for closer races
-                // Base Speed roughly maps to game units
-                this.baseSpeed = 95 + Math.random() * 5; // 95-100 range
-                this.accel = 20 + Math.random() * 10;    // Acceleration
-                this.stamina = Math.random();            // 0-1 measure for late game
-
-                // Race State
-                this.distance = 0; 
-                this.progress = 0; 
-                this.currentSpeed = 0;
-                this.lane = 0; 
-                this.lapsCompleted = 0;
-
-                // Dynamic Mechanics
-                this.surgeState = 0; // 0=Normal, 1=Boost, -1=Lull
-                this.stateTimer = 0;
-            }
-
-            update(dt) {
-                // 1. Update State (Surges and Lulls)
-                this.stateTimer -= dt;
-                if (this.stateTimer <= 0) {
-                    const r = Math.random();
-                    if (r < 0.3) {
-                        // Boost!
-                        this.surgeState = 1;
-                        this.stateTimer = 1 + Math.random() * 2; // 1-3s duration
-                    } else if (r < 0.5) {
-                        // Lull / Catch breath
-                        this.surgeState = -1;
-                        this.stateTimer = 1 + Math.random() * 2;
-                    } else {
-                        // Cruising
-                        this.surgeState = 0;
-                        this.stateTimer = 2 + Math.random() * 3;
-                    }
-                }
-
-                // 2. Calculate Target Velocity
-                // Convert base stat to m/s approx.
-                // 2000m race. Target time ~50-60s => ~35-40 m/s
-                let targetMps = this.baseSpeed / 2.6; 
-
-                // Apply Surge modifiers
-                if (this.surgeState === 1) targetMps *= 1.15; // +15% burst
-                if (this.surgeState === -1) targetMps *= 0.85; // -15% lag
-
-                // Apply Fatigue/Stamina effects logic
-                // Horses slow down slightly as race progresses, stamina mitigates this
-                const raceProgress = Math.min(1, this.distance / (TRACK_LAPS * TRACK_LENGTH_M));
-                
-                // Fatigue curve starting after 50% distance
-                if (raceProgress > 0.5) {
-                    // Factor rises 0 to 0.2
-                    let fatigueFactor = (raceProgress - 0.5) * 0.4; 
-                    // High stamina reduces the impact (stamina 1.0 -> 0 impact)
-                    let effectiveFatigue = fatigueFactor * (1 - (this.stamina * 0.8));
-                    targetMps *= (1 - effectiveFatigue);
-                }
-
-                // 3. Physics update
-                // Smooth interpolation for velocity
-                const approachRate = this.accel * dt;
-                if (this.currentSpeed < targetMps) {
-                    this.currentSpeed = Math.min(targetMps, this.currentSpeed + approachRate);
-                } else {
-                    this.currentSpeed = Math.max(targetMps, this.currentSpeed - approachRate);
-                }
-
-                // 4. Move
-                this.distance += this.currentSpeed * dt;
-                
-                this.progress = this.distance / TRACK_LENGTH_M;
-                
-                // Check Lap
-                if (Math.floor(this.progress) > this.lapsCompleted) {
-                    this.lapsCompleted = Math.floor(this.progress);
-                    if (this.lapsCompleted < TRACK_LAPS) {
-                        return "lap";
-                    } else {
-                        return "finish";
-                    }
-                }
-                return null;
-            }
+        let target=this.baseSpeed/2.6;
+        if(this.surge===1)target*=1.14;
+        if(this.surge===-1)target*=0.86;
+        const prog=Math.min(1,this.distance/RACE_M);
+        if(prog>0.5){const f=(prog-0.5)*0.5;target*=(1-f*(1-this.stamina*0.85));}
+        const approach=this.accel*dt;
+        if(this.currentSpeed<target)this.currentSpeed=Math.min(target,this.currentSpeed+approach);
+        else this.currentSpeed=Math.max(target,this.currentSpeed-approach);
+        this.distance+=this.currentSpeed*dt;
+        this.maxSpeedSeen=Math.max(this.maxSpeedSeen,this.currentSpeed);
+        this.progress=this.distance/RACE_M;
+        this.stride+=this.currentSpeed*dt*1.6;
+        const newLap=Math.floor(this.progress*RACE_M/LAP_M);
+        if(newLap>this.laps){
+            this.laps=newLap;
+            this.splitTimes.push({lap:this.laps,time:(raceT-this.lastLapAt).toFixed(1)});
+            this.lastLapAt=raceT;
+            if(this.laps<LAPS)return 'lap';
+            this.finishTime=raceT.toFixed(2);
+            return 'finish';
         }
+        return null;
+    }
+    rename(n){this.name=n;P.names[this.id]=n;persist();}
+    setColor(c){this.color=c;P.colors[this.id]=c;persist();}
+}
 
-        // --- GAME LOOP ---
-        function init() {
-            resize();
-            resetRace();
+/* ═══════════ STATO ═══════════ */
+let horses=[],bets={},raceActive=false,raceStarted=false,timer=0,lastCommentary=0,stake=50;
+let lastPos={},surgeLog={};
+const $=id=>document.getElementById(id);
+const fmt=t=>t.toFixed(1)+'s';
+
+/* ═══════════ CANVAS ═══════════ */
+const canvas=$('trackCanvas'),ctx=canvas.getContext('2d');
+let cvsW=0,cvsH=0,dpr=1;
+function resize(){
+    dpr=Math.min(devicePixelRatio||1,2);
+    const r=canvas.getBoundingClientRect();
+    cvsW=Math.max(100,r.width);cvsH=Math.max(100,r.height);
+    canvas.width=Math.round(cvsW*dpr);canvas.height=Math.round(cvsH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+}
+addEventListener('resize',()=>{resize();draw();});
+addEventListener('orientationchange',()=>setTimeout(resize,150));
+
+/* ═══════════ DISEGNO ═══════════ */
+function draw(){
+    ctx.clearRect(0,0,cvsW,cvsH);
+    if(!horses.length)return;
+    const cx=cvsW/2,cy=cvsH/2;
+    const rX=Math.min(cvsW*0.44,cvsH*0.52),rY=rX*(cvsH/cvsW)*0.72;
+    // grass gradient
+    const gg=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(rX,rY)*1.5);
+    gg.addColorStop(0,'#2f6b34');gg.addColorStop(1,'#1c4523');
+    ctx.fillStyle=gg;ctx.fillRect(0,0,cvsW,cvsH);
+    // infield detail
+    ctx.fillStyle='rgba(255,255,255,.05)';
+    ctx.beginPath();ctx.ellipse(cx,cy,rX*0.5,rY*0.38,0,0,6.283);ctx.fill();
+    // track surface
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,rX,rY,0,0,6.283);
+    ctx.ellipse(cx,cy,rX*0.55,rY*0.42,0,0,6.283);
+    ctx.fillStyle='#8d6e63';ctx.fill('evenodd');
+    // lane lines
+    const lanes=Math.max(4,horses.length);
+    for(let i=1;i<lanes;i++){
+        const t=i/lanes;
+        const lrX=rX*0.55+(rX-rX*0.55)*t, lrY=rY*0.42+(rY-rY*0.42)*t;
+        ctx.beginPath();ctx.ellipse(cx,cy,lrX,lrY,0,0,6.283);
+        ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=1;ctx.stroke();
+    }
+    // finish line: checkered
+    const fx=cx+rX*0.55,fy=cy;
+    ctx.save();
+    ctx.beginPath();ctx.rect(fx-6,fy-rY*0.42*0.35,12,rY*0.42*0.7);ctx.clip();
+    const sq=6;
+    for(let y=-60;y<60;y+=sq){
+        for(let x=0;x<3;x++){
+            ctx.fillStyle=((Math.floor((y/ sq)+x)+2000)%2===0)?'#fff':'#111';
+            ctx.fillRect(fx-6+x*sq,y*sq,sq,sq);
         }
-
-        function resetRace() {
-            raceActive = false;
-            raceFinished = false;
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('countdown').style.display = 'none';
-            timer = 0;
-            
-            // Re-gen stats slightly or just reset pos
-            horses = HORSE_VARS.map((def, i) => {
-                let h = new Horse(def);
-                h.lane = i;
-                return h;
-            });
-
-            updateLeaderboard();
-            addLog("Race conditions look good. Waiting for start.", false);
-            draw();
+    }
+    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.75)';ctx.font='bold 9px system-ui';ctx.textAlign='center';
+    ctx.fillText('FINISH',fx+24,fy-6);
+    // 200m markers
+    const markers=5;
+    for(let i=1;i<markers;i++){
+        const ang=(i/markers)*6.283;
+        const mx=cx+Math.cos(ang)*rX*0.775,my=cy+Math.sin(ang)*rY*0.71;
+        ctx.beginPath();ctx.arc(mx,my,2.4,0,6.283);ctx.fillStyle='rgba(255,255,255,.5)';ctx.fill();
+    }
+    // horses
+    const sorted=[...horses].sort((a,b)=>b.distance-a.distance);
+    sorted.forEach((h,rank)=>{
+        const idx=horses.indexOf(h);
+        const lapProg=(h.progress*RACE_M/LAP_M)%1;
+        const angle=lapProg*6.283;
+        const lanesN=horses.length;
+        const laneT=(idx+0.5)/lanesN;
+        const lrX=rX*0.55+(rX-rX*0.55)*laneT, lrY=rY*0.42+(rY-rY*0.42)*laneT;
+        const px=cx+Math.cos(angle)*lrX, py=cy+Math.sin(angle)*lrY;
+        const tang=angle+Math.PI/2;
+        drawHorse(h,px,py,tang,rank);
+        // bet glow
+        if(bets[h.id]&&raceStarted){
+            ctx.beginPath();ctx.arc(px,py,13+Math.sin(performance.now()/180)*2,0,6.283);
+            ctx.strokeStyle='rgba(255,209,102,.95)';ctx.lineWidth=2.5;ctx.stroke();
         }
+    });
+    // timer
+    if(raceActive){
+        ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='bold 13px ui-monospace,Menlo,monospace';ctx.textAlign='left';
+        ctx.fillText('⏱ '+timer.toFixed(1)+'s',10,16);
+    }
+}
+function drawHorse(h,x,y,tang,rank){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(tang);
+    const s=Math.min(cvsW,cvsH)/34; // scale
+    // body
+    ctx.fillStyle=h.color;
+    ctx.beginPath();ctx.ellipse(0,0,s*1.35,s*0.62,0,0,6.283);ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1;ctx.stroke();
+    // head
+    ctx.beginPath();ctx.ellipse(s*1.25,-s*0.15,s*0.55,s*0.4,0.3,0,6.283);ctx.fill();
+    // tail
+    ctx.strokeStyle=h.color;ctx.lineWidth=s*0.22;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-s*1.3,0);
+    ctx.quadraticCurveTo(-s*1.9,-s*0.4,-s*1.7,Math.sin(h.stride)*s*0.3);
+    ctx.stroke();
+    // legs (galloping stride)
+    ctx.strokeStyle='#5d4037';ctx.lineWidth=s*0.2;
+    const ph=h.stride;
+    const legs=[[-0.8,-1.1],[0,-1.0],[0.7,-1.1],[1.0,-0.6]];
+    legs.forEach((lg,i)=>{
+        const swing=Math.sin(ph+i*1.7)*s*0.5;
+        ctx.beginPath();ctx.moveTo(lg[0]*s,lg[1]*s*0.2);
+        ctx.lineTo(lg[0]*s+swing*0.4,lg[1]*s*0.2+s*0.9);
+        ctx.stroke();
+    });
+    // jockey
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(s*0.15,-s*0.75,s*0.32,0,6.283);ctx.fill();
+    ctx.fillStyle='#c0392b';
+    ctx.beginPath();ctx.arc(s*0.15,-s*0.75,s*0.2,0,6.283);ctx.fill();
+    ctx.restore();
+    // name tag
+    const bet=bets[h.id];
+    ctx.font='bold '+(bet?'10px':'9px')+' system-ui';
+    ctx.textAlign='center';
+    ctx.fillStyle=bet?'#ffd166':'rgba(255,255,255,.85)';
+    ctx.fillText(h.name.length>12?h.name.slice(0,11)+'…':h.name,x,y-s*2.6);
+    if(rank===0&&raceStarted){
+        ctx.fillStyle='#ffd166';ctx.font='bold 11px system-ui';
+        ctx.fillText('⬆ LEADER',x,y-s*3.7);
+    }
+}
 
-        function prepareRace() {
-            document.getElementById('startBtn').disabled = true;
-            let count = 3;
-            const cdEl = document.getElementById('countdown');
-            cdEl.style.display = 'block';
-            cdEl.innerText = count;
-
-            let int = setInterval(() => {
-                count--;
-                if (count > 0) {
-                    cdEl.innerText = count;
-                } else {
-                    clearInterval(int);
-                    cdEl.innerText = "GO!";
-                    setTimeout(() => cdEl.style.display = 'none', 1000);
-                    startRace();
-                }
-            }, 1000);
+/* ═══════════ LOGICA CORSA ═══════════ */
+function addLog(msg,type){
+    const feed=$('feed');
+    const d=document.createElement('div');
+    d.className='fm '+(type||'');
+    const tm=raceActive?fmt(timer):'';
+    d.innerHTML=`<span class="tm">${tm}</span>${msg}`;
+    feed.prepend(d);
+}
+function generateCommentary(sorted){
+    const lines=[
+        `${sorted[0].name} è in testa e tiene il ritmo!`,
+        `${sorted[sorted.length-1].name} è in difficoltà in coda.`,
+        `${sorted[1].name} prova a chiudere il gap!`,
+        `Guarda ${sorted[2].name} come avanza!`,
+        `${sorted[0].name} sembra imbattibile adesso.`,
+        `Battaglia furiosa per la seconda posizione!`,
+        `Il jockey sprona ${sorted[Math.floor(Math.random()*4)].name}!`,
+        `Sorpresa! ${sorted[Math.floor(Math.random()*5)]} risale la classifica!`
+    ];
+    addLog(lines[Math.floor(Math.random()*lines.length)]);
+}
+function step(dt){
+    if(!raceActive)return;
+    timer+=dt;
+    const sorted=[...horses].sort((a,b)=>b.distance-a.distance);
+    const posMap={};
+    sorted.forEach((h,i)=>posMap[h.id]=i);
+    // overtake detection
+    for(const h of horses){
+        if(h.finishTime)continue;
+        const prev=lastPos[h.id];
+        if(prev!==undefined&&posMap[h.id]<prev){
+            const overtaken=sorted[posMap[h.id]+1];
+            if(overtaken&&!overtaken.finishTime)addLog(`${h.name} supera ${overtaken.name}!`,'imp');
         }
-
-        function startRace() {
-            raceActive = true;
-            addLog("AND THEY'RE OFF!", true);
-            lastCommentaryTime = Date.now();
-            requestAnimationFrame(loop);
+        lastPos[h.id]=posMap[h.id];
+        // surge/lull commentary (once per state)
+        if(h.surge===1&&surgeLog[h.id]!=='s'&&Math.random()<0.4){surgeLog[h.id]='s';addLog(`🚀 ${h.name} accelera con uno scatto!`,'gold');}
+        if(h.surge===-1&&surgeLog[h.id]!=='l'&&Math.random()<0.3){surgeLog[h.id]='l';addLog(`${h.name} perde un po' di ritmo...`);}
+        if(h.surge===0)surgeLog[h.id]='n';
+    }
+    // final stretch banner
+    if(sorted[0]&&sorted[0].progress>0.82&&!document._bannerShown){
+        document._bannerShown=true;
+        const b=$('banner');b.style.display='block';
+        addLog(`🏁 ${sorted[0].name} entra nel rettilineo finale!`,'imp');
+        setTimeout(()=>{b.style.display='none';},4200);
+    }
+    let finished=0;
+    const newFinishers=[];
+    horses.forEach(h=>{
+        if(h.finishTime){finished++;return;}
+        const ev=h.update(dt,timer);
+        if(ev==='lap'){addLog(`🔁 ${h.name} completa il ${h.laps}. giro (${h.splitTimes[h.splitTimes.length-1].time}s)`,'gold');}
+        if(ev==='finish'){
+            h.finishTime=timer.toFixed(2);
+            newFinishers.push(h);
         }
+    });
+    // assign places in distance order (photo-finish tiebreak within same frame)
+    newFinishers.sort((a,b)=>b.distance-a.distance);
+    newFinishers.forEach(h=>{
+        finished++;
+        h.place=finished;
+        addLog(`🏆 ${h.name} TAGLIA IL TRAGUARDO al ${finished}. posto!`,'imp');
+        const c=careerOf(h.id);c.races++;if(finished===1)c.wins++;if(finished<=3)c.places++;
+        if(c.best===null||h.finishTime<c.best)c.best=h.finishTime;
+        persist();
+    });
+    finished=horses.filter(h=>h.finishTime).length;
+    // random commentary
+    if(timer-lastCommentary>2.5){
+        lastCommentary=timer;
+        if(Math.random()>0.55)generateCommentary(sorted);
+    }
+    renderLeaderboard(sorted);
+    if(finished===horses.length&&!horses.every(h=>h.finishTime&&h._settled)){
+        horses.forEach(h=>h._settled=true);
+        endRace(sorted);
+    }
+}
+function startRace(){
+    raceStarted=true;raceActive=true;
+    document._bannerShown=false;
+    lastPos={};surgeLog={};lastCommentary=0;
+    addLog('🟢 E SI PARTE! Via alla Royal Derby!','imp');
+    requestAnimationFrame(loop);
+}
+let lastT=0;
+function loop(t){
+    if(!lastT)lastT=t;
+    const dt=Math.min((t-lastT)/1000,0.05);
+    lastT=t;
+    step(dt);
+    draw();
+    if(raceActive)requestAnimationFrame(loop);
+    else lastT=0;
+}
+function endRace(sorted){
+    raceActive=false;
+    // rank by place (photo-finish consistent), fall back to distance
+    const ranked=[...horses].sort((a,b)=>(a.place??99)-(b.place??99)||(b.distance-a.distance));
+    renderLeaderboard(ranked);
+    const winner=ranked[0];
+    // settle bets
+    let net=0;
+    const rows=ranked.map((h,i)=>{
+        const b=bets[h.id];
+        if(!b)return '';
+        const place=h.place||(i+1);
+        let win=0;
+        if(b.type==='win'&&place===1)win=b.stake*b.odds;
+        if(b.type==='place'&&place<=3)win=b.stake*b.odds*0.55;
+        const gain=Math.round(win-b.stake);
+        net+=gain;
+        const c=careerOf(h.id);c.earned+=Math.max(0,gain);
+        persist();
+        return `<div class="result-row"><div class="rank r${place}">${place}</div><div class="nm">${h.name}</div>
+            <div class="payout ${gain>=0?'':'loss'}">${gain>=0?'+':'−'}€${Math.abs(gain)}</div></div>`;
+    }).join('');
+    P.wallet+=net;
+    if(P.wallet<0)P.wallet=0;
+    persist();
+    $('walletAmt').textContent='€'+Math.round(P.wallet);
+    $('resFinal').textContent=`${winner.name} vince la corsa!`;
+    $('resTime').textContent=`Tempo del vincitore: ${winner.finishTime}s · ${horses.length} partenti`;
+    $('resList').innerHTML=rows||'<div class="hint">Nessuna puntata effettuata.</div>';
+    const netEl=$('resNet');
+    if(betsCount()>0){
+        netEl.textContent=(net>=0?'+':'−')+'€'+Math.abs(Math.round(net))+' sul portafoglio';
+        netEl.className='net '+(net>=0?'win':'loss');
+    }else netEl.textContent='';
+    $('resultModal').classList.add('on');
+    $('startBtn').disabled=false;
+    addLog(`🏁 RISULTATO: 1° ${ranked[0].name}, 2° ${ranked[1].name}, 3° ${ranked[2].name}`,'gold');
+}
+function betsCount(){return Object.keys(bets).length;}
 
-        let lastTime = 0;
-        function loop(timestamp) {
-            if (!lastTime) lastTime = timestamp;
-            const dt = (timestamp - lastTime) / 1000;
-            lastTime = timestamp;
-
-            if (raceActive) {
-                update(dt);
-                draw();
-                requestAnimationFrame(loop);
-            }
-        }
-
-        function update(dt) {
-            timer += dt;
-            let finishedCount = 0;
-            
-            // Sort for race logic (who is leading)
-            let sortedHorses = [...horses].sort((a,b) => b.distance - a.distance);
-
-            horses.forEach(h => {
-                if (h.progress >= TRACK_LAPS) {
-                    finishedCount++;
-                    return; // Already finished
-                }
-
-                let event = h.update(dt);
-                
-                if (event === "lap") {
-                    addLog(`${h.name} completes lap ${h.lapsCompleted}!`, "lap");
-                }
-                if (event === "finish") {
-                    addLog(`${h.name} CROSSES THE LINE!`, "important");
-                    h.finishTime = timer.toFixed(2);
-                }
-            });
-
-            // Random commentary
-            if (Date.now() - lastCommentaryTime > 3000) {
-                if (Math.random() > 0.6) {
-                    generateCommentary(sortedHorses);
-                }
-                lastCommentaryTime = Date.now();
-            }
-
-            updateLeaderboard(sortedHorses);
-
-            if (finishedCount === horses.length) {
-                raceActive = false;
-                raceFinished = true;
-                addLog("Race Finished! Check results.", "important");
-                document.getElementById('startBtn').disabled = false;
-            }
-        }
-
-        function generateCommentary(sorted) {
-            let leader = sorted[0];
-            let last = sorted[sorted.length-1];
-            
-            const lines = [
-                `${leader.name} is holding the lead strongly!`,
-                `${last.name} is struggling at the back.`,
-                `${sorted[1].name} is trying to close the gap!`,
-                `Look at ${sorted[2].name} go!`,
-                `${leader.name} looks unstoppable right now.`,
-                `A fierce battle for the second place!`
-            ];
-            
-            addLog(lines[Math.floor(Math.random() * lines.length)]);
-        }
-
-        function draw() {
-            // Background Track
-            ctx.fillStyle = '#659c3f'; // grass in canvas if needed, but we have div bg
-            ctx.clearRect(0, 0, cvsW, cvsH);
-
-            // Shape of track: Oval
-            // Center
-            const cx = cvsW / 2;
-            const cy = cvsH / 2;
-            const radiusX = cvsW * 0.4; // width radius
-            const radiusY = cvsH * 0.35; // height radius
-
-            // Draw Track Surface
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, 2 * Math.PI);
-            ctx.ellipse(cx, cy, radiusX * 0.6, radiusY * 0.5, 0, 0, 2 * Math.PI); // hole
-            ctx.fillStyle = "#8d6e63"; // Dirt track color
-            ctx.fill("evenodd");
-            
-            // Draw lines
-            ctx.strokeStyle = "rgba(255,255,255,0.5)";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, 2 * Math.PI);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, radiusX * 0.6, radiusY * 0.5, 0, 0, 2 * Math.PI);
-            ctx.stroke();
-
-            // Finish Line (at right side)
-            ctx.beginPath();
-            ctx.moveTo(cx + radiusX * 0.6, cy);
-            ctx.lineTo(cx + radiusX, cy);
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 4;
-            ctx.stroke();
-            
-            // Checker pattern
-            // (Simplified line for now)
-
-            // Draw Horses
-            horses.forEach((h, i) => {
-                // Calculate position on ellipse
-                // normalize progress % 1 (for current lap pos)
-                let lapProg = h.progress % 1; 
-                // In canvas ellipse: 0 is right, goes clockwise
-                let angle = lapProg * Math.PI * 2; 
-
-                // Lane offset: different radius per lane
-                // Track width = radiusX * 0.4
-                // we divide by horses count
-                let trackWidth = radiusX * 0.4;
-                let laneWidth = trackWidth / horses.length;
-                let laneRadiusX = (radiusX * 0.6) + (laneWidth * h.lane) + (laneWidth/2);
-                let laneRadiusY = (radiusY * 0.5) + (laneWidth * h.lane * (radiusY/radiusX)) + (laneWidth/2 * (radiusY/radiusX));
-
-                let px = cx + Math.cos(angle) * laneRadiusX;
-                let py = cy + Math.sin(angle) * laneRadiusY;
-
-                // Draw Horse Dot
-                ctx.beginPath();
-                ctx.arc(px, py, 8, 0, Math.PI*2);
-                ctx.fillStyle = h.color;
-                ctx.fill();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Name Tag (if space allows or hover? simplify: number)
-                ctx.fillStyle = "white";
-                ctx.font = "bold 10px Arial";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(h.lane+1, px, py);
-            });
-        }
-
-        // --- UI UPDATERS ---
-        function updateLeaderboard(sorted) {
-            const list = document.getElementById('leaderboard-list');
-            if(!sorted) sorted = horses;
-            
-            let html = sorted.map((h, i) => {
-                let badgeClass = i===0 ? 'rank-1' : (i===1 ? 'rank-2' : (i===2 ? 'rank-3' : ''));
-                let status = h.finishTime ? `🏁 ${h.finishTime}s` : `L${Math.floor(h.lapsCompleted)+1}`;
-                
-                return `
-                <div class="horse-row">
-                    <div class="rank-badge ${badgeClass}">${i+1}</div>
-                    <div class="horse-color-dot" style="background:${h.color}"></div>
-                    <div class="horse-name">${h.name}</div>
-                    <div class="splits">${status}</div>
+/* ═══════════ LEADERBOARD / STALLA UI ═══════════ */
+function renderLeaderboard(sorted){
+    const list=$('lb-list');
+    if(!sorted)sorted=[...horses].sort((a,b)=>b.distance-a.distance);
+    let html=sorted.map((h,i)=>{
+        const b=bets[h.id];
+        const rcls=i===0?'r1':(i===1?'r2':(i===2?'r3':''));
+        const status=h.finishTime?`🏁 ${h.finishTime}s`:(h.laps>0?`G${h.laps+1} · ${fmt(timer-h.lastLapAt)}`:`Partenza`);
+        return `<div class="row ${b?'bet':''}">
+            <div class="rank ${rcls}">${i+1}</div>
+            <div class="dot" style="background:${h.color}"></div>
+            <div class="nm">${h.name}${b?`<span class="tag">🎯 €${b.stake} @ ${b.odds}</span>`:`<span class="tag">val. ${h.rating}</span>`}</div>
+            <div class="sp ${b?'b':''}">${status}</div>
+            <button class="betbtn ${b?'on':''}" ${raceStarted?'disabled':''} data-id="${h.id}">🎯 ${b?'€'+b.stake:'Punta'}</button>
+        </div>`;
+    }).join('');
+    list.innerHTML=html;
+    list.querySelectorAll('.betbtn').forEach(b=>b.addEventListener('click',()=>toggleBet(b.dataset.id)));
+}
+function renderStable(){
+    const list=$('stable-list');
+    let html=horses.map(h=>{
+        const c=careerOf(h.id);
+        const sbar=v=>`<div class="sbar"><i style="width:${Math.round(v*100)}%"></i></div>`;
+        const sw=SILKS.map(sc=>`<div class="sw ${sc===h.color?'on':''}" data-sw="${sc}" data-id="${h.id}" style="background:${sc}"></div>`).join('');
+        return `<div class="hcard">
+            <div class="dot" style="background:${h.color};width:18px;height:18px;margin-top:8px"></div>
+            <div class="info">
+                <input class="rename" data-id="${h.id}" value="${h.name}" maxlength="22" aria-label="Nome cavallo">
+                <div class="swatches">${sw}</div>
+                <div class="stats">
+                    <div class="srow"><span>Velocità</span><b>${Math.round(h.baseSpeed)}</b></div><div>${sbar(h.baseSpeed/100)}</div>
+                    <div class="srow"><span>Scatto</span><b>${Math.round(h.accel)}</b></div><div>${sbar(h.accel/28)}</div>
+                    <div class="srow"><span>Stamina</span><b>${(h.stamina*100).toFixed(0)}</b></div><div>${sbar(h.stamina)}</div>
+                    <div class="srow"><span>Forma</span><b>${(h.form*100).toFixed(0)}</b></div><div>${sbar(h.form)}</div>
+                    <div class="srow"><span>Valutazione</span><b>${h.rating}</b></div><div></div>
+                    <div class="srow"><span>Corsa / Vinte</span><b>${c.races} / ${c.wins}</b></div>
+                    <div class="srow"><span>Podi</span><b>${c.places}</b></div>
+                    <div class="srow"><span>Record</span><b>${c.best?c.best+'s':'—'}</b></div>
+                    <div class="srow"><span>Vinto (€)</span><b>${Math.round(c.earned)}</b></div>
                 </div>
-                `;
-            }).join('');
-            list.innerHTML = html;
+            </div>
+        </div>`;
+    }).join('');
+    list.innerHTML=html;
+    list.querySelectorAll('.rename').forEach(inp=>{
+        inp.addEventListener('change',()=>{
+            const h=horses.find(x=>x.id===inp.dataset.id);
+            const v=inp.value.trim();
+            if(v){h.rename(v);renderLeaderboard();}
+        });
+    });
+    list.querySelectorAll('.sw').forEach(s=>{
+        s.addEventListener('click',()=>{
+            const h=horses.find(x=>x.id===s.dataset.id);
+            h.setColor(s.dataset.sw);
+            renderStable();renderLeaderboard();draw();
+        });
+    });
+}
+
+/* ═══════════ PUNTATE ═══════════ */
+function oddsOf(h){
+    const avg=horses.reduce((s,x)=>s+x.rating,0)/horses.length;
+    const r=h.rating/avg;
+    return Math.max(1.1,Math.round((1/r*3.2+1.6)*10)/10);
+}
+function toggleBet(id){
+    if(raceStarted)return;
+    const h=horses.find(x=>x.id===id);
+    if(!h)return;
+    if(bets[id]){delete bets[id];}
+    else{
+        if(P.wallet<stake){addLog('❌ Saldo insufficiente!','imp');return;}
+        bets[id]={stake:stake,odds:oddsOf(h),type:'win'};
+        P.wallet-=stake;persist();
+    }
+    $('walletAmt').textContent='€'+Math.round(P.wallet);
+    renderLeaderboard();draw();
+}
+
+/* ═══════════ START / RESET ═══════════ */
+function resetRace(){
+    raceActive=false;raceStarted=false;timer=0;lastT=0;bets={};
+    horses=DEFAULT_HORSES.map((d,i)=>new Horse({...d,id:'h'+i},i));
+    $('resultModal').classList.remove('on');
+    $('startBtn').disabled=false;
+    $('banner').style.display='none';
+    $('countdown').style.display='none';
+    $('walletAmt').textContent='€'+Math.round(P.wallet);
+    $('feed').innerHTML='<div class="fm info"><span class="tm"></span>Benvenuto alla Royal Derby! Scegli su chi puntare e premi START.</div>';
+    renderLeaderboard();renderStable();draw();
+}
+function prepareRace(){
+    if(raceStarted)return;
+    if(!betsCount())addLog('💡 Nessuna puntata: tocca 🎯 su un cavallo per scommettere (evidenziato in oro).','info');
+    $('startBtn').disabled=true;
+    let count=3;
+    const cd=$('countdown');
+    cd.style.display='flex';cd.textContent=count;
+    const int=setInterval(()=>{
+        count--;
+        if(count>0){cd.textContent=count;}
+        else{
+            clearInterval(int);
+            cd.textContent='GO!';
+            setTimeout(()=>{cd.style.display='none';},700);
+            startRace();
         }
+    },900);
+}
 
-        function addLog(msg, type) {
-            const feed = document.getElementById('comm-feed');
-            const div = document.createElement('div');
-            div.className = `feed-msg ${type === 'important' ? 'important' : ''} ${type === 'lap' ? 'lap' : ''}`;
-            
-            let time = raceActive ? timer.toFixed(1) + "s" : "";
-            div.innerText = (time ? `[${time}] ` : "") + msg;
-            
-            feed.prepend(div);
-        }
+/* ═══════════ TEST HOOKS ═══════════ */
+window.__DERBY__={
+    get horses(){return horses;},get raceActive(){return raceActive;},
+    step, reset:resetRace, start:startRace, toggleBet, bets:()=>bets, P,
+    runFull(cb){
+        resetRace();
+        horses.forEach(h=>toggleBet(h.id)); // bet on all
+        startRace();
+        let guard=0;
+        const iv=setInterval(()=>{
+            if(!raceActive||guard++>4000){clearInterval(iv);cb&&cb();}
+        },10);
+    }
+};
 
-        // Start
-        init();
-
-    </script>
+/* ═══════════ INIT ═══════════ */
+$('startBtn').addEventListener('click',prepareRace);
+$('resetBtn').addEventListener('click',()=>{resetRace();addLog('🔄 Corsa azzerata.','info');});
+$('newBetsBtn').addEventListener('click',()=>{
+    if(raceStarted)return;
+    Object.keys(bets).forEach(id=>{P.wallet+=bets[id].stake;});
+    P.wallet=Math.min(P.wallet,5000);persist();
+    bets={};$('walletAmt').textContent='€'+Math.round(P.wallet);
+    renderLeaderboard();draw();
+    addLog('🧹 Puntate azzerate, soldi rimborsati.','info');
+});
+document.querySelectorAll('.stake').forEach(s=>{
+    s.addEventListener('click',()=>{
+        stake=parseInt(s.dataset.v,10);
+        document.querySelectorAll('.stake').forEach(x=>x.classList.toggle('on',x===s));
+    });
+});
+document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+        document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+        t.classList.add('on');
+        $('tab-'+t.dataset.tab).classList.add('on');
+    });
+});
+$('againBtn').addEventListener('click',()=>{resetRace();});
+resize();
+resetRace();
+})();
+</script>
+<script src="../top_buttons.js"></script>
 </body>
 </html>

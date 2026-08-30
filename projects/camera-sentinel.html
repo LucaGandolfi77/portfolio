@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a12">
+<meta name="description" content="CAM//SENTINEL — accende la fotocamera del tuo dispositivo e analizza in tempo reale ciò che vede: LED a infrarossi e riflessi di lenti (tipici delle telecamere di sorveglianza attive), lampeggio dei LED di stato, e oggetti che possono nascondere una camera (AI on-device). Spiega anche perché il browser NON può vedere le telecamere sulla rete e come lo farebbe un'app nativa.">
+<title>CAM//SENTINEL — chi ti sta guardando?</title>
+<style>
+:root{--bg:#060a12;--panel:#0b1320;--line:rgba(120,180,255,.14);--txt:#dbe7ff;--dim:#8fa3c7;--accent:#35e0ff;--warn:#ffd166;--danger:#ff5c7a;--ok:#4ade80}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);min-height:100vh}
+header{padding:18px 18px 6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+header h1{font-size:clamp(20px,5vw,30px);font-weight:800;letter-spacing:2px;
+  background:linear-gradient(90deg,#35e0ff,#b28dff,#ff5c7a);-webkit-background-clip:text;background-clip:text;color:transparent}
+header span{color:var(--dim);font-size:13px}
+main{max-width:760px;margin:0 auto;padding:10px 14px 40px;display:flex;flex-direction:column;gap:16px}
+.viewfinder{position:relative;border-radius:16px;overflow:hidden;background:#000;border:1px solid var(--line);
+  aspect-ratio:3/4;max-height:56vh;width:100%;margin:0 auto;touch-action:none}
+@media(min-width:560px){.viewfinder{aspect-ratio:4/3;max-height:62vh}}
+video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block}
+#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:.55;animation:scan 3.2s linear infinite;pointer-events:none;box-shadow:0 0 12px var(--accent)}
+@keyframes scan{0%{top:0}100%{top:100%}}
+#statusPill{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.pill{font-size:11px;font-weight:700;letter-spacing:.5px;padding:5px 10px;border-radius:20px;background:rgba(6,10,18,.72);
+  border:1px solid var(--line);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--dim)}
+.pill.on{color:var(--ok);border-color:rgba(74,222,128,.5)}
+.pill.busy{color:var(--danger);border-color:rgba(255,92,122,.6)}
+.pill.warn{color:var(--warn);border-color:rgba(255,209,102,.5)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;padding:4px 0}
+.btn{appearance:none;border:1px solid var(--accent);background:rgba(53,224,255,.08);color:var(--txt);
+  padding:11px 16px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:all .2s;letter-spacing:.4px}
+.btn:hover{background:rgba(53,224,255,.18)}
+.btn.primary{background:linear-gradient(90deg,#0ea5e9,#6366f1);border-color:transparent;box-shadow:0 4px 18px rgba(14,165,233,.35)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.warnbtn{border-color:var(--warn);background:rgba(255,209,102,.08)}
+.btn.warnbtn.on{background:var(--warn);color:#16120a}
+label.sens{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);padding:6px 10px;
+  border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+input[type=range]{width:90px;accent-color:var(--accent)}
+.panels{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:640px){.panels{grid-template-columns:1fr 1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.panel h3{font-size:13px;letter-spacing:1.2px;color:var(--dim);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.panel ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.panel li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.03)}
+.panel li .k{color:var(--dim)}
+.panel li .v{font-weight:700;text-align:right;color:var(--txt)}
+.panel li .v.warn{color:var(--warn)}
+.panel li .v.danger{color:var(--danger)}
+.panel li .v.ok{color:var(--ok)}
+#irList li{border-left:3px solid var(--warn)}
+#aiList li{border-left:3px solid var(--accent)}
+#log{max-height:180px;overflow-y:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dim)}
+#log li{background:none;padding:3px 4px;justify-content:flex-start}
+#log .t{color:#5b6f96;margin-right:8px}
+.empty{color:#4d5f82;font-style:italic;font-size:12px;padding:4px 2px}
+.explain{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;line-height:1.7;font-size:14px;color:#c9d8f5}
+.explain h2{font-size:16px;margin-bottom:10px;color:var(--accent);letter-spacing:.5px}
+.explain h3{font-size:14px;margin:14px 0 6px;color:var(--warn)}
+.explain p{margin-bottom:10px}
+.explain code{background:rgba(255,255,255,.06);padding:1px 6px;border-radius:6px;font-size:12.5px;color:#9ee8ff}
+.explain ul{margin:0 0 10px 20px}
+.explain li{margin-bottom:6px}
+.explain b{color:#fff}
+.good{color:var(--ok)}.bad{color:var(--danger)}.meh{color:var(--warn)}
+footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;letter-spacing:1px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CAM//SENTINEL</h1>
+  <span>scanner ottico di telecamere attive — on-device, niente va su internet</span>
+</header>
+<main>
+  <section class="viewfinder" id="viewfinder">
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+    <div class="scanline"></div>
+    <div id="statusPill">
+      <div class="pill" id="pillState">● offline</div>
+      <div class="pill" id="pillHits">IR: 0</div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <button class="btn primary" id="btnStart">▶ Accendi fotocamera</button>
+    <button class="btn" id="btnFlip" disabled>🔄 Cambia camera</button>
+    <button class="btn warnbtn" id="btnAI" disabled>🤖 AI device scan</button>
+    <label class="sens">IR sens
+      <input type="range" id="sens" min="40" max="220" value="140">
+    </label>
+  </div>
+
+  <section class="panels">
+    <div class="panel" style="grid-column:1/-1">
+      <h3>🔐 Stato fotocamera del dispositivo</h3>
+      <ul id="busyList"><li class="empty">Premi "Accendi fotocamera" per iniziare.</li></ul>
+    </div>
+    <div class="panel">
+      <h3>📷 Telecamere collegate</h3>
+      <ul id="devList"><li class="empty">L'elenco appare dopo il permesso.</li></ul>
+    </div>
+    <div class="panel">
+      <h3>🕵️ IR / riflessi di lenti in vista</h3>
+      <ul id="irList"><li class="empty">Nessuna sorgente IR rilevata.</li></ul>
+    </div>
+    <div class="panel" style="grid-column:1/-1">
+      <h3>🤖 AI — oggetti che possono nascondere una camera</h3>
+      <ul id="aiList"><li class="empty">Attiva "AI device scan" (TensorFlow.js COCO-SSD, on-device).</li></ul>
+    </div>
+    <div class="panel" style="grid-column:1/-1">
+      <h3>📜 Registro eventi</h3>
+      <ul id="log"><li class="empty">In attesa…</li></ul>
+    </div>
+  </section>
+
+  <section class="explain">
+    <h2>🔍 Cosa posso rilevare davvero — e cosa no</h2>
+
+    <h3>✅ Quello che QUESTA pagina fa (nel browser)</h3>
+    <p><b>1. La tua fotocamera.</b> Con <code>getUserMedia</code> accendo solo la fotocamera
+    del <i>tuo</i> dispositivo, solo dopo il tuo permesso. Su iOS e Android il sistema concede la
+    camera in <b>esclusiva a una sola app per volta</b>: se un'altra app la sta già usando,
+    la richiesta fallisce con <code>NotReadableError</code>. Quando succede, la pagina ti avvisa:
+    <span class="bad"><b>la tua camera è già in uso da un'altra app</b></span>. È l'unico modo —
+    onesto — per scoprirlo dal browser.</p>
+    <p><b>2. Tutte le telecamere collegate al dispositivo.</b> Con <code>enumerateDevices()</code>
+    elenco ogni camera (webcam interna, esterna, schede di acquisizione) e ascolto
+    <code>devicechange</code> per le accensioni/spegnimenti a caldo.</p>
+    <p><b>3. Telecamere NEL TUO CAMPO VISIVO.</b> Le telecamere di sorveglianza con visione notturna
+    emettono <b>infrarossi</b>: il sensore del telefono li vede come un <b>bagliore viola/bianco</b>.
+    Analizzo ogni frame cercando sorgenti IR brillanti, ne misuro il <b>lampeggio</b> (i LED di stato
+    pulsano) e i <b>riflessi di lente</b>. Una macchia IR stabile o pulsante in vista = fortissima
+    indicazione di una camera accesa. È la stessa tecnica delle app "rilevatore di spie".</p>
+    <p><b>4. AI opzionale.</b> TensorFlow.js + COCO-SSD (tutto on-device) riconosce oggetti che
+    spesso <i>ospitano</i> una camera (TV, laptop, smartphone, telecomando). Non prova che la camera
+    sia accesa: ti dice "qui c'è un dispositivo che può contenerne una".</p>
+
+    <h3>❌ Perché NON posso vedere le telecamere sulla rete o di altri</h3>
+    <p><b>Sandbox del browser.</b> Una pagina web vive in una scatola isolata:
+    <code>getUserMedia</code> dà accesso solo a <i>questa</i> camera, non al sistema.
+    Niente socket raw, niente scansione della rete locale, niente probe RTSP/ONVIF,
+    niente mDNS/UPnP. <code>fetch()</code> verso IP locali è bloccato (Private Network Access),
+    e WebRTC funziona solo verso peer di cui conosci l'indirizzo — non "sente" i dispositivi.</p>
+    <p><b>Nessun accesso all'hardware altrui.</b> La camera del vicino, del soffitto o del laptop
+    accanto è un dispositivo separato: il browser non ha alcun canale per interrogarne lo stato.
+    Se la telecamera non è nel campo visivo della <i>tua</i> camera, per questa pagina
+    semplicemente non esiste.</p>
+    <p><b>Radio/Wi-Fi.</b> Le API di scansione Wi-Fi sono sparite dai browser per motivi di privacy;
+    il Bluetooth Web non permette di "ascoltare" trasmettitori video. Rilevare segnali wireless
+    richiede hardware (SDR), non JavaScript.</p>
+
+    <h3>🛠️ Come lo farebbe un'app nativa (e come lo faresti tu)</h3>
+    <ul>
+      <li><b>iOS / macOS:</b> <code>AVCaptureDevice</code> + <code>AVCaptureSession</code> per lo
+      stato d'uso della camera; <code>NWBrowser</code> (Bonjour) e probe RTSP sulla porta 554 per
+      trovare telecamere IP sulla LAN; librerie ONVIF per interrogare il firmware.</li>
+      <li><b>Android:</b> API Camera2 — <code>CameraManager.registerAvailabilityCallback()</code>
+      ti dice in tempo reale quando una camera viene <b>aperta o chiusa da un'altra app</b>;
+      scansione mDNS/SSDP + probe RTSP per la rete.</li>
+      <li><b>Desktop:</b> su macOS IOKit/CoreMediaIO (il famoso trucco <code>ioreg</code> per lo
+      stato della camera); su Windows Media Foundation / <code>DeviceInformation</code>.</li>
+      <li><b>Radio:</b> un dongle SDR (RTL-SDR) capta i segnali analogici/digitali delle telecamere
+      wireless — serve un'app nativa con permessi di sistema, mai una pagina web.</li>
+    </ul>
+    <p><b>In sintesi:</b> dal browser posso dirti "la tua camera è occupata", elencare le tue
+    telecamere, e trovare telecamere attive <i>che la tua camera può vedere</i> (via IR/lenti + AI).
+    Non posso (e nessun browser può) scansionare la rete o le telecamere degli altri: è un limite
+    di sicurezza, non di codice. Per quello serve un'app nativa — qui sopra c'è la ricetta.</p>
+  </section>
+</main>
+<footer>CAM//SENTINEL — tutto l'analisi gira sul tuo dispositivo · nessun frame viene inviato</footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var S = window.__SENTINEL__ = {};
+
+  /* ═══════ CORE PURA (testabile headless) ═══════ */
+  function classifyError(e) {
+    var n = e && e.name ? e.name : '';
+    if (/NotReadable|TrackStart|AbortError|InUse/i.test(n)) return 'busy';
+    if (/NotAllowed|Permission|SecurityError/i.test(n)) return 'denied';
+    if (/NotFound|DevicesNotFound/i.test(n)) return 'nocamera';
+    if (/Overconstrained/i.test(n)) return 'overconstrained';
+    return 'other';
+  }
+  S.classifyError = classifyError;
+
+  // Analizza un frame RGBA (Uint8ClampedArray w*h) e restituisce blob IR/lenti.
+  // x,y ∈ [0,1]. thr = soglia di luminosità. Parla di "sorgente brillante + viola".
+  function analyzeIR(frame, w, h, thr) {
+    var gridW = Math.max(8, Math.round(w / 8));
+    var gridH = Math.max(8, Math.round(h / 8));
+    var hot = [];
+    for (var gy = 0; gy < gridH; gy++) {
+      for (var gx = 0; gx < gridW; gx++) {
+        var x0 = Math.floor(gx * w / gridW), x1 = Math.floor((gx + 1) * w / gridW);
+        var y0 = Math.floor(gy * h / gridH), y1 = Math.floor((gy + 1) * h / gridH);
+        var maxLum = 0, sumR = 0, sumB = 0, n = 0;
+        for (var y = y0; y < y1; y += 2) {
+          for (var x = x0; x < x1; x += 2) {
+            var i = (y * w + x) * 4;
+            var r = frame[i], g = frame[i + 1], b = frame[i + 2];
+            var lum = (r + g + b) / 3;
+            if (lum > maxLum) maxLum = lum;
+            sumR += r; sumB += b; n++;
+          }
+        }
+        var avgR = sumR / n, avgB = sumB / n;
+        var purple = avgR > 70 && avgB > 70 && avgR > avgB * 0.55 && avgB > avgR * 0.55;
+        if (maxLum > thr && (purple || maxLum > thr + 40)) {
+          hot.push({ x: (gx + 0.5) / gridW, y: (gy + 0.5) / gridH, lum: maxLum });
+        }
+      }
+    }
+    // clustering: region growing — una sorgente connessa = un blob
+    var used = [];
+    hot.forEach(function () { used.push(false); });
+    var blobs = [];
+    for (var si = 0; si < hot.length; si++) {
+      if (used[si]) continue;
+      var queue = [si], group = [];
+      used[si] = true;
+      while (queue.length) {
+        var ci = queue.pop();
+        group.push(hot[ci]);
+        for (var nj = 0; nj < hot.length; nj++) {
+          if (used[nj]) continue;
+          var dxn = hot[nj].x - hot[ci].x, dyn = hot[nj].y - hot[ci].y;
+          if (dxn * dxn + dyn * dyn < 0.0256) { used[nj] = true; queue.push(nj); }
+        }
+      }
+      var cx = 0, cy = 0, peak = 0;
+      group.forEach(function (p) { cx += p.x; cy += p.y; if (p.lum > peak) peak = p.lum; });
+      blobs.push({
+        x: cx / group.length, y: cy / group.length, r: 0.04 + group.length * 0.008,
+        lum: peak, score: Math.min(1, (peak - thr) / 200 + group.length / 6)
+      });
+    }
+    return blobs;
+  }
+  S.analyzeIR = analyzeIR;
+
+  // Tasso di lampeggio di una serie temporale di luminosità (0..1).
+  function blinkRate(series) {
+    if (!series || series.length < 6) return 0;
+    var mean = 0;
+    series.forEach(function (v) { mean += v; });
+    mean /= series.length;
+    var crossings = 0;
+    for (var i = 1; i < series.length; i++) {
+      if ((series[i] - mean) * (series[i - 1] - mean) < 0) crossings++;
+    }
+    return Math.min(1, crossings / (series.length - 1) * 2.2);
+  }
+  S.blinkRate = blinkRate;
+
+  // Self-test sintetico (usato da ?test=1 e dall'harness headless)
+  function runSelfTest() {
+    var results = [];
+    function check(name, pass, detail) { results.push({ name: name, pass: !!pass, detail: detail || '' }); }
+
+    // 1) frame scuro → nessun blob
+    var dark = new Uint8ClampedArray(64 * 48 * 4);
+    for (var i = 0; i < dark.length; i++) dark[i] = 12;
+    var b1 = analyzeIR(dark, 64, 48, 140);
+    check('frame scuro → 0 blob', b1.length === 0, 'blob=' + b1.length);
+
+    // 2) macchia viola brillante (LED IR) → 1 blob con score>0
+    var ir = new Uint8ClampedArray(64 * 48 * 4);
+    for (var p = 0; p < ir.length; p += 4) { ir[p] = 18; ir[p + 1] = 18; ir[p + 2] = 18; ir[p + 3] = 255; }
+    for (var yy = 18; yy < 28; yy++) for (var xx = 28; xx < 36; xx++) {
+      var o = (yy * 64 + xx) * 4; ir[o] = 255; ir[o + 1] = 120; ir[o + 2] = 255; ir[o + 3] = 255;
+    }
+    var b2 = analyzeIR(ir, 64, 48, 140);
+    check('LED IR viola → blob rilevato', b2.length >= 1, 'blob=' + b2.length);
+    check('score > 0 sul blob', b2.length >= 1 && b2[0].score > 0, 'score=' + (b2[0] ? b2[0].score.toFixed(2) : '-'));
+
+    // 3) blob centrato approssimativamente a (0.5, 0.5)
+    check('posizione blob ~centro', b2.length >= 1 && Math.abs(b2[0].x - 0.5) < 0.2 && Math.abs(b2[0].y - 0.5) < 0.2,
+      'x=' + (b2[0] ? b2[0].x.toFixed(2) : '-') + ' y=' + (b2[0] ? b2[0].y.toFixed(2) : '-'));
+
+    // 4) lampeggio: serie alternata → blinkRate alto
+    var blink = [];
+    for (var t = 0; t < 12; t++) blink.push(t % 2 ? 240 : 30);
+    check('lampeggio periodico rilevato', blinkRate(blink) > 0.5, 'rate=' + blinkRate(blink).toFixed(2));
+
+    // 5) serie costante → blinkRate ~0
+    var steady = [];
+    for (var u = 0; u < 12; u++) steady.push(200);
+    check('luce costante → nessun lampeggio', blinkRate(steady) < 0.05, 'rate=' + blinkRate(steady).toFixed(2));
+
+    // 6) classificazione errori getUserMedia
+    check('NotReadableError → busy', classifyError({ name: 'NotReadableError' }) === 'busy');
+    check('NotAllowedError → denied', classifyError({ name: 'NotAllowedError' }) === 'denied');
+    check('NotFoundError → nocamera', classifyError({ name: 'NotFoundError' }) === 'nocamera');
+    check('OverconstrainedError → overconstrained', classifyError({ name: 'OverconstrainedError' }) === 'overconstrained');
+    check('errore sconosciuto → other', classifyError({ name: 'WhateverError' }) === 'other');
+
+    S.results = results;
+    return results;
+  }
+  S.runSelfTest = runSelfTest;
+
+  if (location.search.indexOf('test=1') >= 0) {
+    var res = runSelfTest();
+    var pane = document.createElement('div');
+    pane.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:60vh;overflow:auto;z-index:99;background:#05070d;border-top:1px solid #223;padding:12px;font:12px/1.6 ui-monospace,Menlo,monospace;color:#cfe';
+    pane.innerHTML = '<b>CAM//SENTINEL self-test</b><br>' + res.map(function (r) {
+      return (r.pass ? '✅' : '❌') + ' ' + r.name + (r.detail ? ' — ' + r.detail : '');
+    }).join('<br>') + '<br><b>' + res.filter(function (r) { return r.pass; }).length + '/' + res.length + ' PASS</b>';
+    document.body.appendChild(pane);
+    return; // niente camera in modalità test
+  }
+
+  /* ═══════ UI / RUNTIME ═══════ */
+  var video = $('cam'), overlay = $('overlay'), octx = overlay.getContext('2d');
+  var sens = $('sens'), pillState = $('pillState'), pillHits = $('pillHits');
+  var btnStart = $('btnStart'), btnFlip = $('btnFlip'), btnAI = $('btnAI');
+  var devList = $('devList'), irList = $('irList'), aiList = $('aiList'), logEl = $('log');
+  var stream = null, running = false, facing = 'user', aiOn = false, aiModel = null, aiBusy = false;
+  var irHistory = {}, lastFrame = 0, aiLast = 0, hc = 0;
+
+  function log(msg) {
+    var li = document.createElement('li');
+    var t = new Date();
+    var ts = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2) + ':' + ('0' + t.getSeconds()).slice(-2);
+    li.innerHTML = '<span class="t">' + ts + '</span>' + msg;
+    logEl.appendChild(li);
+    while (logEl.children.length > 40) logEl.removeChild(logEl.firstChild);
+    var empty = logEl.querySelector('.empty');
+    if (empty) empty.remove();
+  }
+  function setPill(el, text, cls) {
+    el.textContent = text;
+    el.className = 'pill' + (cls ? ' ' + cls : '');
+  }
+  function setStatus(kind, msg) {
+    if (kind === 'on') setPill(pillState, '● live', 'on');
+    else if (kind === 'busy') setPill(pillState, '⚠ camera in uso', 'busy');
+    else if (kind === 'warn') setPill(pillState, msg, 'warn');
+    else setPill(pillState, '● ' + msg, '');
+  }
+  function refreshDevices() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      devList.innerHTML = '<li class="empty">API dispositivi non disponibile.</li>';
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices().then(function (devs) {
+      var cams = devs.filter(function (d) { return d.kind === 'videoinput'; });
+      if (!cams.length) { devList.innerHTML = '<li class="empty">Nessuna telecamera trovata.</li>'; return; }
+      devList.innerHTML = '';
+      cams.forEach(function (c, idx) {
+        var li = document.createElement('li');
+        var label = c.label || ('Camera ' + (idx + 1));
+        li.innerHTML = '<span class="k">📷 ' + label + '</span><span class="v ' + (c.deviceId ? 'ok' : '') + '">' + (c.deviceId ? 'connessa' : 'senza permesso') + '</span>';
+        devList.appendChild(li);
+      });
+    }).catch(function () {
+      devList.innerHTML = '<li class="empty">Errore elenco dispositivi.</li>';
+    });
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', function () {
+      log('🔄 dispositivi cambiati — aggiorno elenco');
+      refreshDevices();
+    });
+  }
+
+  function drawBlobs(blobs) {
+    var vw = overlay.clientWidth, vh = overlay.clientHeight;
+    if (overlay.width !== vw || overlay.height !== vh) { overlay.width = vw; overlay.height = vh; }
+    octx.clearRect(0, 0, vw, vh);
+    blobs.forEach(function (b) {
+      var px = b.x * vw, py = b.y * vh, r = Math.max(14, b.r * vw);
+      octx.strokeStyle = 'rgba(255,209,102,.95)';
+      octx.lineWidth = 2;
+      octx.beginPath(); octx.arc(px, py, r, 0, 6.283); octx.stroke();
+      octx.beginPath();
+      octx.moveTo(px - r - 6, py); octx.lineTo(px - r + 4, py);
+      octx.moveTo(px + r - 4, py); octx.lineTo(px + r + 6, py);
+      octx.moveTo(px, py - r - 6); octx.lineTo(px, py - r + 4);
+      octx.moveTo(px, py + r - 4); octx.lineTo(px, py + r + 6);
+      octx.stroke();
+      octx.fillStyle = 'rgba(255,209,102,.9)';
+      octx.font = 'bold 11px system-ui';
+      octx.fillText(b.blink > 0.4 ? 'LED pulsante' : 'IR', px + r + 6, py - 6);
+    });
+  }
+
+  var scanCanvas = document.createElement('canvas');
+  var sctx = scanCanvas.getContext('2d');
+
+  function frameTick() {
+    if (!running || !video.videoWidth) { requestAnimationFrame(frameTick); return; }
+    var w = 160, h = Math.max(60, Math.round(160 * video.videoHeight / video.videoWidth));
+    scanCanvas.width = w; scanCanvas.height = h;
+    sctx.drawImage(video, 0, 0, w, h);
+    var img;
+    try { img = sctx.getImageData(0, 0, w, h); } catch (e) { requestAnimationFrame(frameTick); return; }
+    var thr = parseInt(sens.value, 10) || 140;
+    var blobs = analyzeIR(img.data, w, h, thr);
+    var now = performance.now();
+    // aggiorna storico per il lampeggio
+    blobs.forEach(function (b) {
+      var key = Math.round(b.x * 8) + '_' + Math.round(b.y * 8);
+      if (!irHistory[key]) irHistory[key] = [];
+      irHistory[key].push(b.lum);
+      if (irHistory[key].length > 14) irHistory[key].shift();
+      b.blink = blinkRate(irHistory[key]);
+      b.key = key;
+    });
+    // ripulisci chiavi morte
+    var alive = {};
+    blobs.forEach(function (b) { alive[b.key] = 1; });
+    for (var k in irHistory) if (!alive[k] && irHistory[k][irHistory[k].length - 1] < thr - 20) delete irHistory[k];
+
+    drawBlobs(blobs);
+    hc = blobs.length;
+    pillHits.textContent = 'IR: ' + hc;
+    pillHits.className = 'pill' + (hc ? ' warn' : '');
+    if (now - lastFrame > 1200) {
+      lastFrame = now;
+      irList.innerHTML = '';
+      if (!blobs.length) irList.innerHTML = '<li class="empty">Nessuna sorgente IR. Prova a puntare la camera verso un altro schermo, un LED o una telecamera di sorveglianza.</li>';
+      blobs.forEach(function (b) {
+        var li = document.createElement('li');
+        li.innerHTML = '<span class="k">Sorgente a ' + Math.round(b.x * 100) + '%, ' + Math.round(b.y * 100) + '%</span>' +
+          '<span class="v ' + (b.blink > 0.4 ? 'danger' : 'warn') + '">' +
+          (b.blink > 0.4 ? '⚡ LED pulsante ' + Math.round(b.blink * 100) + '%' : 'IR ' + Math.round(b.score * 100) + '%') + '</span>';
+        irList.appendChild(li);
+      });
+    }
+    if (aiOn && aiModel && now - aiLast > 1500) { aiLast = now; runAI(); }
+    requestAnimationFrame(frameTick);
+  }
+
+  function startCamera(flipTo) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('warn', 'API camera non supportata');
+      log('❌ Questo browser non supporta getUserMedia');
+      return;
+    }
+    var use = flipTo !== undefined ? flipTo : facing;
+    btnStart.disabled = true;
+    var c = {
+      video: { facingMode: { ideal: use }, width: { ideal: 1280 } },
+      audio: false
+    };
+    navigator.mediaDevices.getUserMedia(c).then(function (s) {
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); }
+      stream = s;
+      facing = use;
+      running = true;
+      video.srcObject = s;
+      video.play().catch(function () {});
+      setStatus('on', '');
+      setPill(pillHits, 'IR: 0', '');
+      btnFlip.disabled = false;
+      btnAI.disabled = false;
+      log('✅ Fotocamera avviata (' + (facing === 'user' ? 'frontale' : 'posteriore') + ') — ' + s.getVideoTracks().length + ' traccia video');
+      refreshDevices();
+      requestAnimationFrame(frameTick);
+    }).catch(function (e) {
+      var kind = classifyError(e);
+      btnStart.disabled = false;
+      if (kind === 'busy') {
+        setStatus('busy', '');
+        log('⚠️ NotReadableError → la fotocamera è GIÀ in uso da un\'altra app');
+        busyList.innerHTML = '<li><span class="k">Camera</span><span class="v danger">in uso da un\'altra app</span></li>';
+      } else if (kind === 'denied') {
+        setStatus('warn', 'permesso negato');
+        log('⛔ Permesso negato per la fotocamera');
+      } else if (kind === 'nocamera') {
+        setStatus('warn', 'nessuna camera');
+        log('🚫 Nessuna fotocamera trovata');
+      } else {
+        setStatus('warn', 'errore ' + (e && e.name || '?'));
+        log('❌ Errore fotocamera: ' + (e && e.name || e) + ' — ' + (e && e.message || ''));
+      }
+    });
+  }
+  var busyList = $('busyList');
+
+  btnStart.addEventListener('click', function () {
+    if (running) { stream.getTracks().forEach(function (t) { t.stop(); }); running = false; video.srcObject = null; setStatus('', 'offline'); btnFlip.disabled = true; btnAI.disabled = true; log('⏹ Fotocamera spenta'); return; }
+    startCamera();
+  });
+  btnFlip.addEventListener('click', function () {
+    startCamera(facing === 'user' ? 'environment' : 'user');
+  });
+  btnAI.addEventListener('click', function () {
+    if (!aiOn) {
+      btnAI.textContent = '⏳ caricamento AI…';
+      loadAI().then(function () {
+        aiOn = true;
+        btnAI.textContent = '🤖 AI on';
+        btnAI.classList.add('on');
+        log('🤖 COCO-SSD caricato — rilevamento oggetti attivo');
+      }).catch(function () {
+        btnAI.textContent = '🤖 AI device scan';
+        log('❌ Impossibile caricare il modello AI (offline?)');
+      });
+    } else {
+      aiOn = false;
+      btnAI.textContent = '🤖 AI device scan';
+      btnAI.classList.remove('on');
+      aiList.innerHTML = '<li class="empty">AI disattivata.</li>';
+      log('🤖 AI disattivata');
+    }
+  });
+
+  function loadAI() {
+    return new Promise(function (resolve, reject) {
+      var scripts = [
+        'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js',
+        'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'
+      ];
+      var idx = 0;
+      function next() {
+        if (idx >= scripts.length) {
+          if (window.cocoSsd && window.tf) {
+            cocoSsd.load().then(function (m) { aiModel = m; resolve(); }).catch(reject);
+          } else reject(new Error('libs missing'));
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = scripts[idx++];
+        s.onload = next;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      }
+      next();
+    });
+  }
+
+  function runAI() {
+    if (aiBusy || !aiModel) return;
+    aiBusy = true;
+    aiModel.detect(video).then(function (preds) {
+      var hosts = preds.filter(function (p) {
+        return ['tv', 'laptop', 'cell phone', 'remote', 'clock'].indexOf(p.class) >= 0;
+      });
+      aiList.innerHTML = '';
+      if (!hosts.length) aiList.innerHTML = '<li class="empty">Nessun dispositivo "host camera" in vista.</li>';
+      hosts.forEach(function (p) {
+        var li = document.createElement('li');
+        var icons = { 'tv': '📺', 'laptop': '💻', 'cell phone': '📱', 'remote': '🕹', 'clock': '⏰' };
+        li.innerHTML = '<span class="k">' + (icons[p.class] || '▫') + ' ' + p.class + '</span><span class="v">' + Math.round(p.score * 100) + '%</span>';
+        aiList.appendChild(li);
+      });
+    }).catch(function () {}).then(function () { aiBusy = false; });
+  }
+})();</script>
+</body>
+</html>

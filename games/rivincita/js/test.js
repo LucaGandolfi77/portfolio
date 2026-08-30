@@ -279,6 +279,28 @@
     check('pausa disattivata', G.paused === false);
   });
 
+  step('UI: minimappa, zoom, pulsante auto', function () {
+    // minimappa non deve crashare
+    renderMinimap();
+    check('minimappa renderizzata', true);
+    // zoom
+    var z0 = targetZoom;
+    zoomBy(1.5);
+    check('zoom in aumenta', targetZoom > z0, targetZoom.toFixed(2));
+    zoomBy(0.01);
+    check('zoom clampato al minimo', targetZoom >= 0.2 - 1e-9, targetZoom.toFixed(2));
+    setZoom(0.5);
+    // pulsante auto: entra ed esci
+    G.dialogue = null; G.minigame = null; G.wanted = 0; G.police = [];
+    var c = G.cars[0];
+    tel(c.x + 5, c.y + 5);
+    toggleCarAction();
+    check('pulsante auto entra', G.player.inCar !== null);
+    toggleCarAction();
+    check('pulsante auto esce', G.player.inCar === null);
+    G.wanted = 0; G.police = [];
+  });
+
   step('Compra pizzeria e finale narrato', function () {
     G.dialogue = null; G.minigame = null; G.side = null; G.job = null;
     G.money = 2000; G.stage = 8;

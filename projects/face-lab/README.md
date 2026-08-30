@@ -24,7 +24,11 @@
 | 🔮 **Fish-eye** | Real radial bulge via inverse-mapping pixel warp of the face region |
 | 🫠 **Squash** | Expressive: mouth opens → face squashes vertically, smile → stretches |
 | 🎨 **Cartoon** | Saturated video + bold comic contour outlines of the features |
-| 👓👑🥸 **Props** | Vector glasses, crown (with gems) and mustache tracking the face |
+| 🌀 **Swirl** | Rotational twist of the face region, stronger near the core |
+| 🌈 **Chromatic** | RGB channel split (chromatic aberration) on the face region |
+| 🧊 **Pixelate** | Blocky mosaic on the face region |
+| ⚡ **Neon** | Inverted, saturated, hue-shifted video — cyber glow |
+| 👓👑🥸🎩😊🧔😇 **Props** | Vector glasses, crown, mustache, top hat, blush, beard and halo tracking the face |
 
 ## ✨ Extra
 

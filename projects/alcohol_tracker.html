@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="AlcoTracker — calcola il tuo tasso alcolemico (formula di Widmark), stima quando potrai guidare e quando sarai sobrio. Inserisci sesso, peso, altezza ed età, aggiungi bevande e pasti, guarda il grafico. Vietato ai minori di 18 anni.">
+<title>🍺 AlcoTracker — Tasso Alcolemico & Quando Posso Guidare</title>
+<style>
+:root{
+  --bg:#0b1220; --card:#121b2e; --card2:#18253d; --line:rgba(120,170,255,.14);
+  --txt:#eef3ff; --dim:#93a3c8; --red:#ff5f6d; --amber:#ffb84d; --green:#52ff9e; --cyan:#3ee6ff; --violet:#b28dff;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;touch-action:manipulation}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(700px 300px at 15% -5%,rgba(62,230,255,.08),transparent 60%),
+  radial-gradient(600px 300px at 90% 0%,rgba(255,95,109,.07),transparent 60%)}
+.wrap{width:100%;max-width:1060px;margin:0 auto;padding:calc(10px + var(--safe-t)) 14px calc(40px + var(--safe-b));display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:4px 2px}
+.logo{font-size:clamp(18px,5vw,26px);font-weight:800;letter-spacing:1.5px;
+  background:linear-gradient(90deg,var(--amber),var(--red));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--dim);-webkit-text-fill-color:var(--dim);font-weight:600}
+.card{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.card h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);margin-bottom:12px}
+.grid{display:grid;gap:14px}
+@media(min-width:860px){ .grid{grid-template-columns:1.05fr .95fr} .full{grid-column:1/-1} }
+label{display:block;font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:5px}
+input,select{width:100%;background:rgba(5,10,20,.5);border:1px solid var(--line);border-radius:12px;color:var(--txt);
+  font:inherit;font-size:15px;padding:12px 14px;font-weight:600}
+input:focus,select:focus{outline:1px solid var(--cyan);border-color:var(--cyan)}
+.frow{display:flex;gap:10px;flex-wrap:wrap}
+.frow>*{flex:1 1 120px}
+.sexbtns{display:flex;gap:8px}
+.sexbtn{flex:1;padding:13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);font:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .2s}
+.sexbtn.on{background:linear-gradient(90deg,rgba(62,230,255,.2),rgba(178,141,255,.2));color:var(--txt);border-color:var(--cyan)}
+.btn{appearance:none;border:none;cursor:pointer;font-family:inherit;font-weight:800;border-radius:14px;transition:transform .15s,box-shadow .2s,opacity .2s;padding:14px 18px;font-size:15px}
+.btn:active{transform:scale(.97)}
+.btn.primary{color:#fff;background:linear-gradient(90deg,#0ea5e9,#6366f1);box-shadow:0 6px 20px rgba(14,165,233,.35)}
+.btn.warn{color:#1a1000;background:linear-gradient(90deg,var(--amber),#ff9f43);box-shadow:0 6px 20px rgba(255,155,67,.3)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+.btn.ghost:hover{color:var(--txt);border-color:var(--amber)}
+.btn.danger{background:rgba(255,95,109,.15);color:var(--red);border:1px solid rgba(255,95,109,.4)}
+/* drink grid */
+.drinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.drink{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;cursor:pointer;transition:all .15s;position:relative}
+.drink:active{transform:scale(.96)}
+.drink:hover{border-color:var(--amber)}
+.drink .em{font-size:24px}
+.drink .nm{font-size:12px;font-weight:700;margin-top:4px;line-height:1.25}
+.drink .gr{font-size:10px;color:var(--dim);margin-top:2px}
+.drink.sel{border-color:var(--amber);background:rgba(255,184,77,.1);box-shadow:0 0 12px rgba(255,184,77,.2)}
+/* items list */
+#items{display:flex;flex-direction:column;gap:7px;max-height:240px;overflow-y:auto;padding-right:4px}
+#items::-webkit-scrollbar{width:5px}#items::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:8px 10px;font-size:13px;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.item .em{font-size:20px}
+.item .nm{flex:1;font-weight:600}
+.item .dt{font-size:11px;color:var(--dim)}
+.item .g{font-size:11px;color:var(--amber);font-family:ui-monospace,Menlo,monospace}
+.item .x{background:transparent;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:4px}
+.item .x:hover{color:var(--red)}
+/* BAC hero */
+.hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.bac-big{font-size:clamp(40px,10vw,64px);font-weight:800;font-family:ui-monospace,Menlo,monospace;line-height:1}
+.bac-big small{font-size:14px;color:var(--dim);font-weight:600}
+.bac-state{font-size:14px;font-weight:700;padding:6px 14px;border-radius:30px;margin-top:6px;display:inline-block}
+.ok{background:rgba(82,255,158,.14);color:var(--green)}
+.warn-b{background:rgba(255,184,77,.16);color:var(--amber)}
+.danger{background:rgba(255,95,109,.18);color:var(--red)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.metric{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 12px}
+.metric .k{font-size:10px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase}
+.metric .v{font-size:19px;font-weight:800;margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.metric .v.amber{color:var(--amber)} .metric .v.green{color:var(--green)} .metric .v.red{color:var(--red)}
+#chartWrap{position:relative;margin-top:6px}
+canvas#chart{width:100%;height:260px;display:block;border-radius:12px;background:rgba(3,8,16,.5);border:1px solid var(--line)}
+.chart-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.drivebox{margin-top:14px;padding:14px;border-radius:14px;border:1px solid rgba(82,255,158,.35);background:rgba(82,255,158,.07)}
+.drivebox.no{border-color:rgba(255,95,109,.45);background:rgba(255,95,109,.09)}
+.drivebox .big{font-size:22px;font-weight:800}
+.drivebox .big .t{color:var(--green)}
+.drivebox.no .big .t{color:var(--red)}
+.drivebox p{font-size:12px;color:var(--dim);margin-top:4px;line-height:1.5}
+/* underage overlay */
+#underage{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,.97);padding:24px;text-align:center}
+#underage.on{display:flex}
+#underage .box{max-width:430px}
+#underage .big{font-size:56px}
+#underage h2{font-size:22px;color:var(--red);margin:14px 0 10px;letter-spacing:1px}
+#underage p{color:var(--dim);font-size:14px;line-height:1.7}
+#underage .btn{margin-top:20px}
+.foot{font-size:11px;color:var(--dim);text-align:center;line-height:1.7;padding:0 10px}
+.foot b{color:var(--amber)}
+@media(max-width:560px){ .frow>*{flex:1 1 45%} .drinks{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))} canvas#chart{height:220px} }
+/* ═══ TIMELINE VIEW ═══ */
+.viewtabs{display:flex;gap:8px;padding:2px}
+.vtab{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--dim);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.5px;transition:all .2s}
+.vtab.on{background:linear-gradient(90deg,rgba(62,230,255,.16),rgba(178,141,255,.16));color:var(--txt);border-color:rgba(62,230,255,.45)}
+#timelineView h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+#tlWrap{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(3,8,16,.5)}
+canvas#tlCanvas{width:100%;height:200px;display:block;touch-action:none}
+.tl-grid{position:absolute;inset:0;pointer-events:none}
+.tl-tray{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.tl-tray h3{font-size:10px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;min-height:34px;align-items:center}
+.chip2{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:20px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--txt);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;transition:all .15s;position:relative}
+.chip2:active{cursor:grabbing}
+.chip2:hover{border-color:var(--amber)}
+.chip2 .gr{font-size:10px;color:var(--dim)}
+.chip2 .fav{background:transparent;border:none;color:var(--dim);font-size:13px;cursor:pointer;padding:0 2px}
+.chip2 .fav.on{color:var(--gold)}
+.chip2.food{border-color:rgba(255,184,77,.4);background:rgba(255,184,77,.08)}
+#favChips .chip2{border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.1);box-shadow:0 0 10px rgba(255,209,102,.15)}
+.tl-ghost{position:fixed;z-index:400;pointer-events:none;opacity:.92;transform:scale(1.06);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.tl-hint{font-size:11px;color:var(--dim);margin-top:8px;text-align:center}
+.tl-drop{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);box-shadow:0 0 10px var(--amber);pointer-events:none;z-index:5}
+@media(max-width:560px){ canvas#tlCanvas{height:170px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🍺 AlcoTracker <small>WIDMARK · QUANDO POSSO GUIDARE</small></div>
+    <div style="flex:1"></div>
+    <span class="btn ghost" style="padding:8px 12px;font-size:12px" id="resetProfile">🔄 Nuovo profilo</span>
+  </header>
+
+  <!-- PROFILO -->
+  <div class="card" id="profileCard">
+    <h2>👤 Il tuo profilo (serve per il calcolo)</h2>
+    <div class="frow">
+      <div>
+        <label>SESSO</label>
+        <div class="sexbtns">
+          <button class="sexbtn" data-sex="male">♂ Uomo</button>
+          <button class="sexbtn" data-sex="female">♀ Donna</button>
+        </div>
+      </div>
+      <div><label>PESO (kg)</label><input id="weight" type="number" inputmode="decimal" min="30" max="250" placeholder="70"></div>
+      <div><label>ALTEZZA (cm)</label><input id="height" type="number" inputmode="numeric" min="120" max="220" placeholder="175"></div>
+      <div><label>ETÀ (anni)</label><input id="age" type="number" inputmode="numeric" min="1" max="110" placeholder="30"></div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="frow">
+      <div style="flex:2"><label>METABOLISMO (velocità di smaltimento)</label>
+        <select id="metab">
+          <option value="slow">Lento · 0.10 g/L/h</option>
+          <option value="medium" selected>Medio · 0.15 g/L/h</option>
+          <option value="fast">Veloce · 0.20 g/L/h</option>
+        </select>
+      </div>
+      <div style="flex:1;display:flex;align-items:flex-end">
+        <button class="btn primary" id="saveProfile" style="width:100%">💾 Salva e continua</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="mainGrid" style="display:none">
+    <div class="viewtabs">
+      <button class="vtab on" id="tabClassic">📋 Classica</button>
+      <button class="vtab" id="tabTimeline">🕐 Timeline</button>
+    </div>
+
+    <!-- VISTA CLASSICA -->
+    <div class="grid" id="classicView">
+    <!-- LEFT: add drinks -->
+    <div class="card">
+      <h2>🍷 Cosa hai bevuto / mangiato</h2>
+      <div class="drinks" id="drinkGrid"></div>
+      <div style="height:12px"></div>
+      <div class="frow">
+        <div style="flex:1"><label>QUANDO</label><input id="when" type="datetime-local"><small style="color:var(--dim);font-size:10px;display:block;margin-top:4px">Solo tra ieri, oggi e domani</small></div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="frow">
+        <div style="flex:2"><label>PASTO (assorbimento più lento)</label>
+          <select id="foodSel">
+            <option value="1.00">A stomaco vuoto</option>
+            <option value="0.90">Spuntino leggero</option>
+            <option value="0.80">Pasto leggero (panino/salad)</option>
+            <option value="0.70">Pasto completo</option>
+            <option value="0.60">Pasto abbondante</option>
+          </select>
+        </div>
+        <div style="flex:1;display:flex;align-items:flex-end">
+          <button class="btn ghost" id="addFood" style="width:100%">🍽️ Aggiungi pasto</button>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div id="items">
+        <div class="item"><span class="em">💡</span><span class="nm">Aggiungi bevande e pasti qui sopra…</span></div>
+      </div>
+      <div style="height:10px"></div>
+      <button class="btn danger" id="clearAll" style="width:100%">🗑️ Svuota tutto</button>
+    </div>
+
+    <!-- RIGHT: BAC + chart -->
+    <div class="card">
+      <h2>📊 Tasso alcolemico (formula di Widmark)</h2>
+      <div class="hero">
+        <div>
+          <div class="bac-big" id="bacNow">0.00<small> g/L</small></div>
+          <div><span class="bac-state ok" id="bacState">Sobrio</span></div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div class="drivebox" id="driveBox">
+            <div class="big">🚗 Puoi guidare <span class="t" id="driveTime">—</span></div>
+            <p id="driveNote">Calcolato col limite italiano di 0.5 g/L.</p>
+          </div>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="k">Picco stimato</div><div class="v amber" id="mPeak">—</div></div>
+        <div class="metric"><div class="k">Al picco alle</div><div class="v" id="mPeakTime">—</div></div>
+        <div class="metric"><div class="k">Sobrio alle</div><div class="v green" id="mSober">—</div></div>
+        <div class="metric"><div class="k">Alcol totale</div><div class="v" id="mGrams">—</div></div>
+        <div class="metric"><div class="k">Unità alcoliche</div><div class="v" id="mUA">—</div></div>
+        <div class="metric"><div class="k">Bevande</div><div class="v" id="mCount">—</div></div>
+      </div>
+      <div id="chartWrap">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:var(--green)"></span>Tasso alcolemico stimato</span>
+        <span><span class="legend-dot" style="background:var(--red)"></span>Limite legale 0.5 g/L (guida)</span>
+        <span><span class="legend-dot" style="background:var(--dim)"></span>🍺 Bevande</span>
+        <span><span class="legend-dot" style="background:var(--amber)"></span>🍽️ Pasti</span>
+      </div>
+    </div>
+    </div><!-- /classicView -->
+
+    <!-- VISTA TIMELINE: -12h … +12h, aggiungi trascinando -->
+    <div class="card" id="timelineView" style="display:none">
+      <h2>🕐 Timeline — trascina cibo e bevande sull'orario</h2>
+      <div id="tlWrap">
+        <canvas id="tlCanvas"></canvas>
+        <div class="tl-drop" id="tlDrop" style="display:none"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn ghost" id="tlZoomIn" style="padding:8px 14px;font-size:14px">🔍 +</button>
+        <span class="chip" id="tlZoomLbl">24h</span>
+        <button class="btn ghost" id="tlZoomOut" style="padding:8px 14px;font-size:14px">🔍 −</button>
+        <span style="flex:1"></span>
+        <button class="btn ghost" id="tlDelSel" style="padding:8px 14px;font-size:13px;color:var(--red);border-color:rgba(255,95,109,.4)">🗑️ Elimina selezionato</button>
+      </div>
+      <div class="tl-selbar" id="tlSelBar" style="display:none;margin-top:8px;padding:9px 12px;border-radius:10px;background:rgba(255,184,77,.1);border:1px solid rgba(255,184,77,.4);font-size:13px;font-weight:600;align-items:center;gap:10px">
+        <span style="flex:1" id="tlSelInfo"></span>
+        <button class="btn ghost" style="padding:6px 12px;font-size:12px;color:var(--red)" onclick="__ALCO__.deleteTlSel()">🗑️</button>
+      </div>
+      <div class="tl-tray">
+        <h3>⭐ Preferiti (sempre in vista)</h3>
+        <div class="chips" id="favChips"><span class="hint">Tocca ⭐ su una bevanda o pasto per metterlo qui</span></div>
+        <h3>🍷 Bevande</h3>
+        <div class="chips" id="tlDrinkChips"></div>
+        <h3>🍽️ Pasti</h3>
+        <div class="chips" id="tlFoodChips"></div>
+      </div>
+      <div class="tl-hint">👆 Trascina una chip sulla timeline per aggiungerla a quell'ora · 🔍+/− (o rotella mouse) per lo zoom · tocca un 🍺/🍽️ sulla timeline per selezionarlo e poi 🗑️ Elimina. Solo tra ieri e domani.</div>
+    </div>
+  </div>
+
+  <p class="foot full"><b>⚠️ VIETATO BERE AI MINORENNI.</b> L'app è solo una stima scientifica (formula di Widmark): non sostituisce l'etilometro e ogni corpo reagisce diversamente. Se hai bevuto, <b>non guidare</b>: aspetta il tempo indicato o usa un etilometro omologato. Guida in stato d'ebbrezza = reato.</p>
+</div>
+
+<!-- UNDERAGE -->
+<div id="underage">
+  <div class="box card">
+    <div class="big">🚫</div>
+    <h2>VIETATO BERE AI MINORENNI</h2>
+    <p>Questa app calcola i livelli di alcol nel sangue ed è destinata <b>solo a maggiorenni</b> (18+). Se hai meno di 18 anni non puoi usarla. <b>L'alcol è vietato ai minori</b> e la guida in stato di ebbrezza è un reato.</p>
+    <button class="btn warn" onclick="location.reload()">◀ Torna indietro</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ═══════════ FORMULE SCIENTIFICHE ═══════════ */
+const ETH=0.789; // densità etanolo g/ml
+const R_WIDMARK={male:0.68,female:0.55}; // fattore di distribuzione Widmark
+const BETA={slow:0.10,medium:0.15,fast:0.20}; // g/L/h eliminazione
+const LEGAL_LIMIT=0.5; // g/L (Italia, patente normale)
+const UA=12; // g per unità alcolica
+
+// grammi di alcol puro: volume(ml) × grado(%) × densità
+function grams(vol,abv){return vol*(abv/100)*ETH;}
+// picco Widmark: (g / (r × kg)) × 1.055 (densità sangue) → g/L
+function widmarkPeak(totalG,sex,kg,foodFactor){
+  const r=R_WIDMARK[sex];
+  return (totalG/(r*kg))*1.055*foodFactor;
+}
+// tempo di eliminazione lineare dopo il picco
+function hoursToZero(peak,beta){return peak/beta;}
+
+/* ═══════════ STATO ═══════════ */
+const LS='alcotracker_v1';
+let S=null;
+try{S=JSON.parse(localStorage.getItem(LS));}catch(e){}
+S=S||{sex:'male',weight:'',height:'',age:'',metab:'medium',items:[],favs:[]};
+if(!S.favs)S.favs=[];
+if(S.items)S.items.forEach(i=>{if(i.t&&typeof i.t==='string')i.t=new Date(i.t);});
+
+const $=id=>document.getElementById(id);
+const now=()=>new Date();
+function pad(n){return String(n).padStart(2,'0');}
+function fmtTime(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
+function fmtClock(d){return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+fmtTime(d);}
+function localInputValue(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+fmtTime(d);}
+function parseInput(v){
+  if(!v)return now();
+  const d=new Date(v);
+  return isNaN(d.getTime())?now():d;
+}
+/* finestra consentita: da ieri 00:00 a domani 23:59 */
+function whenBounds(){
+  const n=new Date();
+  const min=new Date(n.getFullYear(),n.getMonth(),n.getDate()-1,0,0,0);
+  const max=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,23,59,59);
+  return {min,max};
+}
+function inWhenWindow(d){
+  const b=whenBounds();
+  return d.getTime()>=b.min.getTime()&&d.getTime()<=b.max.getTime();
+}
+function toastMsg(msg,color){
+  let t=$('toastMsg');
+  if(!t){
+    t=document.createElement('div');
+    t.id='toastMsg';
+    t.style.cssText='position:fixed;top:calc(14px + var(--safe-t));left:50%;transform:translateX(-50%);background:#18253d;border:1px solid var(--amber);color:var(--txt);padding:10px 18px;border-radius:12px;z-index:300;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .25s';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  if(color)t.style.borderColor=color;
+  t.style.opacity='1';
+  clearTimeout(t._tm);
+  t._tm=setTimeout(()=>{t.style.opacity='0';},2600);
+}
+function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
+
+/* ═══════════ DRINK DATABASE (g calcolati) ═══════════ */
+const DRINKS=[
+  {em:'🍺',nm:'Birra piccola',vol:330,abv:4.7},
+  {em:'🍺',nm:'Birra media',vol:660,abv:4.7},
+  {em:'🍺',nm:'Birra artigianale',vol:500,abv:6.0},
+  {em:'🍷',nm:'Vino rosso',vol:125,abv:13},
+  {em:'🍷',nm:'Vino bianco',vol:125,abv:12},
+  {em:'🥂',nm:'Spumante',vol:125,abv:11.5},
+  {em:'🍹',nm:'Aperitivo (Spritz)',vol:220,abv:11},
+  {em:'🍸',nm:'Negroni',vol:90,abv:26},
+  {em:'🍸',nm:'Gin Tonic',vol:200,abv:15},
+  {em:'🥃',nm:'Whisky (dose)',vol:40,abv:40},
+  {em:'🥃',nm:'Vodka shot',vol:30,abv:40},
+  {em:'🍾',nm:'Grappa',vol:30,abv:40},
+  {em:'🍹',nm:'Amaro',vol:30,abv:30},
+  {em:'🍹',nm:'Liquore dolce',vol:30,abv:25},
+  {em:'🍻',nm:'Cocktail (forte)',vol:200,abv:25}
+];
+
+/* ═══════════ MODELLO CURVA ═══════════ */
+// restituisce punti {t:Date, bac} dalla prima bevanda fino a sobrietà + margine
+function buildCurve(items){
+  if(!items.length)return[];
+  const drinks=items.filter(i=>!i.food);
+  if(!drinks.length)return[];
+  // pasti ordinati per tempo
+  const foods=items.filter(i=>i.food).sort((a,b)=>a.t-b.t);
+  const start=Math.min(...items.map(i=>i.t.getTime()));
+  // per OGNI bevanda il fattore pasto è quello attivo AL MOMENTO del consumo:
+  // un pasto influenza solo le bevande da quell'istante in poi, non quelle già bevute.
+  const ctx=drinks.map(d=>{
+    let ff=1.0;
+    for(const f of foods){
+      if(f.t.getTime()<=d.t.getTime())ff=f.foodFactor;else break;
+    }
+    return {d,ff,tau:(ff<0.85?50:30)*60000}; // assorbimento più lento a stomaco pieno
+  });
+  const beta=BETA[S.metab]||0.15;       // g/L per ora
+  const kg=parseFloat(S.weight)||70;
+  const r=R_WIDMARK[S.sex];
+  const end=start+48*3600000;
+  const step=5*60000;                    // passo 5 min → curva fluida
+  const curve=[];
+  for(let t=start;t<=end;t+=step){
+    // alcol assorbito cumulato: ogni bevanda con la sua τ e il suo fattore pasto
+    let absorbed=0;
+    for(const c of ctx){
+      const dt=t-c.d.t.getTime();
+      if(dt<=0)continue;
+      absorbed+=c.d.grams*c.ff*(1-Math.exp(-dt/c.tau));
+    }
+    // eliminazione lineare che parte dalla prima bevanda
+    const elim=beta*(t-start)/3600000;
+    let bac=(absorbed/(r*kg))*1.055-elim;
+    bac=Math.max(0,bac);
+    curve.push({t:new Date(t),bac:Math.min(bac,4)});
+  }
+  return curve;
+}
+function bacAt(curve,date){
+  if(!curve.length)return 0;
+  const ms=date.getTime();
+  if(ms<=curve[0].t.getTime())return curve[0].bac;
+  for(let i=1;i<curve.length;i++){
+    if(ms<=curve[i].t.getTime()){
+      const a=curve[i-1],b=curve[i];
+      const f=(ms-a.t.getTime())/(b.t.getTime()-a.t.getTime());
+      return a.bac+(b.bac-a.bac)*f;
+    }
+  }
+  return curve[curve.length-1].bac;
+}
+function crossing(curve,level){
+  for(let i=1;i<curve.length;i++){
+    const a=curve[i-1],b=curve[i];
+    if(a.bac>level&&b.bac<=level){
+      const f=(a.bac-level)/(a.bac-b.bac);
+      return new Date(a.t.getTime()+(b.t.getTime()-a.t.getTime())*f);
+    }
+  }
+  return null;
+}
+function peakInfo(curve){
+  let p=curve[0];
+  for(const c of curve)if(c.bac>p.bac)p=c;
+  return p;
+}
+
+/* ═══════════ EXPORT TEST ═══════════ */
+window.__ALCO__={
+  grams,widmarkPeak,beta:()=>BETA[S.metab],buildCurve,bacAt,crossing,peakInfo,
+  get S(){return S;},DRINKS,LEGAL_LIMIT,UA,ETH,R_WIDMARK,BETA,
+  whenBounds,inWhenWindow,parseInput,toastMsg,
+  render:function(){renderDrinks();renderItems();renderAll();},
+  renderTimeline,drawTimeline,setView,toggleFav,isFav,favKey,favKeyFood,addDrinkAt,addFoodAt,dropOnTimeline,
+  zoomTimeline,selectTimelineItem,deleteTlSel,getTlZoom:()=>tlZoom,getTlSel:()=>tlSel,tlHalf,
+  setProfile:function(p){Object.assign(S,p);save();applyProfile();}
+};
+
+/* ═══════════ RENDER ═══════════ */
+function renderDrinks(){
+  const g=$('drinkGrid');g.innerHTML='';
+  DRINKS.forEach((d,i)=>{
+    const gr=Math.round(grams(d.vol,d.abv));
+    const b=document.createElement('button');
+    b.className='drink';
+    b.innerHTML=`<div class="em">${d.em}</div><div class="nm">${d.nm}</div><div class="gr">${d.vol}ml · ${d.abv}% · ~${gr}g</div>`;
+    b.addEventListener('click',()=>{
+      const when=parseInput($('when').value);
+      if(!inWhenWindow(when)){toastMsg('⏰ Scegli un orario tra ieri e domani (la data selezionata è fuori finestra)','var(--red)');return;}
+      S.items.push({type:'drink',em:d.em,nm:d.nm,vol:d.vol,abv:d.abv,grams:grams(d.vol,d.abv),t:when});
+      save();renderItems();renderAll();
+    });
+    g.appendChild(b);
+  });
+}
+
+/* ═══════════ TIMELINE VIEW (-12h … +12h, drag & drop) ═══════════ */
+const TL_BASE_HALF=12*3600000; // ±12 ore a zoom 1
+let tlZoom=1;                   // zoom timeline (0.25 = ±48h … 8 = ±1.5h)
+let tlSel=null;                 // indice di S.items selezionato sulla timeline
+function tlHalf(){return TL_BASE_HALF/tlZoom;}
+function zoomTimeline(f){
+  tlZoom=Math.max(0.25,Math.min(8,Math.round((tlZoom*f)*100)/100));
+  const el=$('tlZoomLbl');
+  if(el)el.textContent=Math.round((tlHalf()*2/3600000))+'h';
+  drawTimeline();
+}
+function selectTimelineItem(ev){
+  const cv=$('tlCanvas');if(!cv)return;
+  const r=cv.getBoundingClientRect();
+  const x=(ev.clientX!==undefined?ev.clientX:ev.touches&&ev.touches[0]&&ev.touches[0].clientX||0)-r.left;
+  const nowT=Date.now(),half=tlHalf();
+  const t=nowT-half+(x/Math.max(1,r.width))*(half*2);
+  // trova l'elemento più vicino entro 30 minuti
+  let best=null,bestD=30*60000;
+  S.items.forEach((it,i)=>{
+    const d=Math.abs(it.t.getTime()-t);
+    if(d<bestD){bestD=d;best=i;}
+  });
+  if(best===null){tlSel=null;drawTimeline();hideTlSel();return;}
+  tlSel=best;
+  drawTimeline();
+  showTlSel();
+}
+function showTlSel(){
+  const bar=$('tlSelBar');if(!bar)return;
+  const it=S.items[tlSel];
+  if(!it){hideTlSel();return;}
+  bar.style.display='flex';
+  $('tlSelInfo').textContent=(it.food?'🍽️ ':'')+(it.food?it.nm:it.em+' '+it.nm)+' · '+fmtClock(it.t);
+}
+function hideTlSel(){const bar=$('tlSelBar');if(bar)bar.style.display='none';tlSel=null;}
+function deleteTlSel(){
+  if(tlSel===null)return;
+  S.items.splice(tlSel,1);
+  tlSel=null;
+  hideTlSel();
+  save();renderItems();renderTimeline();renderAll();
+  toastMsg('🗑️ Elemento rimosso','var(--amber)');
+}
+function favKey(drinkIdx){return 'drink:'+drinkIdx;}
+function favKeyFood(factor){return 'food:'+factor;}
+function isFav(k){return S.favs.indexOf(k)>=0;}
+function toggleFav(k){
+  const i=S.favs.indexOf(k);
+  if(i>=0)S.favs.splice(i,1);else S.favs.push(k);
+  save();renderTimeline();
+}
+function addDrinkAt(idx,when){
+  const d=DRINKS[idx];
+  S.items.push({type:'drink',em:d.em,nm:d.nm,vol:d.vol,abv:d.abv,grams:grams(d.vol,d.abv),t:when});
+  save();renderItems();renderTimeline();renderAll();
+}
+function addFoodAt(factor,when){
+  const nm={1.00:'A stomaco vuoto',0.90:'Spuntino leggero',0.80:'Pasto leggero',0.70:'Pasto completo',0.60:'Pasto abbondante'}[factor]||'Pasto';
+  S.items.push({type:'food',em:'🍽️',nm:'Pasto · '+nm,food:true,foodFactor:factor,grams:0,t:when});
+  save();renderItems();renderTimeline();renderAll();
+}
+function makeChip(label,sub,onFav,onTap){
+  const c=document.createElement('div');
+  c.className='chip2'+(onFav&&onFav.food?' food':'');
+  c.innerHTML=`<span class="gr">${label}</span>`+(sub?`<span class="gr">${sub}</span>`:'');
+  if(onFav){
+    const star=document.createElement('button');
+    star.className='fav'+(isFav(onFav.key)?' on':'');
+    star.textContent='⭐';
+    star.title='Preferito';
+    star.addEventListener('click',e=>{e.stopPropagation();toggleFav(onFav.key);});
+    c.appendChild(star);
+  }
+  // drag & drop sulla timeline
+  c.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    startChipDrag(e,onFav);
+  });
+  // tap semplice → usa l'orario del campo QUANDO
+  c.addEventListener('click',e=>{
+    if(e.defaultPrevented)return;
+    const when=parseInput($('when').value);
+    if(!inWhenWindow(when)){toastMsg('⏰ Scegli un orario tra ieri e domani','var(--red)');return;}
+    onTap(when);
+  });
+  return c;
+}
+let drag=null;
+function startChipDrag(e,onFav){
+  const chip=e.currentTarget;
+  const rect=chip.getBoundingClientRect();
+  const ghost=chip.cloneNode(true);
+  ghost.classList.add('tl-ghost');
+  ghost.style.width=rect.width+'px';
+  ghost.style.left=(e.clientX-rect.width/2)+'px';
+  ghost.style.top=(e.clientY-rect.height/2)+'px';
+  document.body.appendChild(ghost);
+  drag={active:true,onFav,x:e.clientX,y:e.clientY,ghost,chipMoved:false};
+  const mv=ev=>{
+    if(!drag)return;
+    if(Math.abs(ev.clientX-drag.x)+Math.abs(ev.clientY-drag.y)>8)drag.chipMoved=true;
+    drag.x=ev.clientX;drag.y=ev.clientY;
+    ghost.style.left=(ev.clientX-rect.width/2)+'px';
+    ghost.style.top=(ev.clientY-rect.height/2)+'px';
+    updateDropGuide(ev.clientX);
+  };
+  const up=ev=>{
+    if(!drag)return;
+    document.removeEventListener('pointermove',mv);
+    document.removeEventListener('pointerup',up);
+    if(drag.chipMoved)dropOnTimeline(ev.clientX,onFav);
+    ghost.remove();
+    hideDropGuide();
+    drag=null;
+  };
+  document.addEventListener('pointermove',mv);
+  document.addEventListener('pointerup',up);
+}
+function updateDropGuide(clientX){
+  const wrap=$('tlWrap');
+  if(!wrap)return;
+  const r=wrap.getBoundingClientRect();
+  if(clientX<r.left||clientX>r.right){hideDropGuide();return;}
+  const d=$('tlDrop');
+  d.style.display='block';
+  d.style.left=(clientX-r.left)+'px';
+}
+function hideDropGuide(){const d=$('tlDrop');if(d)d.style.display='none';}
+function dropOnTimeline(clientX,onFav){
+  const wrap=$('tlWrap');
+  const r=wrap.getBoundingClientRect();
+  const frac=(clientX-r.left)/Math.max(1,r.width); // 0..1 → -half..+half
+  const half=tlHalf();
+  const t=new Date(Date.now()-half+frac*half*2);
+  const b=whenBounds();
+  if(t<b.min||t>b.max){toastMsg('⏰ Fuori finestra: solo tra ieri e domani','var(--red)');return;}
+  if(onFav.food)addFoodAt(onFav.factor,t);
+  else addDrinkAt(onFav.idx,t);
+  toastMsg('✅ Aggiunto alle '+fmtClock(t),'var(--green)');
+}
+function renderTimeline(){
+  if(!$('tlCanvas'))return;
+  renderTlChips();
+  drawTimeline();
+}
+function renderTlChips(){
+  const favs=$('favChips'),dr=$('tlDrinkChips'),fo=$('tlFoodChips');
+  favs.innerHTML='';dr.innerHTML='';fo.innerHTML='';
+  // favoriti sempre in vista (bevande e pasti preferiti)
+  const favItems=S.favs.slice();
+  if(!favItems.length)favs.innerHTML='<span class="hint">Tocca ⭐ su una bevanda o pasto per metterlo qui</span>';
+  favItems.forEach(k=>{
+    if(k.indexOf('drink:')===0){
+      const idx=parseInt(k.split(':')[1],10);
+      const d=DRINKS[idx];if(!d)return;
+      const c=makeChip(d.em+' '+d.nm,Math.round(grams(d.vol,d.abv))+'g',{idx,food:false,key:k},w=>addDrinkAt(idx,w));
+      favs.appendChild(c);
+    }else if(k.indexOf('food:')===0){
+      const f=parseFloat(k.split(':')[1]);
+      const nm={1.00:'A stomaco vuoto',0.90:'Spuntino',0.80:'Pasto leggero',0.70:'Pasto completo',0.60:'Pasto abbondante'}[f]||'Pasto';
+      const c=makeChip('🍽️ '+nm,'',{factor:f,food:true,key:k},w=>addFoodAt(f,w));
+      favs.appendChild(c);
+    }
+  });
+  // tutte le bevande
+  DRINKS.forEach((d,i)=>{
+    const c=makeChip(d.em+' '+d.nm,Math.round(grams(d.vol,d.abv))+'g',{idx:i,food:false,key:favKey(i)},w=>addDrinkAt(i,w));
+    dr.appendChild(c);
+  });
+  // pasti
+  [1.00,0.90,0.80,0.70,0.60].forEach(f=>{
+    const nm={1.00:'A stomaco vuoto',0.90:'Spuntino',0.80:'Pasto leggero',0.70:'Pasto completo',0.60:'Pasto abbondante'}[f];
+    const c=makeChip('🍽️ '+nm,'',{factor:f,food:true,key:favKeyFood(f)},w=>addFoodAt(f,w));
+    fo.appendChild(c);
+  });
+}
+function drawTimeline(){
+  const cv=$('tlCanvas');if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const dpr=Math.min(devicePixelRatio||1,2);
+  const W=cv.clientWidth||600,H=cv.clientHeight||200;
+  cv.width=W*dpr;cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const nowT=Date.now(),half=tlHalf();
+  const xOf=t=>((t-(nowT-half))/(half*2))*W;
+  // griglia oraria adattiva allo zoom
+  const spanH=(half*2)/3600000;
+  let stepH=1;
+  if(spanH>48)stepH=12;else if(spanH>30)stepH=6;else if(spanH>16)stepH=3;else if(spanH>8)stepH=2;
+  ctx.strokeStyle='rgba(120,170,255,.10)';ctx.lineWidth=1;
+  const firstH=Math.ceil((nowT-half)/3600000)*3600000;
+  for(let ts=firstH;ts<=nowT+half;ts+=stepH*3600000){
+    const x=xOf(ts);
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+    ctx.fillStyle='rgba(147,163,200,.75)';ctx.font='9px ui-monospace,Menlo,monospace';ctx.textAlign='center';
+    const d=new Date(ts);
+    const nearNow=Math.abs(ts-nowT)<stepH*1800000;
+    ctx.fillText(nearNow?'ORA':fmtTime(d),x,H-6);
+  }
+  // fascia limite legale se visibile
+  const curve=buildCurve(S.items);
+  if(curve.length){
+    const maxBac=Math.max(0.5,...curve.map(c=>c.bac));
+    const yOf=b=>H-14-(b/maxBac)*(H-34);
+    ctx.beginPath();
+    let started=false;
+    curve.forEach(c=>{
+      const x=xOf(c.t.getTime()),y=yOf(c.bac);
+      if(x<-5||x>W+5)return;
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle='#52ff9e';ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.shadowColor='rgba(82,255,158,.5)';ctx.shadowBlur=6;
+    ctx.stroke();ctx.shadowBlur=0;
+    const yL=yOf(0.5);
+    ctx.strokeStyle='rgba(255,95,109,.7)';ctx.setLineDash([4,4]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,yL);ctx.lineTo(W,yL);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#ff5f6d';ctx.font='bold 8px system-ui';ctx.textAlign='left';
+    ctx.fillText('0.5 g/L',4,yL-3);
+  }
+  // marcatori elementi esistenti (cliccabili: seleziona)
+  S.items.forEach((it,i)=>{
+    const x=xOf(it.t.getTime());
+    if(x<-8||x>W+8)return;
+    const sel=i===tlSel;
+    ctx.font=sel?'16px system-ui':'13px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText(it.food?'🍽️':it.em,x,H-32);
+    // anello di selezione
+    if(sel){
+      ctx.strokeStyle='#ffb84d';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(x,H-32,11,0,6.283);ctx.stroke();
+      ctx.fillStyle='#ffb84d';ctx.font='bold 9px system-ui';
+      ctx.fillText('▼',x,H-12);
+    }
+    ctx.strokeStyle=it.food?'rgba(255,184,77,.5)':'rgba(255,255,255,.25)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,H-24);ctx.lineTo(x,H-14);ctx.stroke();
+  });
+  // linea ORA
+  const xn=xOf(nowT);
+  ctx.strokeStyle='rgba(62,230,255,.8)';ctx.setLineDash([3,3]);ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.moveTo(xn,0);ctx.lineTo(xn,H);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#3ee6ff';ctx.font='bold 10px system-ui';ctx.textAlign='center';
+  ctx.fillText('▶ ORA',xn,12);
+}
+function initTimeline(){
+  $('tabClassic').addEventListener('click',()=>setView('classic'));
+  $('tabTimeline').addEventListener('click',()=>setView('timeline'));
+  const cv=$('tlCanvas');
+  cv.addEventListener('click',e=>selectTimelineItem(e));
+  cv.addEventListener('touchend',e=>{if(e.changedTouches&&e.changedTouches[0]){const t=e.changedTouches[0];selectTimelineItem({clientX:t.clientX});}});
+  $('tlZoomIn').addEventListener('click',()=>zoomTimeline(2));
+  $('tlZoomOut').addEventListener('click',()=>zoomTimeline(0.5));
+  $('tlDelSel').addEventListener('click',deleteTlSel);
+  cv.addEventListener('wheel',e=>{e.preventDefault();zoomTimeline(e.deltaY<0?1.4:0.72);},{passive:false});
+  addEventListener('resize',()=>{if($('timelineView').style.display!=='none')drawTimeline();});
+}
+function setView(v){
+  const classic=v==='classic';
+  $('classicView').style.display=classic?'grid':'none';
+  $('timelineView').style.display=classic?'none':'block';
+  $('tabClassic').classList.toggle('on',classic);
+  $('tabTimeline').classList.toggle('on',!classic);
+  if(!classic){renderTimeline();}
+}
+function renderItems(){
+  const c=$('items');c.innerHTML='';
+  if(!S.items.length){
+    c.innerHTML='<div class="item"><span class="em">💡</span><span class="nm">Aggiungi bevande e pasti qui sopra…</span></div>';
+    return;
+  }
+  S.items.slice().reverse().forEach((it,i)=>{
+    const idx=S.items.length-1-i;
+    const d=document.createElement('div');
+    d.className='item';
+    d.innerHTML=`<span class="em">${it.em}</span>
+      <div style="flex:1"><div class="nm">${it.nm}</div><div class="dt">${fmtClock(it.t)}${it.food?' · pasto':''}</div></div>
+      <div class="g">${it.food?('🍽 '+it.foodFactor):(Math.round(it.grams)+' g')}</div>
+      <button class="x" data-i="${idx}" title="Rimuovi">✕</button>`;
+    c.appendChild(d);
+  });
+  c.querySelectorAll('.x').forEach(x=>x.addEventListener('click',()=>{
+    S.items.splice(parseInt(x.dataset.i,10),1);save();renderItems();renderAll();
+  }));
+}
+function renderAll(){
+  const items=S.items;
+  const curve=buildCurve(items);
+  const nowD=new Date();
+  const bac=bacAt(curve,nowD);
+  $('bacNow').textContent=bac.toFixed(2);
+  const st=$('bacState');
+  if(bac<=0.01){st.textContent='Sobrio';st.className='bac-state ok';}
+  else if(bac<LEGAL_LIMIT){st.textContent='Sotto il limite';st.className='bac-state warn-b';}
+  else{st.textContent='⚠️ SOPRA IL LIMITE';st.className='bac-state danger';}
+  // metrics
+  const totalG=items.reduce((s,i)=>s+(i.grams||0),0);
+  const nDrinks=items.filter(i=>!i.food).length;
+  $('mGrams').textContent=Math.round(totalG)+' g';
+  $('mUA').textContent=(totalG/UA).toFixed(1);
+  $('mCount').textContent=nDrinks;
+  if(curve.length){
+    const pk=peakInfo(curve);
+    $('mPeak').textContent=pk.bac.toFixed(2)+' g/L';
+    $('mPeakTime').textContent=fmtClock(pk.t);
+    const sober=crossing(curve,0.001);
+    $('mSober').textContent=sober?fmtClock(sober):'—';
+    // drive
+    const drive=crossing(curve,LEGAL_LIMIT);
+    const db=$('driveBox');
+    if(drive){
+      const remaining=drive.getTime()-nowD.getTime();
+      const hm=remaining>0?(Math.floor(remaining/3600000)+'h '+(Math.ceil((remaining%3600000)/60000))+'min'):'ora';
+      $('driveTime').textContent=(remaining>0?(fmtClock(drive)+' · tra ~'+hm):'adesso');
+      db.classList.remove('no');
+      $('driveNote').textContent='Limite 0.5 g/L (Italia). Prima di quel momento NON guidare: sei sopra il limite.';
+    }else{
+      $('driveTime').textContent='adesso';
+      db.classList.remove('no');
+      $('driveNote').textContent='Sei sotto il limite di 0.5 g/L. Guida comunque con prudenza.';
+    }
+    if(bac>LEGAL_LIMIT)db.classList.add('no');
+  }else{
+    $('mPeak').textContent='—';$('mPeakTime').textContent='—';$('mSober').textContent='—';
+    $('driveTime').textContent='—';
+    $('driveNote').textContent='Aggiungi almeno una bevanda per il calcolo.';
+  }
+  drawChart(curve,nowD);
+  // timeline: disegna solo se visibile (per non sprecare risorse)
+  if($('timelineView')&&$('timelineView').style.display!=='none')drawTimeline();
+}
+
+/* ═══════════ CHART ═══════════ */
+function drawChart(curve,nowD){
+  const cv=$('chart'),ctx=cv.getContext('2d');
+  const dpr=Math.min(devicePixelRatio||1,2);
+  const W=cv.clientWidth||600,H=cv.clientHeight||260;
+  cv.width=W*dpr;cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const padL=46,padR=14,padT=16,padB=28;
+  const iw=W-padL-padR,ih=H-padT-padB;
+  let t0,t1,maxBac=0.6;
+  if(curve.length){
+    t0=curve[0].t.getTime();
+    t1=Math.max(nowD.getTime(),curve[curve.length-1].t.getTime())+60000;
+    for(const c of curve)maxBac=Math.max(maxBac,c.bac);
+    maxBac=Math.min(Math.ceil(maxBac*1.25*10)/10,4);
+  }else{
+    const n=nowD.getTime();
+    t0=n-3600000;t1=n+3600000;
+  }
+  const X=t=>padL+(t-t0)/(t1-t0)*iw;
+  const Y=b=>padT+ih-(b/maxBac)*ih;
+  // griglia
+  ctx.strokeStyle='rgba(120,170,255,.08)';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=padT+ih*i/4;
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+iw,y);ctx.stroke();
+    ctx.fillStyle='rgba(147,163,200,.7)';ctx.font='10px ui-monospace,Menlo,monospace';ctx.textAlign='right';
+    ctx.fillText((maxBac-maxBac*i/4).toFixed(1),padL-6,y+3);
+  }
+  // fascia sopra il limite (zona vietata)
+  if(maxBac>LEGAL_LIMIT){
+    const yL=Y(LEGAL_LIMIT);
+    const g=ctx.createLinearGradient(0,yL,0,padT);
+    g.addColorStop(0,'rgba(255,95,109,.22)');g.addColorStop(1,'rgba(255,95,109,.06)');
+    ctx.fillStyle=g;
+    ctx.fillRect(padL,padT,iw,yL-padT);
+    // hatch
+    ctx.strokeStyle='rgba(255,95,109,.25)';ctx.lineWidth=1;
+    for(let x=padL;x<padL+iw;x+=10){
+      ctx.beginPath();ctx.moveTo(x,yL);ctx.lineTo(x-6,yL+6);ctx.stroke();
+    }
+  }
+  // linea limite 0.5
+  const yLim=Y(LEGAL_LIMIT);
+  ctx.strokeStyle='rgba(255,95,109,.85)';ctx.setLineDash([5,4]);ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.moveTo(padL,yLim);ctx.lineTo(padL+iw,yLim);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ff5f6d';ctx.font='bold 10px system-ui';ctx.textAlign='left';
+  ctx.fillText('LIMITE 0.5 g/L',padL+6,yLim-5);
+  // linea 0
+  ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,Y(0));ctx.lineTo(padL+iw,Y(0));ctx.stroke();
+  // curva BAC
+  if(curve.length){
+    ctx.beginPath();
+    curve.forEach((c,i)=>{
+      const x=X(c.t.getTime()),y=Y(c.bac);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle='#52ff9e';ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.shadowColor='rgba(82,255,158,.5)';ctx.shadowBlur=8;
+    ctx.stroke();ctx.shadowBlur=0;
+    // area
+    const area=ctx.createLinearGradient(0,padT,0,padT+ih);
+    area.addColorStop(0,'rgba(82,255,158,.28)');area.addColorStop(1,'rgba(82,255,158,.02)');
+    ctx.fillStyle=area;
+    ctx.beginPath();
+    curve.forEach((c,i)=>{const x=X(c.t.getTime()),y=Y(c.bac);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.lineTo(X(t1),Y(0));ctx.lineTo(X(t0),Y(0));ctx.closePath();ctx.fill();
+    // picco
+    const pk=peakInfo(curve);
+    ctx.fillStyle='#ffb84d';
+    ctx.beginPath();ctx.arc(X(pk.t.getTime()),Y(pk.bac),4,0,6.283);ctx.fill();
+    ctx.fillStyle='#ffb84d';ctx.font='bold 10px ui-monospace,Menlo,monospace';ctx.textAlign='center';
+    ctx.fillText(pk.bac.toFixed(2),X(pk.t.getTime()),Y(pk.bac)-9);
+    // bevande come marcatori
+    // bevande e pasti come marcatori sull'asse dei tempi
+    S.items.forEach(it=>{
+      const x=X(it.t.getTime());
+      ctx.font='12px system-ui';ctx.textAlign='center';
+      ctx.fillText(it.food?'🍽️':it.em,x,Y(0)+16);
+      ctx.strokeStyle=it.food?'rgba(255,184,77,.35)':'rgba(255,255,255,.12)';
+      ctx.lineWidth=it.food?1.2:1;
+      ctx.beginPath();ctx.moveTo(x,Y(0)+20);ctx.lineTo(x,Y(0));ctx.stroke();
+    });
+  }
+  // adesso (linea verticale)
+  const xn=X(nowD.getTime());
+  if(xn>=padL&&xn<=padL+iw){
+    ctx.strokeStyle='rgba(62,230,255,.75)';ctx.setLineDash([3,3]);ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(xn,padT);ctx.lineTo(xn,padT+ih);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#3ee6ff';ctx.font='bold 9px system-ui';ctx.textAlign='center';
+    ctx.fillText('ORA',xn,padT+10);
+  }
+  // asse tempi
+  ctx.fillStyle='rgba(147,163,200,.75)';ctx.font='9px ui-monospace,Menlo,monospace';ctx.textAlign='center';
+  const steps=6;
+  for(let i=0;i<=steps;i++){
+    const t=t0+(t1-t0)*i/steps;
+    const d=new Date(t);
+    ctx.fillText(fmtClock(d),X(t),padT+ih+14);
+  }
+}
+
+/* ═══════════ UI ═══════════ */
+function applyProfile(){
+  const s=S.sex;
+  document.querySelectorAll('.sexbtn').forEach(b=>b.classList.toggle('on',b.dataset.sex===s));
+  $('weight').value=S.weight;$('height').value=S.height;$('age').value=S.age;
+  $('metab').value=S.metab;
+  // underage block
+  const age=parseInt(S.age,10);
+  if(age&&age<18){$('underage').classList.add('on');$('mainGrid').style.display='none';$('profileCard').style.display='none';}
+  else{$('underage').classList.remove('on');}
+}
+document.querySelectorAll('.sexbtn').forEach(b=>b.addEventListener('click',()=>{
+  S.sex=b.dataset.sex;save();applyProfile();
+}));
+$('saveProfile').addEventListener('click',()=>{
+  const w=parseFloat($('weight').value),h=parseFloat($('height').value),a=parseInt($('age').value,10);
+  if(!w||w<30||w>250){alert('Inserisci un peso valido (30–250 kg)');return;}
+  if(!h||h<120||h>220){alert('Inserisci un\'altezza valida (120–220 cm)');return;}
+  if(!a||a<1||a>110){alert('Inserisci un\'età valida');return;}
+  S.weight=w;S.height=h;S.age=a;S.metab=$('metab').value;save();
+  $('profileCard').style.display='none';
+  $('mainGrid').style.display='grid';
+  applyProfile();
+  renderDrinks();renderItems();renderAll();
+  if(a<18){$('underage').classList.add('on');}
+});
+$('addFood').addEventListener('click',()=>{
+  const when=parseInput($('when').value);
+  if(!inWhenWindow(when)){toastMsg('⏰ Scegli un orario tra ieri e domani (la data selezionata è fuori finestra)','var(--red)');return;}
+  const factor=parseFloat($('foodSel').value);
+  const nm=$('foodSel').options[$('foodSel').selectedIndex].text;
+  S.items.push({type:'food',em:'🍽️',nm:'Pasto · '+nm,food:true,foodFactor:factor,grams:0,t:when});
+  save();renderItems();renderAll();
+});
+$('clearAll').addEventListener('click',()=>{
+  if(!confirm('Svuotare tutte le bevande e i pasti?'))return;
+  S.items=[];save();renderItems();renderAll();
+});
+$('resetProfile').addEventListener('click',()=>{
+  if(!confirm('Azzerare profilo e dati?'))return;
+  try{localStorage.removeItem(LS);}catch(e){}
+  location.reload();
+});
+addEventListener('resize',()=>renderAll());
+setInterval(renderAll,60000); // aggiorna ogni minuto
+
+/* ═══════════ INIT ═══════════ */
+(function initWhenBounds(){
+  const b=whenBounds();
+  $('when').min=localInputValue(b.min);
+  $('when').max=localInputValue(b.max);
+  $('when').value=localInputValue(now());
+  // ri-centra la finestra a mezzanotte
+  const tillMidnight=new Date();tillMidnight.setHours(24,0,5,0);
+  setTimeout(initWhenBounds,tillMidnight-now());
+})();
+applyProfile();
+initTimeline();
+if(parseInt(S.age,10)>=18){
+  $('profileCard').style.display=S.weight?'none':'block';
+  $('mainGrid').style.display=S.weight?'grid':'none';
+  if(S.weight){renderDrinks();renderItems();renderAll();renderTimeline();}
+}
+})();
+</script>
+<script src="../top_buttons.js"></script>
+</body>
+</html>
