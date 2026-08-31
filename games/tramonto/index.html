@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0a14"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Sunset"/>
+<meta name="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+<meta name="description" content="Sunset Compass: scopri quando il sole tramonta con GPS + bussola + camera AR">
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌅</text></svg>">
+<title>Sunset Compass 🌅</title>
+<style>
+:root{
+  --bg:#0a0a14;--bg2:#12121f;--card:#1a1a2e;--card2:#22223a;
+  --sun:#f0a030;--sun-dim:#c08020;--horizon:#3a2a1a;
+  --txt:#e8d8c0;--dim:#7a6a50;--accent:#ff6b35;
+  --blue:#4a7aaa;--red:#c04040;--green:#5a8a5a;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;touch-action:manipulation}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);user-select:none;-webkit-user-select:none}
+#app{width:100%;max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;padding:calc(8px+var(--safe-t)) 8px calc(8px+var(--safe-b));overflow:hidden}
+
+/* NAV */
+.nav{display:flex;gap:4px;padding:4px;background:var(--card);border-radius:12px;margin-bottom:6px}
+.nav-btn{flex:1;padding:8px;border:none;background:transparent;color:var(--dim);font:inherit;font-size:11px;font-weight:700;border-radius:8px;cursor:pointer;transition:all .15s}
+.nav-btn.on{background:var(--sun);color:var(--bg)}
+
+/* STATUS BAR */
+.status{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--card);border-radius:10px;margin-bottom:6px}
+.status-left{display:flex;align-items:center;gap:6px}
+.status-icon{font-size:18px}
+.status-loc{font-size:10px;color:var(--dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-time{font-size:13px;font-weight:700;color:var(--sun);font-family:ui-monospace,Menlo,monospace}
+
+/* COUNTDOWN */
+.countdown{text-align:center;padding:10px 0 4px}
+.cd-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+.cd-time{font-size:36px;font-weight:800;color:var(--sun);font-family:ui-monospace,Menlo,monospace;line-height:1.1}
+.cd-sub{font-size:11px;color:var(--dim)}
+
+/* COMPASS */
+.compass-wrap{position:relative;width:100%;aspect-ratio:1;max-width:320px;margin:0 auto}
+.compass-svg{width:100%;height:100%}
+
+/* TRAIL */
+.trail-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;margin-top:4px}
+.trail-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:4px 0}
+.trail-scroll::-webkit-scrollbar{display:none}
+.trail-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;transition:background .12s}
+.trail-row:active{background:var(--card2)}
+.trail-row.now{background:var(--card);border:1px solid var(--sun)}
+.trail-time{font-size:12px;font-weight:700;color:var(--sun);font-family:ui-monospace,Menlo,monospace;min-width:44px}
+.trail-az{font-size:10px;color:var(--dim);min-width:50px}
+.trail-alt{font-size:10px;color:var(--dim);min-width:40px}
+.trail-bar{flex:1;height:4px;background:var(--card2);border-radius:2px;overflow:hidden;position:relative}
+.trail-bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.trail-bar-sun{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--sun);top:-2px;transform:translateX(-50%);box-shadow:0 0 6px var(--sun)}
+.trail-event{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;min-width:24px;text-align:center}
+.trail-event.sunset{background:rgba(255,107,53,.2);color:var(--accent)}
+.trail-event.golden{background:rgba(240,160,48,.15);color:var(--sun)}
+.trail-event.blue{background:rgba(74,122,170,.2);color:var(--blue)}
+
+/* CAMERA AR */
+.ar-wrap{position:relative;width:100%;flex:1;overflow:hidden;border-radius:12px;background:#000}
+.ar-video{width:100%;height:100%;object-fit:cover}
+.ar-overlay{position:absolute;inset:0;pointer-events:none}
+.ar-sun{position:absolute;width:36px;height:36px;border-radius:50%;background:var(--sun);box-shadow:0 0 20px var(--sun),0 0 40px rgba(240,160,48,.3);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:18px;transition:left .5s,top .5s}
+.ar-path{position:absolute;inset:0;pointer-events:none}
+.ar-obstacle{position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);background:rgba(255,107,53,.3);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:8px;cursor:pointer;pointer-events:auto}
+.ar-obstacle::after{content:'✕';color:var(--accent);font-size:10px;font-weight:700}
+.ar-tap{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
+.ar-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(10,10,20,.8);padding:6px 12px;border-radius:8px;font-size:10px;color:var(--dim);white-space:nowrap}
+.ar-info{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;font-size:10px;color:var(--txt)}
+.ar-badge{background:rgba(10,10,20,.7);padding:4px 8px;border-radius:6px;font-weight:700}
+.ar-badge.sun-badge{color:var(--sun)}
+.ar-badge.horizon-badge{color:var(--accent)}
+
+/* BTN */
+.btn{appearance:none;border:1px solid var(--card2);background:var(--card);color:var(--txt);padding:10px 16px;border-radius:10px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:all .12s;min-height:40px;font-family:inherit}
+.btn:active{transform:scale(.96)}
+.btn.sun{background:var(--sun);color:var(--bg);border-color:var(--sun)}
+.btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.ghost{background:transparent;color:var(--dim)}
+.btn.small{padding:6px 12px;font-size:11px;min-height:32px;border-radius:8px}
+
+/* MODAL */
+#modal{position:fixed;inset:0;z-index:200;display:none;background:rgba(10,10,20,.9);align-items:center;justify-content:center;padding:12px}
+#modal.on{display:flex}
+.modal-box{max-width:400px;width:100%;background:var(--card);border-radius:16px;padding:20px;text-align:center;border:2px solid var(--sun);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.modal-box .modal-icon{font-size:44px;margin-bottom:6px}
+.modal-box .modal-title{font-size:17px;font-weight:700;margin-bottom:6px;color:var(--sun)}
+.modal-box .modal-txt{font-size:12px;color:var(--cream);line-height:1.5;margin-bottom:12px}
+.modal-box .modal-acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+
+/* PERMISSIONS */
+.perm-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:20px}
+.perm-icon{font-size:64px}
+.perm-title{font-size:18px;font-weight:700;color:var(--sun)}
+.perm-desc{font-size:12px;color:var(--dim);line-height:1.6;max-width:300px}
+.perm-btns{display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px}
+
+/* STARS BG */
+.stars{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+.star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:twinkle 3s infinite}
+@keyframes twinkle{0%,100%{opacity:.2}50%{opacity:1}}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .4s ease}
+
+@media(min-width:600px){#app{max-width:520px}}
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div id="app">
+  <div id="view-perm" class="perm-wrap">
+    <div class="perm-icon">🌅</div>
+    <div class="perm-title">Sunset Compass</div>
+    <div class="perm-desc">Scopri quando il sole scende sotto l'orizzonte. Servono GPS e bussola per calcolare la posizione del sole.</div>
+    <div class="perm-btns">
+      <button class="btn sun" id="btn-start">Inizia 🌅</button>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5">Servono permessi di posizione e orientamento.<br>I dati restano sul tuo telefono.</div>
+    </div>
+  </div>
+  <div id="view-main" style="display:none">
+    <div class="nav">
+      <button class="nav-btn on" id="nav-compass">🧭 Compass</button>
+      <button class="nav-btn" id="nav-camera">📷 Camera</button>
+      <button class="nav-btn" id="nav-tracker">👻 Tracker</button>
+    </div>
+    <div class="status">
+      <div class="status-left">
+        <span class="status-icon">📍</span>
+        <span class="status-loc" id="loc-text">...</span>
+      </div>
+      <div class="status-time" id="clock">--:--</div>
+    </div>
+    <div class="countdown" id="countdown-box">
+      <div class="cd-label">Prossimo tramonto</div>
+      <div class="cd-time" id="cd-time">--:--</div>
+      <div class="cd-sub" id="cd-sub">...</div>
+    </div>
+    <div id="view-compass" class="compass-wrap" style="display:none">
+      <svg class="compass-svg" id="compass-svg" viewBox="0 0 400 400"></svg>
+    </div>
+    <div id="view-tracker" class="trail-wrap" style="display:none">
+      <div class="trail-scroll" id="trail-scroll"></div>
+    </div>
+    <div id="view-camera" class="ar-wrap" style="display:none">
+      <video class="ar-video" id="ar-video" playsinline autoplay muted></video>
+      <svg class="ar-overlay" id="ar-svg" viewBox="0 0 400 400" preserveAspectRatio="none"></svg>
+      <div class="ar-info">
+        <div class="ar-badge sun-badge" id="ar-sun-info">☀️ --°</div>
+        <div class="ar-badge horizon-badge" id="ar-horizon-info">🏔️ -- ostacoli</div>
+      </div>
+      <div class="ar-tap" id="ar-tap"></div>
+      <div class="ar-hint">Tocca l'orizzonte per segnale ostacoli</div>
+    </div>
+  </div>
+</div>
+<div id="modal">
+  <div class="modal-box">
+    <div class="modal-icon" id="modal-icon"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-txt" id="modal-txt"></div>
+    <div class="modal-acts" id="modal-acts"></div>
+  </div>
+</div>
+<script src="js/sun.js"></script>
+<script src="js/compass.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/tracker.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

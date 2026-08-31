@@ -1,0 +1,545 @@
+// Coverage Galaxy — All Missions (Tutorial + 8 Planets)
+// Each planet: different target config, different pedagogical focus
+
+export const MISSIONS = [
+  {
+    id: 'tutorial-telemetry',
+    planetName: 'Telemetry Validator',
+    constellation: 'OBC Cluster',
+    planetEmoji: '📡',
+    functionSig: 'bool validate_telemetry_range(int32_t raw_value, int32_t min_limit, int32_t max_limit)',
+    sourceCode: `#include <stdint.h>\n#include <stdbool.h>\n\n/* REQ-TLM-001: Validate decoded telemetry is within limits */\nbool validate_telemetry_range(int32_t raw_value,\n                              int32_t min_limit,\n                              int32_t max_limit)\n{\n    bool result = false;\n    if (raw_value >= min_limit) {\n        if (raw_value <= max_limit) {\n            result = true;\n        }\n    }\n    return result;\n}`,
+    requirements: [
+      { id: 'REQ-TLM-001', text: 'Validate decoded telemetry within operational limits', method: 'Unit Test' },
+      { id: 'REQ-TLM-002', text: 'Return TRUE if value within [min, max] inclusive', method: 'Unit Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 32', platform: 'Simulator', build: 'Debug', charSigned: true, alignment: 'standard', label: 'Simulator + RISC-V32 Debug' },
+    stations: [
+      { id: 'S1', label: 'result = false', line: 9 },
+      { id: 'S2', label: 'if (raw >= min)', line: 10 },
+      { id: 'S3', label: 'if (raw <= max)', line: 11 },
+      { id: 'S4', label: 'result = true', line: 12 },
+      { id: 'S5', label: 'return result', line: 15 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 1, label: 'true' },
+      { from: 'S2', to: 'S5', decisionId: 'D1', moonIndex: 0, label: 'false' },
+      { from: 'S3', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'true' },
+      { from: 'S3', to: 'S5', decisionId: 'D1', moonIndex: 0, label: 'false' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'raw_value >= min_limit', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'raw_value <= max_limit', decisionId: 'D1', index: 1 },
+    ],
+    dependencies: [],
+    sim: {
+      inputs: [
+        { name: 'raw_value', type: 'int32', min: -2147483648, max: 2147483647 },
+        { name: 'min_limit', type: 'int32', min: -2147483648, max: 2147483647 },
+        { name: 'max_limit', type: 'int32', min: -2147483648, max: 2147483647 },
+      ],
+      decisions: [{ id: 'D1', moons: ['raw_value >= min_limit', 'raw_value <= max_limit'] }],
+      rules: [
+        { when: { 'D1.m0': true, 'D1.m1': true }, trace: ['S1','S2','S3','S4','S5'], returns: true },
+        { when: { 'D1.m0': true, 'D1.m1': false }, trace: ['S1','S2','S3','S5'], returns: false },
+        { when: { 'D1.m0': false, 'D1.m1': false }, trace: ['S1','S2','S5'], returns: false },
+        { when: { 'D1.m0': false, 'D1.m1': true }, trace: ['S1','S2','S5'], returns: false },
+      ],
+    },
+    coverageTargets: { statement: 80, branch: 75 },
+    xpReward: 500, isTutorial: true,
+  },
+
+  // ─── Planet 1: Boot Image Validation ───
+  {
+    id: 'boot-image',
+    planetName: 'Boot Image Validation',
+    constellation: 'OBC Cluster',
+    planetEmoji: '🔧',
+    functionSig: 'boot_status_t boot_validate_image(const boot_header_t *header)',
+    sourceCode: `#include <stdint.h>\n#include <stdbool.h>\n\ntypedef enum { BOOT_OK, BOOT_ERR_MAGIC, BOOT_ERR_LEN, BOOT_ERR_CRC } boot_status_t;\n\ntypedef struct {\n    uint32_t magic;    /* Expected: 0xB007CA1E */\n    uint32_t length;   /* Image length in bytes */\n    uint16_t crc;      /* CRC-16 of image body */\n} boot_header_t;\n\nstatic uint16_t compute_crc(const uint8_t *data, uint32_t len);\n\n/* REQ-BOOT-001: Validate boot image header before jumping */\nboot_status_t boot_validate_image(const boot_header_t *header)\n{\n    boot_status_t status = BOOT_ERR_MAGIC;\n    if (header == NULL) {\n        return BOOT_ERR_MAGIC;\n    }\n    if (header->magic != 0xB007CA1E) {\n        return BOOT_ERR_MAGIC;\n    }\n    if (header->length == 0 || header->length > 0x100000) {\n        return BOOT_ERR_LEN;\n    }\n    /* Validate CRC */\n    status = BOOT_OK;\n    return status;\n}`,
+    requirements: [
+      { id: 'REQ-BOOT-001', text: 'Validate boot image header before jumping to application', method: 'Unit Test' },
+      { id: 'REQ-BOOT-002', text: 'Reject image with invalid magic number', method: 'Unit Test' },
+      { id: 'REQ-BOOT-003', text: 'Reject image with zero or excessive length', method: 'Unit Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 64', platform: 'Simulator', build: 'Debug', charSigned: true, alignment: 'standard', label: 'RISC-V 64 Debug' },
+    stations: [
+      { id: 'S1', label: 'status = ERR_MAGIC', line: 18 },
+      { id: 'S2', label: 'if (header == NULL)', line: 19 },
+      { id: 'S3', label: 'return ERR_MAGIC', line: 20 },
+      { id: 'S4', label: 'if (magic != 0xB007CA1E)', line: 22 },
+      { id: 'S5', label: 'return ERR_MAGIC', line: 23 },
+      { id: 'S6', label: 'if (len == 0 || len > 1M)', line: 25 },
+      { id: 'S7', label: 'return ERR_LEN', line: 26 },
+      { id: 'S8', label: 'status = BOOT_OK', line: 28 },
+      { id: 'S9', label: 'return status', line: 29 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 0, label: 'NULL' },
+      { from: 'S2', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'not NULL' },
+      { from: 'S4', to: 'S5', decisionId: 'D2', moonIndex: 0, label: 'bad magic' },
+      { from: 'S4', to: 'S6', decisionId: 'D2', moonIndex: 1, label: 'magic ok' },
+      { from: 'S6', to: 'S7', decisionId: 'D3', moonIndex: 0, label: 'bad len' },
+      { from: 'S6', to: 'S8', decisionId: 'D3', moonIndex: 1, label: 'len ok' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'header == NULL', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'header->magic != 0xB007CA1E', decisionId: 'D2', index: 0 },
+      { id: 'M3', expr: 'header->length == 0 || header->length > 0x100000', decisionId: 'D3', index: 0 },
+    ],
+    dependencies: [
+      { id: 'dep_crc', kind: 'function', name: 'compute_crc()', keepable: true },
+      { id: 'dep_flash', kind: 'hw', name: 'FLASH_read()', keepable: false },
+    ],
+    sim: {
+      inputs: [
+        { name: 'header_magic', type: 'uint32', special: [0xB007CA1E, 0xDEADBEEF, 0x00000000] },
+        { name: 'header_length', type: 'uint32', min: 0, max: 0x200000, special: [0, 1, 0x100000, 0x100001] },
+        { name: 'header_null', type: 'bool', special: [0, 1] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['header_null == 0'] },
+        { id: 'D2', moons: ['header_magic != 0xB007CA1E'] },
+        { id: 'D3', moons: ['header_length == 0 || header_length > 0x100000'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': false }, trace: ['S1','S2','S3'], returns: 'BOOT_ERR_MAGIC' },
+        { when: { 'D1.m0': true, 'D2.m0': true }, trace: ['S1','S2','S4','S5'], returns: 'BOOT_ERR_MAGIC' },
+        { when: { 'D1.m0': true, 'D2.m0': false, 'D3.m0': true }, trace: ['S1','S2','S4','S6','S7'], returns: 'BOOT_ERR_LEN' },
+        { when: { 'D1.m0': true, 'D2.m0': false, 'D3.m0': false }, trace: ['S1','S2','S4','S6','S8','S9'], returns: 'BOOT_OK' },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1000, isTutorial: false,
+  },
+
+  // ─── Planet 2: Watchdog (MC/DC focus) ───
+  {
+    id: 'watchdog',
+    planetName: 'Watchdog',
+    constellation: 'OBC Cluster',
+    planetEmoji: '🐕',
+    functionSig: 'wdg_status_t wdg_kick(uint32_t key, bool armed)',
+    sourceCode: `#include <stdint.h>\n#include <stdbool.h>\n\ntypedef enum { WDG_KICKED, WDG_ERR_KEY, WDG_ERR_DISARMED } wdg_status_t;\n\n#define WDG_MAGIC_KEY 0x55AA55AA\n\n/* REQ-WDG-001: Kick watchdog only if armed and key matches */\nwdg_status_t wdg_kick(uint32_t key, bool armed)\n{\n    wdg_status_t status;\n    if (armed && (key == WDG_MAGIC_KEY)) {\n        REG_WRITE(WDG_REG, 0x55);\n        status = WDG_KICKED;\n    } else if (!armed) {\n        status = WDG_ERR_DISARMED;\n    } else {\n        status = WDG_ERR_KEY;\n    }\n    return status;\n}`,
+    requirements: [
+      { id: 'REQ-WDG-001', text: 'Kick watchdog only if armed and key matches', method: 'Unit Test' },
+      { id: 'REQ-WDG-002', text: 'Return WDG_ERR_DISARMED if not armed', method: 'Unit Test' },
+      { id: 'REQ-WDG-003', text: 'Return WDG_ERR_KEY if key does not match', method: 'Unit Test' },
+    ],
+    config: { compiler: 'Clang', platform: 'Simulator', build: 'Debug', charSigned: true, alignment: 'standard', label: 'Clang + Simulator' },
+    stations: [
+      { id: 'S1', label: 'if (armed && key==MAGIC)', line: 12 },
+      { id: 'S2', label: 'REG_WRITE(WDG_REG)', line: 13 },
+      { id: 'S3', label: 'status = WDG_KICKED', line: 14 },
+      { id: 'S4', label: 'else if (!armed)', line: 15 },
+      { id: 'S5', label: 'status = WDG_ERR_DISARMED', line: 16 },
+      { id: 'S6', label: 'else (key wrong)', line: 17 },
+      { id: 'S7', label: 'status = WDG_ERR_KEY', line: 18 },
+      { id: 'S8', label: 'return status', line: 20 },
+    ],
+    routes: [
+      { from: 'S1', to: 'S2', decisionId: 'D1', moonIndex: 0, label: 'armed+key OK' },
+      { from: 'S1', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'not both true' },
+      { from: 'S4', to: 'S5', decisionId: 'D2', moonIndex: 0, label: '!armed' },
+      { from: 'S4', to: 'S6', decisionId: 'D2', moonIndex: 1, label: 'armed but bad key' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'armed && (key == 0x55AA55AA)', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: '!armed', decisionId: 'D2', index: 0 },
+    ],
+    dependencies: [
+      { id: 'dep_reg', kind: 'hw', name: 'REG_WRITE()', keepable: false },
+    ],
+    sim: {
+      inputs: [
+        { name: 'key', type: 'uint32', min: 0, max: 4294967295, special: [0x55AA55AA, 0xDEADBEEF, 0x00000000, 0x55AA55AB] },
+        { name: 'armed', type: 'bool', special: [0, 1] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['armed && (key == 0x55AA55AA)'] },
+        { id: 'D2', moons: ['!armed'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true }, trace: ['S1','S2','S3','S8'], returns: 'WDG_KICKED', calls: ['REG_WRITE(WDG_REG, 0x55)'] },
+        { when: { 'D1.m0': false, 'D2.m0': true }, trace: ['S1','S4','S5','S8'], returns: 'WDG_ERR_DISARMED' },
+        { when: { 'D1.m0': false, 'D2.m0': false }, trace: ['S1','S4','S6','S7','S8'], returns: 'WDG_ERR_KEY' },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100, mcdc: 100 },
+    xpReward: 1200, isTutorial: false,
+  },
+
+  // ─── Planet 3: CRC-16 (char unsigned defect) ───
+  {
+    id: 'crc16',
+    planetName: 'CRC-16',
+    constellation: 'COMMS Nebula',
+    planetEmoji: '🔢',
+    functionSig: 'uint16_t crc16_update(uint16_t crc, uint8_t byte)',
+    sourceCode: `#include <stdint.h>\n\nstatic const uint16_t crc16_table[256] = { /* ... */ };\n\n/* REQ-CRC-001: Update CRC-16/CCITT with one byte */\nuint16_t crc16_update(uint16_t crc, uint8_t byte)\n{\n    uint8_t idx = (uint8_t)(crc >> 8);  /* S1: high byte */\n    idx ^= byte;                         /* S2: XOR with input */\n    crc <<= 8;                           /* S3: shift left */\n    crc ^= crc16_table[idx];             /* S4: table lookup */\n    return crc;                          /* S5 */\n}`,
+    requirements: [
+      { id: 'REQ-CRC-001', text: 'Update CRC-16/CCITT with one input byte', method: 'Unit Test' },
+      { id: 'REQ-CRC-002', text: 'Use polynomial 0x1021', method: 'Inspection' },
+    ],
+    config: { compiler: 'GCC RISC-V 32', platform: 'Target: char unsigned', build: 'Release', charSigned: false, alignment: 'standard', label: 'char unsigned target' },
+    stations: [
+      { id: 'S1', label: 'idx = crc >> 8', line: 8 },
+      { id: 'S2', label: 'idx ^= byte', line: 9 },
+      { id: 'S3', label: 'crc <<= 8', line: 10 },
+      { id: 'S4', label: 'crc ^= table[idx]', line: 11 },
+      { id: 'S5', label: 'return crc', line: 12 },
+    ],
+    routes: [
+      { from: 'S1', to: 'S2', decisionId: undefined, label: 'seq' },
+      { from: 'S2', to: 'S3', decisionId: undefined, label: 'seq' },
+      { from: 'S3', to: 'S4', decisionId: undefined, label: 'seq' },
+      { from: 'S4', to: 'S5', decisionId: undefined, label: 'seq' },
+    ],
+    moons: [],
+    dependencies: [
+      { id: 'dep_table', kind: 'global', name: 'crc16_table[]', keepable: true },
+    ],
+    sim: {
+      inputs: [
+        { name: 'crc', type: 'uint16', min: 0, max: 65535, special: [0xFFFF, 0x0000, 0x1234] },
+        { name: 'byte', type: 'uint8', min: 0, max: 255, special: [0x00, 0xFF, 0x41, 0x10] },
+      ],
+      decisions: [],
+      rules: [
+        { when: {}, trace: ['S1','S2','S3','S4','S5'], returns: 'computed_crc' },
+      ],
+      configModifiers: [
+        {
+          condition: 'char_is_unsigned',
+          whenInput: { name: 'crc', value: 0x8000 },
+          overrideRuleIndex: 0,
+          explanation: 'With signed char, negative table index causes out-of-bounds access. With unsigned char, index wraps correctly.',
+        },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1300, isTutorial: false,
+    seededDefect: { id: 'DEF-CRC-001', type: 'char_portability', description: 'On signed-char targets, high byte of CRC can produce negative index when cast to char, causing UB. Fix: ensure uint8_t cast.', severity: 'Major', affectedConfig: 'char_is_unsigned' },
+  },
+
+  // ─── Planet 4: Sensors (alignment defect) ───
+  {
+    id: 'sensors',
+    planetName: 'Sensors',
+    constellation: 'Payload Belt',
+    planetEmoji: '🌡️',
+    functionSig: 'sensor_status_t sensor_read_filtered(sensor_data_t *out)',
+    sourceCode: `#include <stdint.h>\n#include <stdbool.h>\n\ntypedef struct {\n    int16_t raw;\n    int16_t filtered;\n    bool valid;\n} sensor_data_t;\n\ntypedef enum { SENSOR_OK, SENSOR_ERR_RANGE, SENSOR_ERR_STALE } sensor_status_t;\n\n#define SENSOR_MIN (-400)\n#define SENSOR_MAX  850\n\n/* REQ-SEN-001: Read sensor, apply filter, validate range */\nsensor_status_t sensor_read_filtered(sensor_data_t *out)\n{\n    sensor_status_t status = SENSOR_ERR_STALE;\n    if (out == NULL) return SENSOR_ERR_STALE;\n    out->raw = HW_READ(SENSOR_REG);       /* HW read */\n    out->filtered = (out->raw + prev_raw) >> 1;  /* Simple average */\n    if (out->filtered >= SENSOR_MIN &&\n        out->filtered <= SENSOR_MAX) {\n        out->valid = true;\n        status = SENSOR_OK;\n    } else {\n        out->valid = false;\n        status = SENSOR_ERR_RANGE;\n    }\n    prev_raw = out->raw;                   /* Store for next filter */\n    return status;\n}`,
+    requirements: [
+      { id: 'REQ-SEN-001', text: 'Read sensor, apply moving average filter, validate range', method: 'Unit Test' },
+      { id: 'REQ-SEN-002', text: 'Return SENSOR_ERR_RANGE if out of [-400, 850]', method: 'Unit Test' },
+      { id: 'REQ-SEN-003', text: 'Return SENSOR_ERR_STALE for NULL pointer', method: 'Unit Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 64', platform: 'Target: restrictive alignment', build: 'Debug', charSigned: true, alignment: 'restrictive', label: 'Restrictive alignment' },
+    stations: [
+      { id: 'S1', label: 'status = ERR_STALE', line: 18 },
+      { id: 'S2', label: 'if (out == NULL)', line: 19 },
+      { id: 'S3', label: 'return ERR_STALE', line: 20 },
+      { id: 'S4', label: 'out->raw = HW_READ()', line: 21 },
+      { id: 'S5', label: 'out->filtered = avg', line: 22 },
+      { id: 'S6', label: 'if (filtered >= MIN && <= MAX)', line: 23 },
+      { id: 'S7', label: 'valid = true; OK', line: 25 },
+      { id: 'S8', label: 'else: valid = false; ERR_RANGE', line: 27 },
+      { id: 'S9', label: 'prev_raw = out->raw', line: 30 },
+      { id: 'S10', label: 'return status', line: 31 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 0, label: 'NULL' },
+      { from: 'S2', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'ok' },
+      { from: 'S6', to: 'S7', decisionId: 'D2', moonIndex: 0, label: 'in range' },
+      { from: 'S6', to: 'S8', decisionId: 'D2', moonIndex: 1, label: 'out of range' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'out == NULL', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'out->filtered >= SENSOR_MIN && out->filtered <= SENSOR_MAX', decisionId: 'D2', index: 0 },
+    ],
+    dependencies: [
+      { id: 'dep_hw', kind: 'hw', name: 'HW_READ(SENSOR_REG)', keepable: false },
+      { id: 'dep_prev', kind: 'global', name: 'prev_raw', keepable: true },
+    ],
+    sim: {
+      inputs: [
+        { name: 'out_null', type: 'bool', special: [0, 1] },
+        { name: 'raw_value', type: 'int16', min: -32768, max: 32767, special: [-500, -400, 0, 425, 850, 851] },
+        { name: 'prev_raw', type: 'int16', min: -32768, max: 32767, special: [-400, 0, 425] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['out_null == 1'] },
+        { id: 'D2', moons: ['filtered >= -400 && filtered <= 850'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true }, trace: ['S1','S2','S3'], returns: 'SENSOR_ERR_STALE' },
+        { when: { 'D1.m0': false, 'D2.m0': true }, trace: ['S1','S2','S4','S5','S6','S7','S9','S10'], returns: 'SENSOR_OK' },
+        { when: { 'D1.m0': false, 'D2.m0': false }, trace: ['S1','S2','S4','S5','S6','S8','S9','S10'], returns: 'SENSOR_ERR_RANGE' },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1400, isTutorial: false,
+    seededDefect: { id: 'DEF-SEN-001', type: 'alignment', description: 'Casting a byte-aligned buffer to sensor_data_t* via pointer can cause alignment fault on RISC-V with strict alignment. Fix: use packed struct or memcpy.', severity: 'Critical', affectedConfig: 'alignment_strict' },
+  },
+
+  // ─── Planet 5: State Machine (UB defect) ───
+  {
+    id: 'state-machine',
+    planetName: 'State Machine',
+    constellation: 'FDIR Deep Field',
+    planetEmoji: '🔄',
+    functionSig: 'mode_t sm_transition(mode_t current, event_t event)',
+    sourceCode: `#include <stdint.h>\n\ntypedef enum { MODE_INIT, MODE_NOMINAL, MODE_SAFE, MODE_EMERGENCY } mode_t;\ntypedef enum { EVT_BOOT_OK, EVT_FAULT, EVT_RECOVERY, EVT_TIMEOUT } event_t;\n\n/* REQ-FDIR-001: State machine transitions */\nmode_t sm_transition(mode_t current, event_t event)\n{\n    mode_t next;\n    /* BUG: next is not initialized on all paths */\n    switch (current) {\n        case MODE_INIT:\n            if (event == EVT_BOOT_OK)\n                next = MODE_NOMINAL;\n            break;\n        case MODE_NOMINAL:\n            if (event == EVT_FAULT)\n                next = MODE_SAFE;\n            else if (event == EVT_TIMEOUT)\n                next = MODE_EMERGENCY;\n            break;\n        case MODE_SAFE:\n            if (event == EVT_RECOVERY)\n                next = MODE_NOMINAL;\n            break;\n        case MODE_EMERGENCY:\n            next = MODE_SAFE;\n            break;\n        default:\n            break;\n    }\n    return next;\n}`,
+    requirements: [
+      { id: 'REQ-FDIR-001', text: 'State machine transitions per DO-330 state model', method: 'Unit Test' },
+      { id: 'REQ-FDIR-002', text: 'INIT -> NOMINAL on BOOT_OK', method: 'Unit Test' },
+      { id: 'REQ-FDIR-003', text: 'NOMINAL -> SAFE on FAULT', method: 'Unit Test' },
+      { id: 'REQ-FDIR-004', text: 'Return current state for unhandled events', method: 'Unit Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 32', platform: 'Simulator', build: 'Release', charSigned: true, alignment: 'standard', label: 'RISC-V32 Release (optimized)' },
+    stations: [
+      { id: 'S1', label: 'switch(current)', line: 11 },
+      { id: 'S2', label: 'case INIT: if EVT_BOOT_OK', line: 13 },
+      { id: 'S3', label: 'next = NOMINAL', line: 14 },
+      { id: 'S4', label: 'case NOMINAL: if EVT_FAULT', line: 17 },
+      { id: 'S5', label: 'next = SAFE', line: 18 },
+      { id: 'S6', label: 'else if EVT_TIMEOUT', line: 19 },
+      { id: 'S7', label: 'next = EMERGENCY', line: 20 },
+      { id: 'S8', label: 'case SAFE: if EVT_RECOVERY', line: 23 },
+      { id: 'S9', label: 'next = NOMINAL', line: 24 },
+      { id: 'S10', label: 'case EMERGENCY: next = SAFE', line: 27 },
+      { id: 'S11', label: 'return next', line: 31 },
+    ],
+    routes: [
+      { from: 'S1', to: 'S2', decisionId: 'D1', moonIndex: 0, label: 'INIT' },
+      { from: 'S1', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'NOMINAL' },
+      { from: 'S1', to: 'S8', decisionId: 'D1', moonIndex: 2, label: 'SAFE' },
+      { from: 'S1', to: 'S10', decisionId: 'D1', moonIndex: 3, label: 'EMERGENCY' },
+      { from: 'S2', to: 'S3', decisionId: 'D2', moonIndex: 0, label: 'BOOT_OK' },
+      { from: 'S4', to: 'S5', decisionId: 'D3', moonIndex: 0, label: 'FAULT' },
+      { from: 'S4', to: 'S6', decisionId: 'D4', moonIndex: 0, label: 'TIMEOUT' },
+      { from: 'S8', to: 'S9', decisionId: 'D5', moonIndex: 0, label: 'RECOVERY' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'current == MODE_INIT', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'event == EVT_BOOT_OK', decisionId: 'D2', index: 0 },
+      { id: 'M3', expr: 'event == EVT_FAULT', decisionId: 'D3', index: 0 },
+      { id: 'M4', expr: 'event == EVT_TIMEOUT', decisionId: 'D4', index: 0 },
+      { id: 'M5', expr: 'event == EVT_RECOVERY', decisionId: 'D5', index: 0 },
+    ],
+    dependencies: [],
+    sim: {
+      inputs: [
+        { name: 'current', type: 'int32', special: [0, 1, 2, 3] },
+        { name: 'event', type: 'int32', special: [0, 1, 2, 3] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['current == 0', 'current == 1', 'current == 2', 'current == 3'] },
+        { id: 'D2', moons: ['event == 0'] },
+        { id: 'D3', moons: ['event == 1'] },
+        { id: 'D4', moons: ['event == 3'] },
+        { id: 'D5', moons: ['event == 2'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true, 'D2.m0': true }, trace: ['S1','S2','S3','S11'], returns: 1 },
+        { when: { 'D1.m0': true, 'D2.m0': false }, trace: ['S1','S2','S11'], returns: undefined, defect: { id: 'DEF-SM-001', effect: 'next used uninitialized — undefined behavior on optimized build' } },
+        { when: { 'D1.m1': true, 'D3.m0': true }, trace: ['S1','S4','S5','S11'], returns: 2 },
+        { when: { 'D1.m1': true, 'D3.m0': false, 'D4.m0': true }, trace: ['S1','S4','S6','S7','S11'], returns: 3 },
+        { when: { 'D1.m1': true, 'D3.m0': false, 'D4.m0': false }, trace: ['S1','S4','S11'], returns: undefined, defect: { id: 'DEF-SM-001', effect: 'next used uninitialized — UB' } },
+        { when: { 'D1.m2': true, 'D5.m0': true }, trace: ['S1','S8','S9','S11'], returns: 1 },
+        { when: { 'D1.m2': true, 'D5.m0': false }, trace: ['S1','S8','S11'], returns: undefined, defect: { id: 'DEF-SM-001', effect: 'next used uninitialized — UB' } },
+        { when: { 'D1.m3': true }, trace: ['S1','S10','S11'], returns: 2 },
+      ],
+      configModifiers: [
+        {
+          condition: 'build_optimized',
+          overrideRuleIndex: 4,
+          explanation: 'In optimized build, UB from uninitialized variable produces unpredictable return value (garbage from register). Debug build may return 0 by luck.',
+        },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1500, isTutorial: false,
+    seededDefect: { id: 'DEF-SM-001', type: 'uninitialized_variable', description: 'Variable `next` is not initialized on all switch paths. When the event does not match the current state, `next` is returned uninitialized — Undefined Behavior per C standard.', severity: 'Critical', affectedConfig: 'build_optimized' },
+  },
+
+  // ─── Planet 6: Orbital Control (robustness) ───
+  {
+    id: 'orbital-control',
+    planetName: 'Orbital Control',
+    constellation: 'ADCS Cluster',
+    planetEmoji: '🛰️',
+    functionSig: 'void compute_attitude_error(const float q[4], float *err_roll, float *err_pitch, float *err_yaw)',
+    sourceCode: `#include <math.h>\n\n#define PI 3.14159265f\n\n/* REQ-ADCS-001: Compute Euler angles from quaternion */\nvoid compute_attitude_error(const float q[4],\n                            float *err_roll, float *err_pitch, float *err_yaw)\n{\n    float norm = sqrtf(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);\n    if (norm < 1e-6f) {\n        *err_roll  = 0.0f;\n        *err_pitch = 0.0f;\n        *err_yaw   = 0.0f;\n        return;\n    }\n    float q0 = q[0]/norm, q1 = q[1]/norm, q2 = q[2]/norm, q3 = q[3]/norm;\n    *err_roll  = atan2f(2*(q0*q1 + q2*q3), 1 - 2*(q1*q1 + q2*q2));\n    *err_pitch = asinf(2*(q0*q2 - q3*q1));\n    *err_yaw   = atan2f(2*(q0*q3 + q1*q2), 1 - 2*(q2*q2 + q3*q3));\n}`,
+    requirements: [
+      { id: 'REQ-ADCS-001', text: 'Compute Euler angles (RPY) from quaternion', method: 'Unit Test' },
+      { id: 'REQ-ADCS-002', text: 'Handle degenerate quaternion (norm near zero)', method: 'Robustness Test' },
+    ],
+    config: { compiler: 'Clang', platform: 'HW Representative', build: 'Debug', charSigned: true, alignment: 'standard', label: 'Clang + HW representative' },
+    stations: [
+      { id: 'S1', label: 'norm = sqrt(...)', line: 9 },
+      { id: 'S2', label: 'if (norm < 1e-6)', line: 10 },
+      { id: 'S3', label: 'roll=pitch=yaw=0', line: 11 },
+      { id: 'S4', label: 'return', line: 14 },
+      { id: 'S5', label: 'normalize q0-q3', line: 15 },
+      { id: 'S6', label: 'roll = atan2(...)', line: 16 },
+      { id: 'S7', label: 'pitch = asin(...)', line: 17 },
+      { id: 'S8', label: 'yaw = atan2(...)', line: 18 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 0, label: 'degenerate' },
+      { from: 'S2', to: 'S5', decisionId: 'D1', moonIndex: 1, label: 'normal' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'norm < 1e-6', decisionId: 'D1', index: 0 },
+    ],
+    dependencies: [
+      { id: 'dep_math', kind: 'function', name: 'sqrtf/atan2f/asinf', keepable: true },
+    ],
+    sim: {
+      inputs: [
+        { name: 'q0', type: 'float32', special: [1.0, 0.0, 0.707, 0.000001] },
+        { name: 'q1', type: 'float32', special: [0.0, 0.5, 0.000001] },
+        { name: 'q2', type: 'float32', special: [0.0, 0.5] },
+        { name: 'q3', type: 'float32', special: [0.0, 0.5] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['norm < 1e-6'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true }, trace: ['S1','S2','S3','S4'], returns: { roll: 0, pitch: 0, yaw: 0 } },
+        { when: { 'D1.m0': false }, trace: ['S1','S2','S5','S6','S7','S8'], returns: { roll: 'atan2', pitch: 'asin', yaw: 'atan2' } },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1200, isTutorial: false,
+  },
+
+  // ─── Planet 7: Reaction Wheel (overflow) ───
+  {
+    id: 'reaction-wheel',
+    planetName: 'Reaction Wheel',
+    constellation: 'ADCS Cluster',
+    planetEmoji: '⚙️',
+    functionSig: 'int32_t rw_apply_torque(int32_t cmd_torque, int32_t current_rpm, int32_t max_rpm)',
+    sourceCode: `#include <stdint.h>\n\n#define RW_MAX_TORQUE  1000\n#define RW_MIN_TORQUE -1000\n\n/* REQ-RW-001: Apply torque command with saturation protection */\nint32_t rw_apply_torque(int32_t cmd_torque,\n                        int32_t current_rpm,\n                        int32_t max_rpm)\n{\n    int32_t actual = cmd_torque;\n    if (actual > RW_MAX_TORQUE) actual = RW_MAX_TORQUE;\n    if (actual < RW_MIN_TORQUE) actual = RW_MIN_TORQUE;\n    /* Anti-windup: reduce torque near max RPM */\n    if (current_rpm > (max_rpm - 100)) {\n        if (actual > 0) actual = 0;\n    }\n    if (current_rpm < -(max_rpm - 100)) {\n        if (actual < 0) actual = 0;\n    }\n    return actual;\n}`,
+    requirements: [
+      { id: 'REQ-RW-001', text: 'Apply torque with saturation at +/-1000', method: 'Unit Test' },
+      { id: 'REQ-RW-002', text: 'Anti-windup: reduce positive torque when near max RPM', method: 'Unit Test' },
+      { id: 'REQ-RW-003', text: 'Anti-windup: reduce negative torque when near min RPM', method: 'Unit Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 64', platform: 'Simulator', build: 'Release', charSigned: true, alignment: 'standard', label: 'RISC-V 64 Release' },
+    stations: [
+      { id: 'S1', label: 'actual = cmd_torque', line: 11 },
+      { id: 'S2', label: 'if (actual > MAX)', line: 12 },
+      { id: 'S3', label: 'actual = MAX', line: 12 },
+      { id: 'S4', label: 'if (actual < MIN)', line: 13 },
+      { id: 'S5', label: 'actual = MIN', line: 13 },
+      { id: 'S6', label: 'if (rpm > max-100)', line: 15 },
+      { id: 'S7', label: 'if (actual > 0) actual=0', line: 16 },
+      { id: 'S8', label: 'if (rpm < -(max-100))', line: 18 },
+      { id: 'S9', label: 'if (actual < 0) actual=0', line: 19 },
+      { id: 'S10', label: 'return actual', line: 21 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 0, label: 'clamp high' },
+      { from: 'S2', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'ok' },
+      { from: 'S4', to: 'S5', decisionId: 'D2', moonIndex: 0, label: 'clamp low' },
+      { from: 'S4', to: 'S6', decisionId: 'D2', moonIndex: 1, label: 'ok' },
+      { from: 'S6', to: 'S7', decisionId: 'D3', moonIndex: 0, label: 'near max rpm, positive torque' },
+      { from: 'S6', to: 'S8', decisionId: 'D3', moonIndex: 1, label: 'rpm ok' },
+      { from: 'S8', to: 'S9', decisionId: 'D4', moonIndex: 0, label: 'near min rpm, negative torque' },
+      { from: 'S8', to: 'S10', decisionId: 'D4', moonIndex: 1, label: 'ok' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'cmd_torque > 1000', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'actual < -1000', decisionId: 'D2', index: 0 },
+      { id: 'M3', expr: 'current_rpm > (max_rpm - 100)', decisionId: 'D3', index: 0 },
+      { id: 'M4', expr: 'current_rpm < -(max_rpm - 100)', decisionId: 'D4', index: 0 },
+    ],
+    dependencies: [],
+    sim: {
+      inputs: [
+        { name: 'cmd_torque', type: 'int32', min: -2147483648, max: 2147483647, special: [1500, 500, 0, -500, -1500] },
+        { name: 'current_rpm', type: 'int32', min: -2147483648, max: 2147483647, special: [0, 5000, 9900, 10000, -5000, -9900, -10000] },
+        { name: 'max_rpm', type: 'int32', special: [10000] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['cmd_torque > 1000'] },
+        { id: 'D2', moons: ['actual < -1000'] },
+        { id: 'D3', moons: ['current_rpm > (max_rpm - 100)'] },
+        { id: 'D4', moons: ['current_rpm < -(max_rpm - 100)'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true }, trace: ['S1','S2','S3','S4','S6','S10'], returns: 1000 },
+        { when: { 'D1.m0': false, 'D2.m0': true }, trace: ['S1','S2','S4','S5','S6','S10'], returns: -1000 },
+        { when: { 'D1.m0': false, 'D2.m0': false, 'D3.m0': true, 'D4.m0': false }, trace: ['S1','S2','S4','S6','S7','S8','S10'], returns: 0 },
+        { when: { 'D1.m0': false, 'D2.m0': false, 'D3.m0': false, 'D4.m0': true }, trace: ['S1','S2','S4','S6','S8','S9','S10'], returns: 0 },
+        { when: { 'D1.m0': false, 'D2.m0': false, 'D3.m0': false, 'D4.m0': false }, trace: ['S1','S2','S4','S6','S8','S10'], returns: 'cmd_torque' },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100 },
+    xpReward: 1400, isTutorial: false,
+    seededDefect: { id: 'DEF-RW-001', type: 'overflow', description: 'When cmd_torque = INT32_MAX, the comparison cmd_torque > 1000 is fine, but on RISC-V 64 with 32-bit int, intermediate computation of (max_rpm - 100) with max_rpm near INT32_MAX could overflow in signed arithmetic.', severity: 'Major', affectedConfig: 'build_optimized' },
+  },
+
+  // ─── Planet 8: Safe Mode (MC/DC heavy) ───
+  {
+    id: 'safe-mode',
+    planetName: 'Safe Mode Entry',
+    constellation: 'FDIR Deep Field',
+    planetEmoji: '🚨',
+    functionSig: 'bool fdir_check_safe_entry(bool temp_high, bool bus_fault, bool cmd_fault, bool manual_cmd)',
+    sourceCode: `#include <stdbool.h>\n\n/* REQ-FDIR-010: Enter safe mode if any autonomous fault detected\n * OR if manual safe mode command received.\n * Autonomous: temp_high OR bus_fault OR cmd_fault (independent conditions) */\nbool fdir_check_safe_entry(bool temp_high, bool bus_fault,\n                           bool cmd_fault, bool manual_cmd)\n{\n    bool autonomous_fault = false;\n    if (temp_high || bus_fault || cmd_fault) {\n        autonomous_fault = true;\n    }\n    /* BUG: uses && instead of || */\n    if (temp_high && bus_fault && cmd_fault) {\n        autonomous_fault = true;   /* Redundant on correct path */\n    }\n    if (autonomous_fault || manual_cmd) {\n        return true;  /* Enter safe mode */\n    }\n    return false;\n}`,
+    requirements: [
+      { id: 'REQ-FDIR-010', text: 'Enter safe mode on autonomous fault OR manual command', method: 'Unit Test' },
+      { id: 'REQ-FDIR-011', text: 'Autonomous fault = temp_high OR bus_fault OR cmd_fault (any one)', method: 'MC/DC Test' },
+    ],
+    config: { compiler: 'GCC RISC-V 32', platform: 'Simulator', build: 'Debug', charSigned: true, alignment: 'standard', label: 'Simulator + Debug' },
+    stations: [
+      { id: 'S1', label: 'autonomous_fault = false', line: 9 },
+      { id: 'S2', label: 'if (temp_high || bus || cmd)', line: 10 },
+      { id: 'S3', label: 'autonomous_fault = true', line: 11 },
+      { id: 'S4', label: 'if (temp_high && bus && cmd)', line: 14 },
+      { id: 'S5', label: 'autonomous_fault = true (redundant)', line: 15 },
+      { id: 'S6', label: 'if (autonomous || manual)', line: 17 },
+      { id: 'S7', label: 'return true', line: 18 },
+      { id: 'S8', label: 'return false', line: 20 },
+    ],
+    routes: [
+      { from: 'S2', to: 'S3', decisionId: 'D1', moonIndex: 0, label: 'any fault' },
+      { from: 'S2', to: 'S4', decisionId: 'D1', moonIndex: 1, label: 'no fault' },
+      { from: 'S6', to: 'S7', decisionId: 'D3', moonIndex: 0, label: 'enter safe' },
+      { from: 'S6', to: 'S8', decisionId: 'D3', moonIndex: 1, label: 'no safe' },
+    ],
+    moons: [
+      { id: 'M1', expr: 'temp_high || bus_fault || cmd_fault', decisionId: 'D1', index: 0 },
+      { id: 'M2', expr: 'temp_high && bus_fault && cmd_fault', decisionId: 'D2', index: 0 },
+      { id: 'M3', expr: 'autonomous_fault || manual_cmd', decisionId: 'D3', index: 0 },
+    ],
+    dependencies: [],
+    sim: {
+      inputs: [
+        { name: 'temp_high', type: 'bool', special: [0, 1] },
+        { name: 'bus_fault', type: 'bool', special: [0, 1] },
+        { name: 'cmd_fault', type: 'bool', special: [0, 1] },
+        { name: 'manual_cmd', type: 'bool', special: [0, 1] },
+      ],
+      decisions: [
+        { id: 'D1', moons: ['temp_high || bus_fault || cmd_fault'] },
+        { id: 'D2', moons: ['temp_high && bus_fault && cmd_fault'] },
+        { id: 'D3', moons: ['autonomous_fault || manual_cmd'] },
+      ],
+      rules: [
+        { when: { 'D1.m0': true }, trace: ['S1','S2','S3','S4','S6','S7'], returns: true },
+        { when: { 'D1.m0': false, 'D3.m0': false }, trace: ['S1','S2','S4','S6','S8'], returns: false },
+        { when: { 'D1.m0': false, 'D3.m0': true }, trace: ['S1','S2','S4','S6','S7'], returns: true },
+      ],
+    },
+    coverageTargets: { statement: 100, branch: 100, mcdc: 100 },
+    xpReward: 1600, isTutorial: false,
+    seededDefect: { id: 'DEF-FDIR-010', type: 'logic_error', description: 'Line 14 uses && (AND) instead of || (OR). This means safe mode is only entered when ALL THREE faults are present simultaneously, instead of ANY ONE. The correct requirement is OR. This is a logic error in the code, not the test.', severity: 'Critical', affectedConfig: 'all' },
+  },
+];

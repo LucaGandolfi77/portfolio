@@ -77,9 +77,25 @@ window.addEventListener('load', () => {
     },
     
     tick() {
+      // Calculate production rates from buildings
       const rates = this.calculateRates();
-      player.gainResources(rates);
+      
+      // Apply academy resource multiplier
+      const academyLevel = player.buildings.filter(b => b.type === 'academy').reduce((sum, b) => sum + b.level, 0);
+      const resourceMultiplier = 1 + (academyLevel * 0.1);
+      
+      // Apply resource generation with multiplier
+      const finalRates = { gold: 0, wood: 0, food: 0, stone: 0 };
+      Object.keys(rates).forEach(key => {
+        const rate = rates[key] * resourceMultiplier;
+        finalRates[key] += rate;
+      });
+      
+      player.gainResources(finalRates);
       this.checkConsumption();
+      
+      // Update happiness from taverns
+      this.updateHappiness();
     },
     
     const ResourceTypeMap = {
@@ -87,6 +103,17 @@ window.addEventListener('load', () => {
     lumber_camp: 'wood',
     farm: 'food',
     quarry: 'stone'
+  };
+  
+  // Building costs configuration
+  const BuildingCosts = {
+    gold_mine: 50,
+    lumber_camp: 30,
+    farm: 40,
+    quarry: 60,
+    tavern: 100,
+    academy: 80,
+    barracks: 70
   };
   
   calculateRates() {
@@ -108,6 +135,35 @@ window.addEventListener('load', () => {
       
       if (player.resources.food < consumption) {
         player.resources.gold = Math.max(0, player.resources.gold - 1);
+      }
+    },
+    
+    updateHappiness() {
+      // Calculate happiness from taverns
+      const tavernLevel = player.buildings.filter(b => b.type === 'tavern').reduce((sum, b) => sum + b.level, 0);
+      const academyLevel = player.buildings.filter(b => b.type === 'academy').reduce((sum, b) => sum + b.level, 0);
+      const barracksLevel = player.buildings.filter(b => b.type === 'barracks').reduce((sum, b) => sum + b.level, 0);
+      
+      // Base happiness change
+      let happinessChange = tavernLevel * 5; // +5 happiness per tavern level
+      
+      // Academy gives resource multiplier happiness bonus
+      happinessChange += academyLevel * 2;
+      
+      // Barracks give small happiness
+      happinessChange += barracksLevel * 1;
+      
+      // Apply happiness change (capped at 0-100)
+      player.population.happiness = Math.min(100, Math.max(0, player.population.happiness + happinessChange));
+      
+      // Unhappy penalty: reduce production if happiness < 50
+      if (player.population.happiness < 50) {
+        const penalty = Math.floor((50 - player.population.happiness) / 10);
+        // Reduce all resource production by penalty amount
+        player.resources.gold = Math.max(0, player.resources.gold - penalty);
+        player.resources.wood = Math.max(0, player.resources.wood - penalty);
+        player.resources.food = Math.max(0, player.resources.food - penalty);
+        player.resources.stone = Math.max(0, player.resources.stone - penalty);
       }
     },
     
@@ -133,6 +189,12 @@ window.addEventListener('load', () => {
     
     document.getElementById('population').textContent = player.population.count;
     document.getElementById('max-pop').textContent = player.population.max;
+    
+    // Update happiness display
+    const happinessEl = document.getElementById('happiness');
+    if (happinessEl) {
+      happinessEl.textContent = player.population.happiness;
+    }
   }
 
   // Render buildings
