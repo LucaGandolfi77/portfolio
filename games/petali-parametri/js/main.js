@@ -49,7 +49,12 @@
       html += `<button class="btn" id="btn-garden-menu" style="border-color:var(--sage);background:linear-gradient(135deg,#e8f5e9,#c8e6c9)">🌸 Giardino Infinito</button>`;
     }
     $('menu-actions').innerHTML = html;
-    $('btn-new').onclick = () => { saveSave({ completedChapters: [], money: 0 }); renderMenu(); };
+    $('btn-new').onclick = () => {
+      const hasProgress = d.completedChapters.length > 0;
+      if (hasProgress && !confirm('Vuoi ricominciare da capo? Il progresso attuale verrà cancellato.')) return;
+      saveSave({ completedChapters: [], money: 0 });
+      startChapter(0);
+    };
     const cb = document.getElementById('btn-continue');
     if (cb) cb.onclick = () => startChapter(d.completedChapters.length > 0 ? Math.min(d.completedChapters.length, chapters.length - 1) : 0);
     const gb = document.getElementById('btn-garden-menu');

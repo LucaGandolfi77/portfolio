@@ -30,7 +30,6 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Cache aperta');
                 // Cache file per file (non addAll, che è atomica): se una
                 // richiesta fallisce — es. redirect CORS verso il login in
                 // ambienti di preview come github.dev — le altre vengono

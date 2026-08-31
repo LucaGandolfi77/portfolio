@@ -43,9 +43,11 @@
     btns.innerHTML = html;
 
     $('btn-new').onclick = () => {
+      const hasProgress = Save.get().completedChapters.length > 0;
+      if (hasProgress && !confirm('Vuoi ricominciare da capo? Il progresso attuale verrà cancellato.')) return;
       Save.reset();
       Save.load();
-      renderMenu();
+      startChapter(0);
     };
 
     const continueBtn = document.getElementById('btn-continue');

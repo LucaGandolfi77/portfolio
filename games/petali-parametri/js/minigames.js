@@ -686,6 +686,16 @@ window.MiniGames = (() => {
       case 'allucinazioni': return startAllucinazioni(area, onComplete);
       case 'addio': return startAddio(area, onComplete);
     }
+    // Fallback: minigioco sconosciuto → mostra un messaggio e completa
+    // invece di lasciare l'area vuota e bloccare il giocatore.
+    area.innerHTML = `
+      <div class="mg-card" style="text-align:center">
+        <div style="font-size:40px">🌸</div>
+        <div class="mg-title">Minigioco in arrivo</div>
+        <div class="mg-sub">Questo capitolo non ha ancora un minigioco associato ("${gameId}").</div>
+        <button class="btn primary" id="mg-fallback-ok">Continua →</button>
+      </div>`;
+    document.getElementById('mg-fallback-ok').onclick = () => onComplete(true, 0);
   }
 
   return { start };
