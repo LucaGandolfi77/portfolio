@@ -2,10 +2,10 @@
   'use strict';
 
   const engine = window.QuoteSmith;
-  const database = window.QUOTESMITH_DB.QUOTES;
+  let database = [];
   const state = {
     lang: localStorage.getItem('quotesmith.lang') || 'en',
-    category: null,
+    categories: [],
     difficulty: 'easy',
     round: [],
     questionIndex: 0,
@@ -16,6 +16,23 @@
     answers: [],
     bestScore: 0,
     bestStreak: 0,
+  };
+
+  const T = {
+    en: {
+      hintEmpty: 'Pick one or more worlds — the round mixes them.',
+      hintOne: '1 world · {n} quotes',
+      hintMany: '{m} worlds · {n} quotes',
+      all: 'All',
+      none: 'None',
+    },
+    it: {
+      hintEmpty: 'Scegli uno o più mondi: il round li mescola.',
+      hintOne: '1 mondo · {n} citazioni',
+      hintMany: '{m} mondi · {n} citazioni',
+      all: 'Tutti',
+      none: 'Nessuno',
+    },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -66,15 +83,40 @@
     const wrapper = $('category-choices');
     wrapper.innerHTML = '';
     engine.CATEGORIES.forEach((category) => {
-      const count = engine.filterQuotes(database, { category: category.key, lang: state.lang }).length;
+      const count = engine.filterQuotes(database, { category: [category.key], lang: state.lang }).length;
+      const selected = state.categories.indexOf(category.key) !== -1;
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'category-choice' + (state.category === category.key ? ' selected' : '');
-      button.innerHTML = `<span class="category-icon" aria-hidden="true">${category.icon}</span><span class="category-name">${category.name[state.lang]}</span><span class="category-count">${count} quotes</span>`;
-      button.setAttribute('aria-pressed', String(state.category === category.key));
-      button.addEventListener('click', () => { state.category = category.key; renderCategories(); updateStart(); });
+      button.className = 'category-choice' + (selected ? ' selected' : '');
+      button.innerHTML = `<span class="category-icon" aria-hidden="true">${category.icon}</span><span class="category-name">${category.name[state.lang]}</span><span class="category-count">${count} ${state.lang === 'it' ? 'citazioni' : 'quotes'}</span>`;
+      button.setAttribute('aria-pressed', String(selected));
+      button.addEventListener('click', () => {
+        const index = state.categories.indexOf(category.key);
+        if (index === -1) state.categories.push(category.key);
+        else state.categories.splice(index, 1);
+        renderCategories();
+        updateStart();
+      });
       wrapper.appendChild(button);
     });
+
+    const allButton = $('categories-all');
+    const noneButton = $('categories-none');
+    if (allButton && noneButton) {
+      allButton.textContent = T[state.lang].all;
+      noneButton.textContent = T[state.lang].none;
+      allButton.disabled = state.categories.length === engine.CATEGORIES.length;
+      noneButton.disabled = state.categories.length === 0;
+    }
+  }
+
+  function categoryHint() {
+    const t = T[state.lang];
+    if (state.categories.length === 0) return t.hintEmpty;
+    const total = engine.filterQuotes(database, { category: state.categories, lang: state.lang, difficulty: state.difficulty }).length;
+    const count = state.categories.length;
+    const n = total.toLocaleString(state.lang === 'it' ? 'it-IT' : 'en-US');
+    return state.categories.length === 1 ? t.hintOne.replace('{n}', n) : t.hintMany.replace('{m}', count).replace('{n}', n);
   }
 
   function renderDifficulties() {
@@ -102,10 +144,17 @@
       : 'No record yet. Make the first one.';
   }
 
-  function updateStart() { $('start-button').disabled = !state.category; }
+  function updateStart() {
+    $('start-button').disabled = state.categories.length === 0;
+    const hint = $('category-hint');
+    if (hint) hint.textContent = categoryHint();
+  }
 
   function startRound() {
-    state.round = engine.buildRound(database, { category: state.category, lang: state.lang, difficulty: state.difficulty, count: engine.ROUND_SIZE });
+    const selected = state.categories.length
+      ? state.categories.slice()
+      : engine.CATEGORIES.map((category) => category.key);
+    state.round = engine.buildRound(database, { category: selected, lang: state.lang, difficulty: state.difficulty, count: engine.ROUND_SIZE });
     state.questionIndex = 0;
     state.score = 0;
     state.streak = 0;
@@ -216,20 +265,36 @@
 
   function init() {
     loadBest();
-    renderSetup();
-    $('start-button').addEventListener('click', startRound);
-    $('next-button').addEventListener('click', nextQuestion);
-    $('listen-button').addEventListener('click', listen);
-    $('quit-button').addEventListener('click', () => { showScreen('setup'); renderSetup(); });
-    $('retry-button').addEventListener('click', startRound);
-    $('results-menu-button').addEventListener('click', () => { showScreen('setup'); renderSetup(); });
-    $('language-toggle').addEventListener('click', () => {
-      state.lang = state.lang === 'en' ? 'it' : 'en';
-      localStorage.setItem('quotesmith.lang', state.lang);
-      renderSetup();
-    });
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-    window.__quoteSmithState = state;
+    // Quotes now live in quotes.json, loaded asynchronously by data.js.
+    window.QUOTESMITH_READY
+      .then((db) => { database = (db && db.QUOTES) || []; })
+      .catch(() => { database = []; })
+      .then(() => {
+        renderSetup();
+        $('start-button').addEventListener('click', startRound);
+        $('categories-all').addEventListener('click', () => {
+          state.categories = engine.CATEGORIES.map((category) => category.key);
+          renderCategories();
+          updateStart();
+        });
+        $('categories-none').addEventListener('click', () => {
+          state.categories = [];
+          renderCategories();
+          updateStart();
+        });
+        $('next-button').addEventListener('click', nextQuestion);
+        $('listen-button').addEventListener('click', listen);
+        $('quit-button').addEventListener('click', () => { showScreen('setup'); renderSetup(); });
+        $('retry-button').addEventListener('click', startRound);
+        $('results-menu-button').addEventListener('click', () => { showScreen('setup'); renderSetup(); });
+        $('language-toggle').addEventListener('click', () => {
+          state.lang = state.lang === 'en' ? 'it' : 'en';
+          localStorage.setItem('quotesmith.lang', state.lang);
+          renderSetup();
+        });
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+        window.__quoteSmithState = state;
+      });
   }
 
   document.addEventListener('DOMContentLoaded', init);

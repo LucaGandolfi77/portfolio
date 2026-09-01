@@ -25,6 +25,24 @@
     { key: 'internet', icon: '#', name: { en: 'Internet', it: 'Internet' } },
     { key: 'philosophy', icon: '?', name: { en: 'Philosophy', it: 'Filosofia' } },
     { key: 'food', icon: '◇', name: { en: 'Food', it: 'Cucina' } },
+    { key: 'literature', icon: '▦', name: { en: 'Literature', it: 'Letteratura' } },
+    { key: 'poetry', icon: '✎', name: { en: 'Poetry', it: 'Poesia' } },
+    { key: 'art', icon: '◈', name: { en: 'Art', it: 'Arte' } },
+    { key: 'love', icon: '♥', name: { en: 'Love', it: 'Amore' } },
+    { key: 'wisdom', icon: '❖', name: { en: 'Wisdom', it: 'Saggezza' } },
+    { key: 'technology', icon: '⚙', name: { en: 'Technology', it: 'Tecnologia' } },
+    { key: 'nature', icon: '☘', name: { en: 'Nature', it: 'Natura' } },
+    { key: 'motivation', icon: '▲', name: { en: 'Motivation', it: 'Motivazione' } },
+    { key: 'humor', icon: '☺', name: { en: 'Humor', it: 'Umorismo' } },
+    { key: 'superheroes', icon: '★', name: { en: 'Superheroes', it: 'Supereroi' } },
+    { key: 'cats', icon: 'ฅ', name: { en: 'Cats', it: 'Gatti' } },
+    { key: 'coffee', icon: '☕', name: { en: 'Coffee', it: 'Caffè' } },
+    { key: 'puns', icon: '✱', name: { en: 'Puns', it: 'Giochi di parole' } },
+    { key: 'bible', icon: '✝', name: { en: 'Bible', it: 'Bibbia' } },
+    { key: 'fashion', icon: '✂', name: { en: 'Fashion', it: 'Moda' } },
+    { key: 'travel', icon: '✈', name: { en: 'Travel', it: 'Viaggi' } },
+    { key: 'money', icon: '$', name: { en: 'Money', it: 'Soldi' } },
+    { key: 'childhood', icon: '☼', name: { en: 'Childhood', it: 'Infanzia' } },
   ];
   const DIFFICULTIES = [
     { key: 'easy', name: { en: 'Easy', it: 'Facile' }, hint: { en: 'Iconic lines', it: 'Frasi iconiche' } },
@@ -57,11 +75,17 @@
     return quote;
   }
 
+  function matchesCategory(quoteCategory, requested) {
+    if (!requested) return true;
+    if (Array.isArray(requested)) return requested.indexOf(quoteCategory) !== -1;
+    return quoteCategory === requested;
+  }
+
   function filterQuotes(db, options) {
     const opts = options || {};
     return db.map(normalizeQuote).filter((quote) => (
       (!opts.lang || quote.lang === opts.lang) &&
-      (!opts.category || quote.category === opts.category) &&
+      matchesCategory(quote.category, opts.category) &&
       (!opts.difficulty || quote.difficulty === opts.difficulty)
     ));
   }

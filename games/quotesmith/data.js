@@ -1,55 +1,90 @@
 (function (root, factory) {
   'use strict';
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.QUOTESMITH_DB = factory();
-}(typeof self !== 'undefined' ? self : this, function () {
-  'use strict';
 
-  // Short, attributed lines keep the game self-contained and offline.
-  const quotes = [
-    // Movies
-    ['I\'ll be back.', 'The Terminator', 'film', 'en', 'easy'], ['May the Force be with you.', 'Obi-Wan Kenobi', 'film', 'en', 'easy'], ['Why so serious?', 'The Joker', 'film', 'en', 'easy'], ['You can\'t handle the truth!', 'Colonel Jessup', 'film', 'en', 'medium'], ['There\'s no place like home.', 'Dorothy Gale', 'film', 'en', 'easy'], ['Here\'s looking at you, kid.', 'Rick Blaine', 'film', 'en', 'hard'],
-    ['Tornerò.', 'Il Terminator', 'film', 'it', 'easy'], ['Che la Forza sia con te.', 'Obi-Wan Kenobi', 'film', 'it', 'easy'], ['Perché tanto serio?', 'Il Joker', 'film', 'it', 'easy'], ['Non puoi sopportare la verità!', 'Colonnello Jessup', 'film', 'it', 'medium'], ['Non c\'è posto come casa.', 'Dorothy Gale', 'film', 'it', 'easy'], ['Ecco a te, ragazzo.', 'Rick Blaine', 'film', 'it', 'hard'],
-    // TV series
-    ['Winter is coming.', 'Ned Stark', 'series', 'en', 'easy'], ['I am the one who knocks.', 'Walter White', 'series', 'en', 'medium'], ['How you doin\'?', 'Joey Tribbiani', 'series', 'en', 'easy'], ['Bazinga!', 'Sheldon Cooper', 'series', 'en', 'easy'], ['Live long and prosper.', 'Spock', 'series', 'en', 'easy'], ['Chaos is a ladder.', 'Petyr Baelish', 'series', 'en', 'hard'],
-    ['L\'inverno sta arrivando.', 'Ned Stark', 'series', 'it', 'easy'], ['Io sono colui che bussa.', 'Walter White', 'series', 'it', 'medium'], ['Come butta?', 'Joey Tribbiani', 'series', 'it', 'easy'], ['Bazinga!', 'Sheldon Cooper', 'series', 'it', 'easy'], ['Vivi a lungo e prospera.', 'Spock', 'series', 'it', 'easy'], ['Il caos è una scala.', 'Petyr Baelish', 'series', 'it', 'hard'],
-    // Animation
-    ['Good news, everyone!', 'Professor Farnsworth', 'animation', 'en', 'easy'], ['Shut up and take my money!', 'Fry', 'animation', 'en', 'easy'], ['Bite my shiny metal ass!', 'Bender', 'animation', 'en', 'easy'], ['D\'oh!', 'Homer Simpson', 'animation', 'en', 'easy'], ['Eat my shorts!', 'Bart Simpson', 'animation', 'en', 'medium'], ['The goggles! They do nothing!', 'Rainier Wolfcastle', 'animation', 'en', 'hard'],
-    ['Buone notizie, amici!', 'Professor Farnsworth', 'animation', 'it', 'easy'], ['Zitto e prendi i miei soldi!', 'Fry', 'animation', 'it', 'easy'], ['Mordimi il sedere metallico!', 'Bender', 'animation', 'it', 'easy'], ['Doh!', 'Homer Simpson', 'animation', 'it', 'easy'], ['Mangiati i miei pantaloncini!', 'Bart Simpson', 'animation', 'it', 'medium'], ['Gli occhiali! Non servono a niente!', 'Rainier Wolfcastle', 'animation', 'it', 'hard'],
-    // Songs
-    ['We will, we will rock you!', 'Queen', 'songs', 'en', 'easy'], ['Imagine all the people living life in peace.', 'John Lennon', 'songs', 'en', 'easy'], ['Don\'t stop believin\'!', 'Journey', 'songs', 'en', 'easy'], ['I will always love you.', 'Whitney Houston', 'songs', 'en', 'easy'], ['Sweet dreams are made of this.', 'Eurythmics', 'songs', 'en', 'medium'], ['All you need is love.', 'The Beatles', 'songs', 'en', 'easy'],
-    ['We will, we will rock you!', 'Queen', 'songs', 'it', 'easy'], ['Immagina tutte le persone vivere in pace.', 'John Lennon', 'songs', 'it', 'easy'], ['Non smettere di credere!', 'Journey', 'songs', 'it', 'easy'], ['Ti amerò per sempre.', 'Whitney Houston', 'songs', 'it', 'easy'], ['Dolci sogni sono fatti di questo.', 'Eurythmics', 'songs', 'it', 'medium'], ['Tutto ciò di cui hai bisogno è amore.', 'The Beatles', 'songs', 'it', 'easy'],
-    // Books
-    ['Call me Ishmael.', 'Herman Melville', 'books', 'en', 'easy'], ['To be, or not to be.', 'William Shakespeare', 'books', 'en', 'easy'], ['Big Brother is watching you.', 'George Orwell', 'books', 'en', 'easy'], ['Not all those who wander are lost.', 'J.R.R. Tolkien', 'books', 'en', 'medium'], ['We\'re all mad here.', 'The Cheshire Cat', 'books', 'en', 'easy'], ['It was the best of times, it was the worst of times.', 'Charles Dickens', 'books', 'en', 'hard'],
-    ['Chiamatemi Ismaele.', 'Herman Melville', 'books', 'it', 'easy'], ['Essere o non essere.', 'William Shakespeare', 'books', 'it', 'easy'], ['Il Grande Fratello ti guarda.', 'George Orwell', 'books', 'it', 'easy'], ['Non tutti quelli che vagano sono perduti.', 'J.R.R. Tolkien', 'books', 'it', 'medium'], ['Qui siamo tutti matti.', 'Il Gatto del Cheshire', 'books', 'it', 'easy'], ['Era il migliore dei tempi, era il peggiore dei tempi.', 'Charles Dickens', 'books', 'it', 'hard'],
-    // History
-    ['Veni, vidi, vici.', 'Julius Caesar', 'history', 'en', 'easy'], ['I have a dream.', 'Martin Luther King Jr.', 'history', 'en', 'easy'], ['The die is cast.', 'Julius Caesar', 'history', 'en', 'medium'], ['Never, never, never give up.', 'Winston Churchill', 'history', 'en', 'easy'], ['That\'s one small step for a man.', 'Neil Armstrong', 'history', 'en', 'easy'], ['I am the greatest.', 'Muhammad Ali', 'history', 'en', 'easy'],
-    ['Veni, vidi, vici.', 'Giulio Cesare', 'history', 'it', 'easy'], ['Ho un sogno.', 'Martin Luther King Jr.', 'history', 'it', 'easy'], ['Il dado è tratto.', 'Giulio Cesare', 'history', 'it', 'medium'], ['Mai, mai, mai arrendersi.', 'Winston Churchill', 'history', 'it', 'easy'], ['Un piccolo passo per un uomo.', 'Neil Armstrong', 'history', 'it', 'easy'], ['Io sono il più grande.', 'Muhammad Ali', 'history', 'it', 'easy'],
-    // Video games
-    ['It\'s dangerous to go alone! Take this.', 'Old Man', 'games', 'en', 'easy'], ['Do a barrel roll!', 'Peppy Hare', 'games', 'en', 'easy'], ['The right man in the wrong place can make all the difference.', 'G-Man', 'games', 'en', 'hard'], ['Hey! Listen!', 'Navi', 'games', 'en', 'easy'], ['War. War never changes.', 'Ron Perlman', 'games', 'en', 'medium'], ['Finish him!', 'Announcer', 'games', 'en', 'easy'],
-    ['È pericoloso andare da soli! Prendi questo.', 'Il Vecchio', 'games', 'it', 'easy'], ['Fai un giro della morte!', 'Peppy Hare', 'games', 'it', 'easy'], ['L\'uomo giusto nel posto sbagliato può cambiare tutto.', 'G-Man', 'games', 'it', 'hard'], ['Ehi! Ascolta!', 'Navi', 'games', 'it', 'easy'], ['La guerra non cambia mai.', 'Ron Perlman', 'games', 'it', 'medium'], ['Finiscilo!', 'Annunciatore', 'games', 'it', 'easy'],
-    // Proverbs
-    ['Actions speak louder than words.', 'English proverb', 'proverbs', 'en', 'easy'], ['The early bird catches the worm.', 'English proverb', 'proverbs', 'en', 'easy'], ['A journey of a thousand miles begins with a single step.', 'Laozi', 'proverbs', 'en', 'medium'], ['Fortune favors the bold.', 'Latin proverb', 'proverbs', 'en', 'medium'], ['Better late than never.', 'English proverb', 'proverbs', 'en', 'easy'], ['The pen is mightier than the sword.', 'Edward Bulwer-Lytton', 'proverbs', 'en', 'hard'],
-    ['Le azioni parlano più delle parole.', 'Proverbio inglese', 'proverbs', 'it', 'easy'], ['Il mattino ha l\'oro in bocca.', 'Proverbio italiano', 'proverbs', 'it', 'easy'], ['Un viaggio di mille miglia inizia con un singolo passo.', 'Laozi', 'proverbs', 'it', 'medium'], ['La fortuna aiuta gli audaci.', 'Proverbio latino', 'proverbs', 'it', 'medium'], ['Meglio tardi che mai.', 'Proverbio italiano', 'proverbs', 'it', 'easy'], ['La penna è più potente della spada.', 'Edward Bulwer-Lytton', 'proverbs', 'it', 'hard'],
-    // Anime
-    ['Believe it!', 'Naruto Uzumaki', 'anime', 'en', 'easy'], ['I am gonna be King of the Pirates!', 'Monkey D. Luffy', 'anime', 'en', 'easy'], ['Plus Ultra!', 'All Might', 'anime', 'en', 'easy'], ['I\'ll take a potato chip... and eat it!', 'Light Yagami', 'anime', 'en', 'medium'], ['The world is not beautiful, therefore it is.', 'Kino', 'anime', 'en', 'hard'], ['Whatever happens, happens.', 'Spike Spiegel', 'anime', 'en', 'medium'],
-    ['Credici!', 'Naruto Uzumaki', 'anime', 'it', 'easy'], ['Diventerò il re dei pirati!', 'Monkey D. Luffy', 'anime', 'it', 'easy'], ['Plus Ultra!', 'All Might', 'anime', 'it', 'easy'], ['Prenderò una patatina... e la mangerò!', 'Light Yagami', 'anime', 'it', 'medium'], ['Il mondo non è bello, perciò lo è.', 'Kino', 'anime', 'it', 'hard'], ['Qualunque cosa accada, accadrà.', 'Spike Spiegel', 'anime', 'it', 'medium'],
-    // Science
-    ['E pur si muove.', 'Galileo Galilei', 'science', 'en', 'easy'], ['Eureka!', 'Archimedes', 'science', 'en', 'easy'], ['Nothing in life is to be feared.', 'Marie Curie', 'science', 'en', 'medium'], ['The important thing is to never stop questioning.', 'Albert Einstein', 'science', 'en', 'medium'], ['In the middle of difficulty lies opportunity.', 'Albert Einstein', 'science', 'en', 'hard'], ['The cosmos is within us.', 'Carl Sagan', 'science', 'en', 'medium'],
-    ['E pur si muove.', 'Galileo Galilei', 'science', 'it', 'easy'], ['Eureka!', 'Archimede', 'science', 'it', 'easy'], ['Niente nella vita va temuto.', 'Marie Curie', 'science', 'it', 'medium'], ['L\'importante è non smettere mai di fare domande.', 'Albert Einstein', 'science', 'it', 'medium'], ['Nel mezzo della difficoltà si trova l\'opportunità.', 'Albert Einstein', 'science', 'it', 'hard'], ['Il cosmo è dentro di noi.', 'Carl Sagan', 'science', 'it', 'medium'],
-    // Sports
-    ['Float like a butterfly, sting like a bee.', 'Muhammad Ali', 'sports', 'en', 'easy'], ['You miss 100% of the shots you don\'t take.', 'Wayne Gretzky', 'sports', 'en', 'easy'], ['It ain\'t over till it\'s over.', 'Yogi Berra', 'sports', 'en', 'easy'], ['The harder the battle, the sweeter the victory.', 'Les Brown', 'sports', 'en', 'medium'], ['You play to win the game.', 'Herm Edwards', 'sports', 'en', 'medium'], ['Success is no accident.', 'Pele', 'sports', 'en', 'hard'],
-    ['Vola come una farfalla, pungi come un\'ape.', 'Muhammad Ali', 'sports', 'it', 'easy'], ['Sbagli il cento per cento dei tiri che non fai.', 'Wayne Gretzky', 'sports', 'it', 'easy'], ['Non è finita finché non è finita.', 'Yogi Berra', 'sports', 'it', 'easy'], ['Più dura è la battaglia, più dolce è la vittoria.', 'Les Brown', 'sports', 'it', 'medium'], ['Si gioca per vincere.', 'Herm Edwards', 'sports', 'it', 'medium'], ['Il successo non è un caso.', 'Pele', 'sports', 'it', 'hard'],
-    // Internet culture
-    ['This is fine.', 'KC Green', 'internet', 'en', 'easy'], ['One does not simply walk into Mordor.', 'Boromir meme', 'internet', 'en', 'easy'], ['Do it for the Vine.', 'Internet catchphrase', 'internet', 'en', 'medium'], ['Such wow. Very doge.', 'Doge meme', 'internet', 'en', 'easy'], ['The cake is a lie.', 'Portal community', 'internet', 'en', 'easy'], ['It\'s over 9000!', 'Dragon Ball meme', 'internet', 'en', 'easy'],
-    ['Va tutto bene.', 'KC Green', 'internet', 'it', 'easy'], ['Non si entra semplicemente a Mordor.', 'Meme di Boromir', 'internet', 'it', 'easy'], ['Fallo per Vine.', 'Frase di Internet', 'internet', 'it', 'medium'], ['Molto wow. Cane davvero.', 'Meme Doge', 'internet', 'it', 'easy'], ['La torta è una bugia.', 'Comunità di Portal', 'internet', 'it', 'easy'], ['È oltre novemila!', 'Meme di Dragon Ball', 'internet', 'it', 'easy'],
-    // Philosophy
-    ['The unexamined life is not worth living.', 'Socrates', 'philosophy', 'en', 'medium'], ['I think, therefore I am.', 'René Descartes', 'philosophy', 'en', 'easy'], ['God is dead.', 'Friedrich Nietzsche', 'philosophy', 'en', 'easy'], ['Man is born free, and everywhere he is in chains.', 'Jean-Jacques Rousseau', 'philosophy', 'en', 'hard'], ['One cannot step twice in the same river.', 'Heraclitus', 'philosophy', 'en', 'hard'], ['The only true wisdom is in knowing you know nothing.', 'Socrates', 'philosophy', 'en', 'medium'],
-    ['Una vita senza esame non è degna di essere vissuta.', 'Socrate', 'philosophy', 'it', 'medium'], ['Penso, dunque sono.', 'René Descartes', 'philosophy', 'it', 'easy'], ['Dio è morto.', 'Friedrich Nietzsche', 'philosophy', 'it', 'easy'], ['L\'uomo nasce libero, ma ovunque è in catene.', 'Jean-Jacques Rousseau', 'philosophy', 'it', 'hard'], ['Non ci si bagna due volte nello stesso fiume.', 'Eraclito', 'philosophy', 'it', 'hard'], ['La vera saggezza consiste nel sapere di non sapere.', 'Socrate', 'philosophy', 'it', 'medium'],
-    // Food
-    ['Anyone can cook.', 'Gusteau', 'food', 'en', 'easy'], ['First we eat, then we do everything else.', 'M.F.K. Fisher', 'food', 'en', 'medium'], ['Good food is the foundation of genuine happiness.', 'Auguste Escoffier', 'food', 'en', 'medium'], ['People who love to eat are always the best people.', 'Julia Child', 'food', 'en', 'easy'], ['Tell me what you eat, and I will tell you what you are.', 'Jean Anthelme Brillat-Savarin', 'food', 'en', 'hard'], ['There is no sincerer love than the love of food.', 'George Bernard Shaw', 'food', 'en', 'medium'],
-    ['Chiunque può cucinare.', 'Gusteau', 'food', 'it', 'easy'], ['Prima mangiamo, poi facciamo tutto il resto.', 'M.F.K. Fisher', 'food', 'it', 'medium'], ['Il buon cibo è la base della vera felicità.', 'Auguste Escoffier', 'food', 'it', 'medium'], ['Le persone che amano mangiare sono sempre le migliori.', 'Julia Child', 'food', 'it', 'easy'], ['Dimmi cosa mangi e ti dirò chi sei.', 'Jean Anthelme Brillat-Savarin', 'food', 'it', 'hard'], ['Non c\'è amore più sincero dell\'amore per il cibo.', 'George Bernard Shaw', 'food', 'it', 'medium'],
+  // All quotes live in quotes.json. This file only loads it.
+  //   - Node: read the file from disk (for tests/tools).
+  //   - Browser: fetch quotes.json (cached by the service worker).
+  //     If the fetch fails (first visit, opened as file://, no cache yet),
+  //     fall back to a small embedded seed so the game always boots.
+
+  if (typeof module === 'object' && module.exports) {
+    // Node
+    var fs = require('fs');
+    var path = require('path');
+    var raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'quotes.json'), 'utf8'));
+    module.exports = { VERSION: (raw && typeof raw.version === 'number') ? raw.version : 3, QUOTES: raw.quotes || raw };
+    return;
+  }
+
+  // Browser: expose a promise that resolves to the database.
+  var SEED = [
+    // Emergency seed: one iconic line per category, en + it.
+    ['I\'ll be back.', 'The Terminator', 'film', 'en', 'easy'], ['Tornerò.', 'Il Terminator', 'film', 'it', 'easy'],
+    ['Winter is coming.', 'Ned Stark', 'series', 'en', 'easy'], ['L\'inverno sta arrivando.', 'Ned Stark', 'series', 'it', 'easy'],
+    ['D\'oh!', 'Homer Simpson', 'animation', 'en', 'easy'], ['Doh!', 'Homer Simpson', 'animation', 'it', 'easy'],
+    ['Imagine all the people living life in peace.', 'John Lennon', 'songs', 'en', 'easy'], ['Immagina tutte le persone vivere in pace.', 'John Lennon', 'songs', 'it', 'easy'],
+    ['Call me Ishmael.', 'Herman Melville', 'books', 'en', 'easy'], ['Chiamatemi Ismaele.', 'Herman Melville', 'books', 'it', 'easy'],
+    ['Veni, vidi, vici.', 'Julius Caesar', 'history', 'en', 'easy'], ['Veni, vidi, vici.', 'Giulio Cesare', 'history', 'it', 'easy'],
+    ['It\'s dangerous to go alone! Take this.', 'Old Man', 'games', 'en', 'easy'], ['È pericoloso andare da soli! Prendi questo.', 'Il Vecchio', 'games', 'it', 'easy'],
+    ['Actions speak louder than words.', 'English proverb', 'proverbs', 'en', 'easy'], ['Le azioni parlano più delle parole.', 'Proverbio inglese', 'proverbs', 'it', 'easy'],
+    ['Believe it!', 'Naruto Uzumaki', 'anime', 'en', 'easy'], ['Credici!', 'Naruto Uzumaki', 'anime', 'it', 'easy'],
+    ['E pur si muove.', 'Galileo Galilei', 'science', 'en', 'easy'], ['E pur si muove.', 'Galileo Galilei', 'science', 'it', 'easy'],
+    ['Float like a butterfly, sting like a bee.', 'Muhammad Ali', 'sports', 'en', 'easy'], ['Vola come una farfalla, pungi come un\'ape.', 'Muhammad Ali', 'sports', 'it', 'easy'],
+    ['This is fine.', 'KC Green', 'internet', 'en', 'easy'], ['Va tutto bene.', 'KC Green', 'internet', 'it', 'easy'],
+    ['I think, therefore I am.', 'René Descartes', 'philosophy', 'en', 'easy'], ['Penso, dunque sono.', 'René Descartes', 'philosophy', 'it', 'easy'],
+    ['Anyone can cook.', 'Gusteau', 'food', 'en', 'easy'], ['Chiunque può cucinare.', 'Gusteau', 'food', 'it', 'easy'],
+    ['The unexamined life is not worth living.', 'Socrates', 'literature', 'en', 'medium'], ['L\'amor che move il sole e l\'altre stelle.', 'Dante Alighieri', 'literature', 'it', 'medium'],
+    ['Two roads diverged in a wood, and I took the one less traveled by.', 'Robert Frost', 'poetry', 'en', 'medium'], ['Si sta come d\'autunno sugli alberi le foglie.', 'Giuseppe Ungaretti', 'poetry', 'it', 'medium'],
+    ['I dream my painting and I paint my dream.', 'Vincent van Gogh', 'art', 'en', 'medium'], ['Sogno il mio quadro e dipingo il mio sogno.', 'Vincent van Gogh', 'art', 'it', 'medium'],
+    ['The heart has its reasons which reason knows nothing of.', 'Blaise Pascal', 'love', 'en', 'hard'], ['Il cuore ha le sue ragioni che la ragione non conosce.', 'Blaise Pascal', 'love', 'it', 'hard'],
+    ['The journey of a thousand miles begins with a single step.', 'Lao Tzu', 'wisdom', 'en', 'easy'], ['Il viaggio di mille miglia inizia con un singolo passo.', 'Lao Tzu', 'wisdom', 'it', 'easy'],
+    ['Any sufficiently advanced technology is indistinguishable from magic.', 'Arthur C. Clarke', 'technology', 'en', 'hard'], ['Qualsiasi tecnologia sufficientemente avanzata è indistinguibile dalla magia.', 'Arthur C. Clarke', 'technology', 'it', 'hard'],
+    ['Look deep into nature, and then you will understand everything better.', 'Albert Einstein', 'nature', 'en', 'medium'], ['Guarda a fondo nella natura, e allora capirai tutto meglio.', 'Albert Einstein', 'nature', 'it', 'medium'],
+    ['It always seems impossible until it\'s done.', 'Nelson Mandela', 'motivation', 'en', 'easy'], ['Sembra sempre impossibile finché non è fatto.', 'Nelson Mandela', 'motivation', 'it', 'easy'],
+    ['I\'m on a seafood diet. I see food and I eat it.', 'Anonymous', 'humor', 'en', 'easy'], ['Sono a dieta di frutti di mare. Vedo il cibo e lo mangio.', 'Anonimo', 'humor', 'it', 'easy'],
+    ['With great power comes great responsibility.', 'Uncle Ben', 'superheroes', 'en', 'medium'], ['Da un grande potere derivano grandi responsabilità.', 'Zio Ben', 'superheroes', 'it', 'medium'],
+    ['Time spent with cats is never wasted.', 'Sigmund Freud', 'cats', 'en', 'easy'], ['Il tempo trascorso con i gatti non è mai sprecato.', 'Sigmund Freud', 'cats', 'it', 'easy'],
+    ['Coffee is a language in itself.', 'Jackie Chan', 'coffee', 'en', 'easy'], ['Il caffè è di per sé un linguaggio.', 'Jackie Chan', 'coffee', 'it', 'easy'],
+    ['What do you call a bear with no teeth? A gummy bear.', 'Anonymous', 'puns', 'en', 'easy'], ['Come si chiama un orso senza denti? Un orsetto gommoso.', 'Anonimo', 'puns', 'it', 'easy'],
+    ['The truth shall set you free.', 'John', 'bible', 'en', 'easy'], ['La verità vi farà liberi.', 'Giovanni', 'bible', 'it', 'easy'],
+    ['Fashion fades, only style remains the same.', 'Coco Chanel', 'fashion', 'en', 'easy'], ['La moda passa, solo lo stile resta.', 'Coco Chanel', 'fashion', 'it', 'easy'],
+    ['To travel is to live.', 'Hans Christian Andersen', 'travel', 'en', 'easy'], ['Viaggiare è vivere.', 'Hans Christian Andersen', 'travel', 'it', 'easy'],
+    ['Money is better than poverty, if only for financial reasons.', 'Woody Allen', 'money', 'en', 'easy'], ['Il denaro è meglio della povertà, se non altro per ragioni finanziarie.', 'Woody Allen', 'money', 'it', 'easy'],
+    ['Adults are just obsolete children.', 'Dr. Seuss', 'childhood', 'en', 'easy'], ['Gli adulti sono solo bambini superati.', 'Dr. Seuss', 'childhood', 'it', 'easy'],
   ];
 
-  return { VERSION: 2, QUOTES: quotes };
-}));
+  function toDB(raw) {
+    const version = raw && typeof raw.version === 'number' ? raw.version : 3;
+    return { VERSION: version, QUOTES: (raw && Array.isArray(raw.quotes)) ? raw.quotes : (raw || []) };
+  }
+
+  function seedDB() {
+    return { VERSION: 3, OFFLINE_SEED: true, QUOTES: SEED.map(function (q) {
+      return { text: q[0], author: q[1], category: q[2], lang: q[3], difficulty: q[4] };
+    }) };
+  }
+
+  root.QUOTESMITH_READY = fetch('quotes.json', { cache: 'no-cache' })
+    .then(function (response) {
+      if (!response.ok) throw new Error('quotes.json HTTP ' + response.status);
+      return response.json();
+    })
+    .then(toDB)
+    .catch(function () {
+      // Network failed: try the service-worker cache, then the embedded seed.
+      if (root.caches && root.caches.match) {
+        return root.caches.match('quotes.json').then(function (cached) {
+          if (cached) return cached.json().then(toDB);
+          throw new Error('no cache');
+        });
+      }
+      throw new Error('offline');
+    })
+    .catch(function () {
+      return seedDB();
+    })
+    .then(function (db) {
+      root.QUOTESMITH_DB = db; // keep the old synchronous surface working too
+      return db;
+    });
+}(typeof self !== 'undefined' ? self : this, function () {}));

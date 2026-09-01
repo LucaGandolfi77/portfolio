@@ -83,4 +83,19 @@ window.QUESTIONS=[
 {stage:'sage',text:'Teach someone a song you love.',xp:30,theme:'music'},
 {stage:'elder',text:'Write a short memoir piece about one vivid memory.',xp:30,theme:'literature'},
 {stage:'elder',text:'Look at an old photograph and describe the story.',xp:30,theme:'art'}
+,
+{"stage":"sprout","text":"Tell someone you love them today.","xp":10,"theme":"kindness"},
+{"stage":"sprout","text":"Give a hug to someone who looks sad.","xp":10,"theme":"kindness"},
+{"stage":"explorer","text":"Write a thank-you note to a teacher.","xp":10,"theme":"kindness"},
+{"stage":"explorer","text":"Share your snack with someone who forgot theirs.","xp":10,"theme":"kindness"},
+{"stage":"teen","text":"Compliment a classmate you don't usually talk to.","xp":12,"theme":"kindness"},
+{"stage":"teen","text":"Leave an anonymous kind note in a friend's locker or desk.","xp":12,"theme":"kindness"},
+{"stage":"young_adult","text":"Call a family member just to check in.","xp":12,"theme":"kindness"},
+{"stage":"young_adult","text":"Buy a coffee for the person behind you.","xp":12,"theme":"kindness"},
+{"stage":"adult","text":"Write a letter to a friend you've lost touch with.","xp":15,"theme":"kindness"},
+{"stage":"adult","text":"Cook a meal for someone going through a hard time.","xp":15,"theme":"kindness"},
+{"stage":"sage","text":"Share one piece of life advice with a young person.","xp":15,"theme":"kindness"},
+{"stage":"sage","text":"Visit someone who lives alone.","xp":15,"theme":"kindness"},
+{"stage":"elder","text":"Tell a grandchild a story from your childhood.","xp":15,"theme":"kindness"},
+{"stage":"elder","text":"Write down three people who shaped your life and tell them why.","xp":15,"theme":"kindness"}
 ];

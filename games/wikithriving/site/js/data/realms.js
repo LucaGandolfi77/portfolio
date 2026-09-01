@@ -15,7 +15,8 @@ window.REALMS=[
   {id:'music',name:'Music',icon:'🎵',color:'#b04ac0',desc:'The art that lives in time — rhythm, melody, and the science of chills.',stages:['sprout','explorer','teen','young_adult','adult','sage','elder'],bonus:true},
   {id:'film',name:'Film & Storytelling',icon:'🎬',color:'#c06040',desc:'How stories shape us — from camera angles to the hero\'s journey.',stages:['explorer','teen','young_adult','adult','sage','elder'],bonus:true},
   {id:'design',name:'Design & Visual Arts',icon:'🖌️',color:'#4a7a6b',desc:'Color, typography, composition — the invisible language that shapes what you see.',stages:['explorer','teen','young_adult','adult','sage','elder'],bonus:true},
-  {id:'literature',name:'Literature & Poetry',icon:'📚',color:'#8b6540',desc:'Words arranged with love — the books and poems that make life worth living.',stages:['sprout','explorer','teen','young_adult','adult','sage','elder'],bonus:true}
+  {id:'literature',name:'Literature & Poetry',icon:'📚',color:'#8b6540',desc:'Words arranged with love — the books and poems that make life worth living.',stages:['sprout','explorer','teen','young_adult','adult','sage','elder'],bonus:true},
+  {id:'travel',name:'Travel & Experiences Abroad',icon:'✈️',color:'#3a8bc0',desc:'Travel is the only thing you buy that makes you richer — every border crossed redraws the map of who you are.',stages:['sprout','explorer','teen','young_adult','adult','sage','elder'],bonus:true}
 ];
 window.STAGES=[
   {id:'sprout',name:'Sprout',range:[4,8],emoji:'🌱',color:'#7ec07c'},
