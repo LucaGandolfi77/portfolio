@@ -390,6 +390,24 @@ const PROJECTS_DATA = [
     "badgeColor": "#00d4ff"
   },
   {
+    "id": "fantapanchina",
+    "title": "FantaPanchina",
+    "description": "Il fantacalcio che gioca da solo. Idle game con squadre parodiche, mercato svincolati, bidoni leggendari, telecronaca da bar, scudetti d'oro e guadagni offline. La tua squadra segna anche mentre dormi. PWA installabile.",
+    "href": "projects/fantapanchina/index.html",
+    "emoji": "🛋️",
+    "badge": "Game",
+    "badgeColor": "#00d4ff"
+  },
+  {
+    "id": "vite-carrere",
+    "title": "VITE — Emmanuel Carrère",
+    "description": "Un viaggio attraverso le 8 vite di Emmanuel Carrère: 8 capitoli-libro con narrazione, citazioni autentiche e 8 minigiochi tematici. Dalle origini russe a L'Avversario, da Vite che non sono la mia al finale toccante. PWA narrativa installabile.",
+    "href": "projects/vite-carrere/index.html",
+    "emoji": "📖",
+    "badge": "Story",
+    "badgeColor": "#00d4ff"
+  },
+  {
     "id": "slot-builder-game",
     "title": "Slot Builder Game",
     "description": "Build your deck and spin to win.",

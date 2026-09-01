@@ -90,6 +90,8 @@ Representative entry points include:
 - [`projects/vola-pwa/index.html`](projects/vola-pwa/index.html): camera-controlled 3D flying PWA
 - [`projects/rave/index.html`](projects/rave/index.html): camera shader and visual effects tool
 - [`projects/audio-editor-pwa/index.html`](projects/audio-editor-pwa/index.html): browser audio editor PWA
+- [`projects/fantapanchina/index.html`](projects/fantapanchina/index.html): idle fantacalcio PWA with parody teams and offline earnings
+- [`projects/vite-carrere/index.html`](projects/vite-carrere/index.html): narrative PWA journey through Emmanuel Carrère's life and works
 - [`projects/smile_detection/index.html`](projects/smile_detection/index.html): camera-based smile analysis
 - [`projects/facemesh_camera.html`](projects/facemesh_camera.html): real-time face mesh experiment
 - [`games/echoes-of-the-last-dawn/index.html`](games/echoes-of-the-last-dawn/index.html): Three.js story game
