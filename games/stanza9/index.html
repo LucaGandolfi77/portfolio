@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#101527" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="description" content="STANZA 9 — un RPG narrativo moderno (Baldur's Gate × Habbo Hotel): sette giorni per salvare la memoria di un'estate, in una città che ha scelto di dimenticare. iPhone + desktop." />
+<title>STANZA 9 — L'albergo dei ricordi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  html, body { height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #101527; color: #e7ecf6; user-select: none; -webkit-user-select: none;
+    position: fixed; inset: 0; width: 100%; height: 100%;
+  }
+  canvas#view { display: block; position: absolute; inset: 0; touch-action: none; }
+
+  /* ============ HUD ============ */
+  #hud { position: absolute; left: 0; right: 0; top: 0; z-index: 30; pointer-events: none;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 0; }
+  #hud > * { pointer-events: auto; }
+  .hrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip {
+    background: rgba(13, 18, 33, .78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 7px 13px;
+    font-size: 13px; font-weight: 800; color: #dfe7f5; white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  }
+  .chip.cyan { color: #8be9fd; border-color: rgba(120,200,255,.35); }
+  .chip.gold { color: #ffd98a; border-color: rgba(255,200,120,.3); }
+  .chip.pink { color: #ff9ecb; border-color: rgba(255,150,200,.35); }
+  .ibtn {
+    background: rgba(13, 18, 33, .78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.16); border-radius: 999px; min-width: 42px; height: 42px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; padding: 0 13px;
+  }
+  .ibtn .notif { position: relative; }
+  .ibtn .badge {
+    position: absolute; top: -6px; right: -10px; background: #ff5d8f; color: #fff;
+    font-size: 10px; font-weight: 900; border-radius: 999px; min-width: 17px; height: 17px;
+    display: grid; place-items: center; padding: 0 4px; border: 2px solid #101527;
+  }
+  #objective {
+    background: rgba(13, 18, 33, .82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(148, 163, 184, .3); border-radius: 14px; padding: 8px 13px;
+    font-size: 12.5px; line-height: 1.45; max-width: min(94vw, 480px); color: #c9d6ea;
+  }
+  #objective b { color: #8be9fd; }
+
+  #actHint {
+    position: absolute; bottom: calc(env(safe-area-inset-bottom,0px) + 14px); left: 50%; transform: translateX(-50%);
+    background: rgba(13, 18, 33, .85); border: 1px solid rgba(139, 233, 253, .4); color: #dff6ff;
+    border-radius: 999px; padding: 9px 18px; font-size: 13px; font-weight: 700; z-index: 25;
+    opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 92vw; text-align: center;
+  }
+  #actHint.on { opacity: 1; }
+
+  #toast {
+    position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top,0px) + 104px);
+    background: rgba(13, 18, 33, .94); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
+    padding: 9px 16px; font-size: 13px; font-weight: 700; z-index: 80; opacity: 0;
+    transition: opacity .3s; pointer-events: none; max-width: 92vw; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  #toast.on { opacity: 1; }
+
+  /* ============ schermate ============ */
+  .screen { position: absolute; inset: 0; z-index: 40; display: none; overflow-y: auto; }
+  .screen.on { display: block; }
+  .cover {
+    background: radial-gradient(120% 90% at 50% -10%, #2b3a63 0%, #141a30 55%, #0c1120 100%);
+    padding: calc(env(safe-area-inset-top,0px) + 34px) 22px calc(env(safe-area-inset-bottom,0px) + 30px);
+    min-height: 100%; display: flex; flex-direction: column;
+  }
+  .cover .logo { font-size: 56px; text-align: center; margin: 6px 0 10px; text-shadow: 0 0 30px rgba(120,200,255,.5); }
+  .cover h1 { text-align: center; font-size: 34px; letter-spacing: 1px; background: linear-gradient(90deg,#8be9fd,#c9a7ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cover .tag { text-align: center; color: #9fb3d6; font-size: 14px; margin-top: 8px; line-height: 1.5; }
+  .cover .box {
+    background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.1); border-radius: 18px;
+    padding: 16px 18px; margin-top: 18px; font-size: 14.5px; line-height: 1.65; color: #d6e0f2;
+  }
+  .cover .box b { color: #ffd98a; }
+  .cover .btnrow { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
+  .bigbtn {
+    appearance: none; border: none; border-radius: 16px; padding: 16px 20px; font-size: 17px; font-weight: 900;
+    cursor: pointer; color: #071120;
+    background: linear-gradient(135deg,#4fd8f5,#7aa5ff); box-shadow: 0 8px 24px rgba(90,180,255,.3);
+  }
+  .bigbtn.ghost { background: rgba(255,255,255,.08); color: #dfe7f5; border: 1px solid rgba(255,255,255,.16); box-shadow: none; }
+  .bigbtn:active { transform: scale(.98); }
+
+  /* ============ modali ============ */
+  .modal {
+    position: absolute; inset: 0; z-index: 60; display: none; background: rgba(5,8,16,.6);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  .modal.on { display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto;
+    background: #151c31; border: 1px solid rgba(255,255,255,.12); border-top-left-radius: 22px; border-top-right-radius: 22px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,.5); padding: 14px 16px calc(env(safe-area-inset-bottom,0px) + 16px);
+    -webkit-overflow-scrolling: touch;
+  }
+  .sheet h2 { font-size: 16px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sheet .x {
+    margin-left: auto; background: rgba(255,255,255,.08); border: none; color: #c7d3e8;
+    width: 30px; height: 30px; border-radius: 10px; font-size: 15px; cursor: pointer; font-weight: 900;
+  }
+  .sheet .sub { color: #93a7c9; font-size: 12.5px; }
+
+  /* chat */
+  #chatWrap { padding-bottom: 8px; }
+  .msg { display: flex; gap: 8px; margin: 10px 0; align-items: flex-end; }
+  .msg .ava { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 16px; background: #232c46; }
+  .msg .bub {
+    background: #1d2740; border: 1px solid rgba(255,255,255,.08); padding: 10px 13px; border-radius: 16px;
+    max-width: 80%; font-size: 14px; line-height: 1.5; border-bottom-left-radius: 5px;
+  }
+  .msg.me { flex-direction: row-reverse; }
+  .msg.me .bub { background: #12374a; border-color: rgba(90,200,255,.35); border-bottom-left-radius: 16px; border-bottom-right-radius: 5px; }
+  .msg.giulia .bub { background: #2a1630; border-color: rgba(255,150,200,.35); color: #ffd9ec; }
+  .msg.sistema { justify-content: center; }
+  .msg.sistema .bub { background: rgba(255,255,255,.06); border: none; color: #9fb3d6; font-size: 12px; text-align: center; max-width: 92%; }
+  .replyrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .reply {
+    background: rgba(90,200,255,.12); border: 1px solid rgba(90,200,255,.4); color: #c9f2ff;
+    border-radius: 999px; padding: 9px 15px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  .reply:active { background: rgba(90,200,255,.28); }
+
+  /* dialogo */
+  #dlgSheet { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom,0px) + 8px); z-index: 55;
+    width: min(640px, 96vw); display: none; }
+  #dlgSheet.on { display: block; }
+  #dlgCard {
+    background: #171e33; border: 1px solid rgba(255,255,255,.13); border-radius: 20px;
+    box-shadow: 0 -6px 40px rgba(0,0,0,.55); padding: 12px 14px 14px; max-height: 48vh; display: flex; flex-direction: column;
+  }
+  #dlgHead { display: flex; align-items: center; gap: 10px; padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  #dlgAva { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: #232c46; flex: none; }
+  #dlgName { font-weight: 900; font-size: 15px; }
+  #dlgRole { font-size: 11.5px; color: #93a7c9; }
+  #dlgHearts { margin-left: auto; font-size: 13px; color: #ff5d8f; letter-spacing: 1px; }
+  #dlgBody { overflow-y: auto; padding: 10px 2px 4px; -webkit-overflow-scrolling: touch; }
+  #dlgBody p { font-size: 15px; line-height: 1.6; color: #e8eefb; margin-bottom: 8px; }
+  #dlgBody p.thought { color: #a8e0ff; font-style: italic; }
+  #dlgOpts { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.07); max-height: 40%; overflow-y: auto; }
+  .opt {
+    text-align: left; background: rgba(90,200,255,.1); border: 1px solid rgba(90,200,255,.35);
+    color: #e6f7ff; border-radius: 13px; padding: 11px 14px; font-size: 14.5px; font-weight: 700; line-height: 1.4; cursor: pointer;
+  }
+  .opt:active { background: rgba(90,200,255,.25); }
+  .opt.locked { opacity: .42; }
+  .opt.alt { background: rgba(255,200,120,.1); border-color: rgba(255,200,120,.35); color: #ffe6bd; }
+  #dlgClose {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #c7d3e8;
+    border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; margin-top: 9px; width: fit-content;
+  }
+  .tap2 { text-align: center; font-size: 11px; color: #7d90b4; margin-top: 6px; }
+
+  /* diario */
+  .dsec { margin-top: 12px; }
+  .dsec h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8be9fd; margin-bottom: 8px; }
+  .frag { display: flex; gap: 9px; padding: 8px 10px; background: rgba(255,255,255,.04); border-radius: 12px; margin-bottom: 7px; border: 1px solid rgba(255,255,255,.07); }
+  .frag .e { font-size: 18px; }
+  .frag p { font-size: 13px; line-height: 1.45; color: #dce5f4; }
+  .frag.locked { opacity: .35; filter: grayscale(1); }
+  .trustrow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .trustrow .nm { width: 78px; font-weight: 800; color: #cfe0f5; }
+  .trustrow .tk { flex: 1; height: 7px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .trustrow .tk i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg,#4fd8f5,#ff5d8f); }
+  .trustrow .lv { color: #ff9ecb; font-weight: 800; font-size: 12px; min-width: 70px; text-align: right; }
+  .itemrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13.5px; color: #e0e9f8; }
+  .itemrow .e { font-size: 18px; }
+  .itemrow .ds { color: #93a7c9; font-size: 12px; }
+
+  /* capitolo */
+  #chapterCard {
+    position: absolute; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center;
+    background: rgba(5,8,16,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 24px;
+  }
+  #chapterCard.on { display: flex; }
+  .ccard { max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; background: linear-gradient(180deg,#1b2540,#131a2e);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 24px; padding: 24px 22px; box-shadow: 0 20px 70px rgba(0,0,0,.6); }
+  .ccard .day { color: #8be9fd; font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+  .ccard h2 { font-size: 24px; margin: 6px 0 14px; color: #fff; }
+  .ccard p { font-size: 15px; line-height: 1.7; color: #dce5f4; margin-bottom: 12px; }
+  .ccard p i { color: #a8e0ff; }
+
+  /* fine */
+  #endTitle { text-align: center; margin-top: 8px; }
+  .ep { font-size: 15px; line-height: 1.7; color: #dce5f4; margin: 10px 0; }
+  .endbadge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 900; font-size: 12px; letter-spacing: 1px; margin-bottom: 8px; }
+  .statsline { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+
+  .spacer { flex: 1; }
+  #daybtn { background: linear-gradient(135deg,#ffb25e,#ff7a9e); }
+  #daybtn:disabled { opacity: .4; }
+  .footnote { text-align: center; color: #5f7194; font-size: 11px; margin-top: 18px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hrow">
+    <span class="chip cyan" id="hudLoc">…</span>
+    <span class="chip gold" id="hudDay">—</span>
+    <span class="chip pink" id="hudFrags">💠 0/12</span>
+    <span style="flex:1"></span>
+    <button class="ibtn" id="btnStanza9" style="display:none" aria-label="Stanza 9">💻 <span class="notif">Stanza 9<span class="badge" id="st9Badge" style="display:none">●</span></span></button>
+    <button class="ibtn" id="btnChat">💬<span class="badge" id="chatBadge" style="display:none">0</span></button>
+    <button class="ibtn" id="btnDiary">📓</button>
+  </div>
+  <div class="hrow" style="margin-top:6px"><div id="objective"></div></div>
+</div>
+<div id="actHint"></div>
+<div id="toast"></div>
+
+<!-- Capitolo -->
+<div id="chapterCard"><div class="ccard">
+  <div class="day" id="ccDay"></div>
+  <h2 id="ccTitle"></h2>
+  <div id="ccBody"></div>
+  <button class="bigbtn" id="ccBtn" style="width:100%">Continua</button>
+</div></div>
+
+<!-- Dialogo -->
+<div id="dlgSheet">
+  <div id="dlgCard">
+    <div id="dlgHead">
+      <div id="dlgAva"></div>
+      <div><div id="dlgName"></div><div id="dlgRole"></div></div>
+      <div id="dlgHearts"></div>
+    </div>
+    <div id="dlgBody"></div>
+    <div id="dlgOpts"></div>
+    <div style="display:flex;align-items:center">
+      <button id="dlgClose">Chiudi</button>
+      <div class="tap2" style="flex:1;text-align:right">tocca una risposta</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modali -->
+<div class="modal" id="mChat"><div class="sheet">
+  <h2>💬 Stanza 9 · gruppo <button class="x" data-close="mChat">✕</button></h2>
+  <div class="sub" id="chatMembers"></div>
+  <div id="chatWrap"></div>
+</div></div>
+
+<div class="modal" id="mDiary"><div class="sheet">
+  <h2>📓 Diario <button class="x" data-close="mDiary">✕</button></h2>
+  <div class="dsec"><h3>🎯 Obiettivo</h3><div id="objFull" style="font-size:14px;line-height:1.55;color:#dce5f4"></div></div>
+  <div class="dsec"><h3>💠 Ricordi ritrovati (fragments)</h3><div id="diaryFrags"></div></div>
+  <div class="dsec"><h3>🧳 Oggetti</h3><div id="diaryItems"></div></div>
+  <div class="dsec"><h3>❤️ Fiducia</h3><div id="diaryTrust"></div></div>
+  <div class="dsec"><h3>🕘 Passa la serata</h3>
+    <button class="bigbtn" id="dayEndBtn" style="width:100%;background:linear-gradient(135deg,#ffb25e,#ff7a9e);color:#fff">🌙 Dormi e vai al giorno successivo</button>
+    <div style="font-size:12px;color:#93a7c9;margin-top:8px;line-height:1.5" id="dayEndHint"></div>
+  </div>
+  <div class="dsec"><h3>⚙️</h3>
+    <button class="bigbtn ghost" id="resetBtn" style="width:100%">↺ Ricomincia da capo</button>
+  </div>
+</div></div>
+
+<!-- Avvio -->
+<div class="screen on" id="scrStart"><div class="cover">
+  <div class="logo">🛎️</div>
+  <h1>STANZA 9</h1>
+  <div class="tag">L'albergo dei ricordi · un'estate in una città che ha scelto di dimenticare</div>
+  <div class="box" id="introText"></div>
+  <div class="btnrow">
+    <button class="bigbtn" id="startBtn">▶ Inizia l'estate</button>
+    <button class="bigbtn ghost" id="contBtn" style="display:none">💾 Continua</button>
+  </div>
+  <div class="footnote">Un RPG narrativo moderno · ispirato ai grandi dialoghi dei giochi di ruolo e alla semplicità degli hotel social<br>Meridia, 3–9 luglio 2025 · 7 giorni · iPhone & desktop</div>
+</div></div>
+
+<!-- Fine -->
+<div class="screen" id="scrEnd"><div class="cover">
+  <div class="endbadge" id="endBadge" style="background:rgba(255,255,255,.08);color:#fff;align-self:center">FINE</div>
+  <h1 id="endTitle" style="text-align:center">—</h1>
+  <div id="endBody"></div>
+  <div class="statsline" id="endStats"></div>
+  <div class="btnrow">
+    <button class="bigbtn" id="againBtn">↺ Gioca ancora</button>
+    <button class="bigbtn ghost" id="endMenuBtn">🏠 Menu principale</button>
+  </div>
+  <div class="footnote" style="margin-top:10px">STANZA 9 — una storia su memoria, gruppi chat e ciò che facciamo quando le piattaforme muoiono.<br>Nessun dato lascia il dispositivo: salvataggio locale automatico.</div>
+</div></div>
+
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+</body>
+</html>

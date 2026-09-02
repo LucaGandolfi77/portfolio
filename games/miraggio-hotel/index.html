@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#2a1b6b" />
+<meta name="color-scheme" content="dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="description" content="Miraggio Hotel — il piccolo hotel sociale nel browser: scegli il tuo look, entra nelle stanze colorate, parla con gli ospiti, guadagna monete e arreda il tuo personaggio. Ispirato agli hotel virtuali. iPhone + desktop." />
+<title>Miraggio Hotel — il piccolo hotel sociale</title>
+<style>
+  :root{
+    --ink:#2b1e5e; --bg1:#5b3bd6; --bg2:#ff5d9e; --panel:#fff;
+    --acc:#ffd166; --good:#3ddc97;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Helvetica,Arial,sans-serif;
+    color:#fff;overflow:hidden;position:fixed;inset:0;width:100%;height:100%;
+    background:
+      radial-gradient(900px 520px at 85% -10%, rgba(255,209,102,.25), transparent 60%),
+      radial-gradient(760px 480px at -10% 20%, rgba(0,212,255,.2), transparent 55%),
+      linear-gradient(150deg,var(--bg1),#8a4bd6 55%,var(--bg2));
+    user-select:none;-webkit-user-select:none;touch-action:none;
+  }
+  #view{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+
+  /* HUD */
+  #hud{position:absolute;left:0;right:0;top:0;z-index:20;display:flex;gap:8px;align-items:flex-start;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 0;pointer-events:none;flex-wrap:wrap}
+  #hud>*{pointer-events:auto}
+  .chip{background:rgba(255,255,255,.16);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:7px 12px;font-weight:900;font-size:13px;
+    display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 12px rgba(60,20,120,.25);color:#fff}
+  .chip .coin{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:50%;
+    background:linear-gradient(135deg,#ffd166,#ffb347);color:#5a3a00;font-size:11px;font-weight:900}
+  #roomChip{background:rgba(255,255,255,.13)}
+  #badgeChip{font-size:11px;background:linear-gradient(135deg,rgba(255,209,102,.35),rgba(255,93,158,.35));border-color:rgba(255,255,255,.45)}
+  .spacer{flex:1}
+
+  /* dock */
+  #dock{position:absolute;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;
+    padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 8px);pointer-events:none}
+  .dockbar{pointer-events:auto;display:flex;gap:6px;background:rgba(255,255,255,.18);backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.4);border-radius:22px;padding:7px;
+    box-shadow:0 10px 30px rgba(60,20,120,.3);max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .dockbar::-webkit-scrollbar{display:none}
+  .db{appearance:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:transparent;color:#fff;padding:7px 12px;border-radius:16px;font:inherit;font-size:.62rem;font-weight:900;
+    min-width:56px;transition:background .15s}
+  .db .ic{font-size:22px;line-height:1}
+  .db.on,.db:active{background:rgba(255,255,255,.22)}
+
+  /* sheet */
+  .sheetwrap{position:absolute;inset:0;z-index:40;display:none;align-items:flex-end;justify-content:center;
+    background:rgba(40,20,90,.35);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  .sheetwrap.on{display:flex}
+  .sheet{width:100%;max-width:560px;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:rgba(255,255,255,.97);color:var(--ink);border-radius:26px 26px 0 0;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 18px);
+    box-shadow:0 -12px 44px rgba(60,20,120,.4)}
+  .shead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .shead h3{margin:0;font-size:1.05rem;flex:1}
+  .x{appearance:none;border:none;background:#efe9ff;color:#5b3bd6;width:32px;height:32px;border-radius:50%;
+    font:inherit;font-weight:900;cursor:pointer;font-size:15px}
+  .gtitle{font-size:.7rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#8f7fd6;margin:12px 0 6px}
+
+  /* stanze */
+  .roomlist{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  @media(max-width:480px){.roomlist{grid-template-columns:1fr}}
+  .room{border:2px solid #e7e0ff;background:#faf8ff;border-radius:16px;padding:12px;display:flex;gap:10px;align-items:center;
+    text-align:left;cursor:pointer;font:inherit;transition:transform .12s,border-color .12s}
+  .room:active{transform:scale(.98);border-color:var(--bg2)}
+  .room .re{font-size:26px}
+  .room b{color:#3a2a8f;display:block;font-size:.95rem}
+  .room small{color:#8a7fb8;font-size:.74rem}
+  .room .online{color:var(--good);font-size:.68rem;font-weight:900}
+  .room.here{border-color:var(--bg1);background:#efe9ff}
+
+  /* guardaroba */
+  .rowopt{display:flex;gap:7px;flex-wrap:wrap}
+  .opt{border:2px solid #e7e0ff;background:#fff;border-radius:12px;min-height:44px;padding:6px 10px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:.8rem;font-weight:800;color:#3a2a8f}
+  .opt .sw{width:22px;height:22px;border-radius:8px;border:1px solid rgba(0,0,0,.15);display:inline-block}
+  .opt small{color:#8a7fb8}
+  .opt.on{border-color:var(--bg1);background:#efe9ff}
+  .opt.lock{opacity:.6}
+  .coin-tag{display:inline-flex;align-items:center;gap:3px;color:#b8860b;font-weight:900}
+  .bigbtn{appearance:none;border:none;cursor:pointer;width:100%;border-radius:16px;padding:14px;font:inherit;font-weight:900;
+    font-size:1rem;background:linear-gradient(135deg,#5b3bd6,#ff5d9e);color:#fff;margin-top:14px}
+
+  /* emote */
+  .emotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .emo{border:2px solid #e7e0ff;background:#fff;border-radius:14px;padding:10px 6px;cursor:pointer;font:inherit;font-size:.78rem;
+    font-weight:800;color:#3a2a8f;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .emo .e{font-size:26px}
+  .emo:active{border-color:var(--bg2);background:#ffe9f2}
+
+  /* compositore chat in alto (sotto la keyboard) */
+  #composer{position:absolute;left:10px;right:10px;z-index:35;top:calc(env(safe-area-inset-top,0px) + 8px);
+    display:none;align-items:center;gap:8px;background:rgba(255,255,255,.97);border-radius:16px;padding:8px;
+    box-shadow:0 10px 30px rgba(60,20,120,.35)}
+  #composer.on{display:flex}
+  #composer input{flex:1;border:none;outline:none;font:inherit;font-size:1rem;color:#2b1e5e;background:transparent;padding:6px 4px}
+  #composer button{appearance:none;border:none;background:linear-gradient(135deg,#5b3bd6,#ff5d9e);color:#fff;border-radius:12px;
+    width:44px;height:44px;font-size:19px;cursor:pointer;flex:none}
+
+  /* notifiche */
+  #toast{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);z-index:60;
+    background:rgba(43,30,94,.92);border:1.5px solid rgba(255,209,102,.7);color:#fff;border-radius:999px;padding:9px 16px;
+    font-size:.84rem;font-weight:800;opacity:0;transition:opacity .22s;pointer-events:none;max-width:90vw;text-align:center}
+  #toast.on{opacity:1}
+
+  /* start screen */
+  .cover{position:absolute;inset:0;z-index:80;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(1000px 600px at 80% -10%,rgba(255,209,102,.3),transparent 60%),
+      radial-gradient(800px 500px at -10% 30%,rgba(0,212,255,.25),transparent 55%),linear-gradient(150deg,#3a2188,#6d2ea8 55%,#d13d88)}
+  .cover .panel{width:min(480px,100%);background:rgba(255,255,255,.14);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.35);border-radius:28px;padding:24px 20px;text-align:center;
+    box-shadow:0 30px 90px rgba(30,10,80,.5)}
+  .cover h1{margin:0;font-size:clamp(2rem,9vw,3.4rem);letter-spacing:-.02em;
+    background:linear-gradient(92deg,#fff,#ffe08a 55%,#9fe4ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .cover .tag{margin:4px 0 18px;font-size:.95rem;opacity:.92}
+  .field{width:100%;border-radius:14px;border:2px solid rgba(255,255,255,.5);background:rgba(255,255,255,.16);color:#fff;
+    padding:13px 14px;font:inherit;font-size:1rem;text-align:center;outline:none}
+  .field::placeholder{color:rgba(255,255,255,.65)}
+  .lab{display:block;font-size:.72rem;letter-spacing:.12em;font-weight:900;text-transform:uppercase;opacity:.85;margin:14px 0 6px}
+  .swatches{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+  .swatch{width:40px;height:40px;border-radius:12px;border:2px solid rgba(255,255,255,.4);cursor:pointer}
+  .swatch.on{border-color:#fff;box-shadow:0 0 0 3px var(--acc)}
+  .go{appearance:none;border:none;cursor:pointer;width:100%;border-radius:16px;padding:15px;font:inherit;font-weight:900;
+    font-size:1.1rem;background:linear-gradient(135deg,#ffd166,#ff9f43);color:#4a2c00;margin-top:20px}
+  .preview{display:flex;justify-content:center;margin:12px 0 4px}
+  canvas#avprev{width:120px;height:150px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <span class="chip" id="nameChip">👤 —</span>
+  <span class="chip" id="coinChip">🪙 <span class="coin" id="coins">0</span></span>
+  <span class="chip" id="roomChip">🏨 —</span>
+  <span class="spacer"></span>
+  <span class="chip" id="badgeChip">🏅 —</span>
+  <span class="chip" id="evChip" style="display:none">—</span>
+  <button class="chip" id="soundBtn" style="background:rgba(255,255,255,.14)">🔊</button>
+  <button class="chip" id="shopChip" style="display:none">🛒 Negozio mobili</button>
+  <button class="chip" id="stashChip" style="display:none">📦 Magazzino</button>
+</div>
+
+<!-- dock -->
+<div id="dock">
+  <div class="dockbar">
+    <button class="db on" id="dbRooms"><span class="ic">🗺️</span>Stanze</button>
+    <button class="db" id="dbMissions"><span class="ic">📋</span>Missioni</button>
+    <button class="db" id="dbGames"><span class="ic">🎮</span>Giochi</button>
+    <button class="db" id="dbEmotes"><span class="ic">😄</span>Emote</button>
+    <button class="db" id="dbChat"><span class="ic">💬</span>Chat</button>
+    <button class="db" id="dbWardrobe"><span class="ic">👕</span>Look</button>
+  </div>
+</div>
+
+<!-- compositore chat (in alto, fuori dalla tastiera) -->
+<div id="composer">
+  <input id="chatInput" type="text" maxlength="90" autocomplete="off" placeholder="Scrivi qualcosa…" />
+  <button id="chatSend" aria-label="Invia">➤</button>
+</div>
+
+<!-- stanze -->
+<div class="sheetwrap" id="sRooms"><div class="sheet">
+  <div class="shead"><h3>🗺️ Stanze del Miraggio</h3><button class="x" data-close="sRooms">✕</button></div>
+  <div class="roomlist" id="roomList"></div>
+</div></div>
+
+<!-- missioni + amici -->
+<div class="sheetwrap" id="sMissions"><div class="sheet">
+  <div class="shead"><h3>📋 Missioni di oggi</h3><span id="missionsDone" style="font-size:.8rem;color:#8f7fd6;font-weight:800"></span><button class="x" data-close="sMissions">✕</button></div>
+  <div id="missionsBody"></div>
+  <div class="gtitle" style="margin-top:16px">💞 Amici e storie segrete</div>
+  <div id="friendsBody"></div>
+  <div class="gtitle">🏆 Trofei</div>
+  <div id="trophyBody"></div>
+  <div class="gtitle">📔 Album degli amici</div>
+  <div id="albumBody"></div>
+  <div class="gtitle">📖 Diario del Miraggio</div>
+  <div id="diaryBody"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="mini" id="diaryCopy">📋 Copia diario</button>
+    <button class="mini" id="diaryClear">🗑️ Svuota diario</button>
+  </div>
+</div></div>
+
+<!-- giochi -->
+<div class="sheetwrap" id="sGames"><div class="sheet">
+  <div class="shead"><h3>🎮 Minigiochi</h3><button class="x" data-close="sGames">✕</button></div>
+  <div id="gamesBody"></div>
+</div></div>
+
+<!-- overlay minigioco -->
+<div class="sheetwrap" id="gameWrap"><div class="sheet" id="gamePanel">
+  <div class="shead"><h3 id="gameTitle">🎮</h3><button class="x" id="gameClose">✕</button></div>
+  <div id="gameBody"></div>
+</div></div>
+
+<!-- look -->
+<div class="sheetwrap" id="sWardrobe"><div class="sheet">
+  <div class="shead"><h3>👕 Guardaroba</h3><span style="color:#b8860b;font-weight:900" id="coinLbl">🪙 0</span><button class="x" data-close="sWardrobe">✕</button></div>
+  <div id="wardBody"></div>
+  <button class="mini" id="lookShot" style="width:100%;margin-top:12px;padding:12px">📸 Salva il tuo look come immagine</button>
+</div></div>
+
+<!-- emote -->
+<div class="sheetwrap" id="sEmotes"><div class="sheet">
+  <div class="shead"><h3>😄 Emote</h3><button class="x" data-close="sEmotes">✕</button></div>
+  <div class="emotes" id="emoList"></div>
+</div></div>
+
+<div id="toast" role="status"></div>
+
+<!-- negozio mobili -->
+<div class="sheetwrap" id="sShop"><div class="sheet">
+  <div class="shead"><h3>🛒 Negozio mobili</h3><span style="color:#b8860b;font-weight:900" id="shopCoins">🪙 0</span><button class="x" data-close="sShop">✕</button></div>
+  <div id="shopBody"></div>
+</div></div>
+
+<!-- magazzino -->
+<div class="sheetwrap" id="sStash"><div class="sheet">
+  <div class="shead"><h3>📦 Magazzino</h3><button class="x" data-close="sStash">✕</button></div>
+  <div id="stashBody"></div>
+</div></div>
+
+<!-- start -->
+<div class="cover" id="cover">
+  <div class="panel">
+    <h1>Miraggio Hotel</h1>
+    <div class="tag">l'hotel più colorato del browser: chiacchiera, balla, guadagna monete e rifatti il look</div>
+    <label class="lab" style="margin-top:4px">Il tuo nome</label>
+    <input class="field" id="nick" maxlength="14" placeholder="es. Pippo" />
+    <div class="preview"><canvas id="avprev" width="120" height="150"></canvas></div>
+    <label class="lab">Pelle</label>
+    <div class="swatches" id="skinSw"></div>
+    <label class="lab">Capelli</label>
+    <div class="swatches" id="hairSw"></div>
+    <label class="lab">Tuta (top)</label>
+    <div class="swatches" id="topSw"></div>
+    <button class="go" id="enterBtn">🚪 Entra al Miraggio</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+</body>
+</html>

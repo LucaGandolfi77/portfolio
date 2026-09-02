@@ -48,7 +48,8 @@ body{
 #engineChip{position:fixed;top:calc(var(--site-top-bar-height,36px) + env(safe-area-inset-top) + 8px);
   right:calc(env(safe-area-inset-right) + 12px);z-index:60;display:flex;align-items:center;gap:8px;
   background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:9px 14px;
-  font-size:.72rem;font-weight:700;color:var(--dim)}
+  font-size:.72rem;font-weight:700;color:var(--dim);max-width:min(72vw,360px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #engineChip .dot{width:9px;height:9px;border-radius:50%;background:#888}
 #engineChip.smart .dot{background:var(--gold);box-shadow:0 0 8px var(--gold)}
 #engineChip.neural .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
@@ -125,9 +126,16 @@ body{
 /* neural */
 .neural-box{display:flex;flex-direction:column;gap:9px}
 .nrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
-#modelUrl{flex:1;min-width:220px;min-height:42px;background:rgba(255,255,255,.05);
+#modelUrl,#modelSel{flex:1;min-width:220px;min-height:42px;background:rgba(255,255,255,.05);
   border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:9px 13px;
   font-family:'Inter';font-size:.76rem;user-select:text;-webkit-user-select:text}
+#modelSel{cursor:pointer;appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 19px) 55%,calc(100% - 14px) 55%;
+  background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+#modelSel:focus,#modelUrl:focus{outline:none;border-color:var(--acc)}
+#modelSel option{background:var(--panel);color:var(--txt)}
+#presetNoteTxt{font-size:.7rem;color:var(--dim);line-height:1.5;display:block}
 #neuralBar{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;flex:1;min-width:160px}
 #neuralFill{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .3s}
 #neuralStat{font-size:.7rem;color:var(--dim);min-width:130px}
@@ -209,8 +217,19 @@ body{
     </div>
     <div class="neural-box">
       <div class="nrow">
-        <input id="modelUrl" placeholder="Paste a public ONNX colorization model URL (.onnx)"
-          value="">
+        <select id="modelSel">
+          <option value="" disabled selected>Pick a colorization model…</option>
+          <option value="ddcolor">DDColor · 256px — balanced (~108 MB, recommended)</option>
+          <option value="ddcolor-tiny">DDColor Tiny · 512px — finest detail (~129 MB, slower)</option>
+          <option value="eccv16">ECCV16 (Zhang 2016) — classic (~123 MB)</option>
+          <option value="custom">Paste my own ONNX URL…</option>
+        </select>
+      </div>
+      <div class="nrow" id="customUrlRow" style="display:none">
+        <input id="modelUrl" placeholder="Public ONNX URL — grayscale 3-channel input (256×256), 2-channel Lab chroma output">
+      </div>
+      <div class="nrow" id="presetNote" style="display:none">
+        <span id="presetNoteTxt"></span>
       </div>
       <div class="nrow">
         <div id="neuralBar"><div id="neuralFill"></div></div>
@@ -223,7 +242,7 @@ body{
 
 <div id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js" defer></script>
 <script>
 (function(){
 'use strict';
@@ -373,7 +392,7 @@ function setImage(imgEl){
   try{
     grayData=wc.getImageData(0,0,grayW,grayH).data;
   }catch(e){grayData=null;return false;}
-  neuralBase=null;
+  neuralBase=null;neuralL=null;neuralLKey='';
   $('stageWrap').classList.add('on');
   $('adjCard').style.display='block';
   $('exportCard').style.display='block';
@@ -528,12 +547,37 @@ $('newPhotoBtn').addEventListener('click',function(){
   $('adjCard').style.display='none';
   $('exportCard').style.display='none';
   $('dropzone').style.display='block';
-  grayData=null;neuralBase=null;usingNeural=false;
+  grayData=null;neuralBase=null;usingNeural=false;neuralL=null;neuralLKey='';
 });applyPipeline();toast('Grading reset');
 });
 
 /* ============ NEURAL ENGINE ============ */
-var ortReady=false,ortLoading=false,session=null;
+var ortLoading=false,session=null;
+var neuralCfg={name:'Custom model',url:null,size:256,channels:3,boost:1.15};
+var neuralL=null,neuralLKey='';
+/* Curated public ONNX colorization models (Hugging Face, CORS-enabled).
+   Contract: grayscale input (L or gray-RGB, 0..1 / Lab L 0..100) -> 2-channel
+   Lab chroma output. channel0=a (green<->red), channel1=b (blue<->yellow). */
+var PRESETS={
+  ddcolor:{
+    name:'DDColor \u00b7 256px',short:'DDColor',
+    url:'https://huggingface.co/Faridzar/ddcolor-mirror/resolve/main/ddcolor-fp16.onnx',
+    size:256,channels:3,boost:1.15,mb:'\u2248108 MB',
+    hint:'Modern ICCV\u201923 photo colorizer \u2014 the best balance of natural color and speed. Downloads ~108 MB once, then runs fully on your device.'
+  },
+  'ddcolor-tiny':{
+    name:'DDColor Tiny \u00b7 512px',short:'DDColor Tiny',
+    url:'https://huggingface.co/edgetools/ddcolor/resolve/main/ddcolor-tiny-fp16.onnx',
+    size:512,channels:3,boost:1.15,mb:'\u2248129 MB',
+    hint:'Same DDColor with a bigger 512\u00d7512 input for the finest detail. Downloads ~129 MB and is noticeably slower \u2014 the first colorize can take a while.'
+  },
+  eccv16:{
+    name:'ECCV16 \u00b7 256px',short:'ECCV16',
+    url:'https://huggingface.co/Toolsbeaver/toolsbeaver-colorizer/resolve/main/colorizer-eccv16.onnx',
+    size:256,channels:1,boost:1.25,mb:'\u2248123 MB',
+    hint:'The classic Zhang et al. (ECCV 2016) research colorizer \u2014 natural but more muted colors. Downloads ~123 MB.'
+  }
+};
 function setEngine(mode,label){
   engineMode=mode;
   $('engineChip').className=mode;
@@ -554,30 +598,57 @@ function loadScriptOnce(src){
     document.head.appendChild(s);
   });
 }
+function syncPresetUI(){
+  var v=$('modelSel').value,isCustom=(v==='custom');
+  $('customUrlRow').style.display=isCustom?'flex':'none';
+  $('presetNote').style.display=(v&&!isCustom)?'block':'none';
+  if(v&&!isCustom&&PRESETS[v])$('presetNoteTxt').textContent=PRESETS[v].hint;
+}
+$('modelSel').addEventListener('change',syncPresetUI);
 async function loadNeuralModel(){
-  var url=$('modelUrl').value.trim();
-  if(!url){toast('Paste a model URL first');return;}
+  var v=$('modelSel').value,p=PRESETS[v];
+  var url=(p?p.url:$('modelUrl').value.trim())||'';
+  if(!url){
+    toast(v==='custom'?'Paste a public ONNX colorization model URL first':'Pick a model from the dropdown first');
+    return;
+  }
   if(ortLoading)return;
+  if(session&&!usingNeural&&neuralCfg.url===url){ // model already in memory
+    usingNeural=true;
+    setNProg(100,neuralCfg.name+' ready');
+    setEngine('neural','NEURAL READY \u00b7 '+(p?p.short:'Custom model'));
+    toast(neuralCfg.name+' active again');
+    applyPipeline();
+    return;
+  }
   ortLoading=true;
+  neuralCfg={
+    name:p?p.name:'Custom model',
+    url:url,
+    size:p?p.size:256,
+    channels:p?p.channels:3,
+    boost:(p&&typeof p.boost==='number')?p.boost:1.15
+  };
   setEngine('loading','LOADING MODEL\u2026');
   setNProg(4,'Loading runtime\u2026');
   var timeout=setTimeout(function(){
     failNeural('Timed out \u2014 Smart engine kept working.');
-  },45000);
+  },180000);
   try{
-    await loadScriptOnce('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js');
-    setNProg(18,'Runtime ready. Fetching model\u2026');
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
+    setNProg(14,'Runtime ready. Fetching '+neuralCfg.name+(p?(' ('+p.mb+')'):'')+'\u2026');
     if(!window.ort)throw new Error('ONNX runtime unavailable');
     var resp=await fetch(url);
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     var buf=await resp.arrayBuffer();
-    setNProg(70,'Model downloaded ('+Math.round(buf.size/1048576)+' MB). Compiling\u2026');
+    var mb=Math.round(buf.size/1048576);
+    setNProg(62,'Model downloaded ('+mb+' MB). Compiling\u2026');
     session=await window.ort.InferenceSession.create(buf,{executionProviders:['wasm']});
     clearTimeout(timeout);
-    setNProg(100,'Neural ready');
-    setEngine('neural','NEURAL READY');
+    setNProg(100,neuralCfg.name+' ready');
+    setEngine('neural','NEURAL READY \u00b7 '+(p?p.short:'Custom model'));
     usingNeural=true;
-    toast('Neural engine active \u2014 colorize again to use it');
+    toast(neuralCfg.name+' loaded \u2014 colorize again to use it');
     applyPipeline();
   }catch(err){
     clearTimeout(timeout);
@@ -594,49 +665,92 @@ $('loadNeuralBtn').addEventListener('click',function(){
   if(usingNeural){usingNeural=false;setEngine('smart','SMART ENGINE');applyPipeline();toast('Switched to Smart engine');return;}
   loadNeuralModel();
 });
-
+/* ---- neural decode helpers ---- */
+function grayToLabL(v){ // relative luminance 0..1 -> CIE Lab L* (0..100)
+  var lin=v>0.04045?Math.pow((v+0.055)/1.055,2.4):v/12.92;
+  if(lin<=0.008856)return 903.3*lin;
+  return 116*Math.cbrt(lin)-16;
+}
+function chromaToCanvas(plane,w,h){ // boosted ab (+128) drawn as grayscale for canvas resize
+  var c=document.createElement('canvas');c.width=w;c.height=h;
+  var g=c.getContext('2d');
+  var id=g.createImageData(w,h),d=id.data;
+  for(var i=0;i<w*h;i++){
+    var b=clamp(Math.round(plane[i]+128),0,255);
+    d[i*4]=b;d[i*4+1]=b;d[i*4+2]=b;d[i*4+3]=255;
+  }
+  g.putImageData(id,0,0);
+  return c;
+}
+function upscaleChroma(plane,w,h,tw,th){ // returns Float32Array(tw*th) of boosted ab
+  var src=chromaToCanvas(plane,w,h);
+  var c=document.createElement('canvas');c.width=tw;c.height=th;
+  var g=c.getContext('2d');
+  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  g.drawImage(src,0,0,tw,th);
+  var d=g.getImageData(0,0,tw,th).data;
+  var out=new Float32Array(tw*th);
+  for(var i=0;i<tw*th;i++)out[i]=d[i*4]-128;
+  return out;
+}
+function ensureNeuralL(){ // cache CIE Lab L* of every source pixel (full resolution)
+  var key=grayW+'x'+grayH;
+  if(neuralL&&neuralLKey===key)return neuralL;
+  neuralL=new Float32Array(grayW*grayH);
+  var gd=grayData;
+  for(var i=0;i<grayW*grayH;i++){
+    neuralL[i]=grayToLabL((gd[i*4]*0.299+gd[i*4+1]*0.587+gd[i*4+2]*0.114)/255);
+  }
+  neuralLKey=key;
+  return neuralL;
+}
 async function runNeural(){
-  var inputC=document.createElement('canvas');
-  inputC.width=256;inputC.height=256;
-  var ic=inputC.getContext('2d',{willReadFrequently:true});
-  ic.drawImage(workCanvas,0,0,256,256);
-  var d=ic.getImageData(0,0,256,256).data;
-  var R=new Float32Array(256*256),G=new Float32Array(256*256),B=new Float32Array(256*256);
-  for(var i=0;i<256*256;i++){
-    R[i]=d[i*4]/255;G[i]=d[i*4+1]/255;B[i]=d[i*4+2]/255;
+  var N=neuralCfg.size,ch=neuralCfg.channels;
+  var inC=document.createElement('canvas');
+  inC.width=N;inC.height=N;
+  var ic=inC.getContext('2d',{willReadFrequently:true});
+  ic.imageSmoothingEnabled=true;ic.imageSmoothingQuality='high';
+  ic.drawImage(workCanvas,0,0,N,N);
+  var d=ic.getImageData(0,0,N,N).data;
+  var plane=N*N;
+  var feeds={};
+  if(ch===1){
+    // 1-channel input: CIE Lab L* (0..100) of the grayscale image (ECCV16 style)
+    var Lin=new Float32Array(plane);
+    for(var i=0;i<plane;i++){
+      Lin[i]=grayToLabL((d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255);
+    }
+    feeds[session.inputNames[0]]=new window.ort.Tensor('float32',Lin,[1,1,N,N]);
+  }else{
+    // 3-channel input: grayscale RGB in 0..1 (DDColor style)
+    var g3=new Float32Array(3*plane);
+    for(var i=0;i<plane;i++){
+      var v=(d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255;
+      g3[i]=v;g3[plane+i]=v;g3[2*plane+i]=v;
+    }
+    feeds[session.inputNames[0]]=new window.ort.Tensor('float32',g3,[1,3,N,N]);
   }
-  var tensor=new window.ort.Tensor('float32',[].concat(R,G,B),[1,3,256,256]);
-  var feeds={};feeds[session.inputNames[0]]=tensor;
   var results=await session.run(feeds);
-  var key=session.outputNames[0];
-  var out=results[key];
-  var dims=out.dims;
-  var ab=out.data;
-  var chCount=dims[1]||2;
-  var plane=dims[2]*dims[3];
-  var aArr,chA,dummy;
-  if(chCount>=2){aArr=ab.subarray(0,plane);chA=ab.subarray(plane,plane*2);}
-  else{aArr=ab;chA=ab;}
-  var outC=document.createElement('canvas');
-  outC.width=256;outC.height=256;
-  var oc=outC.getContext('2d');
-  var od=oc.createImageData(256,256);
-  var Lc=document.createElement('canvas');Lc.width=256;Lc.height=256;
-  var lc=Lc.getContext('2d');lc.drawImage(workCanvas,0,0,256,256);
-  var ld=lc.getImageData(0,0,256,256).data;
-  for(var pi=0;pi<plane;pi++){
-    var L=(ld[pi*4]*0.299+ld[pi*4+1]*0.587+ld[pi*4+2]*0.114)/255;
-    var aa=chA[pi],bb=aArr[pi];
-    var rgb=labToRgb(L*100,aa*128,bb*128);
-    od.data[pi*4]=rgb[0];od.data[pi*4+1]=rgb[1];od.data[pi*4+2]=rgb[2];od.data[pi*4+3]=255;
+  var out=results[session.outputNames[0]];
+  var dims=out.dims,oN=dims[2]*dims[3],oC=dims[1]||2;
+  var od=out.data;
+  // chroma convention: channel 0 = a (green<->red), channel 1 = b (blue<->yellow)
+  var boost=neuralCfg.boost;
+  var aP=new Float32Array(oN),bP=new Float32Array(oN);
+  for(var i=0;i<oN;i++){
+    aP[i]=od[i]*boost;
+    bP[i]=(oC>1?od[oN+i]:0)*boost;
   }
-  oc.putImageData(od,0,0);
-  var full=document.createElement('canvas');
-  full.width=grayW;full.height=grayH;
-  var fc=full.getContext('2d');
-  fc.imageSmoothingEnabled=true;fc.imageSmoothingQuality='high';
-  fc.drawImage(outC,0,0,grayW,grayH);
-  return fc.getImageData(0,0,grayW,grayH).data;
+  // upscale smooth chroma to full size, keep full-resolution luminance
+  var aU=upscaleChroma(aP,dims[2],dims[3],grayW,grayH);
+  var bU=upscaleChroma(bP,dims[2],dims[3],grayW,grayH);
+  var nl=ensureNeuralL();
+  var base=new Uint8ClampedArray(grayW*grayH*4);
+  for(var i=0;i<grayW*grayH;i++){
+    var rgb=labToRgb(nl[i],aU[i],bU[i]);
+    base[i*4]=rgb[0];base[i*4+1]=rgb[1];base[i*4+2]=rgb[2];base[i*4+3]=255;
+  }
+  return base;
 }
 function labToRgb(L,A,B){
   var eps=216/24389,k=24389/27;
@@ -774,7 +888,7 @@ window.__colorizerDebug={
     grayW=Math.max(1,w|0);grayH=Math.max(1,h|0);
     workCanvas.width=grayW;workCanvas.height=grayH;
     grayData=new Uint8ClampedArray(data);
-    neuralBase=null;
+    neuralBase=null;neuralL=null;neuralLKey='';
     $('stageWrap').classList.add('on');
     $('adjCard').style.display='block';
     $('exportCard').style.display='block';

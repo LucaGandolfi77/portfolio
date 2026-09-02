@@ -1,192 +1,494 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Streaming — Luca Gandolfi</title>
-  <link href="../assets/css/main.css" rel="stylesheet">
-  <style>
-    body{font-family:Inter,system-ui,Segoe UI,Arial;background:#071023;color:#e6f7ff;padding:24px}
-    .wrap{max-width:1100px;margin:0 auto}
-    h1{margin:0 0 8px}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-    input[type=search],input[type=text]{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;flex:1}
-    button{background:#00d4ff;color:#002;border:none;padding:10px 12px;border-radius:8px;cursor:pointer}
-    .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
-    .item{background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;display:flex;gap:10px;align-items:flex-start}
-    .thumb{width:140px;height:80px;border-radius:6px;object-fit:cover;background:#0a2030}
-    .meta{flex:1}
-    .small{font-size:0.9rem;color:#9fcfff}
-    video{width:100%;max-height:520px;border-radius:8px;background:black}
-    iframe{width:100%;height:520px;border:0;border-radius:8px}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Cerca e riproduci video pubblici e archivi TV da Internet Archive. Streaming diretto dal browser, senza upload.">
+<title>Streaming — film &amp; archivi liberi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d16;--panel:rgba(15,19,32,.92);--line:rgba(140,180,255,.14);
+  --txt:#eef2ff;--dim:#93a3c4;--acc:#00e5ff;--acc2:#ff7ab8;--gold:#ffd166;--ok:#4de3c0;--bad:#ff6b7a;
+  color-scheme:dark;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg)}
+body{
+  background:
+    radial-gradient(90% 55% at 12% -6%, rgba(0,229,255,.09) 0%,transparent 55%),
+    radial-gradient(80% 50% at 95% 2%, rgba(255,122,184,.08) 0%, transparent 55%),
+    var(--bg);
+  color:var(--txt);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  min-height:100vh;min-height:100dvh;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  overflow-x:hidden;
+}
+#site-top-bar{top:env(safe-area-inset-top)}
+button{font-family:inherit;color:inherit;touch-action:manipulation}
+input{font-size:16px;user-select:text;-webkit-user-select:text}
+
+/* fixed header */
+.back-btn{
+  position:fixed;top:calc(env(safe-area-inset-top) + var(--site-top-bar-height,36px) + 8px);
+  left:calc(env(safe-area-inset-left) + 12px);z-index:60;
+  color:var(--dim);text-decoration:none;font-weight:600;font-size:.82rem;
+  padding:10px 14px;border-radius:12px;background:var(--panel);
+  border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  min-height:44px;display:inline-flex;align-items:center;
+}
+.back-btn:active{color:#fff;border-color:var(--acc)}
+.brand{position:fixed;top:calc(env(safe-area-inset-top) + var(--site-top-bar-height,36px) + 10px);
+  left:50%;transform:translateX(-50%);z-index:59;text-align:center;pointer-events:none;width:min(86vw,560px)}
+.brand h1{font-family:'Fredoka',sans-serif;font-weight:600;font-size:clamp(1rem,4vw,1.3rem);
+  background:linear-gradient(92deg,var(--acc),var(--acc2) 60%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.brand p{font-size:.6rem;color:var(--dim);letter-spacing:2.5px;text-transform:uppercase}
+
+.wrap{max-width:1100px;margin:0 auto;padding:calc(env(safe-area-inset-top) + var(--site-top-bar-height,36px) + 62px)
+  14px calc(env(safe-area-inset-bottom) + 24px);display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.card h2{font-size:.72rem;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);
+  font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card h2 .sub{color:var(--dim);opacity:.75;text-transform:none;letter-spacing:0;font-weight:500;font-size:.68rem}
+#playerCard{scroll-margin-top:calc(env(safe-area-inset-top) + var(--site-top-bar-height,36px) + 80px)}
+
+/* search */
+.search-row{display:flex;gap:8px}
+.search-row input{flex:1;min-width:0;min-height:50px;background:rgba(255,255,255,.05);border:1px solid var(--line);
+  border-radius:14px;color:var(--txt);padding:0 16px;outline:none;transition:border-color .15s;font-weight:600}
+.search-row input:focus{border-color:var(--acc)}
+.btn{min-height:50px;padding:0 20px;border:none;border-radius:14px;cursor:pointer;font-weight:800;
+  font-size:.92rem;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(140deg,var(--acc),#0090b8);color:#04222b}
+.btn.ghost{background:rgba(255,255,255,.06);color:var(--txt);border:1px solid var(--line)}
+.btn svg{width:18px;height:18px;flex:none}
+.btn.sq{width:50px;padding:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{min-height:40px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--dim);font-weight:700;font-size:.8rem;padding:8px 14px;cursor:pointer;transition:.15s}
+.chip:active{transform:scale(.96)}
+.chip[aria-pressed="true"]{background:linear-gradient(140deg,var(--acc),#00a8c8);color:#04222b;border-color:transparent}
+.hint{color:var(--dim);font-size:.72rem;line-height:1.5;margin-top:10px;opacity:.85}
+
+/* player */
+#playerCard{display:none}
+#playerCard.on{display:block}
+.player-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.player-title .t{font-weight:800;font-size:.95rem;flex:1;min-width:160px;line-height:1.35}
+.player-title .x{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);
+  background:rgba(255,255,255,.05);color:var(--dim);cursor:pointer;font-size:1rem}
+.player-title .x:active{transform:scale(.94)}
+.player-box{position:relative;margin-top:12px;border-radius:16px;overflow:hidden;background:#000;
+  border:1px solid var(--line)}
+.player-box video,.player-box iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+.ovplay{position:absolute;inset:0;margin:auto;width:74px;height:74px;border-radius:50%;border:none;
+  background:rgba(10,13,22,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.ovplay svg{width:30px;height:30px;margin-left:3px}
+.ovplay.hide{display:none}
+.player-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.player-actions .btn{min-height:44px;padding:0 14px;font-size:.8rem}
+
+/* results */
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px;margin-top:12px}
+.item{background:rgba(255,255,255,.03);border:1px solid rgba(140,180,255,.09);border-radius:16px;
+  overflow:hidden;display:flex;flex-direction:column;transition:transform .12s,border-color .15s}
+.item:active{transform:scale(.985)}
+.item:focus-within{border-color:var(--acc)}
+.thumb{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(0,229,255,.12),rgba(255,122,184,.08)),#0b1220;
+  display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.item .body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:7px;flex:1}
+.item .ti{font-weight:700;font-size:.88rem;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;min-height:2.4em}
+.item .su{color:var(--dim);font-size:.7rem;font-weight:600;letter-spacing:.3px}
+.item .ds{color:var(--dim);font-size:.74rem;line-height:1.45;opacity:.8;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.item .acts{display:flex;gap:7px;margin-top:auto;padding-top:6px}
+.item .acts .btn{min-height:42px;flex:1;padding:0 10px;font-size:.78rem}
+.item .acts .btn.ico{flex:none;width:42px;padding:0}
+.status{color:var(--dim);font-size:.82rem;padding:6px 2px;line-height:1.5}
+.status.err{color:var(--bad)}
+.status .btn{min-height:0;margin-left:8px;padding:6px 12px;font-size:.75rem;vertical-align:middle}
+
+/* skeleton */
+.sk .skline{height:12px;border-radius:6px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));
+  background-size:200% 100%;animation:shine 1.2s infinite}
+@keyframes shine{to{background-position:-200% 0}}
+.card-loading{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px;margin-top:12px}
+.card-loading .ph{height:150px;border-radius:16px}
+
+/* toast */
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(10px);
+  bottom:calc(env(safe-area-inset-bottom) + 18px);z-index:300;background:var(--panel);
+  border:1px solid var(--line);color:var(--txt);font-size:.83rem;font-weight:600;
+  padding:12px 20px;border-radius:14px;opacity:0;transition:.25s;pointer-events:none;max-width:88vw;
+  text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{color:var(--dim);font-size:.68rem;text-align:center;line-height:1.6;opacity:.8}
+
+@media(max-width:420px){.brand p{display:none}.btn{padding:0 16px}.btn span.txt{display:none}.btn.sq{display:inline-flex}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Streaming Video</h1>
-    <p class="small">Search public videos and TV archives (Internet Archive). You can also paste direct URLs (mp4/webm) or iframe embeds (YouTube) to play them.</p>
 
-    <div class="controls">
-      <input id="q" type="search" placeholder="Search (e.g. news, documentary, bbc, italy)" />
-      <button id="searchBtn">Search</button>
-      <button id="topBtn">Popular</button>
-      <input id="urlInput" type="text" placeholder="Incolla video URL diretto (mp4) o YouTube embed URL" style="max-width:520px" />
-      <button id="playUrlBtn">Play URL</button>
+<main class="wrap">
+
+  <!-- CERCA -->
+  <section class="card" aria-label="Cerca video">
+    <form class="search-row" id="searchForm">
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off"
+        placeholder="Cerca: documentari, news, scienza, italia…">
+      <button class="btn primary" id="searchBtn" type="submit" aria-label="Cerca">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <span class="txt">Cerca</span>
+      </button>
+    </form>
+    <div class="chips" id="catChips" role="group" aria-label="Categorie"></div>
+  </section>
+
+  <!-- URL DIRETTO -->
+  <section class="card" aria-label="Riproduci URL">
+    <form class="search-row" id="urlForm">
+      <input id="urlInput" type="text" inputmode="url" enterkeyhint="go" autocapitalize="none"
+        spellcheck="false" autocomplete="off"
+        placeholder="Incolla un URL diretto (mp4 / webm) oppure un link YouTube…">
+      <button class="btn primary" id="playUrlBtn" type="submit">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <span class="txt">Play</span>
+      </button>
+    </form>
+    <p class="hint">Streaming diretto da Internet Archive / YouTube: nessun video viene caricato qui.</p>
+  </section>
+
+  <!-- PLAYER -->
+  <section class="card" id="playerCard" aria-label="Riproduttore">
+    <div class="player-title">
+      <div class="t" id="nowTitle"></div>
+      <button class="x" id="closePlayer" aria-label="Chiudi riproduttore">✕</button>
     </div>
-
     <div id="playerArea"></div>
+    <div class="player-actions" id="playerActions"></div>
+  </section>
 
-    <h3 style="margin-top:18px">Results</h3>
-    <div id="results" class="results" aria-live="polite"></div>
-  </div>
+  <!-- RISULTATI -->
+  <section class="card" aria-label="Risultati">
+    <h2>Risultati <span class="sub" id="resCount"></span></h2>
+    <div id="results" aria-live="polite"></div>
+  </section>
 
-  <script>
-    const api = 'https://archive.org/advancedsearch.php';
-    const resultsEl = document.getElementById('results');
-    const qEl = document.getElementById('q');
-    const searchBtn = document.getElementById('searchBtn');
-    const topBtn = document.getElementById('topBtn');
-    const playerArea = document.getElementById('playerArea');
-    const urlInput = document.getElementById('urlInput');
-    const playUrlBtn = document.getElementById('playUrlBtn');
+  <footer>Contenuti pubblici da <b>Internet Archive</b> (public domain / licenze libere). La riproduzione avviene direttamente dal browser — nessun upload, nessuna registrazione. Collegamento alla rete richiesto.</footer>
 
-    function escapeHtml(t){ if(!t) return ''; return String(t).replace(/[&<>\"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+</main>
 
-    async function search(q){
-      resultsEl.innerHTML = '<div class="small">Loading…</div>';
-      const query = `((mediatype:(movies) OR mediatype:(audio_video)) AND (${q}))`;
-      const url = `${api}?q=${encodeURIComponent(query)}&fl[]=identifier,created,title,description,scanner,mediatype&rows=24&page=1&output=json`;
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+function esc(t){ if(t==null)return ''; return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(msg,ms){var el=$('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(function(){el.classList.remove('show');},ms||2200);}
+function fmtNum(n){ n=Number(n)||0;
+  if(n>=1e6)return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+  if(n>=1e3)return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k';
+  return String(n); }
+
+var API='https://archive.org/advancedsearch.php';
+var resultsEl=$('results'),resCount=$('resCount');
+var qEl=$('q'),urlInput=$('urlInput');
+var playerCard=$('playerCard'),playerArea=$('playerArea'),nowTitle=$('nowTitle');
+var activeCat='';
+
+/* ---------- categorie ---------- */
+var CATS=[
+  {label:'🔥 Popolari',q:''},
+  {label:'Documentari',q:'documentary'},
+  {label:'TV vintage',q:'vintage television'},
+  {label:'News storiche',q:'newsreel'},
+  {label:'Cartoni',q:'cartoons'},
+  {label:'Concerti',q:'concerts'},
+  {label:'Scienza',q:'science'},
+  {label:'Film muti',q:'silent films'},
+  {label:'Italia',q:'italy'}
+];
+(function(){
+  var box=$('catChips');
+  CATS.forEach(function(c,i){
+    var b=document.createElement('button');
+    b.type='button';b.className='chip';b.textContent=c.label;
+    b.setAttribute('aria-pressed',String(i===0));
+    b.addEventListener('click',function(){
+      activeCat=c.label;
+      Array.prototype.forEach.call(box.children,function(x){x.setAttribute('aria-pressed',String(x===b));});
+      if(c.q){qEl.value=c.q;search(c.q);}
+      else{topList();}
+    });
+    box.appendChild(b);
+  });
+})();
+
+/* ---------- stato risultati / skeleton ---------- */
+function skeleton(){
+  resultsEl.innerHTML='<div class="card-loading">'
+    +new Array(8).fill('<div class="ph"><div class="sk skline" style="height:150px;width:100%"></div></div>').join('')+'</div>';
+  resCount.textContent='';
+}
+function setStatus(msg,isErr){
+  resultsEl.innerHTML='';
+  var d=document.createElement('div');
+  d.className='status'+(isErr?' err':'');
+  d.textContent=msg;
+  resultsEl.appendChild(d);
+}
+function countLabel(n){return n?'('+n+')':'';}
+
+/* ---------- ricerca Internet Archive ---------- */
+function buildQuery(q){
+  // singole parole => ricerca AND su tutti i campi metadata
+  var terms=q.replace(/["'']/g,'').split(/\s+/).filter(Boolean)
+    .map(function(t){return '('+t+')';}).join(' AND ');
+  return '(mediatype:(movies)) AND '+terms;
+}
+async function search(q){
+  skeleton();
+  var ctrl=new AbortController();
+  var to=setTimeout(function(){ctrl.abort();},25000);
+  var url=API+'?q='+encodeURIComponent(buildQuery(q))+
+    '&fl[]=identifier,created,title,description,downloads,mediatype&rows=24&page=1&output=json';
+  try{
+    var r=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(to);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var j=await r.json();
+    var docs=(j&&j.response&&j.response.docs)||[];
+    resCount.textContent=countLabel(docs.length);
+    if(!docs.length){setStatus('Nessun risultato per "'+esc(q)+'". Prova con termini più generici.');return;}
+    renderResults(docs);
+  }catch(e){
+    clearTimeout(to);
+    setStatus('Errore di ricerca: '+(e.name==='AbortError'?'il server ha tardato a rispondere. Riprova.':esc(e.message||e)),true);
+  }
+}
+async function topList(){
+  skeleton();
+  var ctrl=new AbortController();
+  var to=setTimeout(function(){ctrl.abort();},25000);
+  var url=API+'?q='+encodeURIComponent('(mediatype:(movies))')+
+    '&sort[]=downloads+desc&fl[]=identifier,created,title,description,downloads,mediatype&rows=24&page=1&output=json';
+  try{
+    var r=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(to);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var j=await r.json();
+    var docs=(j&&j.response&&j.response.docs)||[];
+    resCount.textContent=countLabel(docs.length);
+    if(!docs.length){setStatus('Nessun elemento popolare trovato.');return;}
+    renderResults(docs);
+  }catch(e){
+    clearTimeout(to);
+    setStatus('Errore di caricamento: '+(e.name==='AbortError'?'il server ha tardato a rispondere. Riprova.':esc(e.message||e)),true);
+  }
+}
+
+/* ---------- griglia risultati ---------- */
+function renderResults(items){
+  resultsEl.innerHTML='';
+  if(!items.length){setStatus('Nessun risultato.');return;}
+  var wrap=document.createElement('div');wrap.className='res-grid';
+  items.forEach(function(it){
+    var id=it.identifier||'',title=it.title||id;
+    var date=(it.created||'').slice(0,10);
+    var dl=fmtNum(it.downloads);
+    var desc=it.description||'';
+
+    var card=document.createElement('div');card.className='item';
+    card.setAttribute('role','listitem');
+
+    var th=document.createElement('div');th.className='thumb';
+    var img=document.createElement('img');
+    img.alt='';img.loading='lazy';img.decoding='async';
+    img.src='https://archive.org/services/img/'+encodeURIComponent(id);
+    img.addEventListener('error',function(){img.remove();});
+    th.appendChild(img);
+    var ph=document.createElement('span');ph.textContent='🎬';th.appendChild(ph);
+    card.appendChild(th);
+
+    var body=document.createElement('div');body.className='body';
+    body.innerHTML='<div class="ti">'+esc(title)+'</div>'
+      +'<div class="su">'+esc(date)+(dl?' · '+dl+' scaricamenti':'')+'</div>'
+      +'<div class="ds">'+esc(desc.length>240?desc.slice(0,240)+'…':desc)+'</div>';
+    var acts=document.createElement('div');acts.className='acts';
+    var pb=document.createElement('button');pb.className='btn primary';pb.type='button';
+    pb.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M8 5v14l11-7z"/></svg><span>Play</span>';
+    pb.addEventListener('click',function(){playArchive(id,title);});
+    var ob=document.createElement('button');ob.className='btn ico';ob.type='button';ob.title='Apri su Archive.org';
+    ob.setAttribute('aria-label','Apri su Archive.org');
+    ob.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+    ob.addEventListener('click',function(){window.open('https://archive.org/details/'+encodeURIComponent(id),'_blank');});
+    acts.appendChild(pb);acts.appendChild(ob);
+    body.appendChild(acts);
+    card.appendChild(body);
+    wrap.appendChild(card);
+  });
+  resultsEl.appendChild(wrap);
+}
+
+/* ---------- player ---------- */
+function openPlayer(){
+  playerCard.classList.add('on');
+  if(typeof playerCard.scrollIntoView==='function'){
+    try{playerCard.scrollIntoView({behavior:'smooth',block:'start'});}
+    catch(e){try{playerCard.scrollIntoView();}catch(e2){}}
+  }
+}
+function setPlayerMsg(msg,isErr){
+  playerArea.innerHTML='<div class="status'+(isErr?' err':'')+'">'+esc(msg)+'</div>';
+}
+function buildVideo(src,poster,onLoaded){
+  playerArea.innerHTML='<div class="player-box">'
+    +'<video id="videoPlayer" controls playsinline preload="metadata" crossorigin="anonymous"'
+    +(poster?' poster="'+esc(poster)+'"':'')+'></video>'
+    +'<button class="ovplay" id="ovPlay" aria-label="Riproduci">'
+    +'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button></div>';
+  var v=$('videoPlayer');
+  v.src=src;
+  var ov=$('ovPlay');
+  var tryPlay=function(){
+    var p=v.play();
+    if(p&&p.catch)p.catch(function(){});
+  };
+  v.addEventListener('playing',function(){ov.classList.add('hide');});
+  v.addEventListener('pause',function(){if(!v.ended)ov.classList.remove('hide');});
+  v.addEventListener('ended',function(){ov.classList.remove('hide');});
+  v.addEventListener('error',function(){
+    ov.classList.add('hide');
+    setPlayerMsg('Questo file non è riproducibile nel browser. Apri su Archive.org dal pulsante qui sotto.',true);
+  });
+  ov.addEventListener('click',function(){tryPlay();});
+  if(onLoaded)v.addEventListener('loadedmetadata',onLoaded);
+  // tenta autoplay (funziona se ancora dentro il gesto utente)
+  tryPlay();
+  return v;
+}
+function setActions(html){$('playerActions').innerHTML=html;}
+
+async function playArchive(id,title){
+  openPlayer();
+  nowTitle.textContent=title||id;
+  setActions('');
+  playerArea.innerHTML='<div class="status">Caricamento del contenuto da Internet Archive…</div>';
+  try{
+    var r=await fetch('https://archive.org/metadata/'+encodeURIComponent(id));
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var j=await r.json();
+    var files=j.files||[];
+    var vids=files.filter(function(f){
+      if(!f||!f.name)return false;
+      var nm=f.name.toLowerCase();
+      if(/thumbnail|_thumb|poster/i.test(nm))return false;
+      var ext=(nm.split('.').pop());
+      return ['mp4','m4v','webm','ogv','ogg','mov'].indexOf(ext)>=0;
+    });
+    // preferisci il file più leggero sotto i 200 MB (streaming più rapido)
+    vids.sort(function(a,b){return ((a.size||0)-(b.size||0));});
+    var pick=vids.find(function(f){return (f.size||0)<200*1048576;})||vids[0];
+    if(!pick){ // fallback: formato video dichiarato
+      var alt=files.find(function(f){return f.name&&/video|mp4|webm|ogg/i.test(f.format||'');});
+      if(!alt)throw new Error('none');
+      pick=alt;
+    }
+    var file=pick.name;
+    var src='https://archive.org/download/'+encodeURIComponent(id)+'/'+file.split('/').map(encodeURIComponent).join('/');
+    buildVideo(src,'https://archive.org/services/img/'+encodeURIComponent(id));
+    setActions(
+      '<a class="btn ghost" href="https://archive.org/details/'+encodeURIComponent(id)+'" target="_blank" rel="noopener">Scheda su Archive.org ↗</a>'
+      +'<a class="btn ghost" href="https://archive.org/download/'+encodeURIComponent(id)+'/'+file.split('/').map(encodeURIComponent).join('/')+'" target="_blank" rel="noopener">File sorgente ↓</a>'
+    );
+    if('mediaSession' in navigator){
       try{
-        const r = await fetch(url);
-        if (!r.ok) {
-          resultsEl.innerHTML = `<div class="small">Error searching: ${r.status} ${r.statusText}</div>`;
-          console.error('Search fetch failed', r.status, r.statusText);
-          return;
-        }
-        let j;
-        try {
-          j = await r.json();
-        } catch (parseErr) {
-          resultsEl.innerHTML = `<div class="small">Error parsing search response: ${escapeHtml(parseErr.message||String(parseErr))}</div>`;
-          console.error('JSON parse error', parseErr);
-          return;
-        }
-        const docs = (j && j.response && j.response.docs) ? j.response.docs : [];
-        if (!docs.length) {
-          resultsEl.innerHTML = `<div class="small">No results for "${escapeHtml(q)}". Try a broader query or check spelling.</div>`;
-          return;
-        }
-        renderResults(docs);
-      }catch(e){
-        resultsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`;
-        console.error(e);
-      }
+        navigator.mediaSession.metadata=new MediaMetadata({
+          title:(j.metadata&&(j.metadata.title||j.metadata.identifier))||id,
+          artist:(j.metadata&&j.metadata.creator)||'Internet Archive'
+        });
+      }catch(e){}
     }
+  }catch(e){
+    nowTitle.textContent='';
+    setActions('');
+    setPlayerMsg('Impossibile trovare un video riproducibile per questo elemento. Aprilo su Archive.org dalla scheda.',true);
+  }
+}
 
-    async function top(){
-      resultsEl.innerHTML = '<div class="small">Loading popular…</div>';
-      const url = `${api}?q=mediatype:(movies)&sort[]=downloads+desc&fl[]=identifier,created,title,description,mediatype&rows=24&page=1&output=json`;
-      try{
-        const r = await fetch(url);
-        if (!r.ok) {
-          resultsEl.innerHTML = `<div class="small">Error loading popular: ${r.status} ${r.statusText}</div>`;
-          console.error('Top fetch failed', r.status, r.statusText);
-          return;
-        }
-        let j;
-        try { j = await r.json(); } catch (parseErr) {
-          resultsEl.innerHTML = `<div class="small">Error parsing popular response: ${escapeHtml(parseErr.message||String(parseErr))}</div>`;
-          console.error('JSON parse error', parseErr);
-          return;
-        }
-        const docs = (j && j.response && j.response.docs) ? j.response.docs : [];
-        if (!docs.length) {
-          resultsEl.innerHTML = '<div class="small">No popular items found.</div>';
-          return;
-        }
-        renderResults(docs);
-      }catch(e){
-        resultsEl.innerHTML = `<div class="small">Network or server error: ${escapeHtml(e.message||String(e))}</div>`;
-        console.error(e);
-      }
-    }
+/* ---------- URL personalizzati ---------- */
+function ytIdOf(u){
+  var m;
+  m=u.match(/[?&]v=([\w-]{6,})/); if(m)return m[1];
+  m=u.match(/youtu\.be\/([\w-]{6,})/); if(m)return m[1];
+  m=u.match(/youtube\.com\/(?:shorts|embed|live)\/([\w-]{6,})/); if(m)return m[1];
+  return null;
+}
+function isYt(u){return /youtube\.com|youtu\.be/i.test(u);}
+function playCustomUrl(u){
+  var low=u.toLowerCase();
+  if(isYt(u)){
+    var id=ytIdOf(u);
+    if(!id){toast('URL YouTube non riconosciuto');return;}
+    openPlayer();
+    nowTitle.textContent='YouTube · '+id;
+    setActions('');
+    playerArea.innerHTML='<div class="player-box">'
+      +'<iframe id="ytFrame" src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)
+      +'?rel=0&playsinline=1" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+    setActions('<a class="btn ghost" href="https://www.youtube.com/watch?v='+encodeURIComponent(id)+'" target="_blank" rel="noopener">Apri su YouTube ↗</a>');
+    return;
+  }
+  if(/\.(mp4|m4v|webm|ogv|ogg|mov)(\?|#|$)/i.test(low)){
+    openPlayer();
+    nowTitle.textContent=u.replace(/^https?:\/\//,'').split('/')[0];
+    setActions('');
+    buildVideo(u,'');
+    return;
+  }
+  toast('Incolla un URL diretto (mp4, webm, ogv…) o un link YouTube');
+}
 
-    function renderResults(items){
-      resultsEl.innerHTML = '';
-      if(!items.length){ resultsEl.innerHTML = '<div class="small">No results found.</div>'; return; }
-      items.forEach(it=>{
-        const div = document.createElement('div'); div.className='item';
-        const thumb = document.createElement('img'); thumb.className='thumb'; thumb.alt='thumb';
-        // Use archive thumbnail if available
-        thumb.src = `https://archive.org/services/img/${it.identifier}`;
-        thumb.onerror = ()=>{ thumb.src = './assets/favicon.svg'; }
-        const meta = document.createElement('div'); meta.className='meta';
-        meta.innerHTML = `<div style="font-weight:700">${escapeHtml(it.title||it.identifier)}</div><div class="small">${escapeHtml(it.created||'')} · ${escapeHtml(it.mediatype||'')}</div><div style="margin-top:6px;color:#a0c0e0">${escapeHtml((it.description||'').substring(0,200))}...</div>`;
-        const btnBox = document.createElement('div'); btnBox.style.display='flex'; btnBox.style.flexDirection='column'; btnBox.style.gap='8px';
-        const playBtn = document.createElement('button'); playBtn.textContent='Play';
-        playBtn.onclick = ()=> playArchiveItem(it.identifier);
-        const infoBtn = document.createElement('button'); infoBtn.textContent='Apri su Archive'; infoBtn.onclick = ()=> window.open('https://archive.org/details/'+it.identifier, '_blank');
-        btnBox.appendChild(playBtn); btnBox.appendChild(infoBtn);
-        div.appendChild(thumb); div.appendChild(meta); div.appendChild(btnBox);
-        resultsEl.appendChild(div);
-      });
-    }
+/* ---------- eventi ---------- */
+$('searchForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var q=qEl.value.trim();
+  if(!q)return;
+  activeCat='';
+  Array.prototype.forEach.call($('catChips').children,function(x){x.setAttribute('aria-pressed','false');});
+  search(q);
+});
+$('urlForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var u=urlInput.value.trim();
+  if(!u){toast('Incolla prima un URL');return;}
+  playCustomUrl(u);
+});
+$('closePlayer').addEventListener('click',function(){
+  playerCard.classList.remove('on');
+  playerArea.innerHTML='';nowTitle.textContent='';setActions('');
+  try{if('mediaSession' in navigator)navigator.mediaSession.metadata=null;}catch(e){}
+});
 
-    async function playArchiveItem(id){
-      playerArea.innerHTML = '<div class="small">Loading metadata…</div>';
-      try{
-        const r = await fetch(`https://archive.org/metadata/${id}`);
-        const j = await r.json();
-        const files = j.files || [];
-        // Prefer mp4, webm, ogv
-        const prefer = ['mp4','webm','ogg','ogv'];
-        let fileEntry = files.find(f=> prefer.includes((f.name||'').split('.').pop().toLowerCase()));
-        if(!fileEntry){ // try first file with a name
-          fileEntry = files.find(f=> f.name && f.size && f.format && /video|mp4|webm|ogg/i.test(f.format));
-        }
-        if(!fileEntry){ playerArea.innerHTML = '<div class="small">Nessun file video disponibile per questo item.</div>'; return; }
-        const fileName = fileEntry.name;
-        const src = `https://archive.org/download/${id}/${encodeURIComponent(fileName)}`;
-        // create video element
-        playerArea.innerHTML = `<video id="videoPlayer" controls crossorigin="anonymous" playsinline></video>`;
-        const v = document.getElementById('videoPlayer');
-        v.src = src;
-        v.play().catch(e=>console.warn('Autoplay prevented',e));
-        // Media session
-        if('mediaSession' in navigator){
-          navigator.mediaSession.metadata = new MediaMetadata({ title: j.metadata && (j.metadata.title||id) || id, artist: j.metadata && j.metadata.creator || 'Internet Archive' });
-        }
-      }catch(e){ playerArea.innerHTML = '<div class="small">Error loading item.</div>'; console.error(e); }
-    }
-
-    function isYouTubeUrl(u){ return /youtube\.com|youtu\.be/.test(u); }
-
-    function playCustomUrl(u){
-      // If YouTube embed URL, insert iframe
-      if(isYouTubeUrl(u)){
-        // transform to embed if needed
-        let embed = u;
-        if(/watch\?v=/.test(u)){
-          const id = new URLSearchParams(new URL(u).search).get('v'); embed = `https://www.youtube.com/embed/${id}`;
-        } else if(/youtu\.be\//.test(u)){
-          const id = u.split('/').pop(); embed = `https://www.youtube.com/embed/${id}`;
-        }
-        playerArea.innerHTML = `<iframe src="${embed}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
-        return;
-      }
-      // otherwise try to treat as direct video URL
-      playerArea.innerHTML = `<video id="videoPlayer" controls crossorigin="anonymous" playsinline src="${u}"></video>`;
-      const v = document.getElementById('videoPlayer');
-      v.play().catch(e=>console.warn('Autoplay prevented',e));
-    }
-
-    searchBtn.onclick = ()=>{ const q = qEl.value.trim(); if(q) search(q); }
-    topBtn.onclick = ()=> top();
-    playUrlBtn.onclick = ()=>{ const u = urlInput.value.trim(); if(!u) return alert('Inserisci un URL'); playCustomUrl(u); }
-
-    // Autoload popular on open
-    top();
-  </script>
-</body>
+/* ---------- avvio ---------- */
+topList();
+})();
+</script>
 <script src="top_buttons.js"></script>
+</body>
 </html>

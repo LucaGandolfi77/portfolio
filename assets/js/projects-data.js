@@ -85,17 +85,17 @@ const PROJECTS_DATA = [
   },
   {
     "id": "sankey-generator",
-    "title": "Sankey Generator",
-    "description": "Generatore interattivo di diagrammi Sankey. Inserisci valori, genera e scarica in JPEG o SVG.",
+    "title": "Sankey — diagrammi di flusso",
+    "description": "Generatore interattivo di diagrammi Sankey dal vivo: esempi pronti (energia, budget, app), layout con slider (spessore, distanza, altezza, allineamento), palette moderne o personalizzate, focus al tocco su un nodo, tooltip, valori su nodi e flussi, export PNG/JPEG/SVG. Ottimizzato per iPhone.",
     "href": "projects/sankey.html",
-    "emoji": "📊",
+    "emoji": "🌊",
     "badge": "Visual / Data",
     "badgeColor": "#00d4ff"
   },
   {
     "id": "rsa-keygen",
-    "title": "RSA Keygen",
-    "description": "Generate RSA public/private keys in-browser using BigInt. Demo encrypt/decrypt and coprime selection.",
+    "title": "Laboratorio Crittografico",
+    "description": "RSA passo-passo con visualizzazione del flusso (p, q, n, φ, e, d, cifra e decifra con numeri veri), generazione chiavi BigInt, firma/verifica SHA-256, AES-256-GCM con PBKDF2, cifrari classici (Cesare, Vigenère, XOR) e hash/HMAC (SHA-1…SHA-512). Solo educativo, in-browser, ottimizzato per iPhone.",
     "href": "projects/RSA.html",
     "emoji": "🔐",
     "badge": "Crypto",
@@ -176,7 +176,7 @@ const PROJECTS_DATA = [
   {
     "id": "longest-midi",
     "title": "Longest MIDI",
-    "description": "Carica un file .mid/.midi, calcola la durata in secondi e logga tutte le note.",
+    "description": "Analizza file .mid/.midi: durata esatta, statistiche, partitura e piano roll con riproduzione audio.",
     "href": "projects/longest_midi.html",
     "emoji": "🎵",
     "badge": "Audio / Tool",
@@ -355,8 +355,8 @@ const PROJECTS_DATA = [
   },
   {
     "id": "lyrics-search",
-    "title": "Lyrics Search",
-    "description": "Find song by lyrics text.",
+    "title": "Reverse Lyrics Finder",
+    "description": "Incolla una frase di una canzone e trova il brano: anteprime audio 30s (iTunes), testo completo con la frase evidenziata (Lyrics.ovh), link Genius/Apple Music, copy & share. PWA-friendly, iPhone + desktop.",
     "href": "projects/lyrics_finder.html",
     "emoji": "🎵",
     "badge": "Tool",

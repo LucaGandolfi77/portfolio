@@ -924,6 +924,72 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
+// Floating Testimonial Rotator
+class TestimonialRotator {
+    constructor(containerSelector, options = {}) {
+        this.container = document.querySelector(containerSelector);
+        if (!this.container) return;
+        this.cards = this.container.querySelectorAll('.testimonial-float-card');
+        if (!this.cards.length) return;
+        this.currentIndex = 0;
+        this.displayTime = options.displayTime || 4000;
+        this.exitTime = options.exitTime || 700;
+        this.enterTime = options.enterTime || 800;
+        this.isRunning = false;
+        this.timer = null;
+        this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    start() {
+        if (this.isRunning || !this.cards.length) return;
+        this.isRunning = true;
+        this.showCard(this.currentIndex);
+    }
+
+    stop() {
+        this.isRunning = false;
+        clearTimeout(this.timer);
+        this.cards.forEach(c => {
+            c.classList.remove('float-entering', 'float-idle', 'float-exiting', 'float-exiting-left');
+            c.style.display = 'none';
+        });
+    }
+
+    showCard(index) {
+        if (!this.isRunning) return;
+        this.cards.forEach(c => {
+            c.classList.remove('float-entering', 'float-idle', 'float-exiting', 'float-exiting-left');
+            c.style.display = 'none';
+        });
+        const card = this.cards[index];
+        card.style.display = 'block';
+        card.classList.add('float-entering');
+
+        const enterDur = this.reducedMotion ? 300 : this.enterTime;
+        this.timer = setTimeout(() => {
+            card.classList.remove('float-entering');
+            card.classList.add('float-idle');
+            this.timer = setTimeout(() => this.swishNext(), this.displayTime);
+        }, enterDur);
+    }
+
+    swishNext() {
+        if (!this.isRunning) return;
+        const card = this.cards[this.currentIndex];
+        card.classList.remove('float-idle');
+        const dir = this.currentIndex % 2 === 0 ? 'float-exiting' : 'float-exiting-left';
+        card.classList.add(dir);
+
+        this.currentIndex = (this.currentIndex + 1) % this.cards.length;
+
+        this.timer = setTimeout(() => {
+            card.classList.remove(dir);
+            card.style.display = 'none';
+            this.showCard(this.currentIndex);
+        }, this.exitTime);
+    }
+}
+
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     createParticles();
@@ -931,11 +997,18 @@ document.addEventListener('DOMContentLoaded', () => {
     handleScroll(); // Also run handleScroll
     createPoems();
 
+    // Start floating testimonial rotator
+    const testimonialRotator = new TestimonialRotator('.testimonial-float-container', {
+        displayTime: 4500,
+        exitTime: 700
+    });
+    testimonialRotator.start();
+
     // Auto collapse large sections after a short delay to allow rendering
     setTimeout(() => {
         if (typeof autoCollapse === 'function') {
             // autoCollapse('.projects-grid', 600); // Removed to avoid duplicate button since it has a static one
-            autoCollapse('.testimonials-container', 400);
+            // Testimonials now use floating rotator, no auto-collapse needed
         }
     }, 200);
 

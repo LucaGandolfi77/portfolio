@@ -1,676 +1,1405 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Longest MIDI — length analyzer</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
-    textarea{width:100%;height:260px}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.min.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<title>Longest MIDI — Analizzatore di durata e riproduttore</title>
+<style>
+  :root{
+    --bg:#070d18;
+    --card:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+    --border:rgba(255,255,255,.09);
+    --border2:rgba(255,255,255,.16);
+    --txt:#e7eef9;
+    --muted:#93a7c2;
+    --acc:#22d3ee;
+    --acc2:#60a5fa;
+    --pink:#ff5d9e;
+    --amber:#ffd166;
+    --green:#4ade80;
+    --mono:ui-monospace,'SF Mono','Cascadia Code',Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1100px 520px at 85% -12%,rgba(34,211,238,.12),transparent 60%),
+      radial-gradient(900px 480px at -10% 30%,rgba(96,165,250,.08),transparent 55%),
+      var(--bg);
+    color:var(--txt);
+    font-family:system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    padding:20px 14px 48px;
+    line-height:1.45;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+
+  /* ---------- hero ---------- */
+  .hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .hero-icon{
+    width:64px;height:64px;border-radius:18px;flex:none;display:grid;place-items:center;font-size:32px;
+    background:linear-gradient(135deg,rgba(34,211,238,.25),rgba(96,165,250,.18));
+    border:1px solid rgba(34,211,238,.4);box-shadow:0 6px 24px rgba(34,211,238,.15), inset 0 1px 0 rgba(255,255,255,.15);
+  }
+  .hero h1{margin:0;font-size:1.55rem;letter-spacing:.2px}
+  .hero .sub{margin:4px 0 0;color:var(--muted);font-size:.92rem;max-width:640px}
+  .file-chip{
+    margin-left:auto;display:flex;align-items:center;gap:8px;max-width:340px;
+    background:rgba(34,211,238,.09);border:1px solid rgba(34,211,238,.35);color:#aef1fb;
+    padding:8px 14px;border-radius:999px;font-size:.85rem;
+  }
+  .file-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none;box-shadow:0 0 8px var(--green)}
+  .file-chip .fname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+    padding:16px;
+  }
+  section{display:block}
+  .hidden{display:none!important}
+
+  /* ---------- drop zone ---------- */
+  .drop-zone{
+    position:relative;text-align:center;padding:34px 20px;cursor:pointer;
+    border:2px dashed rgba(148,163,184,.28);border-radius:20px;margin-bottom:18px;
+    transition:border-color .18s, background .18s, transform .12s;
+    background:rgba(255,255,255,.02);
+  }
+  .drop-zone:hover,.drop-zone:focus-visible{border-color:rgba(34,211,238,.6);background:rgba(34,211,238,.05);outline:none}
+  .drop-zone.drag{border-color:var(--acc);background:rgba(34,211,238,.10);transform:scale(1.005)}
+  .drop-zone.error{border-color:var(--pink);background:rgba(255,93,158,.06)}
+  .dz-icon{font-size:40px;line-height:1}
+  .dz-title{margin:10px 0 2px;font-weight:700;font-size:1.1rem}
+  .dz-sub{margin:0 0 14px;color:var(--muted);font-size:.9rem}
+  .dz-sub .link{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+  .dz-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+  .btn{
+    appearance:none;border:none;cursor:pointer;font:inherit;font-weight:700;
+    border-radius:12px;padding:10px 18px;color:#05131f;
+    background:linear-gradient(135deg,#0ea5e9,#22d3ee);
+    box-shadow:0 4px 14px rgba(34,211,238,.25);transition:filter .15s, transform .1s;
+  }
+  .btn:hover{filter:brightness(1.12)}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+  .btn.ghost{
+    background:rgba(255,255,255,.07);color:var(--txt);border:1px solid var(--border2);
+    box-shadow:none;
+  }
+  .btn.ghost:hover{background:rgba(255,255,255,.12)}
+  .btn.sm{padding:7px 13px;font-size:.85rem;border-radius:10px}
+  .btn-link{background:none;border:none;color:var(--acc);cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:3px;padding:2px}
+
+  /* ---------- stats ---------- */
+  .sec-head{display:flex;align-items:center;gap:12px;margin:20px 0 12px;flex-wrap:wrap}
+  .sec-head h2{margin:0;font-size:1.15rem}
+  .sec-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px}
+  .stat{display:flex;gap:12px;align-items:center;padding:14px 16px}
+  .stat .ico{font-size:22px;opacity:.95}
+  .stat .label{font-size:.74rem;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+  .stat .value{font-size:1.3rem;font-weight:800;font-family:var(--mono);letter-spacing:-.3px;line-height:1.2;word-break:break-word}
+  .stat .value small{font-size:.75rem;color:var(--muted);font-weight:500}
+  .stat .sub{font-size:.74rem;color:var(--muted)}
+
+  /* ---------- detail cards ---------- */
+  .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:760px){.dgrid{grid-template-columns:1fr}}
+  .card h3{margin:0 0 10px;font-size:.9rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .tempo-chips{display:flex;gap:8px;flex-wrap:wrap;max-height:150px;overflow:auto;padding:2px}
+  .chip{
+    font-family:var(--mono);font-size:.8rem;padding:5px 10px;border-radius:999px;white-space:nowrap;
+    background:rgba(255,255,255,.06);border:1px solid var(--border2);color:#cfe3f7;
+  }
+  .chip b{color:var(--acc)}
+  .ch-list{display:flex;flex-direction:column;gap:6px;max-height:170px;overflow:auto;padding-right:4px}
+  .ch-row{display:flex;align-items:center;gap:10px;font-size:.88rem}
+  .ch-row .pall{width:12px;height:12px;border-radius:4px;flex:none}
+  .ch-row .ch-n{font-family:var(--mono);color:#cfe3f7}
+  .ch-row .bar{flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+  .ch-row .bar i{display:block;height:100%;border-radius:4px;background:var(--acc);opacity:.85}
+  .ch-row .cnt{font-family:var(--mono);font-size:.78rem;color:var(--muted);min-width:84px;text-align:right}
+  .topnote{display:flex;align-items:center;gap:8px;font-size:.88rem;margin-bottom:6px}
+  .topnote .nm{font-family:var(--mono);width:46px;color:#cfe3f7}
+  .topnote .bar{flex:1;height:9px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+  .topnote .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#0ea5e9,#22d3ee)}
+  .topnote .cnt{font-family:var(--mono);font-size:.78rem;color:var(--muted);min-width:44px;text-align:right}
+  .empty-note{color:var(--muted);font-size:.88rem;font-style:italic}
+
+  /* ---------- player ---------- */
+  .player{padding:16px 18px;margin-top:18px}
+  .player-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .round-btn{
+    width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;flex:none;
+    display:grid;place-items:center;color:#05131f;
+    background:linear-gradient(135deg,#0ea5e9,#22d3ee);
+    box-shadow:0 6px 18px rgba(34,211,238,.3);transition:filter .15s,transform .1s;
+  }
+  .round-btn svg{width:22px;height:22px;fill:currentColor}
+  .round-btn:hover{filter:brightness(1.1)}
+  .round-btn:active{transform:scale(.96)}
+  .round-btn.stop{background:rgba(255,255,255,.1);color:#ffd9e8;box-shadow:none;width:44px;height:44px}
+  .round-btn.stop:hover{background:rgba(255,255,255,.18)}
+  .timebox{font-family:var(--mono);font-size:1.25rem;font-weight:700;letter-spacing:.5px;min-width:178px;color:#dff6fd}
+  .timebox .tot{color:var(--muted);font-size:.95rem;font-weight:500}
+  .pmeta{font-size:.82rem;color:var(--muted)}
+  .pmeta b{color:#cfe3f7;font-family:var(--mono)}
+  .player-opts{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .opt{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+  .opt select{
+    background:#0b1426;color:var(--txt);border:1px solid var(--border2);border-radius:8px;
+    padding:6px 8px;font:inherit;font-family:var(--mono);font-size:.85rem;
+  }
+  .opt input[type=range]{width:110px;accent-color:var(--acc)}
+  .seek-row{display:flex;align-items:center;gap:12px;margin-top:14px}
+  .seek-row input[type=range]{flex:1;accent-color:var(--acc);height:26px}
+  .seek-row .tm{font-family:var(--mono);font-size:.8rem;color:var(--muted);min-width:58px;text-align:center}
+
+  /* ---------- tabs / viz ---------- */
+  .tabs{display:flex;gap:6px;margin:18px 0 12px;flex-wrap:wrap}
+  .tab{
+    appearance:none;border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--muted);
+    font:inherit;font-weight:700;font-size:.9rem;padding:9px 16px;border-radius:999px;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .tab:hover{color:var(--txt)}
+  .tab.on{background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#05131f;border-color:transparent}
+  .viz-card{padding:12px}
+  .viz-wrap{position:relative;overflow:auto;border-radius:12px;max-height:520px}
+  .viz-wrap.roll{max-height:none;overflow:hidden;background:#0a1322;border:1px solid var(--border2)}
+  .viz-wrap.sheet{background:#fdf9f0;border:1px solid var(--border2)}
+  .canvas-holder{position:relative;line-height:0}
+  #rollOverlay{position:absolute;inset:0;cursor:pointer;width:100%;height:100%}
+  .sheet-hint{font-size:.82rem;color:var(--muted);margin:0 0 8px}
+  textarea#log{
+    width:100%;min-height:280px;background:#0a1120;color:#c6e2d9;border:1px solid var(--border2);
+    border-radius:12px;padding:12px;font-family:var(--mono);font-size:.82rem;line-height:1.5;resize:vertical;
+  }
+  .viz-empty{color:var(--muted);padding:40px 10px;text-align:center}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;bottom:20px;right:20px;z-index:12000;max-width:340px;
+    background:#0d1b30;border:1px solid rgba(34,211,238,.4);color:#dff6fd;border-radius:12px;
+    padding:12px 16px;font-size:.9rem;box-shadow:0 10px 30px rgba(0,0,0,.5);
+    opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .25s,transform .25s;
+  }
+  #toast.show{opacity:1;transform:none}
+  #toast.err{border-color:rgba(255,93,158,.55);color:#ffe3ee}
+
+  footer{margin-top:26px;color:#5d7188;font-size:.8rem;text-align:center}
+  kbd{background:rgba(255,255,255,.08);border:1px solid var(--border2);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-family:var(--mono);font-size:.75em}
+</style>
 </head>
 <body>
-  <h1>Longest MIDI — length analyzer</h1>
-  <div class="controls">
-    <input id="file" type="file" accept=".mid,.midi" />
-    <button id="loadExample">Carica esempio</button>
-    <button id="parseBtn">Analizza</button>
-    <a id="downloadExample" href="../assets/midi/symphony_9_1.mid">Scarica esempio .mid</a>
-  </div>
-  <div>
-    <strong>Risultato:</strong> <span id="duration">—</span> secondi · <strong>Note:</strong> <span id="noteCount">—</span>
-  </div>
-  <h3>Log eventi</h3>
-  <textarea id="log" readonly></textarea>
+<main class="wrap">
 
-  <div id="playerControls" style="margin-top:12px">
-    <button id="playBtn" disabled>Play</button>
-    <button id="stopBtn" disabled>Stop</button>
-    <span id="playTime">0.000 / 0.000 s</span>
-  </div>
-  <div id="volumeControls" style="margin-top:6px">
-    <label>Volume <input id="volume" type="range" min="0" max="100" step="1" value="80"></label>
-  </div>
-  <div id="staveContainer" style="margin-top:18px; background:#fff; padding:10px; border-radius:6px;">
-    <div id="stave" ></div>
-  </div>
+  <!-- ===== Hero ===== -->
+  <header class="hero">
+    <div class="hero-icon">🎵</div>
+    <div>
+      <h1>Longest MIDI</h1>
+      <p class="sub">Analizzatore di durata: carica un file <b>.mid / .midi</b> per ottenere durata esatta,
+      statistiche, partitura e piano roll, con riproduzione audio.</p>
+    </div>
+    <div id="fileChip" class="file-chip hidden"><span class="dot"></span><span class="fname" id="fileChipName"></span></div>
+  </header>
 
-  <script>
-  function hexToUint8Array(hex) {
-    hex = hex.replace(/[^0-9A-Fa-f]/g,'');
-    const out = new Uint8Array(hex.length/2);
-    for (let i=0;i<out.length;i++) out[i]=parseInt(hex.substr(i*2,2),16);
-    return out;
-  }
+  <!-- ===== Drop zone ===== -->
+  <section id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Carica file MIDI">
+    <input type="file" id="file" accept=".mid,.midi,audio/midi,audio/x-midi" hidden />
+    <div class="dz-icon">🎼</div>
+    <p class="dz-title">Trascina qui un file MIDI</p>
+    <p class="dz-sub">oppure <span class="link">clicca per sceglierlo</span> — oppure prova un esempio</p>
+    <div class="dz-actions">
+      <button id="loadExample" class="btn ghost sm" type="button">▶ Esempio breve</button>
+      <button id="loadSong" class="btn ghost sm" type="button">🎻 Vattene amore</button>
+      <a id="downloadLink" href="../assets/midi/Vattene_amore.mid" download class="btn ghost sm" style="text-decoration:none">⬇ Scarica un .mid</a>
+    </div>
+  </section>
 
-  function readVarLen(bytes, pos) {
-    let value = 0, i = 0, b;
-    do {
-      b = bytes[pos + i];
-      value = (value << 7) | (b & 0x7F);
-      i++;
-    } while (b & 0x80);
-    return { value, length: i };
-  }
+  <!-- ===== Stats ===== -->
+  <section id="statsSection" class="hidden">
+    <div class="sec-head">
+      <h2>📊 Analisi</h2>
+      <span class="rule"></span>
+      <button id="copyReport" class="btn ghost sm" type="button">📋 Copia report</button>
+    </div>
+    <div class="stats">
+      <div class="card stat"><div class="ico">⏱️</div><div><div class="label">Durata</div><div class="value" id="stDur">—</div><div class="sub" id="stDurSub"></div></div></div>
+      <div class="card stat"><div class="ico">🎵</div><div><div class="label">Note</div><div class="value" id="stNotes">—</div><div class="sub" id="stNotesSub"></div></div></div>
+      <div class="card stat"><div class="ico">🎶</div><div><div class="label">Polifonia max</div><div class="value" id="stPoly">—</div><div class="sub" id="stPolySub"></div></div></div>
+      <div class="card stat"><div class="ico">🎹</div><div><div class="label">Estensione</div><div class="value" id="stRange">—</div><div class="sub" id="stRangeSub"></div></div></div>
+      <div class="card stat"><div class="ico">💓</div><div><div class="label">Tempo iniziale</div><div class="value" id="stTempo">—</div><div class="sub" id="stTempoSub"></div></div></div>
+      <div class="card stat"><div class="ico">🎛️</div><div><div class="label">Canali usati</div><div class="value" id="stCh">—</div><div class="sub" id="stChSub"></div></div></div>
+    </div>
 
-  function parseMIDI(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
-    let p = 0;
-    function readStr(len){
-      const s = String.fromCharCode.apply(null, bytes.slice(p,p+len)); p+=len; return s;
-    }
-    function readUint32(){ const v = (bytes[p]<<24)|(bytes[p+1]<<16)|(bytes[p+2]<<8)|bytes[p+3]; p+=4; return v; }
-    function readUint16(){ const v = (bytes[p]<<8)|bytes[p+1]; p+=2; return v; }
+    <div class="dgrid">
+      <div class="card"><h3>⏲ Cambi di tempo</h3><div id="tempoChips" class="tempo-chips"></div></div>
+      <div class="card"><h3>🎼 Canali</h3><div id="channelList" class="ch-list"></div></div>
+      <div class="card"><h3>🏆 Note più suonate</h3><div id="topNotes"></div></div>
+      <div class="card"><h3>ℹ️ File MIDI</h3>
+        <div id="fileMeta" style="font-family:var(--mono);font-size:.85rem;color:#cfe3f7;line-height:1.9"></div>
+      </div>
+    </div>
+  </section>
 
-    const headerId = readStr(4);
-    if (headerId !== 'MThd') throw new Error('Not a MIDI file (no MThd)');
-    const headerLen = readUint32();
-    const format = readUint16();
-    const ntrks = readUint16();
-    const division = readUint16();
-    p = p + (headerLen - 6);
+  <!-- ===== Player ===== -->
+  <section id="playerSection" class="card player hidden">
+    <div class="player-top">
+      <button id="playBtn" class="round-btn" type="button" disabled aria-label="Play/Pausa"></button>
+      <button id="stopBtn" class="round-btn stop" type="button" disabled aria-label="Stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+      <div class="timebox"><span id="timeCur">0:00.0</span> <span class="tot">/ <span id="timeTot">0:00.0</span></span></div>
+      <div class="pmeta" id="playerMeta"></div>
+      <div class="player-opts">
+        <label class="opt">Velocità
+          <select id="speedSel" title="Velocità di riproduzione">
+            <option value="0.5">0.5×</option>
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label class="opt">🔊 <input id="volume" type="range" min="0" max="100" step="1" value="80" /></label>
+      </div>
+    </div>
+    <div class="seek-row">
+      <span class="tm">0:00.0</span>
+      <input id="seek" type="range" min="0" max="0" step="0.01" value="0" disabled />
+      <span class="tm" id="seekTot">0:00.0</span>
+    </div>
+  </section>
 
-    const tracks = [];
-    for (let t=0;t<ntrks;t++){
-      const id = readStr(4);
-      if (id!=='MTrk') throw new Error('Expected MTrk');
-      const len = readUint32();
-      const trackStart = p;
-      const trackEnd = p + len;
-      let absTick = 0;
-      let lastStatus = null;
-      const events = [];
-      while (p < trackEnd) {
-        const vl = readVarLen(bytes, p);
-        absTick += vl.value;
-        p += vl.length;
-        let status = bytes[p];
-        if (status < 0x80) {
-          // running status
-          if (lastStatus === null) throw new Error('Running status without previous status');
-          status = lastStatus;
-        } else {
-          p++;
-          lastStatus = status;
-        }
-        if (status === 0xFF) {
-          const metaType = bytes[p++];
-          const linfo = readVarLen(bytes, p); p += linfo.length;
-          const mlen = linfo.value;
-          if (metaType === 0x2F) { // End of track
-            p += mlen;
-            events.push({type:'endOfTrack', tick:absTick});
-            break;
-          } else if (metaType === 0x51 && mlen===3) {
-            const b0=bytes[p], b1=bytes[p+1], b2=bytes[p+2];
-            const tempo = (b0<<16)|(b1<<8)|b2; // microseconds per quarter note
-            events.push({type:'tempo', tick:absTick, tempo});
-            p += mlen;
-          } else {
-            p += mlen; // skip other meta
-          }
-        } else if (status >= 0x80 && status <= 0xEF) {
-          const ev = (status & 0xF0) >> 4;
-          const channel = status & 0x0F;
-          let param1 = bytes[p++];
-          let param2 = null;
-          // program change and channel aftertouch use 1 param
-          if (ev !== 0xC && ev !== 0xD) {
-            param2 = bytes[p++];
-          }
-          if (ev === 0x9) {
-            const velocity = param2!==null?param2:0;
-            if (velocity>0) events.push({type:'noteOn', tick:absTick, channel, note:param1, velocity});
-            else events.push({type:'noteOff', tick:absTick, channel, note:param1, velocity:0});
-          } else if (ev === 0x8) {
-            events.push({type:'noteOff', tick:absTick, channel, note:param1, velocity:param2||0});
-          } else {
-            // ignore other channel messages
-          }
-        } else {
-          // system common / realtime or unknown: skip
-        }
-      }
-      p = trackEnd;
-      tracks.push(events);
-    }
+  <!-- ===== Visualizations ===== -->
+  <section id="vizSection" class="hidden">
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="sheet" type="button">🎼 Partitura</button>
+      <button class="tab" data-tab="roll" type="button">🎹 Piano roll</button>
+      <button class="tab" data-tab="log" type="button">📋 Log eventi</button>
+    </div>
 
-    // Merge all events by tick
-    const all = [].concat(...tracks).sort((a,b)=>a.tick - b.tick);
-    return {events: all, division};
-  }
+    <div class="card viz-card" data-panel="sheet">
+      <p class="sheet-hint" id="sheetHint">Le note sono colorate per canale; nota evidenziata = in riproduzione. Clicca sulla partitura per andare a quel punto.</p>
+      <div class="viz-wrap sheet" id="staveWrap"><div id="stave" class="canvas-holder"></div></div>
+    </div>
 
-  function analyze(eventsObj) {
-    const events = eventsObj.events;
-    const division = eventsObj.division;
-    let currentTempo = 500000; // default µs per quarter
-    let lastTick = 0;
-    let seconds = 0;
-    const logLines = [];
-    for (const ev of events) {
-      const delta = ev.tick - lastTick;
-      seconds += (delta * currentTempo) / 1_000_000 / division;
-      lastTick = ev.tick;
-      if (ev.type === 'tempo') {
-        logLines.push(`[${seconds.toFixed(3)}s] Tempo change: ${ev.tempo} µs/qn`);
-        currentTempo = ev.tempo;
-      } else if (ev.type === 'noteOn') {
-        logLines.push(`[${seconds.toFixed(3)}s] Note ON  ch${ev.channel+1} note ${ev.note} vel ${ev.velocity}`);
-      } else if (ev.type === 'noteOff') {
-        logLines.push(`[${seconds.toFixed(3)}s] Note OFF ch${ev.channel+1} note ${ev.note}`);
-      } else if (ev.type==='endOfTrack') {
-        // ignore
-      }
-    }
-    // final length is seconds (time of last event). If no events, 0.
-    return {seconds, log: logLines.join('\n')};
-  }
+    <div class="card viz-card hidden" data-panel="roll">
+      <p class="sheet-hint">Timeline completa: ogni nota è un rettangolo colorato per canale (altezza = altezza della nota). Clicca per spostare la riproduzione.</p>
+      <div class="viz-wrap roll" id="rollWrap">
+        <div class="canvas-holder" id="rollHolder" style="width:100%">
+          <canvas id="rollBase"></canvas>
+          <canvas id="rollOverlay"></canvas>
+        </div>
+      </div>
+    </div>
 
-  const fileInput = document.getElementById('file');
-  const loadExample = document.getElementById('loadExample');
-  const parseBtn = document.getElementById('parseBtn');
-  const logEl = document.getElementById('log');
-  const durationEl = document.getElementById('duration');
-  const downloadExample = document.getElementById('downloadExample');
+    <div class="card viz-card hidden" data-panel="log">
+      <p class="sheet-hint">Eventi estratti dal file (le voci oltre le ultime 500 righe vengono omesse).</p>
+      <textarea id="log" readonly spellcheck="false"></textarea>
+    </div>
+  </section>
 
-  let currentArrayBuffer = null;
+  <footer>Parser MIDI 100% JavaScript · riproduzione con Tone.js · nessun dato lascia il browser</footer>
+</main>
+<div id="toast" role="status"></div>
 
-  fileInput.addEventListener('change', (e)=>{
-    const f = e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{ currentArrayBuffer = reader.result; logEl.value = 'File caricato: ' + f.name; durationEl.textContent='—'; };
-    reader.readAsArrayBuffer(f);
-  });
+<script id="core-script">
+/* =========================================================
+   CORE (puro): parser MIDI + analisi — nessuna dipendenza DOM
+   ========================================================= */
+function hexToUint8Array(hex) {
+  hex = String(hex).replace(/[^0-9A-Fa-f]/g, '');
+  if (hex.length % 2) hex = '0' + hex;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
 
-  loadExample.addEventListener('click', async ()=>{
-    try {
-      const res = await fetch('longest_midi.hex');
-      if (!res.ok) throw new Error('Impossibile caricare esempio');
-      const hex = await res.text();
-      const bytes = hexToUint8Array(hex);
-      currentArrayBuffer = bytes.buffer;
-      // prepare download link
-      const blob = new Blob([bytes], {type:'audio/midi'});
-      downloadExample.href = URL.createObjectURL(blob);
-      downloadExample.download = 'longest_midi_example.mid';
-      logEl.value = 'Esempio caricato in memoria.';
-      durationEl.textContent='—';
-    } catch (err) { logEl.value = 'Errore: '+err.message; }
-  });
+function readVarLen(bytes, pos) {
+  let value = 0, i = 0, b;
+  do {
+    b = bytes[pos + i];
+    if (b === undefined) break;
+    value = (value << 7) | (b & 0x7F);
+    i++;
+  } while (b & 0x80);
+  return { value, length: i };
+}
 
-  parseBtn.addEventListener('click', ()=>{
-    if (!currentArrayBuffer) { logEl.value='Nessun file caricato.'; return; }
-    try {
-      const parsed = parseMIDI(currentArrayBuffer);
-      const res = analyze(parsed);
-      durationEl.textContent = res.seconds.toFixed(3);
-      logEl.value = res.log;
-    } catch (err) { logEl.value = 'Parsing error: '+err.message; }
-  });
-  </script>
-  <script>
-  // MIDI playback using Tone.js + @tonejs/midi
-  const playBtn = document.getElementById('playBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const playTime = document.getElementById('playTime');
-  const volumeInput = document.getElementById('volume');
+function midiToName(m) {
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const octave = Math.floor(m / 12) - 1;
+  return names[((m % 12) + 12) % 12] + octave;
+}
 
-  let midiObj = null;
-  let tonePart = null;
-  let synth = null;
-  let volNode = null;
-  let playbackTotal = 0;
-  let loadedNotes = null;
-  let prepared = false;
-  let currentRenderedNotes = null;
-  let currentBpm = 120;
-  let lastHighlightedIndex = -1;
-  
+/* Ritorna { format, ntrks, division, smpte, fps, tpf, tracks, events } */
+function parseMIDI(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  let p = 0;
+  const readStr = (len) => { const s = String.fromCharCode.apply(null, bytes.slice(p, p + len)); p += len; return s; };
+  const readUint32 = () => { const v = ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0; p += 4; return v; };
+  const readUint16 = () => { const v = (bytes[p] << 8) | bytes[p + 1]; p += 2; return v; };
 
-  function enablePlayerControls(enabled) {
-    playBtn.disabled = !enabled;
-    stopBtn.disabled = !enabled;
-  }
+  const headerId = readStr(4);
+  if (headerId !== 'MThd') throw new Error('Non è un file MIDI valido (manca l’header MThd)');
+  const headerLen = readUint32();
+  const format = readUint16();
+  const ntrks = readUint16();
+  const division = readUint16();
+  p += Math.max(0, headerLen - 6);
 
-  async function loadMidiArrayBuffer(arrayBuffer) {
-    try {
-      let parsedFallback = null;
-      // If @tonejs/midi provided a global Midi constructor, use it
-      let notes = [];
-      let total = 0;
+  const smpte = !!(division & 0x8000);
+  const fps = smpte ? (256 - (division >> 8)) : null;
+  const tpf = smpte ? (division & 0xFF) : null;
+  if (!smpte && division <= 0) throw new Error('Divisione temporale MIDI non valida (0)');
+  if (smpte && (!fps || !tpf)) throw new Error('Divisione SMPTE non valida');
 
-      if (typeof Midi === 'function' || (typeof Midi === 'object' && typeof Midi.default === 'function')) {
-        const MidiCtor = (typeof Midi === 'function') ? Midi : Midi.default;
-        midiObj = new MidiCtor(arrayBuffer);
-        total = midiObj.duration || 0;
-        // collect notes from all tracks
-        midiObj.tracks.forEach(track=>{
-          track.notes.forEach(n=>{
-            // try to preserve channel information if available; default to 0
-            const ch = (typeof n.channel !== 'undefined') ? n.channel : (typeof track.channel !== 'undefined' ? track.channel : 0);
-            notes.push({time: n.time, note: n.name, duration: n.duration, velocity: n.velocity, channel: ch});
-          });
-        });
+  const tracks = [];
+  for (let t = 0; t < ntrks; t++) {
+    if (p + 8 > bytes.length) break;
+    const id = readStr(4);
+    if (id !== 'MTrk') throw new Error('Chunk inatteso: ' + id);
+    const len = readUint32();
+    const trackEnd = Math.min(bytes.length, p + len);
+    let absTick = 0;
+    let lastStatus = null;
+    const events = [];
+    while (p < trackEnd) {
+      const vl = readVarLen(bytes, p);
+      if (vl.length <= 0) break;
+      absTick += vl.value;
+      p += vl.length;
+      if (p >= bytes.length) break;
+
+      let status = bytes[p];
+      if (status < 0x80) {
+        if (lastStatus === null) throw new Error('Running status senza stato precedente');
+        status = lastStatus; // data byte: running status
       } else {
-        // Fallback: use our parseMIDI to build a notes list (tick->seconds conversion)
-        parsedFallback = parseMIDI(arrayBuffer);
-        // convert parsed events (ticks) into seconds and extract noteOn/noteOff pairs
-        const division = parsedFallback.division;
-        let currentTempo = 500000; // µs per quarter
-        let lastTick = 0;
-        let currentSeconds = 0;
-        // annotate events with seconds
-        parsedFallback.events.forEach(ev => {
-          const delta = ev.tick - lastTick;
-          currentSeconds += (delta * currentTempo) / 1_000_000 / division;
-          lastTick = ev.tick;
-          ev._seconds = currentSeconds;
-          if (ev.type === 'tempo') currentTempo = ev.tempo;
-        });
-
-        // track active notes by channel+note
-        const active = Object.create(null);
-        parsedFallback.events.forEach(ev => {
-          if (ev.type === 'noteOn') {
-            const key = ev.channel + ':' + ev.note;
-            active[key] = {start: ev._seconds, velocity: (ev.velocity||0)/127, channel: ev.channel};
-          } else if (ev.type === 'noteOff') {
-            const key = ev.channel + ':' + ev.note;
-            const a = active[key];
-            if (a) {
-              const start = a.start;
-              const duration = Math.max(0.001, ev._seconds - start);
-              notes.push({time: start, note: midiNoteToName(ev.note), duration, velocity: a.velocity, channel: a.channel});
-              delete active[key];
-            }
-          }
-        });
-
-        // close any remaining active notes to last event time
-        const lastSec = parsedFallback.events.length? parsedFallback.events[parsedFallback.events.length-1]._seconds : 0;
-        for (const k in active) {
-          const a = active[k];
-          notes.push({time: a.start, note: midiNoteToName(parseInt(k.split(':')[1],10)), duration: Math.max(0.001, lastSec - a.start), velocity: a.velocity, channel: a.channel});
-        }
-        total = lastSec;
+        p++;
+        lastStatus = status;
       }
 
-      // store notes for playback; actual AudioNodes will be created on user gesture
-      loadedNotes = notes;
-
-      // set tempo if present (use first tempo if available)
-      if (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0) {
-        Tone.Transport.bpm.value = midiObj.header.tempos[0].bpm;
-      } else if (!midiObj && parsedFallback) {
-        // find first tempo event in parsedFallback events
-        const tEv = parsedFallback.events.find(e=>e.type==='tempo');
-        if (tEv) Tone.Transport.bpm.value = Math.round(60000000 / tEv.tempo);
-      }
-
-      // do not create audio graph now (will be created on Play)
-      tonePart = null;
-      prepared = false;
-
-      // update UI
-      playbackTotal = total;
-      playTime.textContent = formatPlayTime(0, playbackTotal);
-      // update note count
-      const noteCountEl = document.getElementById('noteCount');
-      if (noteCountEl) noteCountEl.textContent = String(notes.length);
-      // render staff with notes (treble clef / G)
-      try {
-        const bpm = (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0)
-          ? midiObj.header.tempos[0].bpm
-          : (parsedFallback ? (parsedFallback.events.find(e=>e.type==='tempo') ? Math.round(60000000/parsedFallback.events.find(e=>e.type==='tempo').tempo) : 120) : 120);
-        currentRenderedNotes = notes.slice().sort((a,b)=>a.time - b.time);
-        currentBpm = bpm;
-        lastHighlightedIndex = -1;
-        renderStave(currentRenderedNotes, currentBpm, -1);
-      } catch(err) { console.error('Stave render error', err); }
-      enablePlayerControls(true);
-      // update download link as well
-      const blob = new Blob([new Uint8Array(arrayBuffer)], {type:'audio/midi'});
-      downloadExample.href = URL.createObjectURL(blob);
-      downloadExample.download = 'loaded.mid';
-    } catch (e) {
-      console.error('Error preparing MIDI for playback', e);
-      logEl.value += '\nPlayback prepare error: '+e.message;
-      enablePlayerControls(false);
-    }
-  }
-
-  // helper: convert midi note number to name (C4 style)
-  function midiNoteToName(n) {
-    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-    const octave = Math.floor(n/12)-1;
-    const name = names[n%12];
-    return name + octave;
-  }
-
-  // Format seconds as fixed "000.000"
-  // Format seconds as MM:SS (no milliseconds)
-  function formatSecondsMMSS(sec) {
-    const s = Number.isFinite(sec) ? Math.max(0, Math.floor(sec)) : 0;
-    const mm = Math.floor(s / 60);
-    const ss = s % 60;
-    const mmStr = String(mm).padStart(2, '0');
-    const ssStr = String(ss).padStart(2, '0');
-    return `${mmStr}:${ssStr}`;
-  }
-  function formatPlayTime(current, total) {
-    return `${formatSecondsMMSS(current)} / ${formatSecondsMMSS(total)}`;
-  }
-
-  // Wire file load & example load to also prepare audio
-  fileInput.addEventListener('change', (e)=>{
-    const f = e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = async ()=>{
-      currentArrayBuffer = reader.result;
-      logEl.value = 'File caricato: ' + f.name;
-      durationEl.textContent='—';
-      await loadMidiArrayBuffer(currentArrayBuffer);
-    };
-    reader.readAsArrayBuffer(f);
-  });
-
-  loadExample.addEventListener('click', async ()=>{
-    try {
-      const res = await fetch('longest_midi.hex');
-      if (!res.ok) throw new Error('Impossibile caricare esempio');
-      const hex = await res.text();
-      const bytes = hexToUint8Array(hex);
-      currentArrayBuffer = bytes.buffer;
-      // prepare download link
-      const blob = new Blob([bytes], {type:'audio/midi'});
-      downloadExample.href = URL.createObjectURL(blob);
-      downloadExample.download = 'longest_midi_example.mid';
-      logEl.value = 'Esempio caricato in memoria.';
-      durationEl.textContent='—';
-      await loadMidiArrayBuffer(currentArrayBuffer);
-    } catch (err) { logEl.value = 'Errore: '+err.message; }
-  });
-
-  // Play / stop handlers
-  playBtn.addEventListener('click', async ()=>{
-    if (!loadedNotes) return;
-    // Ensure audio context started after user gesture
-    if (Tone.context.state !== 'running') await Tone.start();
-
-    // prepare audio graph and Tone.Part on first play
-    if (!prepared) {
-      try {
-        // create volume and synth
-        if (volNode) { volNode.dispose(); volNode = null; }
-        if (synth) { synth.dispose(); synth = null; }
-        volNode = new Tone.Volume(0).toDestination();
-        synth = new Tone.PolySynth(Tone.Synth).connect(volNode);
-        // set initial volume from UI
-        const vPercent = parseInt(volumeInput?.value || 80, 10);
-        const vDb = (vPercent === 0) ? -100 : (-60 + (vPercent/100)*60);
-        volNode.volume.value = vDb;
-
-        // set transport BPM if available
-        if (midiObj && midiObj.header && midiObj.header.tempos && midiObj.header.tempos.length>0) {
-          Tone.Transport.bpm.value = midiObj.header.tempos[0].bpm;
-        } else if (!midiObj && currentBpm) {
-          Tone.Transport.bpm.value = currentBpm;
-        }
-
-        // create the Tone.Part from loadedNotes
-          tonePart = new Tone.Part((time, val) => {
-            // create a short-lived synth per note to avoid polyphony limits
-            try {
-              const noteSynth = new Tone.Synth().connect(volNode);
-              noteSynth.triggerAttackRelease(val.note, val.duration, time, val.velocity);
-              // dispose after expected duration (wall-clock fallback)
-              setTimeout(() => { try { noteSynth.dispose(); } catch (e) {} }, (val.duration + 0.5) * 1000);
-            } catch (e) {
-              console.error('Note playback error', e);
-            }
-          }, loadedNotes).start(0);
-        tonePart.loop = false;
-        prepared = true;
-      } catch (err) {
-        console.error('Error preparing playback on gesture', err);
-      }
-    }
-
-    if (Tone.Transport.state !== 'started') {
-      Tone.Transport.start();
-      playBtn.textContent = 'Pause';
-      // do not auto-scroll; user will control page scrolling
-      requestAnimationFrame(updatePlayTime);
-    } else {
-      Tone.Transport.pause();
-      playBtn.textContent = 'Play';
-    }
-  });
-
-  stopBtn.addEventListener('click', ()=>{
-    Tone.Transport.stop();
-    Tone.Transport.position = '0:0:0';
-    playBtn.textContent = 'Play';
-    playTime.textContent = formatPlayTime(0, playbackTotal);
-    
-  });
-
-  // speed control removed
-
-  // Volume control
-  volumeInput.addEventListener('input', ()=>{
-    const p = parseInt(volumeInput.value, 10);
-    if (!volNode) return;
-    const db = (p === 0) ? -100 : (-60 + (p/100)*60);
-    volNode.volume.value = db;
-  });
-
-  function updatePlayTime(){
-    const s = Tone.Transport.seconds * (Tone.Transport.playbackRate || 1);
-    const total = playbackTotal || 0;
-    playTime.textContent = formatPlayTime(s, total);
-    // highlight currently playing note
-    if (currentRenderedNotes && currentRenderedNotes.length>0) {
-      // find highest index with time <= s
-      let idx = -1;
-      for (let i=0;i<currentRenderedNotes.length;i++) {
-        if (currentRenderedNotes[i].time <= s) idx = i;
-        else break;
-      }
-      if (idx !== lastHighlightedIndex) {
-        lastHighlightedIndex = idx;
-        try { renderStave(currentRenderedNotes, currentBpm, idx); } catch(e) { console.error(e); }
-      }
-    }
-    if (Tone.Transport.state === 'started') requestAnimationFrame(updatePlayTime);
-  }
-
-  // --- Simple Canvas rendering (replaces VexFlow) ---
-  function renderStave(notes, bpm=120, activeIndex=-1) {
-    // notes: [{time, note: 'C4' or 'C#4', duration (s), velocity}]
-    const container = document.getElementById('stave');
-    if (!container) return;
-    container.innerHTML = '';
-    // sizing: use container width if available
-    const containerWidth = Math.max(600, Math.min(1200, container.clientWidth || window.innerWidth - 80));
-    const margin = 24;
-    const colWidth = 64; // minimum space per time column (wider for readability)
-    // group notes by time (within epsilon)
-    const eps = 0.001;
-    const sorted = notes.slice().sort((a,b)=>a.time - b.time);
-    const groups = [];
-    let gIndex = 0;
-    for (let i=0;i<sorted.length;i++){
-      const n = sorted[i];
-      if (groups.length===0) { groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++}]}); }
-      else {
-        const last = groups[groups.length-1];
-        if (Math.abs(n.time - last.time) <= eps) {
-          last.notes.push({note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++});
+      if (status === 0xFF) {
+        const metaType = bytes[p++];
+        const linfo = readVarLen(bytes, p);
+        p += linfo.length;
+        const mlen = linfo.value;
+        if (metaType === 0x2F) {            // End of Track
+          p += mlen;
+          events.push({ type: 'endOfTrack', tick: absTick });
+          break;
+        } else if (metaType === 0x51 && mlen === 3) {  // Tempo
+          const b0 = bytes[p], b1 = bytes[p + 1], b2 = bytes[p + 2];
+          const tempo = (b0 << 16) | (b1 << 8) | b2;   // µs per quarter note
+          events.push({ type: 'tempo', tick: absTick, tempo });
+          p += mlen;
         } else {
-          groups.push({time:n.time, notes:[{note:n.note, duration:n.duration, velocity:n.velocity, channel:n.channel, globalIndex:gIndex++}]});
+          p += mlen; // altri meta ignorati
         }
+      } else if (status >= 0x80 && status <= 0xEF) {
+        const ev = (status & 0xF0) >> 4;
+        const channel = status & 0x0F;
+        let param1 = bytes[p++];
+        let param2 = null;
+        if (ev !== 0xC && ev !== 0xD) param2 = bytes[p++]; // program change / channel aftertouch: 1 param
+        if (ev === 0x9) {
+          const velocity = param2 !== null && param2 !== undefined ? param2 : 0;
+          if (velocity > 0) events.push({ type: 'noteOn', tick: absTick, channel, note: param1, velocity });
+          else events.push({ type: 'noteOff', tick: absTick, channel, note: param1, velocity: 0 });
+        } else if (ev === 0x8) {
+          events.push({ type: 'noteOff', tick: absTick, channel, note: param1, velocity: param2 || 0 });
+        }
+        // altri messaggi di canale ignorati
+      } else if (status === 0xF0 || status === 0xF7) { // SysEx con lunghezza
+        const linfo = readVarLen(bytes, p);
+        p += linfo.length + linfo.value;
+      } else {
+        p++; // byte system realtime raro dentro una traccia
       }
     }
+    p = Math.min(bytes.length, trackEnd);
+    tracks.push(events);
+  }
 
-    const columnsPerLine = Math.max(1, Math.floor((containerWidth - margin*2) / colWidth));
-    const lineHeight = 220; // increased line height to leave ample vertical space between staves
-    const lines = Math.max(1, Math.ceil(groups.length / columnsPerLine));
-    const width = containerWidth;
-    const height = lines * lineHeight + 20;
+  // merge & sort per tick (sort stabile: le note allo stesso tick restano in ordine di arrivo)
+  const all = [].concat.apply([], tracks).sort((a, b) => a.tick - b.tick);
+  return { format, ntrks, division, smpte, fps, tpf, tracks, events: all };
+}
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-    container.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    // background
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,height);
+/* =========================================================
+   ANALISI: converte i tick in secondi e produce statistiche
+   ========================================================= */
+function buildAnalysis(parsed) {
+  const { events, division, smpte, fps, tpf } = parsed;
+  const tpq = smpte ? 1 : division;
 
-    // helpers
-    function noteNameToMidi(name) {
-      const m = String(name).match(/^([A-G])(#?)(-?\d+)$/i);
-      if (!m) return 60;
-      const letters = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
-      const letter = m[1].toUpperCase();
-      const accidental = m[2] || '';
-      const octave = parseInt(m[3], 10);
-      let base = letters[letter]; if (accidental === '#') base += 1;
-      return (octave + 1) * 12 + base;
+  let currentTempo = 500000;          // µs/qn di default (120 BPM)
+  let lastTick = 0;
+  let curSec = 0;
+  const tempoList = [];               // {sec, tempo, bpm}
+  const noteSegs = [];                // {start,end,dur,midi,vel,ch}
+  const activeMap = Object.create(null);
+  const chStats = {};                 // ch -> {on, sec, notes}
+  const pitchCount = {};              // midi -> conteggio
+  let noteOnCount = 0;
+  let maxPoly = 0, polyAt = 0;
+  let minMidi = Infinity, maxMidi = -Infinity;
+
+  const advanceTo = (tick) => {
+    const delta = tick - lastTick;
+    if (delta > 0) {
+      if (smpte) curSec += delta / (fps * tpf);
+      else curSec += (delta * currentTempo) / 1e6 / tpq;
+      lastTick = tick;
     }
+  };
 
-    const refMidi = 64; // E4 on bottom line
-    const staffSpacing = 16; // px — larger spacing between staff lines
-    const refYOffsetInLine = 56; // top offset for staff within line (gives room above staff)
-    const semitoneToY = staffSpacing/2;
-    // channel color palette
-    const channelColors = ['#1976d2','#e91e63','#388e3c','#f57c00','#6a1b9a','#009688','#455a64','#d32f2f','#ff8f00','#7b1fa2','#00796b','#c62828','#2e7d32','#6d4c41','#0288d1','#ad1457'];
-    function getChannelColor(ch) { if (typeof ch !== 'number') return '#111'; return channelColors[ch % channelColors.length] || '#111'; }
-
-    // map duration (s) -> note type given bpm
-    function durationToNoteType(durationSec, bpm) {
-      if (!Number.isFinite(durationSec) || durationSec <= 0) return '32nd';
-      const beats = durationSec * (bpm/60);
-      // assume 4/4 where whole = 4 beats
-      if (beats >= 3.5) return 'whole';
-      if (beats >= 1.75) return 'half';
-      if (beats >= 0.9) return 'quarter';
-      if (beats >= 0.45) return 'eighth';
-      if (beats >= 0.22) return '16th';
-      return '32nd';
-    }
-
-    function drawFlags(ctx, x, y, up, count) {
-      // draw simple flag shapes; up=true means flags near top of stem pointing right
-      ctx.fillStyle = ctx.fillStyle || '#000';
-      for (let i=0;i<count;i++) {
-        const offset = i * 6;
-        ctx.beginPath();
-        if (up) {
-          // flag starts at (x,y + offset) curves right-down
-          ctx.moveTo(x, y + offset);
-          ctx.quadraticCurveTo(x + 10, y + 6 + offset, x + 4, y + 12 + offset);
-          ctx.lineTo(x + 6, y + 10 + offset);
-        } else {
-          // downward stem flags to left, mirrored
-          ctx.moveTo(x, y - offset);
-          ctx.quadraticCurveTo(x - 10, y - 6 - offset, x - 4, y - 12 - offset);
-          ctx.lineTo(x - 6, y - 10 - offset);
-        }
-        ctx.closePath(); ctx.fill();
+  for (const ev of events) {
+    advanceTo(ev.tick);
+    if (ev.type === 'tempo') {
+      if (!smpte) {
+        const bpm = 60000000 / ev.tempo;
+        tempoList.push({ sec: curSec, tempo: ev.tempo, bpm });
+        currentTempo = ev.tempo;
+      }
+    } else if (ev.type === 'noteOn') {
+      const seg = { start: curSec, midi: ev.note, vel: ev.velocity || 0, ch: ev.channel };
+      activeMap[ev.channel + ':' + ev.note] = seg;
+      noteOnCount++;
+      const cs = chStats[ev.channel] || (chStats[ev.channel] = { on: 0, sec: 0 });
+      cs.on++;
+      pitchCount[ev.note] = (pitchCount[ev.note] || 0) + 1;
+      if (ev.note < minMidi) minMidi = ev.note;
+      if (ev.note > maxMidi) maxMidi = ev.note;
+      const nActive = Object.keys(activeMap).length;
+      if (nActive > maxPoly) { maxPoly = nActive; polyAt = curSec; }
+    } else if (ev.type === 'noteOff') {
+      const seg = activeMap[ev.channel + ':' + ev.note];
+      if (seg) {
+        const dur = Math.max(0, curSec - seg.start);
+        seg.end = curSec; seg.dur = dur;
+        noteSegs.push(seg);
+        delete activeMap[ev.channel + ':' + ev.note];
+        chStats[ev.channel].sec += dur;
       }
     }
+  }
+  // chiudi eventuali note rimaste aperte alla fine del file
+  const endSec = curSec;
+  for (const k in activeMap) {
+    const seg = activeMap[k];
+    const dur = Math.max(0, endSec - seg.start);
+    seg.end = endSec; seg.dur = dur;
+    noteSegs.push(seg);
+    chStats[seg.ch].sec += dur;
+  }
 
-    // render each line
-    for (let line=0; line<lines; line++){
-      const lineTop = line * lineHeight;
-      // draw staff lines
-      ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
-      for (let i=0;i<5;i++){
-        const y = lineTop + refYOffsetInLine + i*staffSpacing;
-        ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width - margin, y); ctx.stroke();
-      }
-      // clef
-      ctx.font = '24px serif'; ctx.fillStyle = '#000';
-      ctx.fillText('𝄞', margin + 2, lineTop + refYOffsetInLine + 2*staffSpacing);
+  const total = Math.max(0, curSec);
+  const bpm = tempoList.length ? Math.round(tempoList[0].bpm) : 120;
+  return {
+    total, bpm, noteSegs, noteOnCount,
+    tempoList, chStats, pitchCount,
+    maxPoly, polyAt,
+    minMidi: Number.isFinite(minMidi) ? minMidi : null,
+    maxMidi: Number.isFinite(maxMidi) ? maxMidi : null,
+    formatName: parsed.format === 0 ? '0 (singola traccia)' : parsed.format === 1 ? '1 (parallelo)' : parsed.format === 2 ? '2 (indipendente)' : String(parsed.format),
+    divLabel: smpte ? (fps + ' fps × ' + tpf + ' tick/frame (SMPTE)') : (division + ' PPQ')
+  };
+}
+</script>
+
+<script>
+/* =========================================================
+   UI + riproduzione (Tone.js)
+   ========================================================= */
+'use strict';
+// Se il CDN di Tone.js non è raggiungibile (offline), evita ReferenceError
+var Tone = (typeof Tone === 'undefined') ? null : Tone;
+const $ = (id) => document.getElementById(id);
+const pad2 = (n) => String(n).padStart(2, '0');
+const pad3 = (n) => String(n).padStart(3, '0');
+
+function fmtPlay(sec) {
+  sec = Number.isFinite(sec) ? Math.max(0, sec) : 0;
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60), d = Math.floor((sec % 1) * 10);
+  const h = Math.floor(m / 60);
+  if (h > 0) return h + ':' + pad2(m % 60) + ':' + pad2(s) + '.' + d;
+  return m + ':' + pad2(s) + '.' + d;
+}
+function fmtClock(sec) {
+  sec = Number.isFinite(sec) ? Math.max(0, Math.round(sec)) : 0;
+  const m = Math.floor(sec / 60), s = sec % 60, h = Math.floor(m / 60);
+  if (h > 0) return h + ':' + pad2(m % 60) + ':' + pad2(s);
+  return m + ':' + pad2(s);
+}
+function fmtThousand(n) { return Number(n).toLocaleString('it-IT'); }
+
+const CHANNEL_COLORS = ['#22d3ee', '#ff5d9e', '#4ade80', '#ffb454', '#c792ea', '#38bdf8', '#94a3b8',
+  '#f87171', '#ffd166', '#2dd4bf', '#a78bfa', '#f472b6', '#a3e635', '#fb923c', '#7dd3fc', '#facc15'];
+const getChannelColor = (ch) => CHANNEL_COLORS[((Number(ch) % 16) + 16) % 16] || '#94a3b8';
+
+/* ---------- elementi ---------- */
+const dropZone = $('dropZone');
+const fileInput = $('file');
+const loadExample = $('loadExample');
+const loadSong = $('loadSong');
+const downloadLink = $('downloadLink');
+const fileChip = $('fileChip');
+const fileChipName = $('fileChipName');
+const statsSection = $('statsSection');
+const playerSection = $('playerSection');
+const vizSection = $('vizSection');
+const playBtn = $('playBtn');
+const stopBtn = $('stopBtn');
+const timeCur = $('timeCur');
+const timeTot = $('timeTot');
+const seekEl = $('seek');
+const seekTot = $('seekTot');
+const speedSel = $('speedSel');
+const volumeEl = $('volume');
+const playerMeta = $('playerMeta');
+const copyReportBtn = $('copyReport');
+const logEl = $('log');
+
+let toastTimer = null;
+function toast(msg, isErr) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
+}
+
+/* ---------- stato ---------- */
+const state = {
+  buf: null, name: '', analysis: null, parsed: null,
+  notes: [],          // note per il player {time, note, duration, velocity}
+  total: 0, bpm: 120,
+  playing: false, posSec: 0, prepared: false, dragging: false,
+  speed: 1,
+  sheetGeom: null,    // geometria della partitura per il click-to-seek
+  activeIdx: -1,
+  lastRollW: 0
+};
+let volNode = null, synth = null, tonePart = null;
+let currentTab = 'sheet';
+
+/* =========================================================
+   Caricamento file
+   ========================================================= */
+async function handleBuffer(arrayBuffer, name) {
+  try {
+    const parsed = parseMIDI(arrayBuffer);
+    const a = buildAnalysis(parsed);
+    state.parsed = parsed;
+    state.analysis = a;
+    state.buf = arrayBuffer;
+    state.name = name || 'file.mid';
+
+    // nota per nota per il player (ordinate per tempo)
+    const segs = a.noteSegs.slice().sort((x, y) => x.start - y.start || x.midi - y.midi);
+    state.notes = segs.map(s => ({
+      time: s.start,
+      note: midiToName(s.midi),
+      duration: Math.max(0.04, s.dur),
+      velocity: Math.min(1, Math.max(0.15, s.vel / 127)),
+      midi: s.midi, channel: s.ch
+    }));
+    state.total = a.total;
+    state.bpm = a.bpm;
+    state.activeIdx = -1;
+
+    resetPlayer();
+    renderStats();
+    populateLog();
+    showSections();
+
+    fileChipName.textContent = name;
+    fileChip.classList.remove('hidden');
+    playerMeta.innerHTML = '';
+    const meta = [];
+    if (a.noteSegs.length) meta.push('<b>' + fmtThousand(a.noteSegs.length) + '</b> note');
+    if (a.tempoList.length) meta.push('<b>' + a.tempoList.length + '</b> cambi tempo');
+    if (parsed.ntrks) meta.push('<b>' + parsed.ntrks + '</b> tracce');
+    playerMeta.innerHTML = meta.join(' · ');
+    toast('✅ ' + name + ' analizzato: ' + fmtPlay(a.total) + ' (' + a.total.toFixed(3) + ' s)');
+  } catch (e) {
+    console.error(e);
+    toast('Errore: ' + e.message, true);
+    dropZone.classList.add('error');
+    setTimeout(() => dropZone.classList.remove('error'), 1600);
+  }
+}
+
+function showSections() {
+  statsSection.classList.remove('hidden');
+  playerSection.classList.remove('hidden');
+  vizSection.classList.remove('hidden');
+  // re-render dopo che il layout è disponibile
+  requestAnimationFrame(() => { renderStave(); renderRoll(); });
+}
+
+function resetPlayer() {
+  if (Tone && Tone.Transport) {
+    try { Tone.Transport.stop(); Tone.Transport.position = '0:0:0'; } catch (e) {}
+  }
+  state.playing = false; state.posSec = 0; state.prepared = false;
+  if (tonePart) { try { tonePart.dispose(); } catch (e) {} tonePart = null; }
+  if (synth) { try { synth.dispose(); } catch (e) {} synth = null; }
+  if (volNode) { try { volNode.dispose(); } catch (e) {} volNode = null; }
+  playBtn.disabled = !(Tone && state.notes && state.notes.length);
+  stopBtn.disabled = true;
+  playBtn.classList.remove('paused');
+  setPlayIcon(false);
+  if (Tone) { try { Tone.Transport.bpm.value = Math.max(40, Math.min(240, state.bpm)); } catch (e) {} }
+  seekEl.max = Math.max(0, Math.round(state.total * 100) / 100);
+  seekEl.value = 0;
+  seekEl.disabled = !state.total;
+  timeCur.textContent = '0:00.0';
+  const tot = fmtPlay(state.total);
+  timeTot.textContent = tot; seekTot.textContent = tot;
+  speedSel.value = '1';
+}
+
+/* =========================================================
+   Stats
+   ========================================================= */
+function renderStats() {
+  const a = state.analysis;
+  if (!a) return;
+  $('stDur').innerHTML = fmtClock(a.total) + '<small> · ' + a.total.toFixed(3) + ' s</small>';
+  $('stDurSub').textContent = 'fino all’ultimo evento';
+  $('stNotes').innerHTML = fmtThousand(a.noteOnCount);
+  $('stNotesSub').textContent = a.noteSegs.length !== a.noteOnCount ? a.noteSegs.length + ' chiuse correttamente' : 'eventi note-on';
+  $('stPoly').innerHTML = fmtThousand(a.maxPoly);
+  $('stPolySub').textContent = a.maxPoly > 0 ? 'insieme a ' + fmtPlay(a.polyAt) : '—';
+  $('stRange').innerHTML = (a.minMidi !== null && a.maxMidi !== null)
+    ? midiToName(a.minMidi) + ' – ' + midiToName(a.maxMidi)
+    : '—';
+  $('stRangeSub').textContent = (a.maxMidi !== null && a.minMidi !== null) ? (a.maxMidi - a.minMidi + 1) + ' semitoni' : '';
+  $('stTempo').innerHTML = a.bpm + ' <small>BPM</small>';
+  $('stTempoSub').textContent = a.tempoList.length ? a.tempoList.length + ' cambi di tempo' : 'nessun cambio';
+  const chs = Object.keys(a.chStats || {}).length;
+  $('stCh').textContent = chs || '0';
+  $('stChSub').textContent = chs ? 'ch ' + Object.keys(a.chStats).map(Number).sort((x, y) => x - y).map(c => c + 1).join(', ') : 'nessuna nota';
+
+  // cambi di tempo
+  const tWrap = $('tempoChips');
+  tWrap.innerHTML = '';
+  if (!a.tempoList.length) {
+    tWrap.innerHTML = '<span class="empty-note">Nessun cambio di tempo (120 BPM fisso)</span>';
+  } else {
+    const show = a.tempoList.slice(0, 60);
+    show.forEach(t => {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = fmtPlay(t.sec) + '  →  ';
+      const b = document.createElement('b');
+      b.textContent = Math.round(t.bpm) + ' BPM';
+      c.appendChild(b);
+      tWrap.appendChild(c);
+    });
+    if (a.tempoList.length > 60) {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = '+' + (a.tempoList.length - 60) + ' altri';
+      tWrap.appendChild(c);
     }
+  }
 
-    // draw groups into columns, wrapping to next line
-    groups.forEach((g, gi) => {
-      const col = gi % columnsPerLine;
-      const row = Math.floor(gi / columnsPerLine);
-      const x = margin + col * colWidth + colWidth/2;
-      const lineTop = row * lineHeight;
-      const staffTop = lineTop + refYOffsetInLine;
-      // for simultaneous notes, stack vertically by pitch
-      g.notes.forEach((nEntry, ni) => {
-        const midi = noteNameToMidi(nEntry.note);
-        const y = staffTop + 4*staffSpacing - (midi - refMidi) * semitoneToY;
-        // draw ledger if outside
-        if (y < staffTop - staffSpacing || y > staffTop + 4*staffSpacing + staffSpacing) {
-          ctx.beginPath(); ctx.moveTo(x - 18, y); ctx.lineTo(x + 18, y); ctx.stroke();
-        }
-        // note head (slightly larger for visibility with increased spacing)
-        const rx=9, ry=6;
-        const noteType = durationToNoteType(nEntry.duration || 0, bpm);
-        const isHollow = (noteType === 'whole' || noteType === 'half');
-        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
-        const isActive = (typeof activeIndex === 'number') && (nEntry.globalIndex === activeIndex);
-        if (isHollow) { ctx.strokeStyle = isActive ? '#c2185b' : '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
-        else { ctx.fillStyle = isActive ? '#e91e63' : '#000'; ctx.fill(); }
-        // draw stem and flags for non-whole notes
-        if (noteType !== 'whole') {
-          const middleY = staffTop + 2*staffSpacing;
-          const stemUp = (y > middleY);
-          const stemLen = 48;
-          if (stemUp) {
-            const sx = x + rx;
-            const sy1 = y;
-            const sy2 = y - stemLen;
-            ctx.beginPath(); ctx.moveTo(sx, sy1); ctx.lineTo(sx, sy2); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
-            // flags (eighth/16th/32nd)
-            if (noteType === 'eighth') drawFlags(ctx, sx, sy2, true, 1);
-            else if (noteType === '16th') drawFlags(ctx, sx, sy2, true, 2);
-            else if (noteType === '32nd') drawFlags(ctx, sx, sy2, true, 3);
-          } else {
-            const sx = x - rx;
-            const sy1 = y;
-            const sy2 = y + stemLen;
-            ctx.beginPath(); ctx.moveTo(sx, sy1); ctx.lineTo(sx, sy2); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
-            if (noteType === 'eighth') drawFlags(ctx, sx, sy2, false, 1);
-            else if (noteType === '16th') drawFlags(ctx, sx, sy2, false, 2);
-            else if (noteType === '32nd') drawFlags(ctx, sx, sy2, false, 3);
-          }
-        }
-        // accidental
-        if (nEntry.note && nEntry.note.includes('#')) { ctx.fillStyle='#000'; ctx.font='12px serif'; ctx.fillText('#', x-16, y+4); }
-        // note description + channel (draw channel in distinct color)
-        const chText = (typeof nEntry.channel !== 'undefined') ? ('ch' + (Number(nEntry.channel) + 1)) : '';
-        ctx.font='12px monospace';
-        const noteLabel = nEntry.note || '';
-        const noteLabelX = x - 18;
-        ctx.fillStyle = '#111';
-        ctx.fillText(noteLabel, noteLabelX, y - 12);
-        if (chText) {
-          const noteW = ctx.measureText(noteLabel).width;
-          const chX = noteLabelX + noteW + 6;
-          ctx.fillStyle = getChannelColor(Number(nEntry.channel));
-          ctx.fillText(chText, chX, y - 12);
-        }
-        // duration text (seconds) under staff
-        ctx.fillStyle='#333'; ctx.font='11px monospace'; ctx.fillText((nEntry.duration||0).toFixed(2)+'s', x-14, lineTop + refYOffsetInLine + 5*staffSpacing + 14);
-      });
-      // small time label under column (MM:SS)
-      ctx.fillStyle='#444'; ctx.font='10px monospace';
-      ctx.fillText(formatSecondsMMSS(g.time), x-18, lineTop + refYOffsetInLine + 5*staffSpacing + 28);
+  // canali
+  const cWrap = $('channelList');
+  cWrap.innerHTML = '';
+  const chKeys = Object.keys(a.chStats || {}).map(Number).sort((x, y) => x - y);
+  if (!chKeys.length) {
+    cWrap.innerHTML = '<span class="empty-note">Nessuna nota nel file</span>';
+  } else {
+    const maxSec = Math.max.apply(null, chKeys.map(c => a.chStats[c].sec || 0)) || 1;
+    chKeys.forEach(c => {
+      const s = a.chStats[c];
+      const row = document.createElement('div');
+      row.className = 'ch-row';
+      row.innerHTML = '<span class="pall" style="background:' + getChannelColor(c) + '"></span>' +
+        '<span class="ch-n">ch' + (c + 1) + '</span>' +
+        '<span class="bar"><i style="width:' + Math.max(3, (s.sec / maxSec) * 100) + '%;background:' + getChannelColor(c) + '"></i></span>' +
+        '<span class="cnt">' + fmtThousand(s.on) + ' note · ' + fmtPlay(s.sec) + '</span>';
+      cWrap.appendChild(row);
     });
   }
-  </script>
+
+  // top note
+  const tWrap2 = $('topNotes');
+  tWrap2.innerHTML = '';
+  const pitches = Object.keys(a.pitchCount || {}).map(Number).sort((x, y) => a.pitchCount[y] - a.pitchCount[x]);
+  if (!pitches.length) {
+    tWrap2.innerHTML = '<span class="empty-note">—</span>';
+  } else {
+    const top = pitches.slice(0, 8);
+    const maxC = a.pitchCount[top[0]] || 1;
+    top.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'topnote';
+      row.innerHTML = '<span class="nm">' + midiToName(m) + '</span>' +
+        '<span class="bar"><i style="width:' + Math.max(4, (a.pitchCount[m] / maxC) * 100) + '%"></i></span>' +
+        '<span class="cnt">' + fmtThousand(a.pitchCount[m]) + '</span>';
+      tWrap2.appendChild(row);
+    });
+  }
+
+  // meta file
+  const parsed = state.parsed;
+  $('fileMeta').innerHTML =
+    'nome: <b>' + escapeHtml(state.name) + '</b><br>' +
+    'formato: ' + a.formatName + '<br>' +
+    'tracce: ' + parsed.ntrks + '<br>' +
+    'divisione: ' + a.divLabel + '<br>' +
+    (parsed.smpte ? '' : 'tempo base: ' + a.bpm + ' BPM');
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* =========================================================
+   Log / report
+   ========================================================= */
+function reportText(includeNotes) {
+  const a = state.analysis, parsed = state.parsed;
+  if (!a) return '';
+  const L = [];
+  L.push('=== Longest MIDI — report ===');
+  L.push('File: ' + state.name);
+  L.push('Formato MIDI: ' + a.formatName + ' · tracce: ' + parsed.ntrks + ' · divisione: ' + a.divLabel);
+  L.push('Durata totale: ' + fmtPlay(a.total) + ' (' + a.total.toFixed(3) + ' s)');
+  L.push('Note (note-on): ' + a.noteOnCount + (a.noteSegs.length !== a.noteOnCount ? ' (chiuse: ' + a.noteSegs.length + ')' : ''));
+  L.push('Polifonia massima: ' + a.maxPoly + ' note insieme @ ' + fmtPlay(a.polyAt));
+  if (a.minMidi !== null) L.push('Estensione: ' + midiToName(a.minMidi) + ' – ' + midiToName(a.maxMidi) + ' (' + (a.maxMidi - a.minMidi + 1) + ' semitoni)');
+  L.push('Tempo iniziale: ' + a.bpm + ' BPM · cambi di tempo: ' + a.tempoList.length);
+  const chs = Object.keys(a.chStats || {}).map(Number).sort((x, y) => x - y);
+  if (chs.length) {
+    L.push('');
+    L.push('— Canali —');
+    chs.forEach(c => L.push('ch' + (c + 1) + ': ' + a.chStats[c].on + ' note · durata audio ' + a.chStats[c].sec.toFixed(2) + ' s'));
+  }
+  if (a.tempoList.length) {
+    L.push('');
+    L.push('— Cambi di tempo —');
+    a.tempoList.forEach(t => L.push(fmtPlay(t.sec) + ' → ' + Math.round(t.bpm) + ' BPM (' + fmtThousand(t.tempo) + ' µs/qn)'));
+  }
+  const pitches = Object.keys(a.pitchCount || {}).map(Number).sort((x, y) => a.pitchCount[y] - a.pitchCount[x]).slice(0, 10);
+  if (pitches.length) {
+    L.push('');
+    L.push('— Note più suonate —');
+    pitches.forEach(m => L.push(midiToName(m) + ' × ' + a.pitchCount[m]));
+  }
+  if (includeNotes) {
+    const segs = a.noteSegs.slice().sort((x, y) => x.start - y.start);
+    const cap = 500;
+    L.push('');
+    L.push('— Eventi nota (' + (segs.length > cap ? 'prime ' + cap + ' di ' : '') + segs.length + ') —');
+    segs.slice(0, cap).forEach(s => L.push('[' + s.start.toFixed(3) + 's] ' + midiToName(s.midi) + ' · ch' + (s.ch + 1) + ' · vel ' + s.vel + ' · dur ' + s.dur.toFixed(3) + 's'));
+    if (segs.length > cap) L.push('… (' + (segs.length - cap) + ' righe omesse)');
+  }
+  return L.join('\n');
+}
+function populateLog() {
+  logEl.value = reportText(true);
+}
+
+/* =========================================================
+   Player (Tone.js)
+   ========================================================= */
+function setPlayIcon(paused) {
+  playBtn.innerHTML = paused
+    ? '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+}
+function ensurePrepared() {
+  if (state.prepared) return;
+  const notes = state.notes;
+  if (!notes.length) return;
+  const peak = state.analysis ? state.analysis.maxPoly : 0;
+  const voices = Math.max(24, Math.min(128, peak + 12));
+
+  volNode = new Tone.Volume(0).toDestination();
+  synth = new Tone.PolySynth(Tone.Synth, { maxPolyphony: voices }).connect(volNode);
+  const p = parseInt(volumeEl.value || '80', 10);
+  volNode.volume.value = dbFromPct(p);
+  try { Tone.Transport.bpm.value = Math.max(40, Math.min(240, state.bpm)); } catch (e) {}
+
+  tonePart = new Tone.Part((time, val) => {
+    try {
+      synth.triggerAttackRelease(val.note, val.duration, time, val.velocity);
+    } catch (e) { console.error(e); }
+  }, notes).start(0);
+  tonePart.loop = false;
+  state.prepared = true;
+}
+function dbFromPct(p) {
+  p = Math.max(0, Math.min(100, Number(p) || 0));
+  return p === 0 ? -Infinity : -48 + (p / 100) * 48;
+}
+
+async function togglePlay() {
+  if (!state.notes || !state.notes.length) { toast('Questo file non contiene note riproducibili', true); return; }
+  if (typeof Tone === 'undefined') { toast('Tone.js non caricato (offline?) — riproduzione non disponibile', true); return; }
+  if (Tone.context.state !== 'running') { try { await Tone.start(); } catch (e) {} }
+  ensurePrepared();
+
+  if (!state.playing) {
+    const tr = Tone.Transport;
+    if (tr.state === 'paused') { tr.start(); }               // riprendi
+    else { tr.start(undefined, Math.min(state.posSec, state.total)); }
+    state.playing = true;
+    stopBtn.disabled = false;
+    setPlayIcon(true);
+    tick();
+  } else {
+    Tone.Transport.pause();
+    state.playing = false;
+    setPlayIcon(false);
+    updatePlayheadUI(Tone.Transport.seconds || state.posSec);
+  }
+}
+function doStop() {
+  state.playing = false;
+  state.posSec = 0;
+  if (Tone) {
+    try { Tone.Transport.stop(); Tone.Transport.position = '0:0:0'; } catch (e) {}
+  }
+  setPlayIcon(false);
+  stopBtn.disabled = true;
+  timeCur.textContent = '0:00.0';
+  seekEl.value = 0;
+  if (state.activeIdx !== -1) { state.activeIdx = -1; renderStave(); }
+  updateRollOverlay(0);
+}
+function seekTo(sec, updateDisplay) {
+  if (!state.total) return;
+  sec = Math.max(0, Math.min(state.total, Number(sec) || 0));
+  if (state.playing && Tone) {
+    try {
+      Tone.Transport.stop();
+      Tone.Transport.position = '0:0:0';
+      Tone.Transport.start(undefined, sec);
+    } catch (e) {}
+  } else if (Tone && Tone.Transport.state === 'paused') {
+    try { Tone.Transport.stop(); Tone.Transport.position = '0:0:0'; } catch (e) {}
+  }
+  state.posSec = sec;
+  if (updateDisplay) updatePlayheadUI(sec);
+}
+function tick() {
+  if (!state.playing) return;
+  let s = 0;
+  try { s = Tone.Transport.seconds || 0; } catch (e) {}
+  if (state.total > 0 && s >= state.total - 0.005) { doStop(); updatePlayheadUI(state.total); return; }
+  updatePlayheadUI(s);
+  requestAnimationFrame(tick);
+}
+function updatePlayheadUI(s) {
+  s = Math.max(0, Math.min(s, state.total || 0));
+  timeCur.textContent = fmtPlay(s);
+  if (!state.dragging) seekEl.value = Math.round(s * 100) / 100;
+  // evidenziazione partitura (solo se gestibile)
+  const notes = state.notes;
+  let idx = -1;
+  // evidenzia la partitura solo se visibile e gestibile
+  if (currentTab === 'sheet' && state.sheetGeom && notes.length && state.analysis && state.analysis.noteSegs.length <= 2200) {
+    for (let i = 0; i < notes.length; i++) { if (notes[i].time <= s) idx = i; else break; }
+  }
+  if (idx !== state.activeIdx) { state.activeIdx = idx; if (currentTab === 'sheet') renderStave(); }
+  updateRollOverlay(s);
+}
+
+/* =========================================================
+   Partitura (canvas)
+   ========================================================= */
+function renderStave() {
+  const holder = $('stave');
+  const wrap = $('staveWrap');
+  if (!holder || !state.analysis) return;
+  const a = state.analysis;
+  const segs = a.noteSegs;
+  holder.innerHTML = '';
+
+  const wrapW = Math.max(340, wrap.clientWidth - 24 || 900);
+  if (!segs.length) {
+    holder.innerHTML = '<div class="viz-empty">Nessuna nota da disegnare 🎼</div>';
+    state.sheetGeom = null;
+    return;
+  }
+  if (segs.length > 8000) {
+    holder.innerHTML = '<div class="viz-empty">File molto grande (' + fmtThousand(segs.length) + ' note): partitura disattivata per prestazioni — usa la vista <b>Piano roll</b> 🎹</div>';
+    state.sheetGeom = null;
+    return;
+  }
+
+  // raggruppa per tempo di attacco
+  const eps = 0.0015;
+  const sorted = segs.slice().sort((x, y) => x.start - y.start || x.midi - y.midi);
+  const groups = [];
+  sorted.forEach(s => {
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(s.start - last.time) <= eps) last.notes.push(s);
+    else groups.push({ time: s.start, notes: [s] });
+  });
+
+  const margin = 42, colWidth = 66, lineH = 210;
+  const colsPerLine = Math.max(2, Math.floor((wrapW - margin * 2) / colWidth));
+  const lines = Math.max(1, Math.ceil(groups.length / colsPerLine));
+  const W = wrapW;
+  const H = lines * lineH + 24;
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'sheet-canvas';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.style.cursor = 'pointer';
+  holder.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // foglio
+  ctx.fillStyle = '#fdf9f0';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#cfd6df';
+  ctx.fillStyle = '#23324a';
+  ctx.font = '30px serif';
+
+  // righi + chiave di violino per ogni linea
+  const staffTopOf = (line) => line * lineH + 60;
+  for (let line = 0; line < lines; line++) {
+    const staffTop = staffTopOf(line);
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(margin, staffTop + i * 14);
+      ctx.lineTo(W - margin, staffTop + i * 14);
+      ctx.lineWidth = i === 2 ? 1.1 : 0.8;
+      ctx.stroke();
+    }
+    ctx.fillText('𝄞', margin + 4, staffTop + 4 * 14 - 2);
+  }
+
+  const semitoneY = 7;         // px per semitono
+  const stemLen = 44;
+
+  // funzione durata -> tipo di nota
+  function noteType(dur, bpm) {
+    if (!Number.isFinite(dur) || dur <= 0) return '32nd';
+    const beats = dur * (bpm / 60);
+    if (beats >= 3.5) return 'whole';
+    if (beats >= 1.75) return 'half';
+    if (beats >= 0.9) return 'quarter';
+    if (beats >= 0.45) return 'eighth';
+    if (beats >= 0.22) return '16th';
+    return '32nd';
+  }
+  function drawFlags(x, y, up, count) {
+    for (let i = 0; i < count; i++) {
+      const o = i * 5;
+      ctx.beginPath();
+      if (up) { ctx.moveTo(x, y + o); ctx.quadraticCurveTo(x + 9, y + 5 + o, x + 3, y + 11 + o); }
+      else { ctx.moveTo(x, y - o); ctx.quadraticCurveTo(x - 9, y - 5 - o, x - 3, y - 11 - o); }
+      ctx.fill();
+    }
+  }
+
+  state.sheetGeom = { groups, colsPerLine, lineH, margin, colWidth, W };
+
+  // la nota attiva è l'ultima partita <= tempo corrente
+  const activeNote = state.activeIdx >= 0 && state.activeIdx < state.notes.length ? state.notes[state.activeIdx].midi : null;
+
+  groups.forEach((grp, gi) => {
+    const col = gi % colsPerLine;
+    const row = Math.floor(gi / colsPerLine);
+    const staffTop = staffTopOf(row);
+    const xBase = margin + col * colWidth + colWidth / 2;
+    // posizione: accoda le note di un accordo (con limite per accordi enormi)
+    const nChord = grp.notes.length;
+    const spacing = nChord > 12 ? 0 : (nChord > 6 ? 9 : 13);
+    const off = (i) => xBase + (i - (nChord - 1) / 2) * spacing;
+
+    grp.notes.forEach((s, ni) => {
+      const x = off(ni);
+      const y = staffTop + 4 * 14 - (s.midi - 64) * semitoneY;
+      const isActive = activeNote !== null && s.midi === activeNote && Math.abs(s.start - grp.time) < eps;
+      const color = isActive ? '#e11d74' : getChannelColor(s.ch);
+      const dark = '#1c2733';
+
+      // tagli addizionali fuori dal rigo
+      if (y < staffTop - 10 || y > staffTop + 4 * 14 + 10) {
+        ctx.strokeStyle = '#aab6c4';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x - 16, y); ctx.lineTo(x + 16, y); ctx.stroke();
+      }
+      // testa
+      const nt = noteType(s.dur, state.bpm);
+      ctx.beginPath();
+      ctx.ellipse(x, y, 8, 5.4, -0.25, 0, Math.PI * 2);
+      if (nt === 'whole' || nt === 'half') {
+        ctx.strokeStyle = color; ctx.lineWidth = isActive ? 2 : 1.4; ctx.stroke();
+      } else {
+        ctx.fillStyle = color; ctx.fill();
+        if (isActive) { ctx.fillStyle = 'rgba(225,29,116,.25)'; ctx.fill(); ctx.fillStyle = color; }
+      }
+      ctx.strokeStyle = color; ctx.lineWidth = isActive ? 1.6 : 1.1;
+      // gambo e code
+      if (nt !== 'whole') {
+        const middle = staffTop + 2 * 14;
+        const up = y > middle;
+        const sx = up ? x + 7 : x - 7;
+        const topY = up ? y - stemLen : y + stemLen;
+        ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx, topY); ctx.stroke();
+        ctx.fillStyle = color;
+        if (nt === 'eighth') drawFlags(sx, topY, up, 1);
+        else if (nt === '16th') drawFlags(sx, topY, up, 2);
+        else if (nt === '32nd') drawFlags(sx, topY, up, 3);
+      }
+      // diesis
+      if (s.midi % 12 === 1 || s.midi % 12 === 3 || s.midi % 12 === 6 || s.midi % 12 === 8 || s.midi % 12 === 10) {
+        ctx.fillStyle = dark; ctx.font = '13px serif';
+        ctx.fillText('♯', x - 19, y + 4);
+      }
+      // etichetta nome + canale (solo se c'è spazio tra le note)
+      const label = midiToName(s.midi) + (grp.notes.length > 1 ? '' : '');
+      ctx.font = '10.5px ' + 'ui-monospace,monospace';
+      ctx.fillStyle = isActive ? '#e11d74' : '#3d4b5f';
+      ctx.textAlign = 'center';
+      const lx = x;
+      const ly = (s.midi >= 76) ? y + 16 : y - 14;
+      ctx.fillText(label + (grp.notes.length > 1 && ni === grp.notes.length - 1 ? '  ·ch' + (s.ch + 1) : ''), lx, ly);
+      ctx.textAlign = 'left';
+    });
+    // tempo del gruppo sotto la colonna
+    ctx.font = '9.5px ui-monospace,monospace';
+    ctx.fillStyle = '#8a94a6';
+    ctx.fillText(fmtPlay(grp.time), xBase - 14, staffTop + 5 * 14 + 20);
+  });
+
+  // click-to-seek
+  canvas.onclick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const geom = state.sheetGeom;
+    if (!geom) return;
+    const col = Math.floor((x - geom.margin) / geom.colWidth);
+    if (col < 0) return;
+    const row = Math.floor(y / geom.lineH);
+    const gi = row * geom.colsPerLine + col;
+    if (gi >= 0 && gi < geom.groups.length) {
+      seekTo(geom.groups[gi].time, true);
+    }
+  };
+}
+
+/* =========================================================
+   Piano roll (2 canvas: base statico + overlay playhead)
+   ========================================================= */
+const rollHolder = $('rollHolder');
+const rollBase = $('rollBase');
+const rollOverlay = $('rollOverlay');
+let rollGeom = null;
+let lastHoverSec = null;
+let rollDisabled = false;
+
+function renderRoll() {
+  if (!state.analysis) return;
+  rollDisabled = false;
+  const a = state.analysis;
+  const wrap = $('rollWrap');
+  const W = Math.max(340, rollHolder.clientWidth || wrap.clientWidth || 900);
+  const segs = a.noteSegs;
+  rollBase.width = 0; rollOverlay.width = 0; // azzera per cambi dimensioni
+  if (!segs.length) {
+    rollHolder.innerHTML = '<div class="viz-empty">Nessuna nota da disegnare 🎹</div>';
+    rollGeom = null; rollDisabled = true;
+    return;
+  }
+  if (segs.length > 120000) {
+    rollHolder.innerHTML = '<div class="viz-empty">Troppe note (' + fmtThousand(segs.length) + ') per la visualizzazione.</div>';
+    rollGeom = null; rollDisabled = true;
+    return;
+  }
+
+  const minM = a.minMidi, maxM = a.maxMidi, range = Math.max(1, maxM - minM + 1);
+  const rowH = range <= 30 ? 11 : range <= 55 ? 7 : range <= 90 ? 4.5 : 3;
+  const topPad = 14, bottomPad = 22, leftPad = 42, rightPad = 10;
+  const plotH = Math.max(90, range * rowH);
+  const H = topPad + plotH + bottomPad;
+  const plotW = Math.max(60, W - leftPad - rightPad);
+  const pxPerSec = state.total > 0 ? plotW / state.total : 1;
+
+  rollHolder.innerHTML = '';
+  const holder2 = $('rollHolder');
+  const cb = document.createElement('canvas');
+  const co = document.createElement('canvas');
+  cb.id = 'rollBase2'; co.id = 'rollOverlay2';
+  co.style.cssText = 'position:absolute;inset:0;cursor:pointer';
+  holder2.appendChild(cb); holder2.appendChild(co);
+  holder2.style.position = 'relative';
+  holder2.style.height = H + 'px';
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  [cb, co].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); c.style.width = W + 'px'; c.style.height = H + 'px'; });
+  const bctx = cb.getContext('2d');
+  bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  rollGeom = { W, H, leftPad, rightPad, topPad, bottomPad, plotW, plotH, pxPerSec, minM, maxM, range, rowH };
+
+  // sfondo
+  bctx.fillStyle = '#0a1322';
+  bctx.fillRect(0, 0, W, H);
+  const yOf = (m) => topPad + (maxM - m + 0.5) * rowH;
+  // linee semitono / ottava
+  for (let m = minM; m <= maxM; m++) {
+    const y = yOf(m);
+    const isC = m % 12 === 0;
+    bctx.strokeStyle = isC ? 'rgba(148,163,184,.20)' : 'rgba(148,163,184,.06)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.moveTo(leftPad, y); bctx.lineTo(W - rightPad, y); bctx.stroke();
+  }
+  // note
+  segs.forEach(s => {
+    const x0 = leftPad + s.start * pxPerSec;
+    const x1 = leftPad + s.end * pxPerSec;
+    const w = Math.max(1.5, x1 - x0);
+    const y = yOf(s.midi) - rowH * 0.82;
+    bctx.globalAlpha = 0.5 + 0.45 * Math.min(1, s.vel / 127);
+    bctx.fillStyle = getChannelColor(s.ch);
+    if (w <= 2.5) { bctx.fillRect(x0, y + rowH * 0.2, w, rowH * 0.6); }
+    else {
+      const r = Math.min(3, rowH / 3);
+      rr(bctx, x0, y, w, rowH * 0.84, r);
+      bctx.fill();
+    }
+  });
+  bctx.globalAlpha = 1;
+
+  // etichette ottave (C)
+  bctx.fillStyle = '#64748b';
+  bctx.font = '9.5px ui-monospace,monospace';
+  let step = range > 80 ? 2 : 1;
+  for (let m = minM; m <= maxM; m += step) {
+    if (m % 12 !== 0) continue;
+    bctx.textAlign = 'right';
+    bctx.fillText(midiToName(m), leftPad - 6, yOf(m) + 3);
+  }
+  // ticks temporali
+  const stepSec = niceStep(pxPerSec);
+  bctx.textAlign = 'left';
+  for (let t = 0; t <= state.total; t += stepSec) {
+    const x = leftPad + t * pxPerSec;
+    bctx.strokeStyle = 'rgba(148,163,184,.15)';
+    bctx.beginPath(); bctx.moveTo(x, topPad); bctx.lineTo(x, topPad + plotH); bctx.stroke();
+    bctx.fillStyle = '#8fa3bd';
+    bctx.fillText(fmtPlay(t), x + 3, H - 7);
+  }
+
+  // overlay listeners
+  co.addEventListener('mousemove', (e) => {
+    const r = co.getBoundingClientRect();
+    lastHoverSec = state.total > 0 ? ((e.clientX - r.left - leftPad) / pxPerSec) : 0;
+    drawRollOverlay();
+  });
+  co.addEventListener('mouseleave', () => { lastHoverSec = null; drawRollOverlay(); });
+  co.addEventListener('click', (e) => {
+    const r = co.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    if (x < leftPad || x > W - rightPad) return;
+    seekTo((x - leftPad) / pxPerSec, true);
+  });
+  drawRollOverlay();
+}
+
+function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function niceStep(pxPerSec) {
+  const target = 110;
+  const raw = pxPerSec > 0 ? target / pxPerSec : 60;
+  const steps = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600, 5400, 7200, 10800, 14400, 21600, 28800, 43200, 86400];
+  for (const s of steps) if (s >= raw) return s;
+  return 86400;
+}
+function drawRollOverlay() {
+  const co = $('rollOverlay2') || rollOverlay;
+  const g = rollGeom;
+  if (!co || !g) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const ctx = co.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, g.W, g.H);
+  let s = state.playing ? (Tone ? Tone.Transport.seconds || 0 : state.posSec) : state.posSec;
+  s = Math.max(0, Math.min(s, state.total));
+  const x = g.leftPad + s * g.pxPerSec;
+  // playhead
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, g.topPad - 6); ctx.lineTo(x, g.topPad + g.plotH + 6); ctx.stroke();
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath(); ctx.moveTo(x - 5, g.topPad - 6); ctx.lineTo(x + 5, g.topPad - 6); ctx.lineTo(x, g.topPad + 1); ctx.closePath(); ctx.fill();
+  // pill tempo
+  ctx.font = '600 11px ui-monospace,monospace';
+  const label = fmtPlay(s);
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = '#ffd166';
+  rr(ctx, Math.min(x + 8, g.W - tw - 20), g.topPad - 16, tw + 12, 18, 5); ctx.fill();
+  ctx.fillStyle = '#1a1206';
+  ctx.fillText(label, Math.min(x + 14, g.W - tw - 14), g.topPad - 2);
+  // hover
+  if (lastHoverSec !== null && !state.playing) {
+    const hx = g.leftPad + Math.max(0, Math.min(1, lastHoverSec / (state.total || 1))) * g.pxPerSec;
+    ctx.strokeStyle = 'rgba(148,163,184,.35)';
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(hx, g.topPad); ctx.lineTo(hx, g.topPad + g.plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(13,27,48,.95)';
+    ctx.font = '11px ui-monospace,monospace';
+    const ht = fmtPlay(lastHoverSec);
+    const hw = ctx.measureText(ht).width;
+    rr(ctx, hx + 6, g.topPad + g.plotH - 24, hw + 10, 18, 5); ctx.fill();
+    ctx.fillStyle = '#bcd6e8';
+    ctx.fillText(ht, hx + 11, g.topPad + g.plotH - 10);
+  }
+}
+function updateRollOverlay(s) {
+  if (!state.analysis || rollDisabled) return;
+  if (!rollGeom) { renderRoll(); return; }
+  state.posSec = s;
+  drawRollOverlay();
+}
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(tb => {
+  tb.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === tb));
+    const tab = tb.dataset.tab;
+    currentTab = tab;
+    document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== tab));
+    if (tab === 'roll') requestAnimationFrame(() => renderRoll());
+    if (tab === 'sheet') requestAnimationFrame(() => renderStave());
+  });
+});
+
+/* =========================================================
+   Eventi UI
+   ========================================================= */
+dropZone.addEventListener('click', (e) => {
+  if (e.target.closest('button, a')) return;
+  fileInput.click();
+});
+dropZone.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button, a')) { e.preventDefault(); fileInput.click(); }
+});
+['dragover', 'dragenter'].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove('drag'); }));
+dropZone.addEventListener('drop', (e) => {
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+
+function readFile(f) {
+  const reader = new FileReader();
+  reader.onload = () => handleBuffer(reader.result, f.name);
+  reader.onerror = () => toast('Impossibile leggere il file', true);
+  reader.readAsArrayBuffer(f);
+}
+fileInput.addEventListener('change', () => { if (fileInput.files && fileInput.files[0]) readFile(fileInput.files[0]); fileInput.value = ''; });
+
+loadExample.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  try {
+    const res = await fetch('longest_midi.hex');
+    if (!res.ok) throw new Error('esempio non trovato');
+    const hex = await res.text();
+    const bytes = hexToUint8Array(hex);
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    await handleBuffer(buf, 'esempio_breve.mid');
+  } catch (err) { toast('Errore caricamento esempio: ' + err.message, true); }
+});
+loadSong.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  try {
+    const res = await fetch('../assets/midi/Vattene_amore.mid');
+    if (!res.ok) throw new Error('non trovato su questo host');
+    const buf = await res.arrayBuffer();
+    await handleBuffer(buf, 'Vattene_amore.mid');
+  } catch (err) { toast('Errore caricamento canzone: ' + err.message, true); }
+});
+
+playBtn.addEventListener('click', togglePlay);
+stopBtn.addEventListener('click', doStop);
+
+speedSel.addEventListener('change', () => {
+  const v = parseFloat(speedSel.value);
+  state.speed = v;
+  if (Tone) { try { Tone.Transport.playbackRate = v; } catch (e) {} }
+});
+volumeEl.addEventListener('input', () => {
+  if (volNode) volNode.volume.value = dbFromPct(volumeEl.value);
+});
+
+seekEl.addEventListener('input', () => {
+  state.dragging = true;
+  const v = parseFloat(seekEl.value);
+  timeCur.textContent = fmtPlay(v);
+  state.posSec = v;
+  drawRollOverlay();
+});
+seekEl.addEventListener('change', () => {
+  state.dragging = false;
+  seekTo(parseFloat(seekEl.value), true);
+});
+
+copyReportBtn.addEventListener('click', async () => {
+  const txt = reportText(false);
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('📋 Report copiato negli appunti');
+  } catch (e) {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('📋 Report copiato'); } catch (e2) { toast('Copia non riuscita', true); }
+    ta.remove();
+  }
+});
+
+// scorciatoia: barra spaziatrice play/pausa
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space') return;
+  const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || document.activeElement === dropZone) return;
+  if (!playerSection.classList.contains('hidden') && !playBtn.disabled) {
+    e.preventDefault();
+    togglePlay();
+  }
+});
+
+// ridisegna se cambia la larghezza
+let resizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => { renderRoll(); renderStave(); }, 180);
+});
+</script>
+<script src="top_buttons.js"></script>
 </body>
 </html>

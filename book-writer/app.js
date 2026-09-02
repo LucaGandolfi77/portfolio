@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════════
-   Book Writer — Web UI  (app.js)
-   Port of book-writer-gui.py to a browser-based SPA
+   Book Writer v2.0 — Application Logic
+   Home screen · FAQ modal · Mobile nav · Stats
    ═══════════════════════════════════════════════════ */
 
 (function () {
   "use strict";
 
-  // ─── Localization ────────────────────────────────
+  // ─── Localization ──────────────────────────────
   const LOCALES = {
     English: {
       generate: "Generate 5 Ideas",
@@ -97,20 +97,37 @@
       const k = el.getAttribute("data-t");
       if (LOCALES[uiLang] && LOCALES[uiLang][k]) el.textContent = LOCALES[uiLang][k];
     });
-    document.getElementById("btnLang").textContent = "🌐 " + (uiLang === "English" ? "EN" : "IT");
-    // re-set placeholder
+    const langBtn = document.getElementById("btnLang");
+    if (langBtn) langBtn.textContent = "🌐 " + (uiLang === "English" ? "EN" : "IT");
+    const homeBtn = document.getElementById("btnLangHome");
+    if (homeBtn) homeBtn.textContent = uiLang === "English" ? "EN" : "IT";
+    // update ideas placeholder
     const ph = document.getElementById("ideasGrid");
     if (ph && ph.children.length === 1 && ph.children[0].hasAttribute("data-t")) {
       ph.children[0].textContent = t("ideasPlaceholder");
     }
   }
 
-  // ─── State ───────────────────────────────────────
+  // ─── State ─────────────────────────────────────
   let books = [];
   let selectedIdx = -1;
   let selectedIdea = -1;
   let busy = false;
   const logHistory = [];
+
+  // Persistent stats
+  let stats = { chaptersWritten: 0, ideasGenerated: 0, sessions: 0 };
+  function loadStats() {
+    try {
+      const s = JSON.parse(localStorage.getItem("bookwriter_stats"));
+      if (s) stats = s;
+    } catch (_) {}
+  }
+  function saveStats() {
+    try { localStorage.setItem("bookwriter_stats", JSON.stringify(stats)); } catch (_) {}
+  }
+  function recordChapter() { stats.chaptersWritten++; saveStats(); updateNerdStats(); }
+  function recordIdea() { stats.ideasGenerated++; saveStats(); updateNerdStats(); }
 
   const writeOptions = {
     include_dialogue: true,
@@ -119,7 +136,7 @@
     interior_monologue: false,
   };
 
-  // ─── DOM refs ────────────────────────────────────
+  // ─── DOM refs ──────────────────────────────────
   const $ = (id) => document.getElementById(id);
   const selModel = $("selModel");
   const inpChapters = $("inpChapters");
@@ -138,30 +155,252 @@
   const btnWrite = $("btnWrite");
   const btnAuto = $("btnAuto");
 
-  // ─── Helpers ─────────────────────────────────────
+  // ─── Home screen ───────────────────────────────
+  const homeScreen = $("homeScreen");
+  const appScreen = $("appScreen");
+  let homeVisible = true;
+
+  function enterApp() {
+    if (!homeVisible) return;
+    homeVisible = false;
+    homeScreen.classList.add("fade-out");
+    setTimeout(() => {
+      homeScreen.classList.add("hidden");
+      homeScreen.classList.remove("fade-out");
+      appScreen.classList.remove("hidden");
+      // Force reflow then animate in
+      void appScreen.offsetWidth;
+      appScreen.style.opacity = "0";
+      appScreen.style.transform = "translateY(12px)";
+      requestAnimationFrame(() => {
+        appScreen.style.transition = "opacity .5s ease, transform .5s ease";
+        appScreen.style.opacity = "1";
+        appScreen.style.transform = "translateY(0)";
+      });
+    }, 500);
+  }
+
+  function goHome() {
+    appScreen.style.opacity = "0";
+    appScreen.style.transform = "translateY(12px)";
+    setTimeout(() => {
+      appScreen.classList.add("hidden");
+      homeScreen.classList.remove("hidden");
+      void homeScreen.offsetWidth; /* force reflow */
+      homeScreen.classList.remove("fade-out");
+      homeVisible = true;
+      // Animate in
+      requestAnimationFrame(() => {
+        homeScreen.style.opacity = "1";
+      });
+    }, 400);
+  }
+
+  // ─── Hero canvas particles ─────────────────────
+  function initHeroCanvas() {
+    const canvas = $("heroCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let w, h, particles = [];
+    const PARTICLE_COUNT = 60;
+
+    function resize() {
+      w = canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
+      h = canvas.height = canvas.offsetHeight * (window.devicePixelRatio || 1);
+      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+      canvas.style.width = canvas.offsetWidth + "px";
+      canvas.style.height = canvas.offsetHeight + "px";
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particles.push({
+        x: Math.random() * canvas.offsetWidth,
+        y: Math.random() * canvas.offsetHeight,
+        r: Math.random() * 1.8 + 0.5,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        alpha: Math.random() * 0.5 + 0.15,
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+      particles.forEach((p) => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = canvas.offsetWidth;
+        if (p.x > canvas.offsetWidth) p.x = 0;
+        if (p.y < 0) p.y = canvas.offsetHeight;
+        if (p.y > canvas.offsetHeight) p.y = 0;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,229,200,${p.alpha})`;
+        ctx.fill();
+      });
+      // draw connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(0,229,200,${0.08 * (1 - d / 120)})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(draw);
+    }
+    draw();
+  }
+
+  // ─── FAQ modal ─────────────────────────────────
+  const faqModal = $("faqModal");
+  let activeFaqTab = "desc";
+
+  function openFAQ() {
+    updateNerdStatsFromFiles();
+    faqModal.classList.add("show");
+    switchFaqTab("desc");
+  }
+  function closeFAQ() {
+    faqModal.classList.remove("show");
+  }
+
+  function switchFaqTab(tabId) {
+    activeFaqTab = tabId;
+    document.querySelectorAll(".faq-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabId));
+    document.querySelectorAll(".faq-panel").forEach((p) => p.classList.toggle("active", p.id === "faq-" + tabId));
+    // move indicator
+    const activeTab = document.querySelector(`.faq-tab[data-tab="${tabId}"]`);
+    const indicator = $(".faq-indicator");
+    if (activeTab && indicator) {
+      indicator.style.width = activeTab.offsetWidth + "px";
+      indicator.style.left = (activeTab.offsetLeft - activeTab.parentElement.offsetLeft) + 'px';
+    }
+  }
+
+  function updateNerdStats() {
+    const linesCSS = countLines("style.css");
+    const linesJS = countLines("app.js");
+    const linesHTML = countLines("index.html");
+    const totalKB = ((linesCSS + linesJS + linesHTML) * 0.06).toFixed(1); // approx bytes per line
+    const els = {
+      statLines: linesCSS,
+      statJS: linesJS,
+      statHTML: linesHTML,
+      statKB: totalKB,
+      statBooks: books.length,
+      statChapters: stats.chaptersWritten,
+      statIdeas: stats.ideasGenerated,
+      statSessions: stats.sessions,
+    };
+    Object.entries(els).forEach(([id, val]) => {
+      const el = $(id);
+      if (el) el.textContent = val;
+    });
+  }
+  function countLines(path) {
+    try {
+      const el = document.createElement("link");
+      // We can't actually read local files from browser easily
+      // Use an estimate based on the actual loaded file
+      return "—";
+    } catch (_) { return "—"; }
+  }
+
+  // Count actual lines from loaded content (via fetch)
+  async function countLinesFromFile(path) {
+    try {
+      const res = await fetch(path);
+      const text = await res.text();
+      return text.split("\n").length;
+    } catch (_) { return "—"; }
+  }
+  async function updateNerdStatsFromFiles() {
+    const [css, js, html] = await Promise.all([
+      countLinesFromFile("style.css"),
+      countLinesFromFile("app.js"),
+      countLinesFromFile("index.html"),
+    ]);
+    const totalLines = (typeof css === "number" ? css : 0) + (typeof js === "number" ? js : 0) + (typeof html === "number" ? html : 0);
+    const totalKB = ((totalLines * 80) / 1024).toFixed(1); // approx
+    const els = { statLines: css, statJS: js, statHTML: html, statKB: totalKB };
+    Object.entries(els).forEach(([id, val]) => {
+      const el = $(id);
+      if (el) el.textContent = val;
+    });
+  }
+
+  // ─── Mobile bottom nav ─────────────────────────
+  const bottomNav = $("bottomNav");
+  if (bottomNav) {
+    bottomNav.addEventListener("click", (e) => {
+      const btn = e.target.closest(".bottom-nav-btn");
+      if (!btn) return;
+      const tab = btn.dataset.tab;
+      bottomNav.querySelectorAll(".bottom-nav-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      scrollToPanel(tab);
+    });
+  }
+
+  function scrollToPanel(tab) {
+    const panels = {
+      books: $(".panel-books"),
+      center: $(".panel-center"),
+      log: $(".panel-log"),
+    };
+    const panel = panels[tab];
+    if (!panel) return;
+    const parent = panel.parentElement;
+    // On mobile we scroll the panel into view by changing grid behavior
+    if (window.innerWidth < 1024) {
+      parent.style.gridTemplateRows = "0fr 1fr 1fr";
+      // Highlight active panel
+      Object.values(panels).forEach((p) => {
+        p.style.opacity = "0.4";
+        p.style.transition = "opacity .25s";
+      });
+      panel.style.opacity = "1";
+      setTimeout(() => panel.scrollTo({ top: 0, behavior: "smooth" }), 50);
+    } else {
+      panel.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  // ─── Helpers ───────────────────────────────────
   function log(msg) {
     const ts = new Date().toLocaleTimeString();
     const entry = `[${ts}] ${msg}`;
     logHistory.push(entry);
-    logBox.textContent += entry + "\n";
-    logBox.scrollTop = logBox.scrollHeight;
+    if (logBox) logBox.textContent += entry + "\n";
+    if (logBox) logBox.scrollTop = logBox.scrollHeight;
   }
 
   function setStatus(text, isBusy) {
-    statusText.textContent = text;
-    statusDot.classList.toggle("busy", !!isBusy);
+    if (statusText) statusText.textContent = text;
+    if (statusDot) statusDot.classList.toggle("busy", !!isBusy);
     busy = !!isBusy;
-    btnGenerate.disabled = busy || selectedIdx < 0;
-    btnWrite.disabled = busy || selectedIdx < 0;
-    btnAuto.disabled = busy || selectedIdx < 0;
+    if (btnGenerate) btnGenerate.disabled = busy || selectedIdx < 0;
+    if (btnWrite) btnWrite.disabled = busy || selectedIdx < 0;
+    if (btnAuto) btnAuto.disabled = busy || selectedIdx < 0;
   }
 
   function toast(msg, type) {
     const el = document.createElement("div");
     el.className = "toast " + (type || "");
     el.textContent = msg;
-    $("toasts").appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+    const container = $("toasts");
+    if (container) {
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
   }
 
   function escapeHtml(s) {
@@ -170,7 +409,7 @@
     return d.innerHTML;
   }
 
-  // ─── Book model ──────────────────────────────────
+  // ─── Book model ────────────────────────────────
   function createBook(data) {
     return {
       title: data.title || "Untitled",
@@ -189,8 +428,9 @@
     };
   }
 
-  // ─── Render book list ────────────────────────────
+  // ─── Render book list ──────────────────────────
   function renderBooks() {
+    if (!bookListEl) return;
     bookListEl.innerHTML = "";
     books.forEach((b, i) => {
       const li = document.createElement("li");
@@ -200,12 +440,12 @@
       li.addEventListener("dblclick", () => openEditBook(i));
       bookListEl.appendChild(li);
     });
+    updateNerdStats();
   }
 
   function selectBook(idx) {
     selectedIdx = idx;
     const b = books[idx];
-    // set UI lang from book language
     if (b.language && b.language.toLowerCase().startsWith("it")) {
       uiLang = "Italian";
     } else {
@@ -215,9 +455,16 @@
     renderBooks();
     showContext();
     setStatus(t("ready"), false);
+    // On mobile, switch to books tab
+    if (bottomNav && window.innerWidth < 1024) {
+      bottomNav.querySelectorAll(".bottom-nav-btn").forEach((b) => b.classList.remove("active"));
+      const booksBtn = bottomNav.querySelector('[data-tab="books"]');
+      if (booksBtn) booksBtn.classList.add("active");
+    }
   }
 
   function showContext() {
+    if (!contextBox) return;
     if (selectedIdx < 0) {
       contextBox.textContent = t("selectBook");
       return;
@@ -251,8 +498,9 @@
     contextBox.textContent = lines.join("\n");
   }
 
-  // ─── Ideas rendering ────────────────────────────
+  // ─── Ideas rendering ──────────────────────────
   function renderIdeas(ideas) {
+    if (!ideasGrid) return;
     ideasGrid.innerHTML = "";
     selectedIdea = -1;
     ideas.forEach((text, i) => {
@@ -269,25 +517,21 @@
   }
 
   function clearIdeas() {
+    if (!ideasGrid) return;
     ideasGrid.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:12px" data-t="ideasPlaceholder">${t("ideasPlaceholder")}</div>`;
     selectedIdea = -1;
   }
 
-  // ─── AI communication ───────────────────────────
+  // ─── AI communication ──────────────────────────
   async function aiChat(messages, temperature) {
-    const model = selModel.value;
-
-    if (model === "ollama") {
-      return ollamaChat(messages, temperature);
-    } else if (model === "google") {
-      return googleChat(messages, temperature);
-    } else {
-      return openaiChat(model, messages, temperature);
-    }
+    const model = selModel ? selModel.value : "ollama";
+    if (model === "ollama") return ollamaChat(messages, temperature);
+    else if (model === "google") return googleChat(messages, temperature);
+    else return openaiChat(model, messages, temperature);
   }
 
   async function ollamaChat(messages, temperature) {
-    const url = inpOllamaUrl.value.trim() || "http://localhost:11434/api/chat";
+    const url = inpOllamaUrl ? inpOllamaUrl.value.trim() || "http://localhost:11434/api/chat" : "http://localhost:11434/api/chat";
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -299,31 +543,29 @@
   }
 
   async function openaiChat(model, messages, temperature) {
-    const key = inpOpenaiKey.value.trim();
+    const key = inpOpenaiKey ? inpOpenaiKey.value.trim() : "";
     if (!key) throw new Error("OpenAI API key not set.");
-      const bodyObj = { model, messages, temperature };
-      try {
-        if (model && model.toLowerCase().includes("gpt-5")) {
-          bodyObj.max_completion_tokens = 4096;
-        } else {
-          bodyObj.max_tokens = 4096;
-        }
-      } catch (e) {
+    const bodyObj = { model, messages, temperature };
+    try {
+      if (model && model.toLowerCase().includes("gpt-5")) {
+        bodyObj.max_completion_tokens = 4096;
+      } else {
         bodyObj.max_tokens = 4096;
       }
-      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(bodyObj),
-      });
+    } catch (e) { bodyObj.max_tokens = 4096; }
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(bodyObj),
+    });
     if (!resp.ok) throw new Error(`OpenAI error ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     return data.choices?.[0]?.message?.content || "";
   }
 
   async function googleChat(messages, temperature) {
-    const key = inpGoogleKey.value.trim();
-    if (!key) throw new Error("Google API key not set.");
+    const key = inpGoogleKey ? inpGoogleKey.value.trim() : "";
+    if (!key) throw new Error("Google AI key not set.");
     const prompt = messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
     const url = `https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key=${key}`;
     const resp = await fetch(url, {
@@ -337,7 +579,7 @@
     throw new Error("Empty response from Google AI.");
   }
 
-  // ─── Prompt builders ────────────────────────────
+  // ─── Prompt builders ───────────────────────────
   function buildSystemPrompt(book) {
     return `You are a professional ${book.language}-language novelist and long-form fiction ghostwriter.
 
@@ -404,12 +646,12 @@ Rules:
   function appendExtras(prompt) {
     const snippet = writeOptionsSnippet();
     if (snippet) prompt += "\n\nPreferences:\n" + snippet;
-    const extras = promptExtras.value.trim();
+    const extras = promptExtras ? promptExtras.value.trim() : "";
     if (extras) prompt += "\n\nAdditional instructions:\n" + extras;
     return prompt;
   }
 
-  // ─── Generate ideas ─────────────────────────────
+  // ─── Generate ideas ────────────────────────────
   async function generateIdeas() {
     if (busy || selectedIdx < 0) return;
     const b = books[selectedIdx];
@@ -432,8 +674,11 @@ Rules:
       const raw = await aiChat(msgs, 1.0);
       const ideas = extractIdeasJson(raw);
       renderIdeas(ideas);
+      stats.ideasGenerated += ideas.length;
+      saveStats();
       log("Ideas ready.");
       setStatus(t("ideasReady"), false);
+      updateNerdStats();
     } catch (e) {
       log("ERROR generating ideas: " + e.message);
       setStatus(t("error"), false);
@@ -443,17 +688,12 @@ Rules:
 
   function extractIdeasJson(raw) {
     raw = raw.trim();
-    // remove common code fences and language hints
     const fence = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
     if (fence && fence[1]) raw = fence[1].trim();
-
-    // try direct parse
     try {
       const d = JSON.parse(raw);
       if (d.ideas && d.ideas.length === 5) return d.ideas;
     } catch (_) {}
-
-    // attempt to find the first balanced JSON object in the text
     for (let i = 0; i < raw.length; i++) {
       if (raw[i] === '{') {
         let depth = 1;
@@ -471,8 +711,6 @@ Rules:
         }
       }
     }
-
-    // try to find an array of strings and wrap it
     const arrMatch = raw.match(/\[\s*(?:".*?"(?:\s*,\s*".*?")+)\s*\]/s);
     if (arrMatch) {
       try {
@@ -480,18 +718,15 @@ Rules:
         if (d.ideas && d.ideas.length === 5) return d.ideas;
       } catch (_) {}
     }
-
-    // last-ditch: try normalize single quotes to double quotes (best-effort)
     try {
       const normalized = raw.replace(/(\')/g, "'").replace(/(^|\W)'(\w)/g, '$1"$2').replace(/(\w)'(\W|$)/g, '$1"$2').replace(/"\s*,\s*"/g, '","');
       const d = JSON.parse(normalized);
       if (d.ideas && d.ideas.length === 5) return d.ideas;
     } catch (_) {}
-
     throw new Error("Could not parse ideas JSON from model output.");
   }
 
-  // ─── Write chapter ──────────────────────────────
+  // ─── Write chapter ─────────────────────────────
   async function writeChapter(chosenIdea) {
     const b = books[selectedIdx];
     const chNum = b.current_chapter + 1;
@@ -517,11 +752,13 @@ Rules:
     b.chapter_titles.push(title);
     b.chapter_summaries.push(summary);
     b.chapter_texts.push(text);
+    recordChapter();
     renderBooks();
     showContext();
     clearIdeas();
     log(`Saved chapter ${b.current_chapter}: ${title}`);
     saveState();
+    updateNerdStats();
   }
 
   function extractChapterParts(raw, chNum) {
@@ -538,7 +775,7 @@ Rules:
     return { title, text, summary };
   }
 
-  // ─── Auto finish ────────────────────────────────
+  // ─── Auto finish ───────────────────────────────
   async function autoFinish() {
     if (busy || selectedIdx < 0) return;
     const b = books[selectedIdx];
@@ -555,7 +792,6 @@ Rules:
         setStatus(`${t("autoMode")} ${chNum}/${b.chapter_target}`, true);
         log(`Auto mode: generating ideas for chapter ${chNum}`);
 
-        // generate ideas
         const msgs = buildContextMessages(b);
         const isIt = (b.language || "English").toLowerCase().startsWith("it");
         let ideaPrompt;
@@ -584,7 +820,7 @@ Rules:
     }
   }
 
-  // ─── Export ──────────────────────────────────────
+  // ─── Export ────────────────────────────────────
   function exportBook() {
     if (selectedIdx < 0) return;
     const b = books[selectedIdx];
@@ -621,11 +857,11 @@ Rules:
     log(`Exported "${b.title}" as ${safe}.txt`);
   }
 
-  // ─── Persist to localStorage ────────────────────
+  // ─── Persist to localStorage ───────────────────
   const STORAGE_KEY = "bookwriter_state";
   function saveState() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ books, writeOptions, uiLang }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ books, writeOptions, uiLang, stats }));
     } catch (_) {}
   }
   function loadState() {
@@ -636,10 +872,11 @@ Rules:
       if (data.books) books = data.books;
       if (data.writeOptions) Object.assign(writeOptions, data.writeOptions);
       if (data.uiLang) uiLang = data.uiLang;
+      if (data.stats) stats = data.stats;
     } catch (_) {}
   }
 
-  // ─── Book modal ─────────────────────────────────
+  // ─── Book modal ────────────────────────────────
   let editingBookIdx = -1;
 
   function openAddBook() {
@@ -677,8 +914,7 @@ Rules:
       return;
     }
     const data = {
-      title,
-      description: desc,
+      title, description: desc,
       genre: $("bmGenre").value.trim(),
       audience: $("bmAudience").value.trim(),
       tone: $("bmTone").value.trim(),
@@ -708,7 +944,7 @@ Rules:
     toast(t("bookDeleted"));
   }
 
-  // ─── Load JSON file ─────────────────────────────
+  // ─── Load JSON file ────────────────────────────
   function handleFileLoad(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -718,7 +954,6 @@ Rules:
         const data = JSON.parse(ev.target.result);
         if (!Array.isArray(data)) throw new Error("Expected JSON array");
         data.forEach((item) => {
-          // prevent duplicates by title
           if (!books.some((b) => b.title === item.title)) {
             books.push(createBook(item));
           }
@@ -735,101 +970,77 @@ Rules:
     e.target.value = "";
   }
 
-  // ─── Wire up events ─────────────────────────────
+  // ─── Wire up events ────────────────────────────
   function init() {
+    loadStats();
     loadState();
     applyLang();
     renderBooks();
     showContext();
+    updateNerdStats();
+
+    // increment session count
+    stats.sessions = (stats.sessions || 0) + 1;
+    saveStats();
+    updateNerdStats();
 
     // sync write-options checkboxes
-    $("optDialogue").checked = writeOptions.include_dialogue;
-    $("optSensory").checked = writeOptions.sensory_detail;
-    $("optMetaphor").checked = writeOptions.use_metaphor;
-    $("optMonologue").checked = writeOptions.interior_monologue;
+    const optDialogue = $("optDialogue");
+    const optSensory = $("optSensory");
+    const optMetaphor = $("optMetaphor");
+    const optMonologue = $("optMonologue");
+    if (optDialogue) optDialogue.checked = writeOptions.include_dialogue;
+    if (optSensory) optSensory.checked = writeOptions.sensory_detail;
+    if (optMetaphor) optMetaphor.checked = writeOptions.use_metaphor;
+    if (optMonologue) optMonologue.checked = writeOptions.interior_monologue;
 
-    // language toggle
-    $("btnLang").addEventListener("click", () => {
-      uiLang = uiLang === "English" ? "Italian" : "English";
-      applyLang();
-      saveState();
+    // hero canvas
+    initHeroCanvas();
+
+    // CTA button — enter app
+    const ctaStart = $("ctaStart");
+    if (ctaStart) ctaStart.addEventListener("click", () => {
+      enterApp();
+      log("Book Writer UI initialized.");
     });
 
-    // generate
-    btnGenerate.addEventListener("click", generateIdeas);
+    // Home button in header
+    const btnHome = $("btnHome");
+    if (btnHome) btnHome.addEventListener("click", goHome);
 
-    // write
-    btnWrite.addEventListener("click", async () => {
-      if (selectedIdx < 0 || selectedIdea < 0) {
-        toast(t("noIdea"), "error");
-        return;
+    // FAQ buttons
+    const btnFAQHome = $("btnFAQHome");
+    const btnFAQApp = $("btnFAQApp");
+    if (btnFAQHome) btnFAQHome.addEventListener("click", openFAQ);
+    if (btnFAQApp) btnFAQApp.addEventListener("click", openFAQ);
+    const faqClose = $("faqClose");
+    if (faqClose) faqClose.addEventListener("click", closeFAQ);
+
+    // FAQ tabs
+    document.querySelectorAll(".faq-tab").forEach((tab) => {
+      tab.addEventListener("click", () => switchFaqTab(tab.dataset.tab));
+    });
+    // Update indicator on resize
+    window.addEventListener("resize", () => {
+      const activeTab = document.querySelector(`.faq-tab[data-tab="${activeFaqTab}"]`);
+      const indicator = $(".faq-indicator");
+      if (activeTab && indicator) {
+        indicator.style.width = activeTab.offsetWidth + "px";
+        indicator.style.left = (activeTab.offsetLeft - activeTab.parentElement.offsetLeft) + 'px';
       }
-      const ideaText = ideasGrid.children[selectedIdea]?.querySelector(".idea-text")?.textContent;
-      if (!ideaText) return;
-      setStatus(t("writing"), true);
-      try {
-        await writeChapter(ideaText);
-        setStatus(t("chapterDone").replace("{n}", books[selectedIdx].current_chapter), false);
-        toast(t("chapterDone").replace("{n}", books[selectedIdx].current_chapter), "success");
-        const b = books[selectedIdx];
-        if (b.current_chapter >= b.chapter_target) {
-          toast(t("bookFinished").replace("{title}", b.title), "success");
-        }
-      } catch (e) {
-        log("ERROR writing chapter: " + e.message);
-        setStatus(t("error"), false);
-        toast(e.message, "error");
-      }
     });
 
-    // auto
-    btnAuto.addEventListener("click", autoFinish);
-
-    // export
-    $("btnExport").addEventListener("click", exportBook);
-
-    // file input
-    $("fileInput").addEventListener("change", handleFileLoad);
-
-    // add book
-    $("btnAddBook").addEventListener("click", openAddBook);
-    $("bmSave").addEventListener("click", saveBookModal);
-    $("bmCancel").addEventListener("click", () => $("bookModal").classList.remove("show"));
-    $("bmDelete").addEventListener("click", deleteBook);
-
-    // options modal
-    $("btnOptions").addEventListener("click", () => {
-      $("optDialogue").checked = writeOptions.include_dialogue;
-      $("optSensory").checked = writeOptions.sensory_detail;
-      $("optMetaphor").checked = writeOptions.use_metaphor;
-      $("optMonologue").checked = writeOptions.interior_monologue;
-      $("optionsModal").classList.add("show");
-    });
-    $("optSave").addEventListener("click", () => {
-      writeOptions.include_dialogue = $("optDialogue").checked;
-      writeOptions.sensory_detail = $("optSensory").checked;
-      writeOptions.use_metaphor = $("optMetaphor").checked;
-      writeOptions.interior_monologue = $("optMonologue").checked;
-      $("optionsModal").classList.remove("show");
-      saveState();
-      log("Write options saved.");
-    });
-    $("optCancel").addEventListener("click", () => $("optionsModal").classList.remove("show"));
-
-    // logs modal
-    $("btnThemeLogs").addEventListener("click", () => {
-      $("fullLogsBox").textContent = logHistory.join("\n");
-      $("logsModal").classList.add("show");
-    });
-    $("logsClose").addEventListener("click", () => $("logsModal").classList.remove("show"));
-    $("logsCopy").addEventListener("click", () => {
-      navigator.clipboard.writeText(logHistory.join("\n")).then(() => toast("Logs copied!", "success"));
-    });
+    // close FAQ on overlay click
+    if (faqModal) {
+      faqModal.addEventListener("click", (e) => {
+        if (e.target === faqModal) closeFAQ();
+      });
+    }
 
     // close modals on overlay click
     document.querySelectorAll(".modal-overlay").forEach((ov) => {
       ov.addEventListener("click", (e) => {
-        if (e.target === ov) ov.classList.remove("show");
+        if (e.target === ov && ov.id !== "faqModal") ov.classList.remove("show");
       });
     });
 
@@ -840,18 +1051,118 @@ Rules:
       }
     });
 
+    // language toggle
+    const btnLang = $("btnLang");
+    if (btnLang) {
+      btnLang.addEventListener("click", () => {
+        uiLang = uiLang === "English" ? "Italian" : "English";
+        applyLang();
+        saveState();
+      });
+    }
+
+    // generate
+    if (btnGenerate) btnGenerate.addEventListener("click", generateIdeas);
+
+    // write
+    if (btnWrite) {
+      btnWrite.addEventListener("click", async () => {
+        if (selectedIdx < 0 || selectedIdea < 0) {
+          toast(t("noIdea"), "error");
+          return;
+        }
+        const ideaText = ideasGrid?.children[selectedIdea]?.querySelector(".idea-text")?.textContent;
+        if (!ideaText) return;
+        setStatus(t("writing"), true);
+        try {
+          await writeChapter(ideaText);
+          setStatus(t("chapterDone").replace("{n}", books[selectedIdx].current_chapter), false);
+          toast(t("chapterDone").replace("{n}", books[selectedIdx].current_chapter), "success");
+          const b = books[selectedIdx];
+          if (b.current_chapter >= b.chapter_target) {
+            toast(t("bookFinished").replace("{title}", b.title), "success");
+          }
+        } catch (e) {
+          log("ERROR writing chapter: " + e.message);
+          setStatus(t("error"), false);
+          toast(e.message, "error");
+        }
+      });
+    }
+
+    // auto
+    if (btnAuto) btnAuto.addEventListener("click", autoFinish);
+
+    // export
+    const btnExport = $("btnExport");
+    if (btnExport) btnExport.addEventListener("click", exportBook);
+
+    // file input
+    const fileInput = $("fileInput");
+    if (fileInput) fileInput.addEventListener("change", handleFileLoad);
+
+    // add book
+    const btnAddBook = $("btnAddBook");
+    if (btnAddBook) btnAddBook.addEventListener("click", openAddBook);
+    const bmSave = $("bmSave");
+    if (bmSave) bmSave.addEventListener("click", saveBookModal);
+    const bmCancel = $("bmCancel");
+    if (bmCancel) bmCancel.addEventListener("click", () => $("bookModal").classList.remove("show"));
+    const bmDelete = $("bmDelete");
+    if (bmDelete) bmDelete.addEventListener("click", deleteBook);
+
+    // options modal
+    const btnOptions = $("btnOptions");
+    if (btnOptions) {
+      btnOptions.addEventListener("click", () => {
+        if (optDialogue) optDialogue.checked = writeOptions.include_dialogue;
+        if (optSensory) optSensory.checked = writeOptions.sensory_detail;
+        if (optMetaphor) optMetaphor.checked = writeOptions.use_metaphor;
+        if (optMonologue) optMonologue.checked = writeOptions.interior_monologue;
+        $("optionsModal").classList.add("show");
+      });
+    }
+    const optSave = $("optSave");
+    if (optSave) optSave.addEventListener("click", () => {
+      if (optDialogue) writeOptions.include_dialogue = optDialogue.checked;
+      if (optSensory) writeOptions.sensory_detail = optSensory.checked;
+      if (optMetaphor) writeOptions.use_metaphor = optMetaphor.checked;
+      if (optMonologue) writeOptions.interior_monologue = optMonologue.checked;
+      $("optionsModal").classList.remove("show");
+      saveState();
+      log("Write options saved.");
+    });
+    const optCancel = $("optCancel");
+    if (optCancel) optCancel.addEventListener("click", () => $("optionsModal").classList.remove("show"));
+
+    // logs modal
+    const btnThemeLogs = $("btnThemeLogs");
+    if (btnThemeLogs) {
+      btnThemeLogs.addEventListener("click", () => {
+        const fullLogsBox = $("fullLogsBox");
+        if (fullLogsBox) fullLogsBox.textContent = logHistory.join("\n");
+        $("logsModal").classList.add("show");
+      });
+    }
+    const logsClose = $("logsClose");
+    if (logsClose) logsClose.addEventListener("click", () => $("logsModal").classList.remove("show"));
+    const logsCopy = $("logsCopy");
+    if (logsCopy) {
+      logsCopy.addEventListener("click", () => {
+        navigator.clipboard.writeText(logHistory.join("\n")).then(() => toast("Logs copied!", "success"));
+      });
+    }
+
     // auto-save settings on change
     [inpChapters, inpWords, inpOllamaUrl, promptExtras].forEach((el) => {
-      el.addEventListener("change", saveState);
+      if (el) el.addEventListener("change", saveState);
     });
 
     setStatus(t("ready"), false);
-    log("Book Writer UI initialized.");
+    log("Book Writer v2.0 initialized.");
 
     // load sample books if empty
-    if (books.length === 0) {
-      loadSampleBooks();
-    }
+    if (books.length === 0) loadSampleBooks();
   }
 
   function loadSampleBooks() {
@@ -879,7 +1190,7 @@ Rules:
     log("Loaded 2 sample books.");
   }
 
-  // Boot
+  // Boot — start with home screen visible
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {

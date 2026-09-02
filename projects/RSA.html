@@ -1,256 +1,645 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>RSA Key Generator — Luca Gandolfi</title>
-  <link href="../assets/css/main.css" rel="stylesheet">
-    <style>
-    body{font-family:Inter,system-ui,Segoe UI,Arial;background:#071023;color:#e6f7ff;padding:24px}
-    .wrap{max-width:980px;margin:0 auto}
-    h1{margin:0 0 12px}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-    select,input,button,textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
-    button{background:#00d4ff;color:#002;border:none}
-    pre{background:rgba(255,255,255,0.03);padding:12px;border-radius:8px;overflow:auto}
-    /* Allow long BigInt values to wrap and use a smaller monospace font */
-    .keys pre{
-      white-space: pre-wrap;
-      word-break: break-all;
-      font-size: 0.85rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
-      line-height: 1.3;
-    }
-    .keys{display:block;gap:8px}
-    .keys h3{margin:12px 0 6px}
-    .small{font-size:0.9rem;color:#9fcfff}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#070d1c" />
+<meta name="color-scheme" content="dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="description" content="Laboratorio crittografico nel browser: RSA (genera, cifra, firma, passo-passo visuale), AES-256-GCM, cifrari classici (Cesare, Vigenère, XOR), SHA/HMAC. Solo educativo. iPhone + desktop." />
+<title>Lab Crittografico — RSA, AES e altro</title>
+<style>
+  :root{
+    --bg:#070d1c; --txt:#eaf2ff; --muted:#93a7c6;
+    --line:rgba(255,255,255,.1); --line2:rgba(255,255,255,.22);
+    --cyan:#00e0ff; --blue:#4ea8ff; --violet:#8b6cff; --pink:#ff5d9e; --gold:#ffd166; --lime:#a9ff8a; --green:#4ade80;
+    --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0}
+  body{
+    min-height:100vh;color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(1100px 540px at 88% -8%, rgba(0,224,255,.13), transparent 60%),
+      radial-gradient(900px 520px at -8% 30%, rgba(139,108,255,.14), transparent 55%),
+      radial-gradient(700px 520px at 105% 105%, rgba(255,93,158,.08), transparent 60%),
+      var(--bg);
+    background-attachment:fixed;line-height:1.5;
+  }
+  .wrap{max-width:1020px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 14px 70px}
+
+  .hero{display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .tile{width:58px;height:58px;border-radius:17px;flex:none;display:grid;place-items:center;font-size:29px;
+    background:linear-gradient(135deg,rgba(0,224,255,.2),rgba(139,108,255,.2));border:1px solid rgba(0,224,255,.45)}
+  .hero h1{margin:0;font-size:clamp(1.5rem,4.6vw,2.2rem);letter-spacing:-.5px;
+    background:linear-gradient(92deg,#fff,var(--cyan) 45%,var(--violet) 80%,var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{margin:4px 0 0;color:var(--muted);font-size:.92rem;max-width:660px}
+
+  .tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{appearance:none;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:#cfe0f5;cursor:pointer;
+    border-radius:999px;padding:10px 15px;font:inherit;font-size:.88rem;font-weight:800;white-space:nowrap;transition:all .15s}
+  .tab.on{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#031018;border-color:transparent}
+
+  .panel{display:none;animation:fade .25s ease}
+  .panel.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border:1px solid var(--line);
+    border-radius:20px;box-shadow:0 16px 44px rgba(0,0,0,.3);padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:1.06rem;display:flex;align-items:center;gap:8px}
+  .card .sub{color:var(--muted);font-size:.83rem;margin-bottom:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  label.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+  input[type=text],input[type=number],input[type=password],select,textarea{
+    background:rgba(0,0,0,.26);border:1.5px solid var(--line2);color:var(--txt);border-radius:12px;
+    padding:11px 12px;font:inherit;font-size:.94rem;outline:none;min-height:44px;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,224,255,.15)}
+  textarea{min-height:76px;resize:vertical;font-family:var(--mono);font-size:.88rem;line-height:1.5}
+  textarea.code{min-height:96px}
+  .mono{font-family:var(--mono);font-size:.85rem;word-break:break-all;white-space:pre-wrap;line-height:1.5}
+  pre.box{background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px;padding:12px;overflow:auto;
+    white-space:pre-wrap;word-break:break-all;font-family:var(--mono);font-size:.82rem;line-height:1.5;margin:8px 0}
+  .btn{appearance:none;border:none;cursor:pointer;border-radius:12px;padding:12px 18px;font:inherit;font-weight:900;
+    font-size:.92rem;color:#031018;display:inline-flex;align-items:center;gap:8px;transition:filter .15s,transform .08s}
+  .btn:active{transform:scale(.98)}
+  .btn:disabled{opacity:.5;cursor:wait}
+  .btn.cyan{background:linear-gradient(135deg,var(--cyan),var(--blue))}
+  .btn.violet{background:linear-gradient(135deg,#9d7bff,#c084fc);color:#150426}
+  .btn.pink{background:linear-gradient(135deg,#ff8ab0,#ff5d9e);color:#2a0613}
+  .btn.lime{background:linear-gradient(135deg,#c3ff9e,#7ddb61);color:#10240a}
+  .btn.gold{background:linear-gradient(135deg,#ffe08a,#ffb347);color:#2a1c02}
+  .btn.ghost{background:rgba(255,255,255,.07);color:var(--txt);border:1px solid var(--line2)}
+  .btn.sm{padding:9px 13px;font-size:.82rem;border-radius:10px}
+  .mini{appearance:none;border:1px solid var(--line2);background:rgba(255,255,255,.06);color:#d5e6fb;cursor:pointer;
+    border-radius:9px;padding:8px 10px;font-size:.78rem;font-weight:800}
+  .mini:active{background:rgba(255,255,255,.14)}
+  .statline{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .stat{font-family:var(--mono);font-size:.72rem;padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.05);
+    border:1px solid var(--line);color:#b9d4ef}
+  .stat b{color:var(--cyan)}
+  .out{display:block;margin-top:8px;font-family:var(--mono);font-size:.84rem;white-space:pre-wrap;word-break:break-all;
+    background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:12px;line-height:1.5;min-height:44px}
+  .good{color:var(--lime);font-weight:800}.bad{color:#ff8fa8;font-weight:800}
+  .hint{font-size:.76rem;color:#5f7194;line-height:1.55;margin-top:6px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-family:var(--mono);font-size:.8rem;margin:10px 0}
+  .kv .k{color:var(--muted);text-align:right;white-space:nowrap}
+  .kv .v{word-break:break-all;color:#d7ecff}
+
+  /* visualizzazione RSA */
+  .flow{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+  .fstep{position:relative;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.03)}
+  .fstep .fn{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);font-weight:900;margin-bottom:3px}
+  .fstep .fe{font-family:var(--mono);font-size:.86rem;line-height:1.6;color:#e8f3ff;word-break:break-word}
+  .fstep .fe b{color:var(--gold)}
+  .fstep.arrow::after{content:"▼";position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:var(--violet);font-size:11px;z-index:2}
+  .fstep.ok{border-color:rgba(169,255,138,.4)}
+  .fstep.ok .fn{color:var(--lime)}
+  .fstep .tag{display:inline-block;font-size:.62rem;padding:2px 8px;border-radius:99px;margin-left:6px;background:rgba(255,255,255,.08);color:var(--muted);vertical-align:middle}
+  .demo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:10px}
+
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);z-index:90;
+    background:rgba(10,20,38,.97);border:1px solid rgba(0,224,255,.45);color:#dffbff;border-radius:999px;padding:11px 18px;
+    font-size:.85rem;font-weight:800;opacity:0;transition:opacity .25s;pointer-events:none;max-width:92vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  #toast.on{opacity:1}
+  .spin{width:15px;height:15px;border-radius:50%;border:2.5px solid rgba(3,16,24,.3);border-top-color:#031018;animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  footer{margin-top:26px;color:#56688a;font-size:.76rem;text-align:center;line-height:1.7}
+  footer b{color:#8fa8cc}
+  .modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:14px;
+    background:rgba(3,6,15,.75);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .modal.on{display:flex}
+  .mbox{width:min(680px,100%);max-height:86vh;overflow:auto;background:#101a30;border:1px solid rgba(255,255,255,.14);
+    border-radius:20px;padding:18px;box-shadow:0 30px 90px rgba(0,0,0,.6)}
+  .mbox h3{margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .mbox p,.mbox li{font-size:.92rem;line-height:1.7;color:#dbe8fb}
+  .mbox b{color:var(--gold)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>RSA Key Generator (in-browser)</h1>
-    <p class="small">Generate RSA keypairs using BigInt. Uses Miller–Rabin primality tests, coprime search and modular inverse. Do not use for production-critical systems: this is an educational demo.</p>
-
-    <div class="controls">
-      <label for="bits">Bit length</label>
-      <select id="bits">
-        <option value="512">512 (fast)</option>
-        <option value="1024" selected>1024</option>
-        <option value="2048">2048 (slow)</option>
-      </select>
-      <button id="gen">Generate Keypair</button>
-      <button id="copy">Copy Private Key</button>
-      <button id="infoBtn">Info</button>
+<main class="wrap">
+  <header class="hero">
+    <div class="tile">🔐</div>
+    <div>
+      <h1>Laboratorio crittografico</h1>
+      <p>RSA, AES, cifrari classici e hash — generati, provati e <b>visualizzati</b> direttamente nel browser. Strumento educativo: non usare le chiavi per sistemi reali.</p>
     </div>
+  </header>
 
-    <div class="keys">
-      <h3>Public key</h3>
-      <pre id="pub">—</pre>
+  <nav class="tabs" aria-label="Strumenti">
+    <button class="tab on" data-tab="rsa">🔑 RSA</button>
+    <button class="tab" data-tab="aes">🔒 AES</button>
+    <button class="tab" data-tab="classic">🎭 Classici</button>
+    <button class="tab" data-tab="hash">🧮 Hash</button>
+    <button class="tab" data-tab="visual">🩻 Come funziona l'RSA</button>
+  </nav>
 
-      <h3>Private key</h3>
-      <pre id="priv">—</pre>
-    </div>
-
-    <h3 style="margin-top:12px">Encrypt / Decrypt</h3>
-    <textarea id="plain" rows="3" style="width:100%" placeholder="Test message"></textarea>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button id="enc">Encrypt</button>
-      <button id="dec">Decrypt</button>
-      <input id="cipher" type="text" placeholder="Cipher (hex)" style="flex:1" />
-    </div>
-    <div id="log" style="margin-top:12px"></div>
-  </div>
-
-  <!-- Info Modal -->
-  <div id="rsaInfoModal" class="modal" role="dialog" aria-hidden="true" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;z-index:2000;">
-    <div style="background:rgba(10,22,40,0.95);backdrop-filter:blur(6px);padding:20px;border-radius:10px;max-width:720px;width:92%;color:#e6f7ff">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <h3 style="margin:0">RSA — Explanation</h3>
-        <button id="rsaInfoClose" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
+  <!-- ================= RSA ================= -->
+  <section class="panel on" data-panel="rsa">
+    <div class="card">
+      <h2>🔑 Chiavi RSA <button class="mini" id="rsaHelp" style="margin-left:auto">❓ come funziona</button></h2>
+      <div class="sub">Genera una coppia di chiavi con numeri primi casuali (Miller–Rabin) e calcola n, φ(n), e e d con BigInt.</div>
+      <div class="row">
+        <label class="lbl">Lunghezza</label>
+        <select id="bits" style="width:auto;min-width:170px">
+          <option value="512" selected>512 bit · veloce</option>
+          <option value="1024">1024 bit · standard demo</option>
+          <option value="2048">2048 bit · lento</option>
+        </select>
+        <button class="btn cyan" id="gen">Genera coppia di chiavi</button>
       </div>
-      <div style="max-height:60vh;overflow:auto">
-        <p>This page generates an RSA keypair (public/private) using BigInt. Below are the elements shown and their roles:</p>
-        <ul>
-          <li><strong>p, q</strong>: two randomly chosen prime numbers. RSA security relies on the difficulty of factoring their product.</li>
-          <li><strong>n = p · q</strong>: the public modulus. It is used in both encryption and decryption.</li>
-          <li><strong>φ(n)</strong> (phi): (p−1)(q−1), useful for computing the private exponent.</li>
-          <li><strong>e</strong>: public exponent (commonly 65537). It must be coprime with φ(n); it is used to encrypt.</li>
-          <li><strong>d</strong>: private exponent, the modular inverse of e modulo φ(n). It is used to decrypt and must remain secret.</li>
-          <li><strong>Public key</strong>: contains `n` and `e`. It can be shared publicly to encrypt messages intended for the private key owner.</li>
-          <li><strong>Private key</strong>: contains `d` (and often p and q). It is used to decrypt and to sign; DO NOT share it.</li>
-        </ul>
-        <p>Algoritmo sintetico:</p>
-        <ol>
-          <li>Genera primi p e q.</li>
-          <li>Calcola n = p·q e φ(n) = (p−1)(q−1).</li>
-          <li>Scegli e coprimo con φ(n) (es. 65537) e calcola d = e^{-1} mod φ(n).</li>
-          <li>Public key = (n, e); Private key = (d) (o d, p, q per efficienza).</li>
-        </ol>
-        <p>Warning: this implementation is educational. Do not use these keys in production; prime generation and secure key handling require additional cryptographic safeguards.</p>
+      <div class="statline" id="keyStats"></div>
+      <div class="demo-grid" style="grid-template-columns:1fr 1fr">
+        <div>
+          <label class="lbl">🔓 Chiave pubblica (n, e)</label>
+          <pre class="box" id="pub" style="min-height:90px">— genera o importa una chiave —</pre>
+          <button class="mini" id="copyPub">📋 copia</button>
+        </div>
+        <div>
+          <label class="lbl">🔐 Chiave privata (d, p, q)</label>
+          <pre class="box" id="priv" style="min-height:90px">—</pre>
+          <button class="mini" id="copyPriv">📋 copia</button>
+        </div>
       </div>
+      <div class="row">
+        <button class="btn ghost sm" id="exportBtn">💾 Esporta chiavi (JSON)</button>
+        <button class="btn ghost sm" id="importBtn">📥 Importa chiavi</button>
+      </div>
+      <pre class="box" id="importBox" style="display:none" contenteditable="true" placeholder='{"n":"…","e":"65537","d":"…"}'>Incolla qui il JSON esportato, poi premi "Carica".</pre>
+      <div class="row" id="importRow" style="display:none"><button class="btn gold sm" id="loadImport">Carica chiavi</button></div>
     </div>
+
+    <div class="card">
+      <h2>✉️ Cifra &amp; decifra</h2>
+      <div class="sub">RSA a libro di testo: cifra m → c = m<sup>e</sup> mod n, decifra c → m = c<sup>d</sup> mod n.</div>
+      <textarea id="plain" class="code" placeholder="Messaggio da cifrare…"></textarea>
+      <div class="row">
+        <button class="btn cyan" id="enc">🔒 Cifra</button>
+        <button class="btn ghost" id="randMsg">🎲 messaggio casuale</button>
+        <span class="hint" id="limitHint" style="margin:0"></span>
+      </div>
+      <textarea id="cipher" class="code" placeholder="Testo cifrato (hex) — qui o incolla dall'esterno"></textarea>
+      <div class="row"><button class="btn violet" id="dec">🔓 Decifra</button></div>
+      <div class="out" id="rsaLog">…</div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Firma &amp; verifica</h2>
+      <div class="sub">Firma educativa: firma = hash(m)<sup>d</sup> mod n; verifica = firma<sup>e</sup> mod n == hash(m). Hash: SHA-256.</div>
+      <textarea id="signText" class="code" placeholder="Messaggio da firmare…"></textarea>
+      <div class="row">
+        <button class="btn pink" id="signBtn">✍️ Firma</button>
+        <button class="btn lime" id="verifyBtn">✅ Verifica firma</button>
+        <span id="verifyStatus"></span>
+      </div>
+      <textarea id="signature" class="code" placeholder="Firma (hex)"></textarea>
+      <div class="hint">💡 Verifica che la firma appartenga a questo messaggio e a questa chiave pubblica.</div>
+    </div>
+  </section>
+
+  <!-- ================= AES ================= -->
+  <section class="panel" data-panel="aes">
+    <div class="card">
+      <h2>🔒 AES-256-GCM</h2>
+      <div class="sub">Cifratura simmetrica autenticata (WebCrypto). La password genera la chiave con PBKDF2-SHA256 (120.000 iterazioni). L'output include sale e nonce.</div>
+      <div class="row" style="align-items:center">
+        <label class="lbl" style="flex:1;min-width:180px">🔑 Password
+          <input type="password" id="aesPass" placeholder="password…" style="margin-top:4px" />
+        </label>
+        <div style="flex:1;min-width:180px"><label class="lbl">Algoritmo derivazione</label>
+          <select id="aesKdf" style="margin-top:4px"><option value="pbkdf2" selected>PBKDF2-SHA256 (raccomandato)</option><option value="fast">PBKDF2 veloce (1000 iter · meno sicuro)</option></select>
+        </div>
+      </div>
+      <label class="lbl">Messaggio</label>
+      <textarea id="aesPlain" class="code" placeholder="Testo in chiaro…"></textarea>
+      <div class="row">
+        <button class="btn violet" id="aesEnc">🔒 Cifra</button>
+        <button class="btn ghost" id="aesDec">🔓 Decifra</button>
+        <button class="mini" id="aesCopy">📋 copia output</button>
+      </div>
+      <textarea id="aesOut" class="code" placeholder="Output base64: salt · iv · ciphertext"></textarea>
+      <div class="hint">GCM autentica i dati: se qualcosa viene alterato, la decifratura fallisce con un errore. Non usare la stessa password per dati reali da questa demo.</div>
+    </div>
+  </section>
+
+  <!-- ================= Classici ================= -->
+  <section class="panel" data-panel="classic">
+    <div class="card">
+      <h2>🎭 Cifrari classici</h2>
+      <div class="sub">Per divertirsi: Cesare, Vigenère e XOR. Tutti decifrabili a mano — ottimi per capire i concetti base.</div>
+
+      <label class="lbl">Testo</label>
+      <textarea id="clText" class="code" placeholder="Testo da elaborare… (accetta lettere, numeri e spazi)"></textarea>
+      <div class="row">
+        <button class="btn cyan sm" data-cl="enc">Cifra</button>
+        <button class="btn ghost sm" data-cl="dec">Decifra</button>
+        <label class="lbl" style="margin-left:8px">Metodo</label>
+        <select id="clMethod">
+          <option value="caesar">Cesare</option>
+          <option value="vigenere">Vigenère</option>
+          <option value="xor">XOR</option>
+        </select>
+        <input type="number" id="clShift" value="3" min="1" max="25" style="width:86px" title="scorrimento Cesare" />
+        <input type="text" id="clKey" placeholder="chiave (Vigenère/XOR)" style="flex:1;min-width:150px" />
+      </div>
+      <div class="out" id="clOut">…</div>
+      <div class="hint">Cesare: ogni lettera scorre di <b>n</b> posizioni. Vigenère: la chiave ripetuta scorre ogni lettera. XOR: byte ⊕ byte della chiave ripetuta (output in hex).</div>
+    </div>
+  </section>
+
+  <!-- ================= Hash ================= -->
+  <section class="panel" data-panel="hash">
+    <div class="card">
+      <h2>🧮 Hash &amp; HMAC</h2>
+      <div class="sub">Impronte digitali del testo: cambia una virgola e il digest cambia completamente. HMAC = digest con chiave (autenticazione).</div>
+      <div class="row">
+        <label class="lbl">Algoritmo</label>
+        <select id="hashAlg">
+          <option value="SHA-1">SHA-1 (legacy)</option>
+          <option value="SHA-256" selected>SHA-256</option>
+          <option value="SHA-384">SHA-384</option>
+          <option value="SHA-512">SHA-512</option>
+        </select>
+        <label class="lbl" style="margin-left:8px">Formato</label>
+        <select id="hashCase"><option value="hex">hex</option><option value="HEX">HEX</option></select>
+      </div>
+      <textarea id="hashInput" class="code" placeholder="Testo da sottoporre ad hash…"></textarea>
+      <div class="out mono" id="hashOut" style="word-break:break-all">…</div>
+      <label class="lbl">Chiave HMAC (opzionale)</label>
+      <input type="text" id="hmacKey" placeholder="lascia vuoto per solo hash" />
+    </div>
+  </section>
+
+  <!-- ================= Visualizza RSA ================= -->
+  <section class="panel" data-panel="visual">
+    <div class="card">
+      <h2>🩻 RSA, passo dopo passo</h2>
+      <div class="sub">Gioca con numeri piccoli e guarda ogni calcolo: dalla scelta dei primi alla cifratura e decifratura, tutto con i valori reali.</div>
+      <div class="demo-grid">
+        <div>
+          <label class="lbl">Primo p</label>
+          <input type="number" id="vp" value="61" min="3" />
+        </div>
+        <div>
+          <label class="lbl">Primo q</label>
+          <input type="number" id="vq" value="53" min="3" />
+        </div>
+        <div>
+          <label class="lbl">Messaggio m (numero &lt; n)</label>
+          <input type="number" id="vm" value="65" min="2" />
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn cyan" id="runViz">▶️ Esegui il flusso</button>
+        <button class="btn ghost" id="demoPair">🎲 coppia di primi casuale</button>
+      </div>
+      <div id="vizSteps"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+
+<!-- modal aiuto -->
+<div class="modal" id="helpModal">
+  <div class="mbox">
+    <h3>🔑 RSA in breve <button class="mini" id="helpClose">✕ chiudi</button></h3>
+    <p>RSA è un cifrario <b>asimmetrico</b>: due chiavi diverse ma matematicamente legate.</p>
+    <ul>
+      <li><b>p, q</b> — due numeri primi casuali e segreti.</li>
+      <li><b>n = p × q</b> — il modulo pubblico. La sicurezza sta nella difficoltà di fattorizzarlo.</li>
+      <li><b>φ(n) = (p−1)(q−1)</b> — usata per costruire la chiave privata.</li>
+      <li><b>e = 65537</b> — esponente pubblico, coprimo con φ(n).</li>
+      <li><b>d = e⁻¹ mod φ(n)</b> — esponente privato (inverso modulare).</li>
+    </ul>
+    <p>Cifrare: <b>c = m<sup>e</sup> mod n</b> · Decifrare: <b>m = c<sup>d</sup> mod n</b>.<br>
+    Firma: <b>hash(m)<sup>d</sup> mod n</b>, verificabile da chiunque con (n, e).</p>
+    <p>⚠️ Versione educativa: niente padding, chiavi piccole, messaggi monoblocco. Per uso reale servono RSA-OAEP/PSS e chiavi ≥ 2048 bit.</p>
   </div>
+</div>
 
-  <script>
-    // Utilities using BigInt
-    const rng = (bytes)=>{
-      const arr = new Uint8Array(bytes);
-      crypto.getRandomValues(arr);
-      let v=0n;
-      for(const b of arr){ v=(v<<8n)+BigInt(b); }
-      return v;
+<script>
+'use strict';
+/* ================= util ================= */
+const $ = id => document.getElementById(id);
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),3000); }
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toHexBytes(u8){ let s=''; for(const b of u8) s+=b.toString(16).padStart(2,'0'); return s; }
+function fromHexBytes(hex){ hex=hex.trim().replace(/\s+/g,''); if(hex.length%2) hex='0'+hex; const u=new Uint8Array(hex.length/2); for(let i=0;i<u.length;i++) u[i]=parseInt(hex.substr(i*2,2),16); return u; }
+function bytesToBigInt(u8){ let v=0n; for(const b of u8) v=(v<<8n)+BigInt(b); return v; }
+function bigIntToBytes(bn){ const hex=bn.toString(16); const p=hex.length%2?'0'+hex:hex; return fromHexBytes(p); }
+function bigIntToText(bn){ try{ return new TextDecoder().decode(bigIntToBytes(bn)); }catch(e){ return ''; } }
+
+/* BigInt math */
+const rngBytes = n => { const a=new Uint8Array(n); crypto.getRandomValues(a); return a; };
+function rngBig(bytes){ let v=0n; for(const b of rngBytes(bytes)) v=(v<<8n)+BigInt(b); return v; }
+const bitMask = bits => (1n<<BigInt(bits))-1n;
+function modPow(base,exp,mod){ base%=mod; let r=1n; while(exp>0n){ if(exp&1n) r=(r*base)%mod; exp>>=1n; base=(base*base)%mod; } return r; }
+function gcd(a,b){ while(b){ const t=a%b; a=b; b=t; } return a<0n?-a:a; }
+function egcdIter(a,b){ let x0=1n,y0=0n,x1=0n,y1=1n; while(b!==0n){ const q=a/b; [a,b]=[b,a-q*b]; [x0,x1]=[x1,x0-q*x1]; [y0,y1]=[y1,y0-q*y1]; } return {g:a,x:x0,y:y0}; }
+function modInv(a,m){ const r=egcdIter(((a%m)+m)%m,m); if(r.g!==1n) return null; return ((r.x%m)+m)%m; }
+function isProbablyPrime(n,k=18){
+  if(n<2n) return false;
+  const sp=[2n,3n,5n,7n,11n,13n,17n,19n,23n,29n,31n,37n];
+  for(const p of sp){ if(n===p) return true; if(n%p===0n) return false; }
+  let d=n-1n,s=0n; while((d&1n)===0n){ d>>=1n; s++; }
+  outer: for(let i=0;i<k;i++){
+    const a = 2n + (rngBig(8) % (n-4n));
+    let x=modPow(a,d,n);
+    if(x===1n||x===n-1n) continue;
+    for(let r=1n;r<s;r++){ x=(x*x)%n; if(x===n-1n) continue outer; }
+    return false;
+  }
+  return true;
+}
+const sleep = ms => new Promise(r=>setTimeout(r,0));
+async function generatePrime(bits){
+  while(true){
+    const bytes=Math.ceil(bits/8);
+    let p = rngBig(bytes) & bitMask(bits);
+    p |= (1n<<(BigInt(bits)-1n)); p |= 1n;
+    if(isProbablyPrime(p)) return p;
+    await sleep(0);
+  }
+}
+async function generateKeypair(bits){
+  const half=Math.floor(bits/2);
+  const p=await generatePrime(half);
+  const q=await generatePrime(bits-half);
+  const n=p*q, phi=(p-1n)*(q-1n);
+  let e=65537n; if(gcd(e,phi)!==1n){ e=3n; while(gcd(e,phi)!==1n) e+=2n; }
+  const d=modInv(e,phi);
+  return {p,q,n,e,d,phi,bits};
+}
+const bitLen = bn => bn.toString(2).length;
+
+/* ================= RSA UI ================= */
+let current=null, aesKeyCache=null;
+const bitsEl=$('bits'), genBtn=$('gen'), pubEl=$('pub'), privEl=$('priv'), keyStats=$('keyStats'),
+  plainEl=$('plain'), cipherEl=$('cipher'), rsaLog=$('rsaLog'), limitHint=$('limitHint'),
+  signText=$('signText'), signature=$('signature'), verifyStatus=$('verifyStatus');
+
+function setCurrent(k){
+  current=k;
+  pubEl.textContent = 'n: ' + k.n + '\ne: ' + k.e;
+  privEl.textContent = 'd: ' + k.d + '\np: ' + k.p + '\nq: ' + k.q;
+  const Ln=bitLen(k.n);
+  keyStats.innerHTML =
+    '<span class="stat">n · <b>'+Ln+' bit</b></span>' +
+    '<span class="stat">e · <b>'+k.e+'</b></span>' +
+    '<span class="stat">d · <b>'+bitLen(k.d)+' bit</b></span>' +
+    '<span class="stat">p,q · <b>primi</b> ✓</span>' +
+    '<span class="stat">messaggio max · <b>'+Math.max(0,Math.floor((Ln-1)/8))+' byte</b></span>';
+  limitHint.textContent = 'Lunghezza massima messaggio: ' + Math.max(0,Math.floor((Ln-1)/8)) + ' byte (n di ' + Ln + ' bit).';
+  rsaLog.textContent = '✅ Coppia di chiavi generata (' + (k.bits||'') + ' bit). Puoi cifrare, decifrare e firmare.';
+}
+function genSpinner(on){ genBtn.disabled=on; genBtn.innerHTML = on ? '<span class="spin"></span> cerco primi…' : 'Genera coppia di chiavi'; }
+async function doGenerate(){
+  genSpinner(true);
+  try{
+    const b=parseInt(bitsEl.value,10);
+    const k=await generateKeypair(b);
+    setCurrent(k);
+    toast('🔑 Coppia di chiavi ' + b + ' bit generata');
+  }catch(e){ console.error(e); rsaLog.textContent='Errore durante la generazione'; }
+  genSpinner(false);
+}
+genBtn.addEventListener('click', doGenerate);
+
+$('copyPub').addEventListener('click', async ()=>{ if(!current) return toast('Genera prima una chiave'); copyText('n:'+current.n+'\ne:'+current.e); });
+$('copyPriv').addEventListener('click', async ()=>{ if(!current) return toast('Genera prima una chiave'); copyText('n:'+current.n+'\nd:'+current.d+'\np:'+current.p+'\nq:'+current.q); toast('🔐 Chiave privata copiata (non condividerla!)'); });
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast('📋 Copiato'); }catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('📋 Copiato'); }catch(e2){} ta.remove(); } }
+
+$('exportBtn').addEventListener('click', ()=>{
+  if(!current) return toast('Genera prima una chiave');
+  const j={ n: current.n.toString(), e: current.e.toString(), d: current.d.toString(), p: current.p.toString(), q: current.q.toString() };
+  copyText(JSON.stringify(j));
+  toast('💾 JSON esportato e copiato');
+});
+$('importBtn').addEventListener('click', ()=>{ $('importBox').style.display='block'; $('importRow').style.display='flex'; });
+$('loadImport').addEventListener('click', ()=>{
+  try{
+    const j=JSON.parse($('importBox').textContent.trim());
+    const need=['n','e','d','p','q'];
+    for(const k of need) if(j[k]===undefined) throw new Error('campo mancante: '+k);
+    const k={ n:BigInt(j.n), e:BigInt(j.e), d:BigInt(j.d), p:BigInt(j.p), q:BigInt(j.q), phi:(BigInt(j.p)-1n)*(BigInt(j.q)-1n) };
+    if(k.n !== k.p*k.q) throw new Error('n ≠ p·q');
+    setCurrent(k); toast('📥 Chiavi importate');
+  }catch(e){ toast('Import non valido: ' + e.message); }
+});
+
+// cifra / decifra
+const RANDOM_MSGS=['ciao, è un messaggio segreto','la risposta è 42','meridiana di mezzanotte','non dirlo a nessuno'];
+$('randMsg').addEventListener('click', ()=>{ plainEl.value = RANDOM_MSGS[Math.floor(Math.random()*RANDOM_MSGS.length)]; });
+$('enc').addEventListener('click', ()=>{
+  if(!current) return toast('Genera prima una chiave');
+  const txt=plainEl.value||'';
+  const bytes=new TextEncoder().encode(txt);
+  const maxB=Math.floor((bitLen(current.n)-1)/8);
+  if(!txt) return toast('Scrivi un messaggio');
+  if(bytes.length>maxB) return toast('Messaggio troppo lungo per n ('+maxB+' byte max)');
+  const m=bytesToBigInt(bytes);
+  if(m<=1n||m>=current.n) return toast('m deve essere tra 2 e n-1');
+  const c=modPow(m,current.e,current.n);
+  cipherEl.value=c.toString(16);
+  rsaLog.innerHTML = '🔒 Cifrato: c = m<sup>e</sup> mod n = <span class="mono">'+esc(c.toString(16))+'</span>';
+});
+$('dec').addEventListener('click', ()=>{
+  if(!current) return toast('Genera prima una chiave');
+  try{
+    const c=BigInt('0x'+(cipherEl.value||'').trim());
+    const m=modPow(c,current.d,current.n);
+    const txt=bigIntToText(m);
+    rsaLog.innerHTML='🔓 Decifrato: m = c<sup>d</sup> mod n → <b class="good">'+esc(txt||'(non testuale)')+'</b>'+(txt?'':'<br><span class="hint">Il numero decifrato non è testo leggibile: era un messaggio non testuale?</span>');
+    if(txt) plainEl.value=txt;
+  }catch(e){ toast('Hex del cifrato non valido'); }
+});
+
+// firma / verifica
+async function sha256Hex(str){ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)); return toHexBytes(new Uint8Array(buf)); }
+$('signBtn').addEventListener('click', async ()=>{
+  if(!current) return toast('Genera prima una chiave');
+  const txt=signText.value||'';
+  if(!txt) return toast('Scrivi un messaggio da firmare');
+  const h=await sha256Hex(txt);
+  let hb=BigInt('0x'+h);
+  if(hb>=current.n){ // n troppo piccolo per l'hash: tronca il digest ai byte utili
+    const maxBytes=Math.floor((bitLen(current.n)-1)/8);
+    const u=fromHexBytes(h); hb=bytesToBigInt(u.slice(u.length-maxBytes));
+  }
+  const s=modPow(hb,current.d,current.n);
+  signature.value=s.toString(16);
+  verifyStatus.innerHTML='<span class="good">✍️ Firmato</span> <span class="hint">(digest SHA-256 cifrato con d)</span>';
+  toast('✍️ Firma creata');
+});
+$('verifyBtn').addEventListener('click', async ()=>{
+  if(!current) return toast('Genera prima una chiave');
+  try{
+    const s=BigInt('0x'+(signature.value||'').trim());
+    const h=await sha256Hex(signText.value||'');
+    let hb=BigInt('0x'+h);
+    const maxBytes=Math.floor((bitLen(current.n)-1)/8);
+    const u=fromHexBytes(h); hb=bytesToBigInt(u.slice(u.length-maxBytes));
+    const check=modPow(s,current.e,current.n);
+    const ok = check===hb;
+    verifyStatus.innerHTML = ok ? '<span class="good">✅ Firma valida: firma^e mod n == hash(messaggio)</span>'
+      : '<span class="bad">❌ Firma NON valida per questo messaggio/chiave</span>';
+  }catch(e){ toast('Hex della firma non valido'); }
+});
+
+/* ================= AES ================= */
+const aesOut=$('aesOut'), aesPlain=$('aesPlain'), aesPass=$('aesPass'), aesKdf=$('aesKdf');
+async function deriveKey(pass, salt, mode){
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  const iters = mode === 'pbkdf2' ? 120000 : 1000;
+  const kdfName = { name:'PBKDF2', hash:'SHA-256', salt, iterations:iters };
+  return crypto.subtle.deriveKey(kdfName, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+$('aesEnc').addEventListener('click', async ()=>{
+  const pass=aesPass.value||'', txt=aesPlain.value;
+  if(!pass) return toast('Inserisci una password');
+  if(!txt) return toast('Scrivi un messaggio');
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pass,salt,aesKdf.value==='pbkdf2'?'pbkdf2':'fast');
+  const ct=new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(txt)));
+  const out=btoa(String.fromCharCode(...salt))+'|'+btoa(String.fromCharCode(...iv))+'|'+btoa(String.fromCharCode(...ct));
+  aesOut.value=out; toast('🔒 Cifrato AES-256-GCM');
+});
+$('aesDec').addEventListener('click', async ()=>{
+  const pass=aesPass.value||'', data=aesOut.value.trim();
+  if(!pass) return toast('Inserisci la password');
+  if(!data) return toast('Nessun output da decifrare');
+  const parts=data.split('|');
+  if(parts.length!==3) return toast('Formato non valido (atteso salt|iv|ciphertext)');
+  try{
+    const u=(s)=>{ const b=atob(s); return Uint8Array.from(b,c=>c.charCodeAt(0)); };
+    const salt=u(parts[0]), iv=u(parts[1]), ct=u(parts[2]);
+    const key=await deriveKey(pass,salt,aesKdf.value==='pbkdf2'?'pbkdf2':'fast');
+    const pt=new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct));
+    aesPlain.value=new TextDecoder().decode(pt);
+    toast('🔓 Decifrato correttamente');
+  }catch(e){ toast('❌ Decifratura fallita: password sbagliata o dato alterato'); }
+});
+$('aesCopy').addEventListener('click', ()=>{ if(aesOut.value) copyText(aesOut.value); });
+
+/* ================= classici ================= */
+const clText=$('clText'), clOut=$('clOut'), clMethod=$('clMethod'), clShift=$('clShift'), clKey=$('clKey');
+function caesarShift(str,n){
+  const acc={'à':'à','è':'è','é':'é','ì':'ì','ò':'ò','ù':'ù'};
+  const ord=['à','è','é','ì','ò','ù'];
+  const idx=c=>{ const i=ord.indexOf(c.toLowerCase()); return i>=0?i:null; };
+  return str.replace(/[a-zA-ZàèéìòùÀÈÉÌÒÙ]/g, ch=>{
+    const up = ch===ch.toUpperCase();
+    const low = ch.toLowerCase();
+    if(idx(low)!==null){
+      const k=((idx(low)+n)%6+6)%6;
+      const res=ord[k];
+      return up?res.toUpperCase():res;
     }
+    const a=97;
+    const k=(((low.charCodeAt(0)-a)+n)%26+26)%26;
+    const res=String.fromCharCode(a+k);
+    return up?res.toUpperCase():res;
+  });
+}
+function vigenere(str,key,dec){ if(!key) return str; const kk=key.toLowerCase().replace(/[^a-z]/g,''); let ki=0; return str.replace(/[a-z]/gi, ch=>{ const up=ch===ch.toUpperCase(); const c=ch.toLowerCase(); if(!/[a-z]/.test(c)) return ch; const k=kk[ki++ % kk.length]; if(!k) return ch; let shift=k.charCodeAt(0)-97; if(dec) shift=(26-shift)%26; let code=((c.charCodeAt(0)-97+shift)%26+26)%26; const res=String.fromCharCode(97+code); return up?res.toUpperCase():res; }); }
+function xorText(str,key){ if(!key) return str; const kk=new TextEncoder().encode(key); const enc=new TextEncoder().encode(str); const out=new Uint8Array(enc.length); for(let i=0;i<enc.length;i++) out[i]=enc[i]^kk[i%kk.length]; return toHexBytes(out); }
+function xorHex(hex,key){ if(!key) return hex; const kk=new TextEncoder().encode(key); const u=fromHexBytes(hex); const out=new Uint8Array(u.length); for(let i=0;i<u.length;i++) out[i]=u[i]^kk[i%kk.length]; try{ return new TextDecoder().decode(out); }catch(e){ return toHexBytes(out);} }
+document.querySelectorAll('[data-cl]').forEach(b=> b.addEventListener('click', ()=>{
+  const enc=b.dataset.cl==='enc'; const txt=clText.value||''; const m=clMethod.value;
+  if(!txt) return toast('Scrivi un testo');
+  let r='';
+  if(m==='caesar') r=caesarShift(txt, enc?parseInt(clShift.value||'3',10):-parseInt(clShift.value||'3',10));
+  else if(m==='vigenere'){ if(!clKey.value) return toast('Serve una chiave per Vigenère'); r=vigenere(txt,clKey.value,!enc); }
+  else { if(!clKey.value) return toast('Serve una chiave per XOR'); r=enc?xorText(txt,clKey.value):xorHex(txt,clKey.value); }
+  clOut.textContent=r;
+  toast((enc?'🔒 Cifrato':'🔓 Decifrato')+' con '+m);
+}));
 
-    function bitMask(bits){ return (1n<<BigInt(bits))-1n; }
+/* ================= hash ================= */
+const hashInput=$('hashInput'), hashOut=$('hashOut'), hashAlg=$('hashAlg'), hashCase=$('hashCase'), hmacKey=$('hmacKey');
+async function computeDigest(){
+  const txt=hashInput.value;
+  if(!txt){ hashOut.textContent='…'; return; }
+  const alg=hashAlg.value;
+  const data=new TextEncoder().encode(txt);
+  const keyH=hmacKey.value;
+  let hex;
+  if(keyH){
+    const raw=await crypto.subtle.importKey('raw', new TextEncoder().encode(keyH), { name:'HMAC', hash: alg }, false, ['sign']);
+    hex=toHexBytes(new Uint8Array(await crypto.subtle.sign('HMAC', raw, data)));
+  } else {
+    hex=toHexBytes(new Uint8Array(await crypto.subtle.digest(alg, data)));
+  }
+  hashOut.textContent = hashCase.value==='HEX' ? hex.toUpperCase() : hex;
+}
+[hashInput, hmacKey, hashAlg, hashCase].forEach(el=>el.addEventListener('input', computeDigest));
+hashInput.addEventListener('input', ()=> hashOut.classList.remove('bad'));
+$('hashOut').addEventListener('click', ()=>{ if(hashOut.textContent!=='…') copyText(hashOut.textContent); });
 
-    function fromBytes(bytes){ let v=0n; for(const b of bytes) v=(v<<8n)+BigInt(b); return v; }
+/* ================= visualizza RSA ================= */
+const vpEl=$('vp'), vqEl=$('vq'), vmEl=$('vm'), vizSteps=$('vizSteps');
+function randomPrimeSmall(max){
+  while(true){ const c=Math.floor(Math.random()*(max-9))+10; const bn=BigInt(c); if(isProbablyPrime(bn,4)) return bn; }
+}
+$('demoPair').addEventListener('click', ()=>{ vpEl.value=randomPrimeSmall(200); vqEl.value=randomPrimeSmall(200); vmEl.value=Math.floor(Math.random()*100)+2; });
+function fmtN(v){ return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+function step(icon,title,tag,inner,cls){
+  return '<div class="fstep '+(cls||'')+(tag?' arrow':'')+'"><div class="fn">'+icon+' '+title+(tag?'<span class="tag">'+tag+'</span>':'')+'</div><div class="fe">'+inner+'</div></div>';
+}
+$('runViz').addEventListener('click', ()=>{
+  const p=BigInt(parseInt(vpEl.value||'0',10)), q=BigInt(parseInt(vqEl.value||'0',10));
+  const m=BigInt(parseInt(vmEl.value||'0',10));
+  vizSteps.innerHTML='';
+  const fail=(msg)=>{ vizSteps.innerHTML='<div class="fstep"><div class="fn">⚠️ Dati non validi</div><div class="fe">'+esc(msg)+'</div></div>'; return; };
+  if(!isProbablyPrime(p,6)||p<2n) return fail('p='+p+' non è un numero primo. Scegli un numero primo (es. 61).');
+  if(!isProbablyPrime(q,6)||q<2n) return fail('q='+q+' non è un numero primo.');
+  if(p===q) return fail('p e q devono essere diversi.');
+  const n=p*q, phi=(p-1n)*(q-1n);
+  let e=65537n; if(gcd(e,phi)!==1n){ e=3n; while(gcd(e,phi)!==1n) e+=2n; }
+  const d=modInv(e,phi);
+  if(m<2n||m>=n) return fail('Il messaggio m='+m+' deve essere tra 2 e n−1 ('+fmtN(n-1n)+').');
+  const c=modPow(m,e,n), m2=modPow(c,d,n);
+  const fmtE=e.toString(16);
+  const rows=
+    step('1️⃣','Scegli due primi', 'solo tu li conosci',
+      'p = <b>'+fmtN(p)+'</b> &nbsp;·&nbsp; q = <b>'+fmtN(q)+'</b><br><span class="hint">La sicurezza dell\'RSA si basa sul fatto che nessun altro riesca a fattorizzare n.</span>')+
+    step('2️⃣','Calcola il modulo', 'pubblico',
+      'n = p × q = <b>'+fmtN(n)+'</b>'+'<br><span class="hint">n è la parte “pubblica”: tutti possono conoscerlo.</span>')+
+    step('3️⃣','Calcola φ(n) e scegli e', '',
+      'φ(n) = (p−1)(q−1) = '+fmtN(phi)+'<br>e = <b>'+e+'</b>'+' (esadecimale: 0x'+fmtE+') — coprimo con φ(n): gcd('+fmtN(e)+', '+fmtN(phi)+') = 1')+
+    step('4️⃣','Calcola la chiave privata', 'segreta',
+      'd = e<sup>−1</sup> mod φ(n) = <b>'+fmtN(d)+'</b><br><span class="hint">d è l\'inverso modulare di e: d×e mod φ(n) = '+( (e*d)%phi )+'</span>')+
+    step('5️⃣','Cifra il messaggio', '',
+      'm = <b>'+fmtN(m)+'</b><br>c = m<sup>e</sup> mod n = '+fmtN(m)+'<sup>'+e+'</sup> mod '+fmtN(n)+'<br>c = <b>'+fmtN(c)+'</b>')+
+    step('6️⃣','Decifra con la chiave privata', '',
+      'm′ = c<sup>d</sup> mod n = '+fmtN(c)+'<sup>'+d+'</sup> mod '+fmtN(n)+'<br>m′ = <b>'+fmtN(m2)+'</b>')+
+    step('✅','Verifica', 'round-trip',
+      'm′ = m ? <b class="'+(m2===m?'good">SÌ ✓':'bad">NO ✗')+'</b> — '+(m2===m?'il ciclo si chiude correttamente.':'qualcosa è andato storto: controlla p, q e m.')+'<br><span class="hint">Questo è il miracolo dell\'RSA: (m<sup>e</sup>)<sup>d</sup> ≡ m (mod n) grazie al piccolo teorema di Fermat.</span>','ok');
+  vizSteps.innerHTML=rows;
+});
 
-    function toHex(bn){ return bn.toString(16); }
+/* ================= tabs & modale ================= */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  const tab=t.dataset.tab;
+  document.querySelectorAll('[data-panel]').forEach(p=>p.classList.toggle('on',p.dataset.panel===tab));
+  if(tab==='hash') computeDigest();
+}));
+$('rsaHelp').addEventListener('click', ()=> $('helpModal').classList.add('on'));
+$('helpClose').addEventListener('click', ()=> $('helpModal').classList.remove('on'));
+$('helpModal').addEventListener('click', e=>{ if(e.target===$('helpModal')) $('helpModal').classList.remove('on'); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') $('helpModal').classList.remove('on'); });
 
-    function modPow(base,exp,mod){
-      base = base % mod;
-      let result = 1n;
-      while(exp>0){ if(exp & 1n) result = (result * base) % mod; exp >>= 1n; base = (base*base) % mod; }
-      return result;
-    }
-
-    function egcd(a,b){
-      if(b===0n) return {g:a,x:1n,y:0n};
-      let {g:x1,x:y1,y:z1} = egcd(b, a % b);
-      // above line intentionally recursive but we need correct unpacking; implement iterative below instead
-    }
-
-    function egcdIter(a,b){
-      let x0=1n,y0=0n,x1=0n,y1=1n;
-      while(b!=0n){ const q = a / b; const r = a - q*b; a=b; b=r; const x2 = x0 - q*x1; x0=x1; x1=x2; const y2 = y0 - q*y1; y0=y1; y1=y2; }
-      return {g:a,x:x0,y:y0};
-    }
-
-    function modInv(a,m){ const r = egcdIter(a,m); if(r.g !== 1n) return null; let inv = r.x % m; if(inv<0) inv += m; return inv; }
-
-    function gcd(a,b){ while(b){ const t = a % b; a=b; b=t;} return a; }
-
-    // Miller-Rabin primality (probabilistic)
-    function isProbablyPrime(n, k=12){
-      if(n<2n) return false;
-      const smallPrimes = [2n,3n,5n,7n,11n,13n,17n,19n,23n,29n,31n,37n];
-      for(const p of smallPrimes){ if(n===p) return true; if(n%p===0n) return false; }
-      let d = n-1n; let s = 0n;
-      while((d & 1n)===0n){ d >>= 1n; s++; }
-      witnessLoop: for(let i=0;i<k;i++){
-        const a = 2n + (rng(8) % (n-4n));
-        let x = modPow(a,d,n);
-        if(x===1n || x===n-1n) continue;
-        for(let r=1n;r<s;r++){
-          x = (x*x) % n;
-          if(x===n-1n) continue witnessLoop;
-        }
-        return false;
-      }
-      return true;
-    }
-
-    async function generatePrime(bits){
-      while(true){
-        // generate random of desired bits with high bit set
-        const bytes = Math.ceil(bits/8);
-        let p = rng(bytes) & bitMask(bits);
-        p |= (1n << (BigInt(bits)-1n)); // ensure top bit
-        p |= 1n; // odd
-        if(isProbablyPrime(p, 20)) return p;
-        // loop until prime
-        await new Promise(r=>setTimeout(r,0));
-      }
-    }
-
-    async function generateKeypair(bits){
-      const half = Math.floor(bits/2);
-      const p = await generatePrime(half);
-      const q = await generatePrime(bits-half);
-      const n = p*q;
-      const phi = (p-1n)*(q-1n);
-      let e = 65537n;
-      if(gcd(e,phi) !== 1n){
-        // find small odd e coprime to phi
-        e = 3n;
-        while(gcd(e,phi) !== 1n) e += 2n;
-      }
-      const d = modInv(e, phi);
-      return {p,q,n,e,d,phi};
-    }
-
-    function textToBigInt(str){ const enc = new TextEncoder().encode(str); return fromBytes(enc); }
-    function bigIntToText(bn){
-      const hex = bn.toString(16); const padded = hex.length%2? '0'+hex: hex; const bytes = new Uint8Array(padded.length/2);
-      for(let i=0;i<bytes.length;i++) bytes[i]=parseInt(padded.substr(i*2,2),16);
-      return new TextDecoder().decode(bytes);
-    }
-
-    // UI wiring
-    const bitsEl = document.getElementById('bits');
-    const genBtn = document.getElementById('gen');
-    const pubEl = document.getElementById('pub');
-    const privEl = document.getElementById('priv');
-    const plainEl = document.getElementById('plain');
-    const encBtn = document.getElementById('enc');
-    const decBtn = document.getElementById('dec');
-    const cipherEl = document.getElementById('cipher');
-    const copyBtn = document.getElementById('copy');
-    const log = document.getElementById('log');
-
-    let current = null;
-
-    genBtn.addEventListener('click', async ()=>{
-      genBtn.disabled = true; genBtn.textContent='Generating…';
-      const b = parseInt(bitsEl.value,10);
-      try{
-        const k = await generateKeypair(b);
-        current = k;
-        pubEl.textContent = `n: ${k.n}\ne: ${k.e}`;
-        privEl.textContent = `d: ${k.d}\np: ${k.p}\nq: ${k.q}`;
-        log.innerHTML = `<div class="small">Generated ${b}-bit keypair. n bitlen: ${k.n.toString(2).length}</div>`;
-        // store minimal PEM-like (not real PEM)
-      }catch(e){ console.error(e); log.textContent = 'Error generating keys'; }
-      genBtn.disabled = false; genBtn.textContent='Generate Keypair';
-    });
-
-    encBtn.addEventListener('click', ()=>{
-      if(!current) return alert('Generate a keypair first');
-      const m = textToBigInt(plainEl.value||'');
-      if(m >= current.n) return alert('Message too long for modulus n; use shorter text.');
-      const c = modPow(m, current.e, current.n);
-      cipherEl.value = c.toString(16);
-      log.innerHTML = '<div class="small">Encrypted (hex)</div>';
-    });
-
-    decBtn.addEventListener('click', ()=>{
-      if(!current) return alert('Generate a keypair first');
-      const cHex = cipherEl.value.trim(); if(!cHex) return alert('Enter cipher hex');
-      const c = BigInt('0x'+cHex);
-      const m = modPow(c, current.d, current.n);
-      try{ const txt = bigIntToText(m); log.innerHTML = `<div class="small">Decrypted text:</div><pre>${txt}</pre>`; }catch(e){ log.textContent='Decrypted (non-text)'; }
-    });
-
-    copyBtn.addEventListener('click', ()=>{
-      if(!current) return alert('Generate first');
-      navigator.clipboard.writeText(`n:${current.n}\ne:${current.e}\nd:${current.d}`).then(()=>alert('Private key copied to clipboard'));
-    });
-    // Info modal handlers
-    const rsaInfoBtn = document.getElementById('infoBtn');
-    const rsaInfoModal = document.getElementById('rsaInfoModal');
-    const rsaInfoClose = document.getElementById('rsaInfoClose');
-    if (rsaInfoBtn && rsaInfoModal) {
-      rsaInfoBtn.addEventListener('click', () => {
-        rsaInfoModal.style.display = 'flex';
-        rsaInfoModal.setAttribute('aria-hidden', 'false');
-      });
-      rsaInfoClose.addEventListener('click', () => {
-        rsaInfoModal.style.display = 'none';
-        rsaInfoModal.setAttribute('aria-hidden', 'true');
-      });
-      rsaInfoModal.addEventListener('click', (e) => { if (e.target === rsaInfoModal) { rsaInfoClose.click(); } });
-    }
-  </script>
-</body>
+/* ================= avvio ================= */
+plainEl.value=RANDOM_MSGS[0];
+signText.value=RANDOM_MSGS[1];
+(async ()=>{ genSpinner(true); try{ const k=await generateKeypair(512); setCurrent(k); }catch(e){ rsaLog.textContent='Errore: '+(e&&e.message); } genSpinner(false); })();
+</script>
 <script src="top_buttons.js"></script>
+</body>
 </html>
