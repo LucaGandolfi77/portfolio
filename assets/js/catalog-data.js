@@ -150,7 +150,7 @@
     ['echoes-wrapper', 'Echoes of the Last Dawn Launcher', 'Launcher page for the low-poly story game.', 'games/echoes-of-the-last-dawn.html', '☼', 'story', ['Three.js', 'Launcher'], false],
     ['friends-tycoon-app', 'Friends Tycoon App', 'Social management game application entry point.', 'games/friends-tycoon/index.html', '♙', 'simulation', ['Simulation'], false],
     ['orto-magico-wrapper', 'Orto Magico Launcher', 'Launcher page for the garden game.', 'games/orto-magico.html', '✿', 'simulation', ['PWA', 'Launcher'], false],
-    ['pinball-game', 'Space Cadet Pinball Game', 'Direct game entry point for the pinball table.', 'games/pinball.html', '🚀', 'arcade', ['Retro'], false],
+    ['pinball-game', 'Space Cadet Pinball Game', '4 themed pinball tables (Space, Dragon Forge, Sakura Garden, Neon Arcade) with unique bonuses and an AUTO mode where the AI plays without ever losing.', 'games/pinball.html', '🚀', 'arcade', ['Retro', '4 Tables', 'AUTO AI'], false],
     ['pokedex-game', 'Pokédex Game', 'Direct games-folder Pokédex entry point.', 'games/pokedex.html', '●', 'quiz', ['Database'], false],
     ['pokemon-game', 'Pokémon Game', 'Direct games-folder Pokémon entry point.', 'games/pokemon.html', '⚡', 'story', ['Adventure'], false],
     ['pokopia-wrapper', 'Pokopia Clone Launcher', 'Launcher page for the world-building game.', 'games/pokopia-clone.html', '⌂', 'simulation', ['Canvas', 'Launcher'], false],
