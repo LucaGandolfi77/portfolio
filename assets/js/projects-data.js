@@ -577,5 +577,15 @@ const PROJECTS_DATA = [
     "emoji": "🚀",
     "badge": "Engineering / Sim",
     "badgeColor": "#ff9f43"
+  },
+  {
+    "id": "cello-browser",
+    "title": "Cello — il browser degli anni '90",
+    "description": "Clone di Cello 1.01a (Cornell Law, 1993–94): chrome stile Windows 3.1, navigazione nel web inventato del 1994 (14 pagine collegate), suono modem sintetizzato e modalità \"Modem Live\" che carica pagine reali via r.jina.ai rendendole in stile anni '90. Immagini mostrano segnaposto ironici (Cello non supportava le immagini). Ottimizzato iPhone.",
+    "href": "projects/cello-browser/index.html",
+    "icon": "🖥️",
+    "emoji": "🖥️",
+    "badge": "Sim",
+    "badgeColor": "#ff9f43"
   }
 ];

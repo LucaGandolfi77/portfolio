@@ -35,7 +35,13 @@
         .back{color:var(--accent);text-decoration:none;font-weight:600;font-size:.95rem}
         .back:hover{text-decoration:underline}
         select{background:rgba(10,20,40,.8);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.9rem}
-        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+        .section{margin-bottom:38px}
+        .section-head{display:flex;align-items:center;gap:14px;margin:0 0 18px}
+        .section-head .sec-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;
+            background:linear-gradient(135deg,rgba(0,212,255,.16),rgba(124,92,255,.16));border:1px solid rgba(120,180,255,.25)}
+        .section-head h2{margin:0;font-size:1.25rem;font-weight:800}
+        .section-head .count{font-size:.75rem;font-weight:700;color:var(--muted);background:rgba(120,180,255,.1);border:1px solid var(--line);padding:4px 10px;border-radius:99px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
         .card{position:relative;display:flex;flex-direction:column;gap:14px;padding:22px;border-radius:22px;text-decoration:none;color:var(--ink);
             background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
             box-shadow:0 18px 50px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
@@ -72,8 +78,11 @@
             </select>
         </div>
 
-        <div class="grid" id="quizGrid" aria-live="polite">
-            <div class="card" style="cursor:default"><div class="icon">🧪</div><h2>Caricamento…</h2><div class="desc">Preparo i reagenti.</div></div>
+        <div id="quizSections" aria-live="polite">
+            <div class="section">
+                <div class="section-head"><span class="sec-icon">🧪</span><h2>Caricamento…</h2><span class="count">…</span></div>
+                <div class="grid"><div class="card" style="cursor:default"><div class="icon">⏳</div><h2>Preparo i reagenti</h2><div class="desc">Caricamento in corso…</div></div></div>
+            </div>
         </div>
 
         <div class="foot" data-i18n="quiz.foot">Ogni quiz genera una <b>card PNG</b> condivisibile: <b>Condividi</b>, <b>Copia</b> o <b>Scarica</b> il risultato. <br>Fatto con zero server e una quantità irresponsabile di emoji.</div>
@@ -83,9 +92,9 @@
         // --- lingua: selettore reale (prima era rotto) ---
         const langSelect = document.getElementById('langSelect');
         const embedded = {
-            en: { quiz: { lead: "Personality, trivia and curiosities. Every result is a shareable card: take the quiz, download the image and prove it to everyone.", foot: "Every quiz produces a shareable <b>PNG card</b>: <b>Share</b>, <b>Copy</b> or <b>Download</b> the result.<br>Built with zero servers and an irresponsible amount of emoji." } },
-            it: { quiz: { lead: "Personalità, cultura e curiosità. Ogni risultato è una card condivisibile: fai il quiz, scarica l'immagine e dimostralo a tutti.", foot: "Ogni quiz genera una <b>card PNG</b> condivisibile: <b>Condividi</b>, <b>Copia</b> o <b>Scarica</b> il risultato.<br>Fatto con zero server e una quantità irresponsabile di emoji." } },
-            es: { quiz: { lead: "Personalidad, cultura y curiosidades. Cada resultado es una tarjeta compartible: haz el quiz, descarga la imagen y demuéstralo a todos.", foot: "Cada quiz genera una <b>tarjeta PNG</b> compartible: <b>Compartir</b>, <b>Copiar</b> o <b>Descargar</b> el resultado.<br>Hecho con cero servidores y una cantidad irresponsable de emojis." } }
+            en: { quiz: { lead: "Personality, trivia and curiosities. Every result is a shareable card: take the quiz, download the image and prove it to everyone.", foot: "Every quiz produces a shareable <b>PNG card</b>: <b>Share</b>, <b>Copy</b> or <b>Download</b> the result.<br>Built with zero servers and an irresponsible amount of emoji.", secKnowledge: "Knowledge & Logic", secFun: "Personality & Humor", badgeNew: "New", badgeShare: "Shareable card", loading: "Loading…" } },
+            it: { quiz: { lead: "Personalità, cultura e curiosità. Ogni risultato è una card condivisibile: fai il quiz, scarica l'immagine e dimostralo a tutti.", foot: "Ogni quiz genera una <b>card PNG</b> condivisibile: <b>Condividi</b>, <b>Copia</b> o <b>Scarica</b> il risultato.<br>Fatto con zero server e una quantità irresponsabile di emoji.", secKnowledge: "Cultura & Logica", secFun: "Personalità & Umorismo", badgeNew: "Nuovo", badgeShare: "Card condivisibile", loading: "Caricamento…" } },
+            es: { quiz: { lead: "Personalidad, cultura y curiosidades. Cada resultado es una tarjeta compartible: haz el quiz, descarga la imagen y demuéstralo a todos.", foot: "Cada quiz genera una <b>tarjeta PNG</b> compartible: <b>Compartir</b>, <b>Copiar</b> o <b>Descargar</b> el resultado.<br>Hecho con cero servidores y una cantidad irresponsable de emojis.", secKnowledge: "Cultura y Lógica", secFun: "Personalidad y Humor", badgeNew: "Nuevo", badgeShare: "Tarjeta compartible", loading: "Cargando…" } }
         };
         function getNested(o,p){ return p.split('.').reduce((x,k)=>x&&x[k]!==undefined?x[k]:undefined, o); }
         async function applyTranslations(lang){
@@ -110,29 +119,46 @@
         }
 
         // --- carica l'indice dei quiz ---
-        const grid = document.getElementById('quizGrid');
+        const grid = document.getElementById('quizSections');
         const startWord = { en:'Start', it:'Inizia', es:'Comenzar' };
+        let SEC_WORD = { badgeNew:'New', badgeShare:'Shareable card', secKnowledge:'Knowledge & Logic', secFun:'Personality & Humor' };
+        function setSecWord(lang){ SEC_WORD = Object.assign(SEC_WORD, embedded[lang]?.quiz || {}); }
+        function quizToCard(q, lang){
+            const title = (q.title&&(q.title[lang]||q.title.en)) || q.slug;
+            const desc = (q.desc&&(q.desc[lang]||q.desc.en)) || '';
+            const icon = q.icon || '❓';
+            const card = document.createElement('a');
+            card.className = 'card';
+            card.href = 'quizzes/'+q.slug+'.html';
+            card.setAttribute('aria-label', title);
+            let badges = '';
+            if(q.new) badges += '<span class="badge new">✦&nbsp;'+(SEC_WORD.badgeNew)+'</span>';
+            if(q.share) badges += '<span class="badge share">'+(SEC_WORD.badgeShare)+'</span>';
+            card.innerHTML = `<div class="icon">${icon}</div><h2>${title}</h2><div class="desc">${desc}</div><div class="badges">${badges}</div><div class="go">${startWord[lang]||startWord.en} →</div>`;
+            return card;
+        }
+        function buildSection(label, emoji, items, lang){
+            const sec = document.createElement('div');
+            sec.className = 'section';
+            const head = document.createElement('div');
+            head.className = 'section-head';
+            head.innerHTML = `<span class="sec-icon">${emoji}</span><h2>${label}</h2><span class="count">${items.length}</span>`;
+            const g = document.createElement('div');
+            g.className = 'grid';
+            items.forEach(q=>{ const c=quizToCard(q.items?q.items:q, lang); tilt(c); g.appendChild(c); });
+            sec.appendChild(head); sec.appendChild(g);
+            return sec;
+        }
         async function loadQuizzes(lang){
             try{
                 const res = await fetch('../assets/quizzes/index.json');
                 if(!res.ok) throw new Error('no-index');
                 const data = await res.json();
                 grid.innerHTML = '';
-                data.forEach(q=>{
-                    const title = (q.title&&(q.title[lang]||q.title.en)) || q.slug;
-                    const desc = (q.desc&&(q.desc[lang]||q.desc.en)) || '';
-                    const icon = q.icon || '❓';
-                    const card = document.createElement('a');
-                    card.className = 'card';
-                    card.href = 'quizzes/'+q.slug+'.html';
-                    card.setAttribute('aria-label', title);
-                    let badges = '';
-                    if(q.new) badges += '<span class="badge new">✦ Nuovo</span>';
-                    if(q.share) badges += '<span class="badge share">Card condivisibile</span>';
-                    card.innerHTML = `<div class="icon">${icon}</div><h2>${title}</h2><div class="desc">${desc}</div><div class="badges">${badges}</div><div class="go">${startWord[lang]||startWord.en} →</div>`;
-                    tilt(card);
-                    grid.appendChild(card);
-                });
+                const knowledge = data.filter(q=>(q.cat||'fun')!=='fun');
+                const fun = data.filter(q=>(q.cat||'fun')==='fun');
+                if(knowledge.length) grid.appendChild(buildSection(SEC_WORD.secKnowledge, '🧠', knowledge, lang));
+                grid.appendChild(buildSection(SEC_WORD.secFun, '🎭', fun, lang));
             }catch(err){
                 grid.innerHTML = '<div class="card" style="cursor:default"><div class="icon">⚠️</div><h2>Errore</h2><div class="desc">Impossibile caricare i quiz.</div></div>';
                 console.warn(err);
@@ -144,10 +170,12 @@
         langSelect.addEventListener('change', async (e)=>{
             const v = e.target.value||'en';
             localStorage.setItem('lang', v);
+            setSecWord(v);
             await applyTranslations(v);
             await loadQuizzes(v);
         });
         document.addEventListener('DOMContentLoaded', async ()=>{
+            setSecWord(savedLang);
             await applyTranslations(savedLang);
             await loadQuizzes(savedLang);
         });

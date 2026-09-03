@@ -1237,6 +1237,17 @@ function toggleSection(containerId, btn) {
     }
 }
 
+function toggleAbout() {
+    const container = document.getElementById('aboutContainer');
+    const arrow = document.getElementById('aboutArrow');
+    if (container) {
+        container.classList.toggle('collapsed');
+        if (arrow) {
+            arrow.style.transform = container.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
+        }
+    }
+}
+
 // Copy value to clipboard (used by the Personal Information section).
 // Falls back to execCommand for older iOS webviews.
 function copyValue(btn) {

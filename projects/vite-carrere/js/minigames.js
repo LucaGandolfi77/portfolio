@@ -303,6 +303,20 @@ var Minigames = (function () {
     }
   }
 
+  function instructionFor(config) {
+    var byType = {
+      puzzle: "Riordina le tessere toccandone una adiacente a quella vuota per spostarla. Completa la foto di famiglia quando i numeri sono in ordine (1, 2, 3… fino alla tessera vuota).",
+      spotDiff: "Osserva ogni scena con attenzione: un oggetto è cambiato o è sparito rispetto all'attesa. Toccarlo lo segna come trovato e passa alla ronda successiva.",
+      swipe: "Leggi ogni affermazione e decidi se è vera (Realtà →) o inventata (← Finzione). Il racconto di Carrère è pieno di dettagli veri che sembrano finzione: fidati del testo.",
+      tower: "La verità è sepolta sotto una pila di bugie. Toccale dall'alto verso il basso, nell'ordine in cui sono state costruite, per rimuoverle e rivelare la verità.",
+      fragments: "I frammenti del testo devono essere riordinati. Toccalli partendo da quello con cui inizia la frase e prosegui in sequenza fino a completare l'incipit.",
+      gentle: "Un gioco senza punteggio: parole di luce cadono lentamente, sfiorale per trattenerle un istante. Non c'è nulla da vincere, solo da ricordare.",
+      breathing: "Segui il cerchio e armonizza il respiro: inspira quando si espande, trattieni quando resta fermo, espira quando si contrae. Cinque cicli completi.",
+      listening: "Le parole appaiono brevemente e svaniscono: leggile di corsa, senza perdere il filo. Alla fine, scegli la parola che ti ha toccato di più."
+    };
+    return byType[config.type] || config.description || "Segui le indicazioni a schermo per completare il gioco.";
+  }
+
   function createListening(el, config, onDone) {
     var idx = 0;
     var words = config.testimonies;
@@ -350,17 +364,47 @@ var Minigames = (function () {
   function launch(containerId, minigameConfig, onDone) {
     var el = document.getElementById(containerId);
     if (!el) return;
+    var finished = false;
+    function finish(result) { if (finished) return; finished = true; onDone(result); }
+
     el.innerHTML = '';
     var config = minigameConfig;
+
+    // intestazione: istruzioni + salta
+    var head = document.createElement('div');
+    head.className = 'mg-head';
+    head.innerHTML =
+      '<div class="mg-actions">' +
+      '<button class="mg-btn" id="mg-howto" type="button">❓ Istruzioni</button>' +
+      '<button class="mg-btn" id="mg-skip" type="button">⏭ Salta questo gioco</button>' +
+      '</div>' +
+      '<div class="mg-instructions" id="mg-instructions" hidden></div>';
+    el.appendChild(head);
+
+    var body = document.createElement('div');
+    body.className = 'mg-body';
+    el.appendChild(body);
+
+    document.getElementById('mg-howto').addEventListener('click', function () {
+      var inst = document.getElementById('mg-instructions');
+      var open = inst.hasAttribute('hidden');
+      inst.hidden = !open;
+      if (open) inst.innerHTML = '<strong>Come si gioca:</strong> ' + instructionFor(config);
+      this.classList.toggle('on', open);
+    });
+    document.getElementById('mg-skip').addEventListener('click', function () {
+      finish({ skipped: true });
+    });
+
     switch (config.type) {
-      case 'puzzle': createPuzzle(el, config, onDone); break;
-      case 'spotDiff': createSpotDiff(el, config, onDone); break;
-      case 'swipe': createSwipe(el, config, onDone); break;
-      case 'tower': createTower(el, config, onDone); break;
-      case 'fragments': createFragments(el, config, onDone); break;
-      case 'gentle': createGentle(el, config, onDone); break;
-      case 'breathing': createBreathing(el, config, onDone); break;
-      case 'listening': createListening(el, config, onDone); break;
+      case 'puzzle': createPuzzle(body, config, finish); break;
+      case 'spotDiff': createSpotDiff(body, config, finish); break;
+      case 'swipe': createSwipe(body, config, finish); break;
+      case 'tower': createTower(body, config, finish); break;
+      case 'fragments': createFragments(body, config, finish); break;
+      case 'gentle': createGentle(body, config, finish); break;
+      case 'breathing': createBreathing(body, config, finish); break;
+      case 'listening': createListening(body, config, finish); break;
     }
   }
 

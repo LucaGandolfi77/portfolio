@@ -120,6 +120,10 @@
   .urlrow input{flex:1;min-width:200px;padding:12px 14px;border-radius:12px;border:1px dashed var(--line2);background:rgba(0,0,0,.2);color:var(--txt);font:inherit;font-size:.9rem;outline:none}
   .urlrow input:focus{border-color:var(--pink)}
   .urlrow .hint{font-size:.74rem;color:#5f7194}
+  .card .sub{color:var(--muted);font-size:.78rem;margin:6px 2px 10px;line-height:1.5}
+  .chips.country{gap:6px;max-height:210px;overflow-y:auto;padding:2px}
+  .chip.cc{font-size:.78rem;padding:6px 10px}
+  .chip.cc.flag{font-size:1.05rem;padding:4px 8px}
 
   /* sezione risultati */
   .shead{display:flex;align-items:center;gap:10px;margin:22px 2px 12px}
@@ -233,6 +237,13 @@
       <button class="sbtn ghost" id="playUrlBtn">▶ Play URL</button>
       <span class="hint">Alcuni stream (es. .m3u) possono essere bloccati dal CORS: in quel caso l'audio parte senza equalizer.</span>
     </div>
+  </section>
+
+  <!-- radio per paese -->
+  <section class="card" id="worldCard" style="padding:16px;margin-bottom:6px">
+    <div class="shead" style="margin-top:2px"><h2>🌍 Radio mondiali · per paese</h2><span class="rule"></span></div>
+    <p class="sub" id="worldHint">Tocca una bandiera per ascoltare le stazioni più votate di quel paese.</p>
+    <div class="chips country" id="countryBar"></div>
   </section>
 
   <div class="shead"><h2>📡 Stazioni</h2><span class="count" id="listCount"></span><span class="rule"></span></div>
@@ -610,6 +621,48 @@ function topStations(){
   return fetchList('/stations/topvote/50');
 }
 
+/* ================= radio per paese ================= */
+// [emoji bandiera, nome, countrycode a 2 lettere (Radio Browser)]
+const COUNTRIES = [
+  ['🇮🇹','Italia','it'], ['🇺🇸','USA','us'], ['🇬🇧','UK','gb'], ['🇩🇪','Germania','de'], ['🇫🇷','Francia','fr'],
+  ['🇪🇸','Spagna','es'], ['🇵🇹','Portogallo','pt'], ['🇬🇷','Grecia','gr'], ['🇳🇱','Paesi Bassi','nl'], ['🇧🇪','Belgio','be'],
+  ['🇨🇭','Svizzera','ch'], ['🇦🇹','Austria','at'], ['🇸🇪','Svezia','se'], ['🇳🇴','Norvegia','no'], ['🇩🇰','Danimarca','dk'],
+  ['🇫🇮','Finlandia','fi'], ['🇮🇪','Irlanda','ie'], ['🇵🇱','Polonia','pl'], ['🇨🇿','Rep. Ceca','cz'], ['🇸🇰','Slovacchia','sk'],
+  ['🇭🇺','Ungheria','hu'], ['🇷🇴','Romania','ro'], ['🇧🇬','Bulgaria','bg'], ['🇭🇷','Croazia','hr'], ['🇷🇸','Serbia','rs'],
+  ['🇹🇷','Turchia','tr'], ['🇺🇦','Ucraina','ua'], ['🇷🇺','Russia','ru'], ['🇯🇵','Giappone','jp'], ['🇰🇷','Corea del Sud','kr'],
+  ['🇨🇳','Cina','cn'], ['🇮🇳','India','in'], ['🇹🇭','Thailandia','th'], ['🇮🇩','Indonesia','id'], ['🇵🇭','Filippine','ph'],
+  ['🇻🇳','Vietnam','vn'], ['🇦🇺','Australia','au'], ['🇳🇿','Nuova Zelanda','nz'], ['🇨🇦','Canada','ca'], ['🇲🇽','Messico','mx'],
+  ['🇧🇷','Brasile','br'], ['🇦🇷','Argentina','ar'], ['🇨🇱','Cile','cl'], ['🇨🇴','Colombia','co'], ['🇵🇪','Perù','pe'],
+  ['🇨🇺','Cuba','cu'], ['🇯🇲','Giamaica','jm'], ['🇲🇦','Marocco','ma'], ['🇩🇿','Algeria','dz'], ['🇪🇬','Egitto','eg'],
+  ['🇳🇬','Nigeria','ng'], ['🇿🇦','Sudafrica','za'], ['🇰🇪','Kenya','ke'], ['🇦🇪','Emirati','ae'], ['🇸🇦','Arabia Saudita','sa'],
+  ['🇮🇱','Israele','il'], ['🇵🇰','Pakistan','pk'], ['🇱🇧','Libano','lb'], ['🇬🇭','Ghana','gh']
+];
+
+function byCountry(code){
+  state.listMode = 'cc:' + code;
+  return fetchList('/stations/bycountrycode/' + encodeURIComponent(code) + '?hidebroken=true&order=votes&reverse=true&limit=40');
+}
+
+function renderCountryBar(){
+  const bar = $('countryBar');
+  bar.innerHTML = '';
+  COUNTRIES.forEach(([flag, name, code]) => {
+    const b = document.createElement('button');
+    b.className = 'chip cc flag';
+    b.type = 'button';
+    b.title = name;
+    b.textContent = flag;
+    b.setAttribute('aria-label', name);
+    b.onclick = () => {
+      chipActive('cc_' + code);
+      byCountry(code);
+      toast('🌍 ' + name);
+    };
+    b.id = 'cc_' + code;
+    bar.appendChild(b);
+  });
+}
+
 /* ================= inizializzazione ================= */
 const GENRES = [
   ['🎷','jazz'], ['🌙','lo-fi'], ['🎸','rock'], ['🎛️','electronic'], ['🏠','house'],
@@ -632,7 +685,7 @@ function renderChips(){
   refreshHeartChip();
 }
 function chipActive(id){
-  document.querySelectorAll('#chips .chip').forEach(c => c.classList.toggle('on', c.id === id));
+  document.querySelectorAll('#chips .chip, #countryBar .chip').forEach(c => c.classList.toggle('on', c.id === id));
 }
 function refreshHeartChip(){
   const b = $('favChip');
@@ -674,6 +727,7 @@ $('muteBtn').onclick = () => {
 
 // caricamento iniziale
 renderChips();
+renderCountryBar();
 fetchList('/stations/search?name=italia&hidebroken=true&order=votes&reverse=true&limit=18').then(list=>{
   if (!list || !list.length) {
     const fallback = [

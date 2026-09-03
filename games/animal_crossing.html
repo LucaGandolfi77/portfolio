@@ -840,11 +840,76 @@
       body.landscape .craft-item { flex-direction: row; align-items: center; text-align: left; gap: 8px; }
       body.landscape .craft-requirements { justify-content: flex-start; }
     }
+
+    /* ===== ERROR OVERLAY ===== */
+    #render-error {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    #render-error .error-card {
+      background: #fff7ec;
+      border: 4px solid #ff7043;
+      border-radius: 16px;
+      padding: 30px 40px;
+      max-width: 420px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      color: #5d4037;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #render-error .error-title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+    #render-error .error-message {
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      word-break: break-word;
+    }
+    #render-error .error-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    #render-error button {
+      font-size: 15px;
+      font-weight: bold;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #8b4513;
+      color: #fff;
+    }
+    #render-error button:last-child {
+      background: #bdbdbd;
+      color: #333;
+    }
+    #render-error button:hover { opacity: 0.9; }
   </style>
 </head>
 <body>
   <!-- Canvas Three.js -->
   <canvas id="gameCanvas"></canvas>
+
+  <!-- Error overlay (mostrato solo in caso di problemi) -->
+  <div id="render-error" style="display:none;">
+    <div class="error-card">
+      <div class="error-title">🛑 Problema con il gioco</div>
+      <div class="error-message" id="error-message"></div>
+      <div class="error-actions">
+        <button id="error-reload">🔄 Ricarica</button>
+        <button id="error-dismiss">✖ Chiudi</button>
+      </div>
+    </div>
+  </div>
   
   <!-- UI Overlay -->
   <div id="ui-overlay">
@@ -1023,10 +1088,39 @@
     </div>
   </div>
   
-  <!-- Three.js via CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+  <!-- Three.js via CDN con fallback locale sincrono -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"
+          onerror="document.write('<scr'+'ipt src=\"three.min.js\"></scr'+'ipt>')"></script>
   
   <script>
+    // ============================================
+    // ===== ERROR BOUNDARY =====
+    // ============================================
+    
+    // Mostra un overlay di errore se il gioco non può essere avviato
+    window.__showError = function(msg) {
+      var el = document.getElementById('render-error');
+      var msgEl = document.getElementById('error-message');
+      if (msgEl) {
+        msgEl.innerHTML = (msg ? msg : 'Si è verificato un errore imprevisto.') +
+          '<br><br>Puoi ricaricare la pagina per riprovare.';
+      }
+      if (el) el.style.display = 'flex';
+    };
+    
+    // Errori globali non gestiti → mostra il problema invece di una pagina bianca
+    window.addEventListener('error', function(e) {
+      if (typeof THREE === 'undefined') return; // gestito dal loader Three.js
+      var m = 'Errore JavaScript: ' + (e.message || e.type);
+      if (e.filename) m += '<br>' + e.filename.split('/').pop() + ':' + (e.lineno || '');
+      window.__showError(m);
+    });
+    
+    // WebGL non disponibile → messaggio chiaro
+    if (!window.WebGLRenderingContext) {
+      window.__showError('Il tuo browser non supporta WebGL, necessario per questo gioco 3D.');
+    }
+    
     // ============================================
     // ===== SETUP THREE.JS E VARIABILI GLOBALI =====
     // ============================================
@@ -1034,12 +1128,19 @@
     const canvas = document.getElementById('gameCanvas');
     
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ 
-      canvas, 
-      antialias: true 
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ 
+        canvas, 
+        antialias: true 
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    } catch (e) {
+      window.__showError('Impossibile inizializzare WebGL: ' + (e.message || e));
+      throw e;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
@@ -1191,7 +1292,7 @@
       const ripple = new THREE.Mesh(rippleGeo, rippleMat);
       ripple.rotation.x = -Math.PI / 2;
       ripple.position.set(-50 + (Math.random() - 0.5) * 45, 0.1, 40 + (Math.random() - 0.5) * 45);
-      ripple.userData.phase = Math.random() * Math.PI * 2;
+      ripple.userData.offset = Math.random() * Math.PI * 2;
       scene.add(ripple);
       ripples.push(ripple);
     }
@@ -3328,45 +3429,59 @@
       lastTime = now;
       const dtSec = Math.min(delta / 1000, 0.05);
       
-      if (!gameState.paused) {
-        // Aggiorna giocatore (solo se non in menu)
-        if (!gameState.craftingOpen && !gameState.pokedexOpen) {
-          updatePlayer();
-        } else {
-          runningNow = false;
+      try {
+        if (!gameState.paused) {
+          // Aggiorna giocatore (solo se non in menu)
+          if (!gameState.craftingOpen && !gameState.pokedexOpen) {
+            updatePlayer();
+          } else {
+            runningNow = false;
+          }
+          
+          // Stamina corsa + nuvole di polvere
+          updateStamina(dtSec);
+          updateDust(dtSec);
+          
+          // Controlla oggetti vicini
+          checkNearbyCollectibles();
+          
+          // Aggiorna creature
+          updateCreatures();
+          
+          // Animate water ripples
+          ripples.forEach(ripple => {
+            ripple.position.y = -0.3 + Math.sin(now * 0.002 + ripple.userData.offset) * 0.1;
+            ripple.rotation.z = now * 0.0005 + ripple.userData.offset;
+          });
+          
+          // Ciclo giorno/notte
+          updateDayNightCycle(delta);
         }
         
-        // Stamina corsa + nuvole di polvere
-        updateStamina(dtSec);
-        updateDust(dtSec);
+        // Aggiorna camera
+        updateCamera();
         
-        // Controlla oggetti vicini
-        checkNearbyCollectibles();
-        
-        // Aggiorna creature
-        updateCreatures();
-        
-        // Animate water ripples
-        ripples.forEach(ripple => {
-          ripple.position.y = -0.3 + Math.sin(now * 0.002 + ripple.userData.offset) * 0.1;
-          ripple.rotation.z = now * 0.0005 + ripple.userData.offset;
-        });
-        
-        // Ciclo giorno/notte
-        updateDayNightCycle(delta);
+        // Render
+        renderer.render(scene, camera);
+      } catch (e) {
+        // Error boundary: blocca il loop ed evidenzia il problema
+        cancelAnimationFrame(gameLoop);
+        window.__showError('Errore durante il rendering: ' + (e.message || e));
       }
-      
-      // Aggiorna camera
-      updateCamera();
-      
-      // Render
-      renderer.render(scene, camera);
     }
     
     // Avvia il gioco
     updateResourceUI();
     loadGame();
     gameLoop();
+    
+    // Pulsanti dell'error boundary
+    var errReload = document.getElementById('error-reload');
+    var errDismiss = document.getElementById('error-dismiss');
+    if (errReload) errReload.addEventListener('click', function() { location.reload(); });
+    if (errDismiss) errDismiss.addEventListener('click', function() {
+      document.getElementById('render-error').style.display = 'none';
+    });
     
     console.log('🏝️ Animal Crossing Clone caricato!');
     console.log('Usa WASD per muoverti, E per raccogliere/catturare, C per il crafting, P per il Pokédex.');

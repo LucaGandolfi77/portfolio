@@ -19,8 +19,24 @@
   function init() {
     const projects = document.getElementById('projectsContainer');
     const games = document.getElementById('gamesFeaturedGrid');
-    if (projects) renderCards(projects, catalog.projects.filter((item) => item.featured).slice(0, 6));
-    if (games) renderCards(games, catalog.games.filter((item) => item.featured).slice(0, 8));
+    if (projects) {
+      renderCards(projects, catalog.projects.filter((item) => item.featured).slice(0, 2));
+      const allLink = document.createElement('a');
+      allLink.href = 'projects.html';
+      allLink.className = 'btn btn-ghost';
+      allLink.style.cssText = 'display:block;text-align:center;margin-top:12px;text-decoration:none;';
+      allLink.innerHTML = 'Vedi tutti i progetti <span aria-hidden="true">→</span>';
+      projects.after(allLink);
+    }
+    if (games) {
+      renderCards(games, catalog.games.filter((item) => item.featured).slice(0, 2));
+      const allLink = document.createElement('a');
+      allLink.href = 'games.html';
+      allLink.className = 'btn btn-ghost';
+      allLink.style.cssText = 'display:block;text-align:center;margin-top:12px;text-decoration:none;';
+      allLink.innerHTML = 'Vedi tutti i giochi <span aria-hidden="true">→</span>';
+      games.after(allLink);
+    }
     document.getElementById('legacyGamesContainer')?.remove();
   }
 
