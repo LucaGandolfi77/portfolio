@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#030510" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="description" content="Solar System Tracker 3D — il sistema solare in tempo reale: posizioni vere dei pianeti calcolate con gli elementi orbitali JPL e l'equazione di Keplero. Accelera il tempo, torna indietro, esplora orbite e dati di ogni pianeta. Ottimizzato per iPhone." />
+<title>🪐 Solar System Tracker 3D</title>
+<style>
+:root{--bg:#030510;--panel:#0b1026;--panel2:#131a3a;--line:rgba(120,150,255,.18);
+  --txt:#eef2ff;--dim:#8fa0cc;--gold:#ffd166;--cyan:#3ee6ff;--green:#52ff9e;--red:#ff5f6d;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;touch-action:none;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none}
+#scene{position:fixed;inset:0;display:block}
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;pointer-events:none;padding:calc(6px + var(--safe-t)) 10px 0;display:flex;flex-direction:column;gap:6px}
+#hud>*{pointer-events:auto}
+.hrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.logo{font-size:clamp(14px,3.6vw,20px);font-weight:800;letter-spacing:1.5px;
+  background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet,#b28dff));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo small{display:block;font-size:9px;letter-spacing:2.5px;color:var(--dim);-webkit-text-fill-color:var(--dim);font-weight:600}
+.chip{background:rgba(5,8,22,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:5px 11px;font-size:12px;font-weight:700;white-space:nowrap}
+.chip b{color:var(--cyan)}
+.btn{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);border-radius:10px;padding:8px 14px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;min-height:38px}
+.btn:active{transform:scale(.96)}
+.btn.on{background:linear-gradient(90deg,rgba(62,230,255,.2),rgba(178,141,255,.2));border-color:var(--cyan);color:#fff}
+.btn.warn{color:var(--gold);border-color:rgba(255,209,102,.4)}
+.btn.small{padding:6px 10px;font-size:11px;min-height:32px}
+/* time bar */
+#timeBar{position:fixed;left:10px;right:10px;bottom:calc(8px + var(--safe-b));z-index:50;pointer-events:none;display:flex;flex-direction:column;gap:5px;align-items:center}
+#timeBar>*{pointer-events:auto}
+.timebox{background:rgba(5,8,22,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;padding:9px 14px;width:min(94vw,560px);display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.trow .dt{font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:.5px}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--cyan);height:26px}
+.speedlbl{font-size:10px;color:var(--dim);letter-spacing:1px;min-width:110px;text-align:center}
+.speeds{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+/* info panel */
+#info{position:fixed;top:50%;right:12px;transform:translateY(-50%);z-index:60;width:min(88vw,300px);display:none;pointer-events:auto}
+#info.on{display:block}
+#info .card{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 14px 44px rgba(0,0,0,.6)}
+#info h3{font-size:16px;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+#info .em{font-size:22px}
+#info .row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+#info .row span:first-child{color:var(--dim)}
+#info .row b{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#info .fact{font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:8px}
+#info .close{position:absolute;top:8px;right:10px;background:transparent;border:none;color:var(--dim);font-size:16px;cursor:pointer}
+/* hint */
+#hint{position:fixed;top:calc(54px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:49;color:var(--dim);font-size:10px;letter-spacing:1px;pointer-events:none;text-align:center;opacity:.85}
+/* test pane */
+#testPane{position:fixed;bottom:0;left:0;right:0;max-height:55vh;overflow:auto;z-index:99;background:rgba(3,5,16,.96);border-top:1px solid #223;padding:12px;font:12px/1.6 ui-monospace,Menlo,monospace;color:#cfe}
+@media(max-width:600px){
+  #info{right:6px;width:min(92vw,260px)}
+  #timeBar{bottom:calc(4px + var(--safe-b))}
+  .trow .dt{font-size:11px}
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="hud">
+  <div class="hrow">
+    <div class="logo">🪐 SOLAR SYSTEM <small>TRACKER 3D · POSIZIONI REALI</small></div>
+    <div style="flex:1"></div>
+    <span class="chip">📅 <b id="hudDate">—</b></span>
+  </div>
+  <div class="hrow">
+    <button class="btn small" id="btnInfo">ℹ️ Info</button>
+    <button class="btn small" id="btnCam">🎥 Vista Terra</button>
+    <button class="btn small" id="btnTest">🧪 Test</button>
+  </div>
+</div>
+<div id="hint">🖱️/👆 trascina per ruotare · rotella/pizzico per zoom · tocca un pianeta per i dati</div>
+
+<div id="timeBar">
+  <div class="timebox">
+    <div class="trow">
+      <span class="dt" id="dateLbl">—</span>
+      <span class="speedlbl" id="speedLbl">Pausa</span>
+    </div>
+    <div class="trow">
+      <button class="btn small" id="btnRev2">⏪×2</button>
+      <button class="btn small" id="btnPause">⏸</button>
+      <button class="btn small" id="btnPlay">▶</button>
+      <button class="btn small" id="btnNow">📌 Oggi</button>
+      <button class="btn small warn" id="btnReset">🔄</button>
+    </div>
+    <div class="trow">
+      <input type="range" id="speedRange" min="-1000" max="1000" value="0" step="1">
+    </div>
+    <div class="speeds">
+      <button class="btn small" data-sp="-365">−1 anno</button>
+      <button class="btn small" data-sp="-30">−1 mese</button>
+      <button class="btn small" data-sp="-1">−1 giorno</button>
+      <button class="btn small" data-sp="1">+1 giorno</button>
+      <button class="btn small" data-sp="30">+1 mese</button>
+      <button class="btn small" data-sp="365">+1 anno</button>
+    </div>
+  </div>
+</div>
+
+<div id="info">
+  <div class="card">
+    <button class="close" id="infoClose">✕</button>
+    <h3><span class="em" id="iEm">🪐</span><span id="iName">—</span></h3>
+    <div id="iRows"></div>
+    <div class="fact" id="iFact"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ═══════════════ DATI ORBITALI REALI (elementi JPL, epoca J2000) ═══════════════ */
+/* a=semiasse maggiore (AU) · e=eccentricità · i=inclinazione (°) · Ω=nodo (°) · ω=perielio (°) · L0=longitudine media a J2000 (°) · nL=variazione L (°/giorno) */
+const ELEMENTS={
+  mercury:{a:0.38710,e:0.20563,i:7.005,Omega:48.331,omega:29.124,L0:252.251,nL:4.09233445,color:0xc7b299,radius:2439.7,mass:'3.30×10²³ kg',period:'88 giorni',moons:0,day:'58.6 giorni terrestri',fact:'Il più vicino al Sole: un anno dura 88 giorni, un giorno 58 giorni terrestri!'},
+  venus:{a:0.72333,e:0.00677,i:3.395,Omega:76.680,omega:54.884,L0:181.980,nL:1.60213034,color:0xffd9a0,radius:6051.8,mass:'4.87×10²⁴ kg',period:'225 giorni',moons:0,day:'243 giorni (retrogrado)',fact:'Ruota al contrario: il Sole sorge a ovest. È il pianeta più caldo: 465 °C.'},
+  earth:{a:1.00000,e:0.01671,i:0.000,Omega:0.000,omega:114.207,L0:100.464,nL:0.98560736,color:0x4da6ff,radius:6371.0,mass:'5.97×10²⁴ kg',period:'365.25 giorni',moons:1,day:'23.9 ore',fact:'Il nostro pianeta. L\'unico conosciuto con la vita. Distanza media dal Sole: 149.6 milioni di km.'},
+  mars:{a:1.52368,e:0.09340,i:1.850,Omega:49.558,omega:286.502,L0:355.453,nL:0.52402068,color:0xe07b39,radius:3389.5,mass:'6.42×10²³ kg',period:'687 giorni',moons:2,day:'24.6 ore',fact:'Il pianeta rosso (ossido di ferro). Ha 2 lune: Phobos e Deimos. Olympus Mons: il vulcano più alto del sistema solare.'},
+  jupiter:{a:5.20260,e:0.04849,i:1.303,Omega:100.464,omega:273.867,L0:34.404,nL:0.08308529,color:0xd8a06a,radius:69911,mass:'1.90×10²⁷ kg',period:'11.9 anni',moons:95,day:'9.9 ore',fact:'Il gigante. 2.5 volte più massiccio di tutti gli altri pianeti insieme. La Grande Macchia Rossa è una tempesta più grande della Terra.'},
+  saturn:{a:9.55491,e:0.05551,i:2.489,Omega:113.666,omega:339.392,L0:49.944,nL:0.03344414,color:0xe8d5a3,radius:58232,mass:'5.68×10²⁶ kg',period:'29.4 anni',moons:146,day:'10.7 ore',fact:'Famoso per gli anelli di ghiaccio e roccia larghi 280.000 km ma spessi solo 10 metri. Densità minore dell\'acqua: galleggerebbe!'},
+  uranus:{a:19.21845,e:0.04630,i:0.773,Omega:74.006,omega:96.999,L0:313.232,nL:0.01172834,color:0x8fd8d8,radius:25362,mass:'8.68×10²⁵ kg',period:'84 anni',moons:28,day:'17.2 ore (retrogrado)',fact:'Ruota "sdraiato": il suo asse è inclinato di 98°. Scoperto nel 1781. Fa -224 °C.'},
+  neptune:{a:30.11039,e:0.00899,i:1.770,Omega:131.784,omega:276.336,L0:304.880,nL:0.00598103,color:0x4a6ae8,radius:24622,mass:'1.02×10²⁶ kg',period:'164.8 anni',moons:16,day:'16.1 ore',fact:'Il più lontano: scoperto con i calcoli, non con il telescopio! Venti fino a 2.100 km/h, i più veloci del sistema solare.'},
+  pluto:{a:39.48212,e:0.24883,i:17.140,Omega:110.304,omega:224.068,L0:238.929,nL:0.00396,color:0xb8a08a,radius:1188,mass:'1.31×10²² kg',period:'248 anni',moons:5,day:'6.4 giorni',fact:'Pianeta nano dal 2006. Orbita molto eccentrica e inclinata di 17°. Il suo cuore ghiacciato: Tombaugh Regio.'},
+};
+const DEG=Math.PI/180;
+const AU_KM=149597870.7;
+const J2000=Date.UTC(2000,0,1,12,0,0);
+const DAY=86400000;
+
+/* ═══════════════ EQUAZIONE DI KEPLERO ═══════════════ */
+// Restituisce posizione eliocentrica {x,y,z} in UA per una data e un pianeta
+function keplerSolve(M,e,tol=1e-8){
+  M=M%(2*Math.PI);if(M<0)M+=2*Math.PI;
+  let E=M;
+  for(let k=0;k<40;k++){
+    const dE=(E-e*Math.sin(E)-M)/(1-e*Math.cos(E));
+    E-=dE;
+    if(Math.abs(dE)<tol)break;
+  }
+  return E;
+}
+function planetPos(dateMs,key){
+  const el=ELEMENTS[key];
+  if(!el)return null;
+  const d=(dateMs-J2000)/DAY;
+  const L=(el.L0+el.nL*d)%360;
+  const M=(L-el.omega)%360; // anomalia media
+  const E=keplerSolve(M*DEG,el.e);
+  // coordinate nell'orbita
+  const x0=el.a*(Math.cos(E)-el.e);
+  const y0=el.a*Math.sqrt(1-el.e*el.e)*Math.sin(E);
+  // rotazioni: argomento del perielio, inclinazione, nodo
+  const w=el.omega*DEG,Om=el.Omega*DEG,inc=el.i*DEG;
+  const cw=Math.cos(w),sw=Math.sin(w);
+  const cO=Math.cos(Om),sO=Math.sin(Om);
+  const ci=Math.cos(inc),si=Math.sin(inc);
+  // posizione nel piano orbitale → eclittica
+  const xp=cw*x0-sw*y0;
+  const yp=sw*x0+cw*y0;
+  const xe=xp;
+  const ye=yp*ci;
+  const ze=yp*si;
+  const x=xe*cO-ze*sO;
+  const z=xe*sO+ze*cO;
+  const y=ye;
+  return {x,y,z,au:Math.hypot(x,y,z)};
+}
+function distanceAU(dateMs,key){const p=planetPos(dateMs,key);return p?p.au:null;}
+function orbitPoints(key,n=256){
+  const el=ELEMENTS[key];const pts=[];
+  const w=el.omega*DEG,Om=el.Omega*DEG,inc=el.i*DEG;
+  const cw=Math.cos(w),sw=Math.sin(w),cO=Math.cos(Om),sO=Math.sin(Om),ci=Math.cos(inc),si=Math.sin(inc);
+  for(let k=0;k<=n;k++){
+    const E=k/n*2*Math.PI;
+    const x0=el.a*(Math.cos(E)-el.e);
+    const y0=el.a*Math.sqrt(1-el.e*el.e)*Math.sin(E);
+    const xp=cw*x0-sw*y0,yp=sw*x0+cw*y0;
+    const xe=xp,ye=yp*ci,ze=yp*si;
+    pts.push(new THREE.Vector3((xe*cO-ze*sO)*AU_SCALE,(ye)*AU_SCALE,(xe*sO+ze*cO)*AU_SCALE));
+  }
+  return pts;
+}
+/* scala visiva: 1 UA = 60 unità; raggi in scala radice per vedere i pianeti */
+const AU_SCALE=60;
+const KM_SCALE=AU_SCALE/AU_KM;
+function visualRadius(km){return 1.1*Math.pow(km/6371,0.55);}
+
+/* ═══════════════ SCENA THREE.JS ═══════════════ */
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x030510);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,6000);
+camera.position.set(0,90,170);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.06;controls.minDistance=6;controls.maxDistance=1500;
+
+/* stelle di fondo */
+const starGeo=new THREE.BufferGeometry();
+const starPos=new Float32Array(3000*3);
+for(let i=0;i<3000;i++){
+  starPos[i*3]=(Math.random()-0.5)*4000;
+  starPos[i*3+1]=(Math.random()-0.5)*4000;
+  starPos[i*3+2]=(Math.random()-0.5)*4000;
+}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
+scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.9,sizeAttenuation:false,transparent:true,opacity:0.85})));
+
+/* Sole */
+const sunMesh=new THREE.Mesh(
+  new THREE.SphereGeometry(5.2,32,32),
+  new THREE.MeshBasicMaterial({color:0xffd166})
+);
+scene.add(sunMesh);
+const glow=new THREE.PointLight(0xffdd88,3,500);
+glow.position.set(0,0,0);
+scene.add(glow);
+scene.add(new THREE.AmbientLight(0x334,0.6));
+
+/* pianeti + orbite + etichette */
+const planetMeshes={};
+const orbitLines={};
+const labelSprites={};
+const PLANET_ORDER=['mercury','venus','earth','mars','jupiter','saturn','uranus','neptune','pluto'];
+PLANET_ORDER.forEach(key=>{
+  const el=ELEMENTS[key];
+  // pianeta
+  const r=visualRadius(el.radius);
+  const mesh=new THREE.Mesh(
+    new THREE.SphereGeometry(r,24,24),
+    new THREE.MeshStandardMaterial({color:el.color,roughness:0.85,metalness:0.05})
+  );
+  mesh.userData.key=key;
+  scene.add(mesh);
+  planetMeshes[key]=mesh;
+  // orbita
+  const geo=new THREE.BufferGeometry().setFromPoints(orbitPoints(key));
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:el.color,transparent:true,opacity:0.35}));
+  scene.add(line);
+  orbitLines[key]=line;
+  // etichetta
+  const cv=document.createElement('canvas');
+  cv.width=256;cv.height=64;
+  const c=cv.getContext('2d');
+  c.font='bold 30px system-ui';c.textAlign='center';
+  c.fillStyle='#fff';c.fillText(key.charAt(0).toUpperCase()+key.slice(1),128,40);
+  const tex=new THREE.CanvasTexture(cv);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  sp.scale.set(8,2,1);
+  scene.add(sp);
+  labelSprites[key]=sp;
+});
+
+/* ═══════════════ STATO TEMPO ═══════════════ */
+let simDate=Date.now();           // data simulata (ms)
+let speed=0;                      // giorni per secondo
+let paused=true;
+let lastT=performance.now();
+const speedNames=s=>{
+  if(s===0)return 'Pausa';
+  const a=Math.abs(s);
+  if(a<1)return (s>0?'+':'−')+a.toFixed(1)+' g/s';
+  if(a<60)return (s>0?'+':'−')+Math.round(a)+' giorni/s';
+  if(a<730)return (s>0?'+':'−')+(a/30.44).toFixed(1)+' mesi/s';
+  return (s>0?'+':'−')+(a/365.25).toFixed(1)+' anni/s';
+};
+function updatePositions(){
+  PLANET_ORDER.forEach(key=>{
+    const p=planetPos(simDate,key);
+    if(!p)return;
+    const m=planetMeshes[key];
+    m.position.set(p.x*AU_SCALE,p.y*AU_SCALE,p.z*AU_SCALE);
+    labelSprites[key].position.set(p.x*AU_SCALE,p.y*AU_SCALE+visualRadius(ELEMENTS[key].radius)+1.6,p.z*AU_SCALE);
+  });
+}
+function fmtDate(ms){
+  const d=new Date(ms);
+  return d.toLocaleDateString('it-IT',{year:'numeric',month:'short',day:'numeric'})+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+}
+function tick(now){
+  requestAnimationFrame(tick);
+  const dt=(now-lastT)/1000;lastT=now;
+  if(!paused&&speed!==0)simDate+=speed*DAY*dt;
+  updatePositions();
+  controls.update();
+  $('dateLbl').textContent=fmtDate(simDate);
+  $('hudDate').textContent=fmtDate(simDate);
+  $('speedLbl').textContent=speedNames(speed);
+  renderer.render(scene,camera);
+}
+
+/* ═══════════════ UI ═══════════════ */
+const $=id=>document.getElementById(id);
+function openInfo(key){
+  const el=ELEMENTS[key],p=planetPos(simDate,key);
+  $('iEm').textContent=({mercury:'☿',venus:'♀',earth:'🌍',mars:'♂',jupiter:'♃',saturn:'♄',uranus:'⛢',neptune:'♆',pluto:'♇'}[key]||'🪐');
+  $('iName').textContent=key.charAt(0).toUpperCase()+key.slice(1);
+  const dAU=p?p.au.toFixed(3):'—';
+  const dKm=p?(p.au*AU_KM/1e6).toFixed(1):'—';
+  $('iRows').innerHTML=`
+    <div class="row"><span>Distanza dal Sole</span><b>${dAU} UA · ${dKm} M km</b></div>
+    <div class="row"><span>Raggio</span><b>${el.radius.toLocaleString('it-IT')} km</b></div>
+    <div class="row"><span>Periodo orbitale</span><b>${el.period}</b></div>
+    <div class="row"><span>Durata del giorno</span><b>${el.day}</b></div>
+    <div class="row"><span>Lune</span><b>${el.moons}</b></div>
+    <div class="row"><span>Massa</span><b>${el.mass}</b></div>`;
+  $('iFact').textContent=el.fact;
+  $('info').classList.add('on');
+}
+function focusOn(key){
+  const m=planetMeshes[key];
+  const d=m.position.length();
+  camera.position.copy(m.position).add(new THREE.Vector3(d*0.6,d*0.35,0));
+  controls.target.copy(m.position);
+  controls.update();
+}
+/* raycast per clic/touch sui pianeti */
+const raycaster=new THREE.Raycaster();
+const pointer=new THREE.Vector2();
+function pick(clientX,clientY){
+  const rect=canvas.getBoundingClientRect();
+  pointer.x=((clientX-rect.left)/rect.width)*2-1;
+  pointer.y=-((clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(pointer,camera);
+  const meshes=PLANET_ORDER.map(k=>planetMeshes[k]);
+  const hit=raycaster.intersectObjects(meshes,false);
+  if(hit.length&&hit[0].object.userData.key){
+    openInfo(hit[0].object.userData.key);
+    return true;
+  }
+  return false;
+}
+canvas.addEventListener('click',e=>{if(!pick(e.clientX,e.clientY))$('info').classList.remove('on');});
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){pick(e.clientX,e.clientY);}});
+
+/* pulsanti */
+$('btnPause').addEventListener('click',()=>{paused=true;speed=0;$('speedRange').value=0;});
+$('btnPlay').addEventListener('click',()=>{paused=false;speed=1;$('speedRange').value=1;});
+$('btnNow').addEventListener('click',()=>{simDate=Date.now();paused=true;speed=0;$('speedRange').value=0;});
+$('btnReset').addEventListener('click',()=>{simDate=Date.now();paused=true;speed=0;$('speedRange').value=0;camera.position.set(0,90,170);controls.target.set(0,0,0);});
+$('btnRev2').addEventListener('click',()=>{paused=false;speed=-2;$('speedRange').value=-2;});
+$('btnInfo').addEventListener('click',()=>{
+  $('hint').textContent='Tocca un pianeta per vedere i dati. Orbite inclinate e eccentriche: sono i VERI elementi JPL.';
+  setTimeout(()=>{$('hint').textContent='🖱️/👆 trascina per ruotare · rotella/pizzico per zoom · tocca un pianeta per i dati';},4000);
+});
+$('btnCam').addEventListener('click',()=>focusOn('earth'));
+$('infoClose').addEventListener('click',()=>$('info').classList.remove('on'));
+document.querySelectorAll('[data-sp]').forEach(b=>b.addEventListener('click',()=>{
+  const v=parseInt(b.dataset.sp,10);
+  paused=false;speed=v;
+  $('speedRange').value=Math.max(-1000,Math.min(1000,v*30));
+}));
+$('speedRange').addEventListener('input',e=>{speed=parseInt(e.target.value,10);paused=speed===0;});
+$('btnTest').addEventListener('click',()=>runTests());
+
+/* ═══════════════ TEST ENGINE ═══════════════ */
+function selfTest(){
+  const r=[];
+  const ok=(n,p,d)=>r.push({name:n,pass:!!p,detail:d||''});
+  const now=Date.now();
+  // 1. distanze plausibili
+  const e=planetPos(now,'earth');
+  ok('Terra ~1 UA dal Sole', e&&Math.abs(e.au-1)<0.02, 'au='+(e?e.au.toFixed(4):'?'));
+  const me=planetPos(now,'mercury');
+  ok('Mercurio < 0.5 UA', me&&me.au<0.5, 'au='+(me?me.au.toFixed(3):'?'));
+  const ne=planetPos(now,'neptune');
+  ok('Nettuno ~30 UA', ne&&ne.au>29&&ne.au<31, 'au='+(ne?ne.au.toFixed(2):'?'));
+  const pl=planetPos(now,'pluto');
+  ok('Plutone 29-49 UA (orbita eccentrica)', pl&&pl.au>28&&pl.au<50, 'au='+(pl?pl.au.toFixed(2):'?'));
+  // 2. ordine di distanza corretto (media su 1 anno)
+  const dist=k=>{let s=0;for(let i=0;i<365;i++){s+=planetPos(now+i*DAY,k).au;}return s/365;};
+  const dMer=dist('mercury'),dVen=dist('venus'),dEar=dist('earth'),dMar=dist('mars');
+  ok('ordine distanze: Merc<Ven<Terra<Mar', dMer<dVen&&dVen<dEar&&dEar<dMar, [dMer,dVen,dEar,dMar].map(x=>x.toFixed(2)).join('<'));
+  // 3. Keplero: E compreso e convergenza
+  const E=keplerSolve(3.5,0.2);
+  ok('Keplero: E finito 0..2π', isFinite(E)&&E>=0&&E<=2*Math.PI, 'E='+E.toFixed(4));
+  // 4. movimento: dopo 1 anno la Terra è tornata vicino
+  const p0=planetPos(now,'earth'),p1=planetPos(now+365.25*DAY,'earth');
+  const drift=Math.hypot(p0.x-p1.x,p0.y-p1.y,p0.z-p1.z);
+  ok('Terra: dopo 1 anno torna vicina (drift<0.05 UA)', drift<0.05, 'drift='+drift.toFixed(4)+' UA');
+  // 5. velocità: Mercurio gira più veloce (spostamento in 10 giorni > Terra)
+  const sMer=Math.hypot(planetPos(now,'mercury').x-planetPos(now+10*DAY,'mercury').x,planetPos(now,'mercury').y-planetPos(now+10*DAY,'mercury').y);
+  const sEar=Math.hypot(planetPos(now,'earth').x-planetPos(now+10*DAY,'earth').x,planetPos(now,'earth').y-planetPos(now+10*DAY,'earth').y);
+  ok('Mercurio si muove più di Terra in 10 giorni', sMer>sEar, 'Mer='+sMer.toFixed(2)+' Ear='+sEar.toFixed(2));
+  // 6. simDate e velocità
+  ok('simDate inizializzato', typeof simDate==='number'&&simDate>0);
+  return r;
+}
+function runTests(){
+  const r=selfTest();
+  let pane=$('testPane');
+  if(!pane){pane=document.createElement('div');pane.id='testPane';document.body.appendChild(pane);}
+  pane.innerHTML='<b>🪐 SOLAR SYSTEM TRACKER — test orbite</b><br>'+
+    r.map(x=>(x.pass?'✅':'❌')+' '+x.name+(x.detail?' — '+x.detail:'')).join('<br>')+
+    '<br><b>'+r.filter(x=>x.pass).length+'/'+r.length+' PASS</b>';
+  return r;
+}
+window.__SOLAR__={ELEMENTS,keplerSolve,planetPos,distanceAU,orbitPoints,selfTest,get simDate(){return simDate;},set simDate(v){simDate=v;},get speed(){return speed;},set speed(v){speed=v;}};
+if(location.search.indexOf('test=1')>=0)setTimeout(runTests,400);
+
+/* ═══════════════ AVVIO ═══════════════ */
+updatePositions();
+$('dateLbl').textContent=fmtDate(simDate);
+$('hudDate').textContent=fmtDate(simDate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+requestAnimationFrame(tick);
+</script>
+<script src="../top_buttons.js"></script>
+</body>
+</html>

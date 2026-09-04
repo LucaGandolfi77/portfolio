@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  username     String      @unique
+  passwordHash String      @map("password_hash")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  characters   Character[]
+
+  @@map("users")
+}
+
+model Character {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  name      String   @unique
+  faction   String
+  classType String   @map("class_type")
+  level     Int      @default(1)
+  xp        Int      @default(0)
+  hp        Int      @default(100)
+  maxHp     Int      @default(100) @map("max_hp")
+  mana      Int      @default(50)
+  maxMana   Int      @default(50) @map("max_mana")
+  posX      Float    @default(0) @map("pos_x")
+  posY      Float    @default(0) @map("pos_y")
+  posZ      Float    @default(0) @map("pos_z")
+  stats     Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items         ItemInstance[]
+  questProgress QuestProgress[]
+
+  @@map("characters")
+}
+
+model ItemDefinition {
+  id           String   @id @default(uuid())
+  name         String
+  type         String   // weapon, helmet, armor, gloves, boots, ring, etc.
+  rarity       String   @default("common")
+  levelReq     Int      @default(1) @map("level_req")
+  classReq     String?  @map("class_req")
+  baseStats    Json     @default("{}") @map("base_stats")
+  description  String   @default("")
+  sellValue    Int      @default(0) @map("sell_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  instances ItemInstance[]
+
+  @@map("item_definitions")
+}
+
+model ItemInstance {
+  id          String   @id @default(uuid())
+  defId       String   @map("def_id")
+  def         ItemDefinition @relation(fields: [defId], references: [id])
+  ownerId     String?  @map("owner_id")
+  owner       Character? @relation(fields: [ownerId], references: [id])
+  slotIdx     Int?     @map("slot_idx")
+  location    String   @default("inventory") // inventory, equipment, bank
+  upgradeLvl  Int      @default(0) @map("upgrade_lvl")
+  affixes     Json     @default("[]")
+  durability  Int      @default(100)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("item_instances")
+}
+
+model QuestDefinition {
+  id          String @id @default(uuid())
+  name        String
+  description String @default("")
+  objectives  Json   @default("[]")
+  rewards     Json   @default("{}")
+  prereqs     Json   @default("[]")
+  npcGiver    String? @map("npc_giver")
+  levelReq    Int    @default(1) @map("level_req")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  progress QuestProgress[]
+
+  @@map("quest_definitions")
+}
+
+model QuestProgress {
+  charId     String @map("char_id")
+  char       Character @relation(fields: [charId], references: [id])
+  questId    String @map("quest_id")
+  quest      QuestDefinition @relation(fields: [questId], references: [id])
+  state      String @default("active") // active, completed, failed
+  counters   Json   @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@id([charId, questId])
+  @@map("quest_progress")
+}

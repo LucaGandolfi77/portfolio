@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: emberfall
+      POSTGRES_PASSWORD: emberfall_dev
+      POSTGRES_DB: emberfall
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emberfall"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.server
+    ports: ["3001:3001"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://emberfall:emberfall_dev@postgres:5432/emberfall?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: emberfall_dev_secret_change_in_prod
+      TICK_RATE: "20"
+    volumes:
+      - ./server:/app/server
+      - ./shared:/app/shared
+      - /app/server/node_modules
+      - /app/shared/node_modules
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+
+  client:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.client
+    ports: ["5173:5173"]
+    depends_on:
+      - server
+    environment:
+      VITE_SERVER_URL: http://localhost:3001
+    volumes:
+      - ./client:/app/client
+      - ./shared:/app/shared
+      - /app/client/node_modules
+      - /app/shared/node_modules
+
+volumes:
+  pgdata:
+  redisdata:

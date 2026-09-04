@@ -60,7 +60,8 @@
     ['smile-detection-wrapper', 'Smile Detection', 'Launcher for browser-based smile analysis.', 'projects/smile_detection.html', '☺', 'computer-vision', ['AI', 'Camera']],
     ['smile-detection', 'Smile Detection App', 'Analyze a smile locally with camera-based vision.', 'projects/smile_detection/index.html', '☺', 'computer-vision', ['AI', 'Camera']],
     ['text-image-researcher', 'Text Image Researcher', 'Explore and analyze text inside images.', 'projects/text_image_researcher.html', '▤', 'ai', ['AI', 'Images']],
-    ['vola', 'Vola! 3D', 'Camera-controlled 3D flying PWA.', 'projects/vola-pwa/index.html', '✈', 'computer-vision', ['3D', 'Camera', 'PWA']]
+    ['vola', 'Vola! 3D', 'Camera-controlled 3D flying PWA.', 'projects/vola-pwa/index.html', '✈', 'computer-vision', ['3D', 'Camera', 'PWA']],
+    ['cabriolo-5am', 'Cabriolo, 5:00', 'Fidenza, estate 2021. Visual novel interattiva con 5 capitoli, 5 minigiochi e 4 finali — l\'alba è nostra.', 'projects/cabriolo-5am/index.html', '🌄', 'story', ['Story', 'PWA', 'Music', 'iPhone']]
   ].map(([id, title, description, href, icon, category, badges]) => ({
     id, title, description, href, icon, category, badges, technologies: badges,
     featured: false, status: 'live', type: 'project', requirements: badges.includes('Camera') ? ['camera'] : []

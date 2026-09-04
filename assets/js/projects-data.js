@@ -587,5 +587,14 @@ const PROJECTS_DATA = [
     "emoji": "🖥️",
     "badge": "Sim",
     "badgeColor": "#ff9f43"
+  },
+  {
+    "id": "cabriolo-5am",
+    "title": "Cabriolo, 5:00",
+    "description": "Fidenza, estate 2021. Visual novel interattiva: Luca, Thomas e Valentina salgono sulla collina di Cabriolo alle 5 di mattina per vedere l'alba, ascoltare musica e sentirsi immortali. 5 capitoli, 5 minigiochi, 4 finali multipli. PWA offline.",
+    "href": "projects/cabriolo-5am/index.html",
+    "emoji": "🌄",
+    "badge": "Story / PWA",
+    "badgeColor": "#00d4ff"
   }
 ];
