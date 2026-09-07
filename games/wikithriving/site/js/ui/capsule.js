@@ -71,7 +71,7 @@
     if(!state.capsule) state.capsule=[];
     var p=state.profile;
     var next=getNextStage(p.stageId);
-    if(!next){alert('You\'ve reached the final stage! No more future selves to write to.');return;}
+    if(!next){window.Toast.info('You\'ve reached the final stage! No more future selves to write to.');return;}
     state.capsule.push({
       id:'cap-'+Date.now(),
       text:input.value.trim(),
@@ -81,7 +81,7 @@
       opened:false
     });
     window.App.setState(state);
-    alert('📮 Letter sealed! It will unlock when you reach '+STAGE_NAMES[next]+'.');
+    window.Toast.success('📮 Letter sealed! It unlocks at '+STAGE_NAMES[next]+'.');
     render();
   }
   function open(capsuleId){

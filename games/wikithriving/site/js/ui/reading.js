@@ -89,7 +89,7 @@
       window.Progress.addXP(state,10);
       const{state:s2,newBadges}=window.Progress.checkBadges(state);
       window.App.setState(s2);
-      if(newBadges.length) alert('🏅 New badge: '+newBadges.map(b=>b.emoji+' '+b.name).join(', '));
+      if(newBadges.length) window.Toast.success('🏅 New badge: '+newBadges.map(b=>b.emoji+' '+b.name).join(', '));
     }
     render();
   }

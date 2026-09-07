@@ -1,4 +1,4 @@
-/* Lesson UI — reader + quiz + garden plant */
+/* Lesson UI — reader + quiz + garden plant (toast + confetti) */
 (function(){
   var currentLesson=null;
   var quizState=null;
@@ -10,7 +10,7 @@
     var realm=window.REALMS.find(function(r){return r.id===currentLesson.realm});
     var gardenEmoji=window.Review&&state.garden&&state.garden[lessonId]?window.Review.getPlantEmoji(state,lessonId):'';
     document.getElementById('lesson-content').innerHTML=`
-      <div class="card card-lg">
+      <div class="card card-lg fade-in">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="font-size:1.4rem">${realm.icon}</span>
           <span class="chip" style="background:${realm.color}20;color:${realm.color}">${realm.name}</span>
@@ -38,17 +38,21 @@
       </div>
     `;
   }
+
   function startQuiz(lessonId,realm){
     var state=window.App.getState();
     if(!window.Economy.hasHearts(state)){
-      alert('❤️ No hearts left! Wait for refill or visit the shop.');
+      window.Toast.error('❤️ No hearts left! Wait for refill or visit the shop.');
+      if(window.SFX) window.SFX.error();
       return;
     }
+    if(window.SFX) window.SFX.click();
     var questions=window.Quiz.buildSet(currentLesson,1);
     if(!questions.length){markDone(lessonId,realm);return;}
     quizState={questions:questions,current:0,score:0,done:false};
     renderQuizQuestion();
   }
+
   function renderQuizQuestion(){
     if(!quizState||!quizState.questions.length){finishQuiz();return;}
     var q=quizState.questions[quizState.current];
@@ -72,6 +76,7 @@
       <div id="quiz-feedback" style="margin-top:12px;display:none"></div>
     `;
   }
+
   function answerQuiz(chosen,correct){
     var options=document.querySelectorAll('#quiz-options button');
     options.forEach(function(btn){btn.onclick=null;btn.style.cursor='default';});
@@ -80,6 +85,7 @@
       quizState.score++;
       options[chosen].style.background='#e8f5e9';
       options[chosen].style.borderColor='#4caf50';
+      if(window.SFX) window.SFX.success();
     } else {
       var state=window.App.getState();
       window.Economy.loseHeart(state);
@@ -88,6 +94,7 @@
       options[chosen].style.borderColor='#ef5350';
       options[correct].style.background='#e8f5e9';
       options[correct].style.borderColor='#4caf50';
+      if(window.SFX) window.SFX.error();
     }
     var feedback=document.getElementById('quiz-feedback');
     if(feedback){
@@ -101,11 +108,14 @@
       `;
     }
   }
+
   function nextQuizQuestion(){
+    if(window.SFX) window.SFX.click();
     quizState.current++;
     if(quizState.current>=quizState.questions.length){finishQuiz();return;}
     renderQuizQuestion();
   }
+
   function finishQuiz(){
     var lessonId=currentLesson.id;
     var realm=currentLesson.realm;
@@ -132,9 +142,11 @@
           <button class="btn btn-primary" style="width:100%" onclick="LessonUI.startQuiz('${lessonId}','${realm}')">Try Again</button>
         </div>
       `;
+      if(window.Analytics) window.Analytics.track('quiz_fail',{lesson_id:lessonId,score:quizState.score,total:quizState.questions.length});
     }
     quizState=null;
   }
+
   function markDone(lessonId,realm){
     var state=window.App.getState();
     var changed=window.Progress.markLessonDone(state,lessonId,realm);
@@ -144,11 +156,22 @@
       if(window.League) window.League.addWeeklyXP(state,window.Progress.XP_PER_LESSON);
       var s2=window.Progress.checkBadges(state);
       window.App.setState(s2.state);
+      // Record last lesson for continue CTA
+      state.lastLessonRealm=realm;
+      state.lastLessonId=lessonId;
+      window.App.setState(state);
+      // Celebrate
+      window.Confetti.celebrate();
+      window.Toast.success('✨ Lesson complete! +10 XP +2 Pearls');
       if(s2.newBadges.length){
-        alert('🏅 New badge: '+s2.newBadges.map(function(b){return b.emoji+' '+b.name;}).join(', '));
+        setTimeout(function(){
+          window.Toast.success('🏅 New badge: '+s2.newBadges.map(function(b){return b.emoji+' '+b.name;}).join(', '));
+        },1500);
       }
+      if(window.Analytics) window.Analytics.track('lesson_complete',{lesson_id:lessonId,realm:realm});
     }
     render(lessonId,window.App.getState());
   }
+
   window.LessonUI={render:render,startQuiz:startQuiz,answerQuiz:answerQuiz,nextQuizQuestion:nextQuizQuestion};
 })();

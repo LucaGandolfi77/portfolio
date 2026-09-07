@@ -18,6 +18,11 @@ function createCardElement(card, options = {}) {
   el.appendChild(rank);
   el.appendChild(suit);
   el.dataset.cardId = card.id;
+  // Attach hold-to-preview for fullscreen card display
+  if (typeof addCardPreview === 'function') {
+    const gameType = (window.gameState && window.gameState.gameType) || (card.gameType) || 'scopa';
+    addCardPreview(el, card, gameType);
+  }
   return el;
 }
 

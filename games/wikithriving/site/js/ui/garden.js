@@ -39,13 +39,13 @@
   function review(lessonId){
     var state=window.App.getState();
     if(!window.Economy.hasHearts(state)){
-      alert('❤️ No hearts left! Wait for refill or visit the shop.');
+      window.Toast.error('❤️ No hearts left! Wait for refill or visit the shop.');
       return;
     }
     var lesson=window.LESSONS.find(function(l){return l.id===lessonId;});
     if(!lesson) return;
     var questions=window.Quiz.buildSet(lesson,2);
-    if(!questions.length){alert('No review questions available.');return;}
+    if(!questions.length){window.Toast.info('No review questions available.');return;}
     window.App.showLesson(lessonId);
   }
   window.GardenUI={render:render,review:review};

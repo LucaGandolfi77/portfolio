@@ -2,6 +2,181 @@ let selectedCardId = null;
 let selectedTakeIds = [];
 let timerInterval = null;
 
+// ===== FULLSCREEN CARD PREVIEW =====
+let holdTimer = null;
+let holdCardEl = null;
+let previewModal = null;
+
+function showFullscreenCard(card, gameType) {
+  if (previewModal) previewModal.remove();
+  const modal = document.createElement('div');
+  modal.className = 'fullscreen-modal-overlay';
+  modal.id = 'card-preview-modal';
+  const rules = getGameRules(gameType);
+  const rulesHTML = rules.map(r => `<div class="rule-item"><span class="rule-num">${r.num}</span><span class="rule-text">${r.text}</span></div>`).join('');
+  modal.innerHTML = `
+    <div class="fullscreen-card" id="fullscreen-card">
+      <div class="fullscreen-icon">🃏</div>
+      <div class="fullscreen-title">${card.rank || card.label || '?'} ${card.suitSymbol || ''}</div>
+      <div class="fullscreen-subtitle">${card.suitLabel || card.suit || card.type || ''}</div>
+      <div class="fullscreen-rules">${rulesHTML || '<p style="color:#666">Nessuna regola disponibile</p>'}</div>
+      <div class="fullscreen-actions">
+        <button class="btn btn-secondary" id="close-card-preview">Chiudi</button>
+        <button class="btn btn-primary" id="keep-viewing">Continua a guardare</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  previewModal = modal;
+  modal.addEventListener('click', (e) => { if (e.target === modal) hideFullscreenCard(); });
+  modal.querySelector('#close-card-preview').addEventListener('click', hideFullscreenCard);
+  modal.querySelector('#keep-viewing').addEventListener('click', () => { hideFullscreenCard(); showToast('Continua a giocare!'); });
+  window._cardPreviewEscHandler = (e) => { if (e.key === 'Escape') hideFullscreenCard(); };
+  document.addEventListener('keydown', window._cardPreviewEscHandler);
+}
+
+function hideFullscreenCard() {
+  if (previewModal) { previewModal.remove(); previewModal = null; }
+  if (window._cardPreviewEscHandler) { document.removeEventListener('keydown', window._cardPreviewEscHandler); window._cardPreviewEscHandler = null; }
+}
+
+function addCardPreview(cardEl, card, gameType) {
+  if (!cardEl || !card) return;
+  cardEl.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    holdCardEl = cardEl;
+    holdTimer = setTimeout(() => { showFullscreenCard(card, gameType); }, 500);
+  });
+  cardEl.addEventListener('mouseup', () => { clearTimeout(holdTimer); holdCardEl = null; });
+  cardEl.addEventListener('mouseleave', () => { clearTimeout(holdTimer); holdCardEl = null; });
+  cardEl.addEventListener('touchstart', () => {
+    holdCardEl = cardEl;
+    holdTimer = setTimeout(() => { showFullscreenCard(card, gameType); }, 500);
+  }, { passive: true });
+  cardEl.addEventListener('touchend', () => { clearTimeout(holdTimer); holdCardEl = null; });
+  cardEl.addEventListener('touchcancel', () => { clearTimeout(holdTimer); holdCardEl = null; });
+}
+
+function getGameRules(gameType) {
+  const rules = {
+    scopa: [
+      { num: '1', text: 'Cattura carte dal tavolo con carte della mano dello stesso valore' },
+      { num: '2', text: 'La scopa (cattura di tutte le carte) vale 1 punto extra' },
+      { num: '3', text: 'Primiera: il giocatore con il sette migliore vince 1 punto' },
+      { num: '4', text: 'Denari: chi cattura più carte di denari vince 1 punto' },
+      { num: '5', text: 'Carte: chi cattura più carte totali vince 1 punto' },
+      { num: '6', text: 'Obiettivo: raggiungere 11 punti per vincere' },
+    ],
+    briscola: [
+      { num: '1', text: 'La briscola è la carta trionfo con valore più alto' },
+      { num: '2', text: 'Si deve seguire il seme del primo giocatore' },
+      { num: '3', text: 'Valori: A=11, 3=10, R=4, C=3, J=2' },
+      { num: '4', text: 'Chi vince più mani vince la partita' },
+    ],
+    blackjack: [
+      { num: '1', text: 'Obiettivo: arrivare a 21 senza superarlo' },
+      { num: '2', text: 'Carte 2-10 valgono il loro valore, figure = 10, Asso = 1 o 11' },
+      { num: '3', text: 'Blackjack (A+10) paga 3:2' },
+      { num: '4', text: 'Il banco sta su 17' },
+    ],
+    settenmezzo: [
+      { num: '1', text: 'Valori: numeri = valore facciale, figure = 0.5' },
+      { num: '2', text: 'Massimo 7.5 punti per vincere' },
+      { num: '3', text: '7 e mezzo naturale batte tutto' },
+      { num: '4', text: 'Superare 7.5 = bust' },
+    ],
+    tressette: [
+      { num: '1', text: 'Valori: A=10, 3=10, 2=8, C=7, R=6, J=5' },
+      { num: '2', text: 'Vince chi fa più punti con le carte catturate' },
+      { num: '3', text: 'Punti totali in gioco: 120' },
+    ],
+    poker: [
+      { num: '1', text: 'Scala: 10-J-Q-K-A è la più alta' },
+      { num: '2', text: 'Colore: 5 carte dello stesso seme' },
+      { num: '3', text: 'Trio: 3 carte dello stesso valore' },
+      { num: '4', text: 'Coppia: 2 carte dello stesso valore' },
+      { num: '5', text: 'Poker: 4 carte dello stesso valore' },
+      { num: '6', text: 'Full: trio + coppia' },
+    ],
+    uno: [
+      { num: '1', text: 'Carta dello stesso valore o seme della cima del mazzo' },
+      { num: '2', text: 'Skip: salta il turno del prossimo giocatore' },
+      { num: '3', text: 'Reverse: inverti direzione gioco' },
+      { num: '4', text: 'Draw 2: prossimo pesca 2 carte' },
+      { num: '5', text: 'Wild: cambia seme, Wild 4: +pesca 4' },
+      { num: '6', text: 'Chi si libera per primo vince' },
+    ],
+    explodingkittens: [
+      { num: '1', text: 'Pesca carte, se peschi Kitten perdi' },
+      { num: '2', text: 'Defuse ti salva (1 per Kitten)' },
+      { num: '3', text: 'Skip salta la tua pesca' },
+      { num: '4', text: 'Attack: passa il turno con +2' },
+      { num: '5', text: 'Favor: chiedi una carta' },
+      { num: '6', text: 'Shuffle: rimischia il mazzo' },
+    ],
+    skullking: [
+      { num: '1', text: '10 round, ad ogni round si punta il numero di prese' },
+      { num: '2', text: 'Skull = 0 prese, King = 1 presa' },
+      { num: '3', text: 'Se manchi la puntata perdi tutti i punti' },
+      { num: '4', text: 'Chi ha più punti dopo 10 round vince' },
+    ],
+    themind: [
+      { num: '1', text: 'Giocare carte in ordine crescente senza parlare' },
+      { num: '2', text: 'A ogni livello si aggiungono stelle' },
+      { num: '3', text: 'Perdere tutti i punti vita = fine partita' },
+      { num: '4', text: 'Vincere tutti i livelli con almeno 1 vita' },
+    ],
+    thiryone: [
+      { num: '1', text: 'Scambia 1 carta con un avversario' },
+      { num: '2', text: 'Chiudi: ferma il turno' },
+      { num: '3', text: 'Valori: A=11, 3=10, K=4, Q=3, J=2' },
+      { num: '4', text: 'Vince chi ha più punti (max 31)' },
+    ],
+    ramino: [
+      { num: '1', text: 'Meld: 3 carte stesso valore o scala stesso seme' },
+      { num: '2', text: 'Jolly = jolly' },
+      { num: '3', text: 'Primo meld minimo 40 punti' },
+      { num: '4', text: 'Chi si libera per primo vince' },
+    ],
+    scala40: [
+      { num: '1', text: 'Primo meld minimo 40 punti' },
+      { num: '2', text: 'Scale: 3+ carte consecutive stesso seme' },
+      { num: '3', text: 'Set: 3+ carte stesso valore' },
+      { num: '4', text: 'Jolly = jolly' },
+    ],
+    memory: [
+      { num: '1', text: 'Trova tutte le coppie' },
+      { num: '2', text: 'Gira 2 carte per volta' },
+      { num: '3', text: 'Griglia 5x5 a 6x6' },
+      { num: '4', text: 'Vince chi fa meno mosse' },
+    ],
+    monopolydeal: [
+      { num: '1', text: '3 set diversi = vittoria' },
+      { num: '2', text: 'Azioni: affitto, pay, steal' },
+      { num: '3', text: '"Col Cavolo!" annulla un affitto' },
+      { num: '4', text: 'Chi completa 3 set per primo vince' },
+    ],
+    odin: [
+      { num: '1', text: 'Sfida: batti il banco' },
+      { num: '2', text: 'Valori: A=1, 2-10=valore, J=11, Q=12, K=13' },
+      { num: '3', text: 'Chi arriva a 30 o vince il turno' },
+      { num: '4', text: 'Bastoni = 0 punti bonus' },
+    ],
+  };
+  return rules[gameType] || [];
+}
+
+function toggleOptimizedGraphic(enabled) {
+  document.body.classList.toggle('optimized-graphic', enabled);
+  if (window.gameState) renderGame(window.gameState);
+}
+window.toggleOptimizedGraphic = toggleOptimizedGraphic;
+
+function clearSelection() {
+  selectedCardId = null;
+  selectedTakeIds = [];
+}
+
 function renderGame(state) {
   if (!state) return;
   switch (state.gameType) {
@@ -38,6 +213,25 @@ function renderGameTopBar(state, name) {
     else info.textContent += ' (CONSEGNA)';
   }
   if (state.phase === 'dealer') info.textContent += ' (BANCO)';
+
+  // Add OPTIMIZED GRAPHIC button if not already present
+  let ogBtn = document.getElementById('optimized-gfx-btn');
+  if (!ogBtn) {
+    ogBtn = document.createElement('button');
+    ogBtn.id = 'optimized-gfx-btn';
+    ogBtn.className = 'btn small';
+    ogBtn.textContent = 'OPTIMIZED GRAPHIC';
+    ogBtn.addEventListener('click', () => {
+      const isEnabled = document.body.classList.toggle('optimized-graphic');
+      ogBtn.textContent = isEnabled ? '🔍 RESTORE NORMAL' : 'OPTIMIZED GRAPHIC';
+      ogBtn.classList.toggle('btn-primary', isEnabled);
+      toggleOptimizedGraphic(isEnabled);
+    });
+    // Insert before game-timer
+    const timer = $('game-timer');
+    if (timer && timer.parentNode) timer.parentNode.insertBefore(ogBtn, timer);
+    else info.parentNode.appendChild(ogBtn);
+  }
 }
 
 function updateTimer(state) {
@@ -564,8 +758,13 @@ function createUnoCardElement(card) {
   suit.style.color = 'rgba(255,255,255,0.7)';
   el.appendChild(rank); el.appendChild(suit);
   el.dataset.cardId = card.id;
+  // Attach hold-to-preview
+  if (typeof addCardPreview === 'function') {
+    const gameType = (window.gameState && window.gameState.gameType) || 'uno';
+    addCardPreview(el, card, gameType);
+  }
   return el;
-}
+
 
 function renderUno(state) {
   clearSelection();
@@ -2367,4 +2566,5 @@ function renderOdin(state) {
 
 function playOdinCard(cardId) {
   window.socket.emit('playerAction', { action: { type: 'play', cardIds: [cardId] } });
+}
 }

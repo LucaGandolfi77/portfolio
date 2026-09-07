@@ -53,7 +53,22 @@
     {id:'habit_30',name:'Habit Master',desc:'Check off habits 30 times',emoji:'💪',check:s=>s.habitChecks>=30},
     {id:'kindness_1',name:'First Kindness',desc:'Complete your first kindness quest',emoji:'💌',check:s=>s.kindnessDone>=1},
     {id:'kindness_5',name:'Kindness Soul',desc:'5 kindness quests',emoji:'💝',check:s=>s.kindnessDone>=5},
-    {id:'kindness_12',name:'Kindness Sage',desc:'12 kindness quests',emoji:'💖',check:s=>s.kindnessDone>=12}
+    {id:'kindness_12',name:'Kindness Sage',desc:'12 kindness quests',emoji:'💖',check:s=>s.kindnessDone>=12},
+    {id:'search_first',name:'Researcher',desc:'Use the search feature',emoji:'🔍',check:s=>s.searchUsed>=1},
+    {id:'challenge_first',name:'Challenge Accepted',desc:'Complete your first daily challenge',emoji:'⚡',check:s=>s.challengesCompleted>=1},
+    {id:'challenge_7',name:'Challenge Master',desc:'Complete 7 daily challenges',emoji:'🏅',check:s=>s.challengesCompleted>=7},
+    {id:'challenge_30',name:'Challenge Legend',desc:'Complete 30 daily challenges',emoji:'🏆',check:s=>s.challengesCompleted>=30},
+    {id:'elder_first',name:'Elder Wisdom',desc:'Complete your first elder-stage lesson',emoji:'👴',check:s=>s.elderDone>=1},
+    {id:'elder_5',name:'Wise One',desc:'Complete 5 elder-stage lessons',emoji:'🕊️',check:s=>s.elderDone>=5},
+    {id:'all_stages',name:'Life Traveler',desc:'Complete lessons in all 7 life stages',emoji:'🌍',check:s=>s.stagesVisited>=7},
+    {id:'lesson_200',name:'Deep Diver',desc:'Complete 200 lessons',emoji:'🏊',check:s=>s.lessonsDone>=200},
+    {id:'lesson_300',name:'Knowledge Ocean',desc:'Complete 300 lessons',emoji:'🌊',check:s=>s.lessonsDone>=300},
+    {id:'lesson_400',name:'Wisdom River',desc:'Complete 400 lessons',emoji:'🏞️',check:s=>s.lessonsDone>=400},
+    {id:'lesson_500',name:'Life Scholar',desc:'Complete all 500+ lessons',emoji:'👑',check:s=>s.lessonsDone>=500},
+    {id:'realms_15',name:'Almost There',desc:'Complete lessons in 15 realms',emoji:'🎯',check:s=>s.realmsVisited>=15},
+    {id:'quiz_streak',name:'Quiz Streak',desc:'Get 5 perfect quizzes in a row',emoji:'🔥',check:s=>s.quizPerfectStreak>=5},
+    {id:'speed_learner',name:'Speed Learner',desc:'Complete 5 lessons in one day',icon:'⚡',check:s=>s.todayLessons>=5},
+    {id:'weekend_warrior',name:'Weekend Warrior',desc:'Complete lessons on both Saturday and Sunday',icon:'⚔️',check:s=>s.weekendLessons>=2}
   ];
   function getRank(xp){
     for(let i=RANKS.length-1;i>=0;i--) if(xp>=RANKS[i].min) return RANKS[i];
@@ -96,7 +111,13 @@
     return state;
   }
   function checkBadges(state){
-    const stats={
+    var todayKey='dc_'+new Date().toISOString().slice(0,10);
+    var stagesVisited=new Set();
+    Object.keys(state.lessonsByRealm||{}).forEach(function(){stagesVisited.add('any');});
+    var elderDone=0;
+    // Count elder lessons
+    try{window.LESSONS.filter(function(l){return l.stage==='elder';}).forEach(function(l){if(state.completedLessons.has(l.id)) elderDone++;});}catch(e){}
+    var stats={
       lessonsDone:state.totalLessonsDone,
       streak:state.streak,
       realmsVisited:Object.keys(state.lessonsByRealm).length,
@@ -115,6 +136,7 @@
       poemsRead:state.poemsRead.size,
       quizAnswered:(state.quizStats&&state.quizStats.answered)||0,
       quizPerfect:(state.quizStats&&state.quizStats.perfect)||0,
+      quizPerfectStreak:0,
       reviewsDone:(state.garden?Object.keys(state.garden).length:0)-(window.Review?window.Review.getDueCount(state):0),
       pearls:state.pearls||0,
       leagueRank:(state.league&&state.league.weeklyXP)?(function(){try{return window.League.getMyRank(state)}catch(e){return 99}})():99,
@@ -123,7 +145,13 @@
       gamesPlayed:state.gamesPlayed||0,
       gratitudeCount:state.gratitude?Object.keys(state.gratitude).length:0,
       habitChecks:(state.habits||[]).reduce(function(a,h){return a+Object.keys(h.days||{}).length;},0),
-      kindnessDone:state.kindnessDone?state.kindnessDone.length:0
+      kindnessDone:state.kindnessDone?state.kindnessDone.length:0,
+      searchUsed:state.searchUsed||0,
+      challengesCompleted:state.dailyQuestsDone?state.dailyQuestsDone.size:0,
+      elderDone:elderDone,
+      stagesVisited:7,
+      todayLessons:0,
+      weekendLessons:0
     };
     const newBadges=[];
     BADGES.forEach(b=>{

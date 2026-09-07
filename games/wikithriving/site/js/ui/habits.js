@@ -121,7 +121,8 @@
         <h4 style="margin-bottom:10px;font-size:.9rem;color:var(--gold2)">Add a Habit</h4>
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${presets.filter(function(p){return !habits.some(function(h){return h.name===p.name});}).map(function(p){
-            return '<button class="card" style="display:flex;align-items:center;gap:10px;padding:12px" onclick="HabitsUI.add(\''+p.name.replace(/'/g,'\\'')+'\',\''+p.emoji+'\')">'+
+            var safeName=p.name.replace(/'/g,"&#39;");
+            return '<button class="card" style="display:flex;align-items:center;gap:10px;padding:12px" onclick="HabitsUI.add(\''+safeName+'\',\''+p.emoji+'\')">'+
               '<span style="font-size:1.2rem">'+p.emoji+'</span>'+
               '<span style="font-weight:500;font-size:.85rem">'+p.name+'</span>'+
               '<span style="margin-left:auto;font-size:.8rem;color:var(--gold)">+ Add</span>'+
@@ -157,8 +158,8 @@
   function add(name,emoji){
     var state=window.App.getState();
     ensureHabits(state);
-    if(state.habits.length>=5){alert('Max 5 habits!');return;}
-    if(state.habits.some(function(h){return h.name===name;})){alert('Already tracking this!');return;}
+    if(state.habits.length>=5){window.Toast.warning('Max 5 habits!');return;}
+    if(state.habits.some(function(h){return h.name===name;})){window.Toast.info('Already tracking this!');return;}
     state.habits.push({id:'h'+Date.now(),name:name,emoji:emoji,created:getToday(),days:{}});
     window.App.setState(state);
     render();

@@ -1,4 +1,4 @@
-/* Shop UI — spend pearls */
+/* Shop UI — spend pearls (toast) */
 (function(){
   function render(){
     var state=window.App.getState();
@@ -13,7 +13,7 @@
       <div style="display:flex;flex-direction:column;gap:12px">
         ${shop.map(function(item){
           var canBuy=pearls>=item.cost;
-          return '<div class="card" style="display:flex;align-items:center;gap:14px;'+(canBuy?'':'opacity:.5')+'">'+
+          return '<div class="card fade-in" style="display:flex;align-items:center;gap:14px;'+(canBuy?'':'opacity:.5')+'">'+
             '<span style="font-size:1.8rem">'+item.emoji+'</span>'+
             '<div style="flex:1"><div style="font-weight:600">'+item.name+'</div>'+
             '<div style="font-size:.8rem;color:var(--ink3)">'+item.desc+'</div></div>'+
@@ -31,16 +31,21 @@
       </div>
     `;
   }
+
   function buy(itemId){
     var state=window.App.getState();
     var result=window.Economy.buyItem(state,itemId);
     if(result.ok){
       window.App.setState(state);
-      alert(result.msg);
+      window.Toast.success(result.msg);
+      if(window.SFX) window.SFX.achievement();
+      if(window.Analytics) window.Analytics.track('shop_buy',{item_id:itemId});
     } else {
-      alert(result.msg);
+      window.Toast.warning(result.msg);
+      if(window.SFX) window.SFX.error();
     }
     render();
   }
+
   window.ShopUI={render:render,buy:buy};
 })();

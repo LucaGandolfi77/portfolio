@@ -82,6 +82,47 @@
       const profile=window.Profile.buildProfile(data);
       const state=window.Progress.initProgress(profile);
       window.App.setState(state);
+      showAhaMoment();
+    }
+  };
+
+  function showAhaMoment(){
+    const el=document.getElementById('onboard-content');
+    el.innerHTML=`
+      <div style="text-align:center">
+        <div style="font-size:4rem;margin-bottom:16px">🎉</div>
+        <h1 style="font-size:1.8rem;margin-bottom:8px">Your first lesson!</h1>
+        <p style="color:var(--ink2);font-size:1rem;margin-bottom:24px">Now you know something most people learn too late.</p>
+        <div class="card" style="text-align:left;margin-bottom:24px;max-width:400px">
+          <div style="font-size:.7rem;color:var(--gold2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📖 First lesson</div>
+          <div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Compound Interest</div>
+          <p style="font-size:.85rem;color:var(--ink3)">Learn how money grows over time — the most powerful concept in personal finance.</p>
+        </div>
+        <button class="btn btn-primary pulse" style="width:100%;max-width:320px" onclick="Onboarding.startFirstLesson()">
+          Start Your First Lesson →
+        </button>
+        <button style="margin-top:12px;font-size:.85rem;color:var(--ink3);text-decoration:underline" onclick="Onboarding.skipToMap()">
+          Skip for now
+        </button>
+      </div>
+    `;
+  }
+
+  window.Onboarding={
+    init(){currentStep=0;data={age:25,gender:'woman',country:'United States'};render();},
+    next(){currentStep++;render();},
+    setAge(v){data.age=parseInt(v);document.getElementById('age-display').textContent=v;document.querySelectorAll('.chip').forEach((el,i)=>{el.classList.toggle('chip-gold',window.STAGES[i].id===getStageId(data.age));});},
+    setGender(g){data.gender=g;render();},
+    setCountry(c){data.country=c;document.getElementById('country-input').value=c;},
+    filterCountries(q){
+      const filtered=countryNames.filter(c=>c.toLowerCase().includes(q.toLowerCase()));
+      document.getElementById('country-list').innerHTML=filtered.slice(0,20).map(c=>`<button style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;font-size:.9rem;cursor:pointer;border-bottom:1px solid var(--cream2)" onclick="Onboarding.setCountry('${c}')">${window.COUNTRIES.find(x=>x.n===c).f} ${c}</button>`).join('');
+    },
+    startFirstLesson(){
+      window.App.render();
+      setTimeout(function(){window.App.showLesson('compound_interest');},100);
+    },
+    skipToMap(){
       window.App.render();
     }
   };

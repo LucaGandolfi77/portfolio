@@ -44,7 +44,7 @@
       allLink.href = 'projects.html';
       allLink.className = 'btn btn-ghost';
       allLink.style.cssText = 'display:block;text-align:center;margin-top:12px;text-decoration:none;';
-      allLink.innerHTML = 'Vedi tutti i progetti <span aria-hidden="true">\2192</span>';
+      allLink.innerHTML = 'Vedi tutti i progetti <span aria-hidden="true">\u2192</span>';
       projects.after(allLink);
     }
     if (games) {
@@ -53,7 +53,7 @@
       allLink.href = 'games.html';
       allLink.className = 'btn btn-ghost';
       allLink.style.cssText = 'display:block;text-align:center;margin-top:12px;text-decoration:none;';
-      allLink.innerHTML = 'Vedi tutti i giochi <span aria-hidden="true">\2192</span>';
+      allLink.innerHTML = 'Vedi tutti i giochi <span aria-hidden="true">\u2192</span>';
       games.after(allLink);
     }
     if (interests) {

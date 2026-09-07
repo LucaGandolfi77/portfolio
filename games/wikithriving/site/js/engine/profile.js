@@ -21,7 +21,7 @@
     return profile;
   }
   function getCurrencySymbol(cur){
-    const map={EUR:'€',GBP:'£',JPY:'¥',CNY:'¥',INR:'₹',KRW:'₩',TRY:'₺',₽:'₽',RUB:'₽',
+    const map={EUR:'€',GBP:'£',JPY:'¥',CNY:'¥',INR:'₹',KRW:'₩',TRY:'₺','₽':'₽',RUB:'₽',
       BRL:'R$',AUD:'A$',CAD:'C$',CHF:'CHF',SEK:'kr',NOK:'kr',DKK:'kr',PLN:'zł',CZK:'Kč',HUF:'Ft',
       THB:'฿',SGD:'S$',HKD:'HK$',MXN:'$',ZAR:'R',EGP:'E£',AED:'د.إ',SAR:'﷼',
       IDR:'Rp',MYR:'RM',PHP:'₱',VND:'₫',PKR:'Rs',BDT:'৳',NPR:'Rs',LKR:'Rs',

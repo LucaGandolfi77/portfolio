@@ -929,8 +929,10 @@ class TestimonialRotator {
     constructor(containerSelector, options = {}) {
         this.container = document.querySelector(containerSelector);
         if (!this.container) return;
-        this.cards = this.container.querySelectorAll('.testimonial-float-card');
+        const cardClass = options.cardClass || '.testimonial-float-card';
+        this.cards = Array.from(this.container.querySelectorAll(cardClass));
         if (!this.cards.length) return;
+        this.order = this.shuffleOrder(this.cards.length);
         this.currentIndex = 0;
         this.displayTime = options.displayTime || 4000;
         this.exitTime = options.exitTime || 700;
@@ -940,8 +942,17 @@ class TestimonialRotator {
         this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
+    shuffleOrder(n) {
+        const arr = Array.from({ length: n }, (_, i) => i);
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
     start() {
-        if (this.isRunning || !this.cards.length) return;
+        if (this.isRunning || !this.cards || !this.cards.length) return;
         this.isRunning = true;
         this.showCard(this.currentIndex);
     }
@@ -961,7 +972,7 @@ class TestimonialRotator {
             c.classList.remove('float-entering', 'float-idle', 'float-exiting', 'float-exiting-left');
             c.style.display = 'none';
         });
-        const card = this.cards[index];
+        const card = this.cards[this.order[index]];
         card.style.display = 'block';
         card.classList.add('float-entering');
 
@@ -975,7 +986,7 @@ class TestimonialRotator {
 
     swishNext() {
         if (!this.isRunning) return;
-        const card = this.cards[this.currentIndex];
+        const card = this.cards[this.order[this.currentIndex]];
         card.classList.remove('float-idle');
         const dir = this.currentIndex % 2 === 0 ? 'float-exiting' : 'float-exiting-left';
         card.classList.add(dir);
@@ -1003,6 +1014,20 @@ document.addEventListener('DOMContentLoaded', () => {
         exitTime: 700
     });
     testimonialRotator.start();
+
+    const projectRotator = new TestimonialRotator('.project-float-container', {
+        displayTime: 5000,
+        exitTime: 700,
+        cardClass: '.project-float-card'
+    });
+    projectRotator.start();
+
+    const gameRotator = new TestimonialRotator('.game-float-container', {
+        displayTime: 5000,
+        exitTime: 700,
+        cardClass: '.game-float-card'
+    });
+    gameRotator.start();
 
     // Auto collapse large sections after a short delay to allow rendering
     setTimeout(() => {

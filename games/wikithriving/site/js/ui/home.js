@@ -105,6 +105,24 @@
       }
     }
 
+    // Continue CTA
+    var continueEl=document.getElementById('home-continue');
+    if(continueEl){
+      if(state.lastLessonId){
+        var lastLesson=window.LESSONS.find(function(l){return l.id===state.lastLessonId;});
+        var lastRealm=lastLesson?window.REALMS.find(function(r){return r.id===lastLesson.realm}):null;
+        continueEl.innerHTML=`
+          <div class="continue-card" onclick="App.showLesson('${state.lastLessonId}')">
+            <div class="realm-tag">${lastRealm?lastRealm.icon+' '+lastRealm.name:''}</div>
+            <div class="lesson-title">${lastLesson?lastLesson.title:'Continue learning'}</div>
+            <div class="lesson-hint">Tap to continue →</div>
+          </div>
+        `;
+      } else {
+        continueEl.innerHTML='';
+      }
+    }
+
     document.getElementById('home-nav').innerHTML=`
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
         <button class="card" style="text-align:center;padding:12px 8px" onclick="App.showScreen('garden')">
@@ -142,6 +160,18 @@
         <button class="card" style="text-align:center;padding:12px 8px" onclick="App.showScreen('habits')">
           <div style="font-size:1.4rem">🔥</div>
           <div style="font-size:.7rem;font-weight:600;margin-top:2px">Habits</div>
+        </button>
+        <button class="card" style="text-align:center;padding:12px 8px" onclick="App.showScreen('search')">
+          <div style="font-size:1.4rem">🔍</div>
+          <div style="font-size:.7rem;font-weight:600;margin-top:2px">Search</div>
+        </button>
+        <button class="card" style="text-align:center;padding:12px 8px" onclick="App.showScreen('streak')">
+          <div style="font-size:1.4rem">📅</div>
+          <div style="font-size:.7rem;font-weight:600;margin-top:2px">Streak</div>
+        </button>
+        <button class="card" style="text-align:center;padding:12px 8px" onclick="App.showScreen('challenge')">
+          <div style="font-size:1.4rem">⚡</div>
+          <div style="font-size:.7rem;font-weight:600;margin-top:2px">Challenge</div>
         </button>
       </div>
     `;
@@ -194,7 +224,7 @@
     var g2=document.getElementById('grat2');
     var g3=document.getElementById('grat3');
     if(!g1||!g1.value.trim()||!g2||!g2.value.trim()||!g3||!g3.value.trim()){
-      alert('Please fill in all three good things!');
+      window.Toast.warning('Please fill in all three good things!');
       return;
     }
     var state=window.App.getState();
