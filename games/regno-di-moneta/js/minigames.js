@@ -1,5 +1,6 @@
-// minigames.js — 6 minigiochi educativi
+// minigames.js — 6 minigiochi educativi + Haptics
 window.MiniGames = (() => {
+  function haptic(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch(e) {} }
   const COINS = [
     { val: 1,   label: '€1',   cls: '' },
     { val: 2,   label: '€2',   cls: '' },
@@ -110,7 +111,7 @@ window.MiniGames = (() => {
         el.onclick = () => {
           const idx = selected.indexOf(c.val);
           if (idx >= 0) { selected.splice(idx, 1); el.classList.remove('selected'); }
-          else { selected.push(c.val); el.classList.add('selected'); }
+          else { selected.push(c.val); el.classList.add('selected'); if (window.Sounds) window.Sounds.play('coin'); haptic(5); }
           document.getElementById('sel-total').textContent = '€' + selected.reduce((a, b) => a + b, 0);
         };
         coinRow.appendChild(el);
@@ -119,10 +120,14 @@ window.MiniGames = (() => {
       document.getElementById('btn-confirm').onclick = () => {
         const totalSel = selected.reduce((a, b) => a + b, 0);
         if (totalSel === change) {
+          if (window.Sounds) window.Sounds.play('correct');
+          haptic([10, 30, 10]);
           score += 10 + timeLeft;
           area.querySelectorAll('.mg-card')[1].style.borderColor = 'var(--green)';
           setTimeout(() => { round++; render(); }, 600);
         } else {
+          if (window.Sounds) window.Sounds.play('wrong');
+          haptic([30, 50, 30]);
           area.querySelectorAll('.mg-card')[1].style.borderColor = 'var(--red)';
           selected = [];
           coinRow.querySelectorAll('.coin').forEach(c => c.classList.remove('selected'));
@@ -558,12 +563,16 @@ window.MiniGames = (() => {
           const idx = +btn.dataset.idx;
           if (idx === q.c) {
             btn.classList.add('correct');
+            if (window.Sounds) window.Sounds.play('correct');
+            haptic([10, 30, 10]);
             hp = Math.max(0, hp - 15);
             score += 10;
             const hpEl = document.getElementById('boss-hp');
             if (hpEl) hpEl.style.width = hp + '%';
           } else {
             btn.classList.add('wrong');
+            if (window.Sounds) window.Sounds.play('wrong');
+            haptic([30, 50, 30]);
             area.querySelectorAll('.mg-btn')[q.c].classList.add('correct');
           }
           setTimeout(() => { qIdx++; render(); }, 800);
@@ -1237,8 +1246,80 @@ window.MiniGames = (() => {
       case 'assicurazioni': return startAssicurazioni(area, onComplete);
       case 'pensioni': return startPensioni(area, onComplete);
       case 'simulatore': return startSimulatore(area, onComplete);
+      case 'obbligazioni': return startObbligazioni(area, onComplete);
     }
   }
 
   return { start };
 })();
+
+// === OBBLIGAZIONI MINIGAME ===
+function startObbligazioni(area, onComplete) {
+  let score = 0;
+  let round = 0;
+  const totalRounds = 5;
+
+  const BONDS = [
+    { name: 'BTP Italia', emoji: '🇮🇹', type: 'gov', coupon: 2.8, risk: 'Basso', years: 5 },
+    { name: 'Corporate Tech', emoji: '💻', type: 'corp', coupon: 4.5, risk: 'Medio', years: 3 },
+    { name: 'Zero Coupon', emoji: '📜', type: 'zero', coupon: 0, risk: 'Basso', years: 7 },
+    { name: 'High Yield', emoji: '⚡', type: 'junk', coupon: 7.2, risk: 'Alto', years: 4 },
+    { name: 'Green Bond', emoji: '🌿', type: 'green', coupon: 3.1, risk: 'Basso', years: 6 }
+  ];
+
+  function render() {
+    if (round >= totalRounds) {
+      const passed = score >= totalRounds * 6;
+      onComplete(passed, score);
+      return;
+    }
+
+    const bond = BONDS[round % BONDS.length];
+    const scenarios = [
+      { q: `Quale obbligazione è più adatta per un investitore prudente?`, a: [bond.name, 'High Yield', 'Nessuna', 'Le azioni'], c: 0 },
+      { q: `Un BTP Italia con coupon 2.8% su €1000 rende...`, a: ['€28/anno', '€280/anno', '€2.8/anno', '€2800/anno'], c: 0 },
+      { q: `Le obbligazioni Zero Coupon non pagano interessi ma...`, a: ['Costano meno del valore nominale', 'Non rendono nulla', 'Sono rischiose', 'Sono always profit'], c: 0 },
+      { q: `Se i tassi di interesse salgono, il valore delle obbligazioni...`, a: ['Scende', 'Sale', 'Resta uguale', 'Triplica'], c: 0 },
+      { q: `Un Green Bond finanzia...`, a: ['Progetti sostenibili', 'Solo aziende tech', 'Il governo', 'Le banche'], c: 0 }
+    ];
+
+    const s = scenarios[round % scenarios.length];
+
+    area.innerHTML = `
+      <div class="mg-card">
+        <div class="mg-title">📜 Obbligazioni — Round ${round + 1}/${totalRounds}</div>
+        <div class="mg-sub">Punti: ${score}</div>
+        <div class="mg-card">
+          <div style="font-size:32px;margin:8px 0">${bond.emoji}</div>
+          <div style="font-size:14px;font-weight:800">${bond.name}</div>
+          <div style="font-size:11px;color:var(--dim)">Tipo: ${bond.type === 'gov' ? 'Governativa' : bond.type === 'corp' ? 'Corporate' : bond.type === 'zero' ? 'Zero Coupon' : bond.type === 'junk' ? 'High Yield' : 'Green'} · Coupon: ${bond.coupon}% · Rischio: ${bond.risk} · Scadenza: ${bond.years} anni</div>
+        </div>
+        <div style="font-size:14px;font-weight:700;margin:12px 0 8px">${s.q}</div>
+        <div id="obbl-answers"></div>
+      </div>`;
+
+    const ansEl = document.getElementById('obbl-answers');
+    s.a.forEach((txt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'mg-btn';
+      btn.textContent = txt;
+      btn.onclick = () => {
+        if (i === s.c) {
+          btn.classList.add('correct');
+          if (window.Sounds) window.Sounds.play('correct');
+          haptic([10, 30, 10]);
+          score += 10;
+        } else {
+          btn.classList.add('wrong');
+          if (window.Sounds) window.Sounds.play('wrong');
+          haptic([30, 50, 30]);
+          ansEl.children[s.c].classList.add('correct');
+        }
+        setTimeout(() => { round++; render(); }, 800);
+      };
+      ansEl.appendChild(btn);
+    });
+  }
+
+  render();
+}

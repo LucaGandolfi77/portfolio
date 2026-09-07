@@ -1,4 +1,4 @@
-// empire.js — Impero di Soldania: idle game infinito
+// empire.js — Impero di Soldania: idle game infinito (v2: expanded)
 window.Empire = (() => {
   const BUILDINGS = [
     { id: 'limonata', name: 'Limonata', emoji: '🍋', desc: 'La tua prima fonte di reddito', baseCost: 15, baseRate: 0.5, costMult: 1.15 },
@@ -8,7 +8,11 @@ window.Empire = (() => {
     { id: 'fondo', name: 'Fondo Investimenti', emoji: '📈', desc: 'Portafoglio diversificato', baseCost: 15000, baseRate: 200, costMult: 1.12 },
     { id: 'borsa', name: 'Borsa Valori', emoji: '💹', desc: 'Alta finanza, alti guadagni', baseCost: 80000, baseRate: 1000, costMult: 1.11 },
     { id: 'palazzo', name: 'Palazzo Reale', emoji: '🏰', desc: 'Il cuore del regno', baseCost: 500000, baseRate: 5000, costMult: 1.10 },
-    { id: 'sovranofondo', name: 'Fondo Sovrano', emoji: '👑', desc: 'La ricchezza suprema della nazione', baseCost: 5000000, baseRate: 30000, costMult: 1.09 }
+    { id: 'sovranofondo', name: 'Fondo Sovrano', emoji: '👑', desc: 'La ricchezza suprema della nazione', baseCost: 5000000, baseRate: 30000, costMult: 1.09 },
+    { id: 'universita', name: 'Università', emoji: '🏫', desc: 'Educazione e ricerca avanzata', baseCost: 25000000, baseRate: 150000, costMult: 1.08 },
+    { id: 'mercatog', name: 'Mercato Globale', emoji: '🌍', desc: 'Commercio internazionale', baseCost: 250000000, baseRate: 1000000, costMult: 1.07 },
+    { id: 'spazio', name: 'Stazione Spaziale', emoji: '🚀', desc: 'Tecnologia del futuro', baseCost: 2500000000, baseRate: 7500000, costMult: 1.06 },
+    { id: 'rift', name: 'Rift Dimensionale', emoji: '🌌', desc: 'La ricchezza illimitata', baseCost: 25000000000, baseRate: 50000000, costMult: 1.05 }
   ];
 
   const UPGRADES = [
@@ -20,24 +24,61 @@ window.Empire = (() => {
     { id: 'u_borsa', name: 'IPO Esclusivo', desc: 'Borsa ×2', cost: 1000000, effect: { building: 'borsa', mult: 2 }, req: { borsa: 5 } },
     { id: 'u_palazzo', name: 'Corona Dimenticata', desc: 'Palazzo ×3', cost: 5000000, effect: { building: 'palazzo', mult: 3 }, req: { palazzo: 3 } },
     { id: 'u_sovrano', name: 'Oro della Corona', desc: 'Sovrano ×3', cost: 50000000, effect: { building: 'sovranofondo', mult: 3 }, req: { sovranofondo: 3 } },
+    { id: 'u_universita', name: 'Ricerca di Eccellenza', desc: 'Università ×2', cost: 500000000, effect: { building: 'universita', mult: 2 }, req: { universita: 3 } },
+    { id: 'u_mercatog', name: 'Rete Commerciale', desc: 'Mercato Globale ×2', cost: 5000000000, effect: { building: 'mercatog', mult: 2 }, req: { mercatog: 3 } },
+    { id: 'u_spazio', name: 'Propulsione Ionica', desc: 'Spazio ×3', cost: 50000000000, effect: { building: 'spazio', mult: 3 }, req: { spazio: 3 } },
+    { id: 'u_rift', name: 'Antimateria', desc: 'Rift ×3', cost: 500000000000, effect: { building: 'rift', mult: 3 }, req: { rift: 3 } },
     { id: 'u_all1', name: 'Educazione Finanziaria', desc: 'Tutti ×1.5', cost: 100000, effect: { all: true, mult: 1.5 }, req: { totalLevels: 30 } },
     { id: 'u_all2', name: 'Interesse Composto', desc: 'Tutti ×2', cost: 5000000, effect: { all: true, mult: 2 }, req: { totalLevels: 80 } },
-    { id: 'u_all3', name: 'Alchimista Finanziario', desc: 'Tutti ×3', cost: 100000000, effect: { all: true, mult: 3 }, req: { totalLevels: 200 } }
+    { id: 'u_all3', name: 'Alchimista Finanziario', desc: 'Tutti ×3', cost: 100000000, effect: { all: true, mult: 3 }, req: { totalLevels: 200 } },
+    { id: 'u_all4', name: 'Mente Universale', desc: 'Tutti ×5', cost: 10000000000, effect: { all: true, mult: 5 }, req: { totalLevels: 400 } }
   ];
 
   const EVENTS = [
     { id: 'crisi', title: '📉 Crisi di Mercato!', desc: 'Tutti i guadagni dimezzati per 15 secondi!', duration: 15000, effect: { type: 'multiplier', value: 0.5 } },
     { id: 'boom', title: '📈 Boom Economico!', desc: 'Tutti i guadagni raddoppiati per 15 secondi!', duration: 15000, effect: { type: 'multiplier', value: 2 } },
-    { id: 'truffa', title: '🦹 Truffa!', desc: 'Perdi il 20% dei soldi!', duration: 0, effect: { type: 'losePercent', value: 0.2 } },
     { id: 'scoperta', title: '💎 Scoperta di un Tesoro!', desc: 'Guadagni €1000 × il tuo prestige!', duration: 0, effect: { type: 'bonus', value: 1000 } },
     { id: 'tasse', title: '🏛️ Rimborso Tasse!', desc: 'Hai ricevuto soldi dal regno!', duration: 0, effect: { type: 'bonus', value: 500 } },
     { id: 'albero', title: '🌳 Albero della Fortuna!', desc: 'I guadagni x3 per 20 secondi!', duration: 20000, effect: { type: 'multiplier', value: 3 } },
-    { id: 'goccia', title: '💧 Goccia d\'Oro!', desc: '+500永久 bonus permanente!', duration: 0, effect: { type: 'permanentBonus', value: 500 } },
+    { id: 'goccia', title: '💧 Goccia d\'Oro!', desc: '+500 bonus permanente!', duration: 0, effect: { type: 'permanentBonus', value: 500 } },
     { id: 'draghi', title: '🐉 Draghi Nemici!', desc: 'Niente guadagni per 10 secondi!', duration: 10000, effect: { type: 'multiplier', value: 0 } }
+  ];
+
+  // Choice-based events (replace instant ones)
+  const CHOICE_EVENTS = [
+    {
+      id: 'crisi_choice', title: '📉 Crisi di Mercato!',
+      options: [
+        { label: 'Accetta la crisi (-50% 15s, +€1000 bonus)', effect: { type: 'multiplier_delayed', value: 0.5, duration: 15000, bonus: 1000 } },
+        { label: 'Proteggi (-10% soldi ora)', effect: { type: 'losePercent', value: 0.1 } }
+      ]
+    },
+    {
+      id: 'boom_choice', title: '📈 Boom Economico!',
+      options: [
+        { label: 'Investi €500 (guadagni x2 per 30s)', effect: { type: 'invest_multi', cost: 500, value: 2, duration: 30000 } },
+        { label: 'Rimani stabile (+€200 sicuri)', effect: { type: 'bonus', value: 200 } }
+      ]
+    },
+    {
+      id: 'truffa_choice', title: '🦹 Truffa!',
+      options: [
+        { label: 'Perdi 20% dei soldi', effect: { type: 'losePercent', value: 0.2 } },
+        { label: 'Paga €300 per investigare (perdi solo 5%)', effect: { type: 'invest_protect', cost: 300, losePercent: 0.05 } }
+      ]
+    },
+    {
+      id: 'tesoro_choice', title: '🗺️ Mappa del Tesoro!',
+      options: [
+        { label: 'Scava subito (+€2000 x prestige)', effect: { type: 'bonus', value: 2000 } },
+        { label: 'Aspetta il momento giusto (+€5000 x prestige)', effect: { type: 'delayed_bonus', value: 5000, delay: 60000 } }
+      ]
+    }
   ];
 
   let state, intervalId, eventTimeout, activeMultiplier = 1;
   let lastRender = 0;
+  let buyMode = 1; // 1, 10, 25, 'max'
 
   function calcBuildingCost(b, level) {
     return Math.round(b.baseCost * Math.pow(b.costMult, level));
@@ -45,11 +86,9 @@ window.Empire = (() => {
 
   function calcBuildingRate(b, level, upgrades) {
     let rate = b.baseRate * level;
-    // Apply building-specific upgrade
     UPGRADES.filter(u => u.effect.building === b.id && upgrades[u.id]).forEach(u => {
       rate *= u.effect.mult;
     });
-    // Apply global upgrades
     UPGRADES.filter(u => u.effect.all && upgrades[u.id]).forEach(u => {
       rate *= u.effect.mult;
     });
@@ -62,7 +101,7 @@ window.Empire = (() => {
       const level = state.buildings[b.id] || 0;
       total += calcBuildingRate(b, level, state.upgrades);
     });
-    return total * state.prestigeMultiplier * activeMultiplier;
+    return (total + (state.permanentBonus || 0)) * state.prestigeMultiplier * activeMultiplier;
   }
 
   function totalLevels() {
@@ -79,25 +118,79 @@ window.Empire = (() => {
     return '€' + n.toExponential(1);
   }
 
+  function calcBulkCost(b, level, count) {
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+      total += calcBuildingCost(b, level + i);
+    }
+    return total;
+  }
+
+  function calcBulkCount(b) {
+    const level = state.buildings[b.id] || 0;
+    if (buyMode === 'max') {
+      let count = 0;
+      let money = state.money;
+      let lvl = level;
+      while (money >= calcBuildingCost(b, lvl)) {
+        money -= calcBuildingCost(b, lvl);
+        lvl++;
+        count++;
+      }
+      return count;
+    }
+    return Math.min(buyMode, 999);
+  }
+
   function updateBuildingCosts() {
     BUILDINGS.forEach(b => {
       const btn = document.getElementById('buy-' + b.id);
       if (!btn) return;
       const level = state.buildings[b.id] || 0;
-      const cost = calcBuildingCost(b, level);
-      const canAfford = state.money >= cost;
-      btn.textContent = formatMoney(cost);
+      const count = calcBulkCount(b);
+      const cost = count > 1 ? calcBulkCost(b, level, count) : calcBuildingCost(b, level);
+      const canAfford = state.money >= cost && count > 0;
+      btn.textContent = (count > 1 ? count + 'x ' : '') + formatMoney(cost);
       btn.disabled = !canAfford;
+
+      // Manager button
+      const mgrBtn = document.getElementById('mgr-' + b.id);
+      if (mgrBtn) {
+        const mgrCost = calcBuildingCost(b, 0) * 10;
+        const hasManager = state.managers && state.managers[b.id];
+        if (hasManager) {
+          mgrBtn.textContent = '✅';
+          mgrBtn.disabled = true;
+        } else {
+          mgrBtn.textContent = formatMoney(mgrCost);
+          mgrBtn.disabled = state.money < mgrCost || level === 0;
+        }
+      }
     });
   }
 
   function buyBuilding(id) {
     const b = BUILDINGS.find(x => x.id === id);
     const level = state.buildings[b.id] || 0;
-    const cost = calcBuildingCost(b, level);
-    if (state.money >= cost) {
+    const count = calcBulkCount(b);
+    const cost = count > 1 ? calcBulkCost(b, level, count) : calcBuildingCost(b, level);
+    if (state.money >= cost && count > 0) {
       state.money -= cost;
-      state.buildings[b.id] = level + 1;
+      state.buildings[b.id] = level + count;
+      if (window.Sounds) window.Sounds.play('buy');
+      Save.save();
+      renderEmpire();
+    }
+  }
+
+  function buyManager(id) {
+    const b = BUILDINGS.find(x => x.id === id);
+    const mgrCost = calcBuildingCost(b, 0) * 10;
+    if (state.money >= mgrCost && !(state.managers && state.managers[id])) {
+      state.money -= mgrCost;
+      if (!state.managers) state.managers = {};
+      state.managers[id] = true;
+      if (window.Sounds) window.Sounds.play('levelup');
       Save.save();
       renderEmpire();
     }
@@ -108,6 +201,7 @@ window.Empire = (() => {
     if (state.money >= u.cost && !state.upgrades[id]) {
       state.money -= u.cost;
       state.upgrades[id] = true;
+      if (window.Sounds) window.Sounds.play('levelup');
       Save.save();
       renderEmpire();
     }
@@ -121,25 +215,61 @@ window.Empire = (() => {
     return true;
   }
 
+  // === PRESTIGE TIERS ===
+  function getPrestigeTier(count) {
+    if (count >= 15 && totalLevels() >= 100) return { tier: 3, multPer10: 1.0, bonus: '2 manager gratis + Rift unlock' };
+    if (count >= 5 && totalLevels() >= 50) return { tier: 2, multPer10: 0.5, bonus: '1 manager gratis' };
+    return { tier: 1, multPer10: 0.25, bonus: '' };
+  }
+
+  function calcPrestigeMult(levels, prestigeCount) {
+    const pt = getPrestigeTier(prestigeCount || 0);
+    return 1 + Math.floor(levels / 10) * pt.multPer10;
+  }
+
+  // === CHOICE EVENTS ===
   function triggerEvent() {
     if (!state || !Save.get().empireUnlocked) return;
-    const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
 
-    switch (ev.effect.type) {
-      case 'multiplier':
-        activeMultiplier = ev.effect.value;
-        setTimeout(() => { activeMultiplier = 1; }, ev.duration);
-        break;
-      case 'losePercent':
-        state.money = Math.max(0, state.money * (1 - ev.effect.value));
-        break;
-      case 'bonus':
-        state.money += ev.effect.value * (state.prestigeMultiplier || 1);
-        break;
-      case 'permanentBonus':
-        state.permanentBonus = (state.permanentBonus || 0) + ev.effect.value;
-        break;
+    // 40% chance of choice event
+    if (Math.random() < 0.4 && totalLevels() >= 5) {
+      const ce = CHOICE_EVENTS[Math.floor(Math.random() * CHOICE_EVENTS.length)];
+      showChoiceEvent(ce);
+    } else {
+      const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+      applyEvent(ev);
     }
+  }
+
+  function showChoiceEvent(ce) {
+    if (window.Sounds) window.Sounds.play('event');
+    const evDiv = document.getElementById('emp-event');
+    if (!evDiv) return;
+
+    const optsHtml = ce.options.map((opt, i) =>
+      `<button class="bld-btn" onclick="Empire.chooseEvent('${ce.id}',${i})" style="width:100%;margin-top:6px;text-align:left">${opt.label}</button>`
+    ).join('');
+
+    evDiv.innerHTML = `
+      <div class="emp-event" style="text-align:left">
+        <div class="ev-title" style="text-align:center">${ce.title}</div>
+        <div class="ev-desc" style="text-align:center;margin-bottom:8px">Scegli una strategia:</div>
+        ${optsHtml}
+      </div>`;
+  }
+
+  function chooseEvent(ceId, optIdx) {
+    const ce = CHOICE_EVENTS.find(e => e.id === ceId);
+    if (!ce) return;
+    const opt = ce.options[optIdx];
+    applyEventEffect(opt.effect);
+    const evDiv = document.getElementById('emp-event');
+    if (evDiv) setTimeout(() => { evDiv.innerHTML = ''; }, 3000);
+  }
+
+  function applyEvent(ev) {
+    if (window.Sounds) window.Sounds.play('event');
+    applyEventEffect(ev.effect);
     state.eventsDone = (state.eventsDone || 0) + 1;
     Save.save();
 
@@ -150,15 +280,69 @@ window.Empire = (() => {
     }
   }
 
+  function applyEventEffect(effect) {
+    switch (effect.type) {
+      case 'multiplier':
+        activeMultiplier = effect.value;
+        setTimeout(() => { activeMultiplier = 1; }, effect.duration);
+        break;
+      case 'multiplier_delayed':
+        activeMultiplier = effect.value;
+        state.money += (effect.bonus || 0) * (state.prestigeMultiplier || 1);
+        setTimeout(() => { activeMultiplier = 1; }, effect.duration);
+        break;
+      case 'losePercent':
+        state.money = Math.max(0, state.money * (1 - effect.value));
+        break;
+      case 'bonus':
+        state.money += effect.value * (state.prestigeMultiplier || 1);
+        break;
+      case 'permanentBonus':
+        state.permanentBonus = (state.permanentBonus || 0) + effect.value;
+        break;
+      case 'invest_multi':
+        if (state.money >= effect.cost) {
+          state.money -= effect.cost;
+          activeMultiplier = effect.value;
+          setTimeout(() => { activeMultiplier = 1; }, effect.duration);
+        }
+        break;
+      case 'invest_protect':
+        if (state.money >= effect.cost) {
+          state.money -= effect.cost;
+          state.money = Math.max(0, state.money * (1 - effect.losePercent));
+        } else {
+          state.money = Math.max(0, state.money * 0.8);
+        }
+        break;
+      case 'delayed_bonus':
+        setTimeout(() => {
+          state.money += effect.value * (state.prestigeMultiplier || 1);
+          Save.save();
+        }, effect.delay);
+        break;
+    }
+    state.eventsDone = (state.eventsDone || 0) + 1;
+  }
+
   function doPrestige() {
     const levels = totalLevels();
     if (levels < 10) return;
-    const newMult = 1 + Math.floor(levels / 10) * 0.25;
+    const pt = getPrestigeTier(state.prestigeCount || 0);
+    const newMult = 1 + Math.floor(levels / 10) * pt.multPer10;
+    const gain = (newMult - state.prestigeMultiplier).toFixed(2);
+    if (!confirm(`Rifondare il Regno? (Tier ${pt.tier})\n\nPerderai: tutti gli edifici, i miglioramenti e i soldi.\nGuadagnerai: moltiplicatore ×${newMult.toFixed(2)} (+${gain}x)\nBonus: ${pt.bonus || 'nessuno'}\nPrestige attuali: ${state.prestigeCount || 0}`)) return;
     state.money = 0;
     state.buildings = {};
     state.upgrades = {};
     state.prestigeCount = (state.prestigeCount || 0) + 1;
     state.prestigeMultiplier = newMult;
+    // Tier 2+: free manager
+    if (pt.tier >= 2 && state.managers) {
+      const freeMgr = Object.keys(state.managers).length > 0 ? Object.keys(state.managers)[0] : null;
+      // keep managers on prestige (they're permanent)
+    }
+    if (window.Sounds) window.Sounds.play('prestige');
     Save.save();
     renderEmpire();
   }
@@ -169,23 +353,37 @@ window.Empire = (() => {
 
     const rate = totalRate();
     const levels = totalLevels();
-    const maxMult = 1 + Math.floor(levels / 10) * 0.25;
+    const pt = getPrestigeTier(state.prestigeCount || 0);
+    const nextMult = calcPrestigeMult(levels, state.prestigeCount || 0);
+    const canPrestige = levels >= 10;
+
+    // Buy mode buttons
+    const buyModes = [1, 10, 25, 'max'];
+    const buyModeHtml = buyModes.map(m =>
+      `<button class="emp-tab ${buyMode === m ? 'on' : ''}" data-bm="${m}" style="min-width:36px;padding:4px 8px;font-size:11px">${m === 'max' ? 'MAX' : m + 'x'}</button>`
+    ).join('');
 
     let buildingsHtml = '';
     BUILDINGS.forEach(b => {
       const level = state.buildings[b.id] || 0;
-      const cost = calcBuildingCost(b, level);
+      const count = calcBulkCount(b);
+      const cost = count > 1 ? calcBulkCost(b, level, count) : calcBuildingCost(b, level);
       const bRate = calcBuildingRate(b, level, state.upgrades);
-      const canAfford = state.money >= cost;
+      const canAfford = state.money >= cost && count > 0;
+      const mgrCost = Math.round(calcBuildingCost(b, 0) * 10);
+      const hasManager = state.managers && state.managers[b.id];
       buildingsHtml += `
         <div class="emp-bld">
           <div class="bld-icon">${b.emoji}</div>
           <div class="bld-info">
             <div class="bld-name">${b.name}</div>
             <div class="bld-desc">${b.desc}</div>
-            <div class="bld-level">Livello ${level}${bRate > 0 ? ` · ${formatMoney(bRate)}/s` : ''}</div>
+            <div class="bld-level">Livello ${level}${bRate > 0 ? ` · ${formatMoney(bRate)}/s` : ''}${hasManager ? ' · 🤖' : ''}</div>
           </div>
-          <button class="bld-btn" id="buy-${b.id}" ${canAfford ? '' : 'disabled'}>${formatMoney(cost)}</button>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            ${level > 0 ? `<button class="bld-btn" id="mgr-${b.id}" title="Manager: guadagno automatico" style="font-size:10px;padding:4px 6px" ${hasManager ? 'disabled' : ''}>${hasManager ? '✅' : '🤖'}</button>` : ''}
+            <button class="bld-btn" id="buy-${b.id}" ${canAfford ? '' : 'disabled'}>${count > 1 ? count + 'x ' : ''}${formatMoney(cost)}</button>
+          </div>
         </div>`;
     });
 
@@ -206,8 +404,8 @@ window.Empire = (() => {
         </div>`;
     });
 
-    const prestigeGain = Math.floor(levels / 10) * 0.25;
-    const canPrestige = levels >= 10;
+    const mgrCount = Object.keys(state.managers || {}).length;
+    const totalMgrCost = BUILDINGS.reduce((s, b) => s + calcBuildingCost(b, 0) * 10, 0);
 
     area.innerHTML = `
       <div class="emp-hdr">
@@ -220,6 +418,10 @@ window.Empire = (() => {
         <button class="emp-tab" data-tab="prestige">👑 Prestige</button>
         <button class="emp-tab" data-tab="stats">📊 Statistiche</button>
       </div>
+      <div style="display:flex;gap:4px;padding:0 4px;margin-bottom:4px;align-items:center">
+        <span style="font-size:10px;color:var(--dim);margin-right:4px">Acquista:</span>
+        ${buyModeHtml}
+      </div>
       <div id="emp-event"></div>
       <div class="emp-scroll" id="emp-content">
         <div class="emp-tab-content" data-tc="buildings">${buildingsHtml || '<div style="text-align:center;color:var(--dim);padding:20px">Nessun edificio disponibile</div>'}</div>
@@ -227,16 +429,18 @@ window.Empire = (() => {
         <div class="emp-tab-content" data-tc="prestige" style="display:none">
           <div class="emp-prestige">
             <div style="font-size:48px;margin:12px 0">👑</div>
-            <div style="font-size:18px;font-weight:800;margin-bottom:8px">Rifonda il Regno</div>
+            <div style="font-size:18px;font-weight:800;margin-bottom:4px">Rifonda il Regno</div>
+            <div style="font-size:11px;color:var(--gold);margin-bottom:8px">Tier ${pt.tier} — Formula: ×${pt.multPer10} per 10 livelli</div>
             <div style="font-size:13px;color:var(--dim);margin-bottom:12px">
               Resetta tutti gli edifici e i miglioramenti.<br>
               Guadagni un moltiplicatore permanente:<br>
-              <b style="color:var(--purple)">+${prestigeGain.toFixed(2)}x</b> (attuale: ×${state.prestigeMultiplier.toFixed(2)})
+              <b style="color:var(--purple)">×${nextMult.toFixed(2)}</b> (attuale: ×${state.prestigeMultiplier.toFixed(2)})
+              ${pt.bonus ? `<br><small style="color:var(--gold)">Bonus: ${pt.bonus}</small>` : ''}
             </div>
             <button class="prestige-btn" ${canPrestige ? '' : 'disabled'} onclick="Empire.prestige()">
-              👑 Rifonda (${canPrestige ? '+' + prestigeGain.toFixed(2) + 'x' : 'min 10 livelli'})
+              👑 Rifonda (${canPrestige ? '×' + nextMult.toFixed(2) : 'min 10 livelli'})
             </button>
-            <div class="emp-prestige-info">Rifondate: ${state.prestigeCount || 0} volte</div>
+            <div class="emp-prestige-info">Rifondate: ${state.prestigeCount || 0} volte · Tier ${pt.tier}</div>
           </div>
         </div>
         <div class="emp-tab-content" data-tc="stats" style="display:none">
@@ -244,22 +448,31 @@ window.Empire = (() => {
             <div class="stat-row"><span>💰 Soldi totali guadagnati</span><span class="stat-val">${formatMoney(state.totalEarned || 0)}</span></div>
             <div class="stat-row"><span>🏗️ Edifici totali</span><span class="stat-val">${levels}</span></div>
             <div class="stat-row"><span>📈 Guadagno/secondo</span><span class="stat-val">${formatMoney(rate)}/s</span></div>
-            <div class="stat-row"><span>👑 Prestige</span><span class="stat-val">×${state.prestigeMultiplier.toFixed(2)} (${state.prestigeCount || 0}x)</span></div>
+            <div class="stat-row"><span>👑 Prestige</span><span class="stat-val">×${state.prestigeMultiplier.toFixed(2)} (${state.prestigeCount || 0}x, Tier ${pt.tier})</span></div>
+            <div class="stat-row"><span>🤖 Manager</span><span class="stat-val">${mgrCount}/${BUILDINGS.length}</span></div>
             <div class="stat-row"><span>⚡ Eventi subiti</span><span class="stat-val">${state.eventsDone || 0}</span></div>
             <div class="stat-row"><span>⬆️ Miglioramenti</span><span class="stat-val">${Object.keys(state.upgrades).length}/${UPGRADES.length}</span></div>
-            <div class="stat-row"><span>🎮 Sessioni Impero</span><span class="stat-val">${state.prestigeCount || 0}</span></div>
+            <div class="stat-row"><span>💎 Bonus permanente</span><span class="stat-val">${formatMoney(state.permanentBonus || 0)}/s</span></div>
           </div>
         </div>
       </div>
     `;
 
     // Tab switching
-    area.querySelectorAll('.emp-tab').forEach(tab => {
+    area.querySelectorAll('.emp-tab[data-tab]').forEach(tab => {
       tab.onclick = () => {
-        area.querySelectorAll('.emp-tab').forEach(t => t.classList.remove('on'));
+        area.querySelectorAll('.emp-tab[data-tab]').forEach(t => t.classList.remove('on'));
         area.querySelectorAll('.emp-tab-content').forEach(c => c.style.display = 'none');
         tab.classList.add('on');
         area.querySelector(`[data-tc="${tab.dataset.tab}"]`).style.display = '';
+      };
+    });
+
+    // Buy mode switching
+    area.querySelectorAll('.emp-tab[data-bm]').forEach(btn => {
+      btn.onclick = () => {
+        buyMode = btn.dataset.bm === 'max' ? 'max' : parseInt(btn.dataset.bm);
+        renderEmpire();
       };
     });
 
@@ -267,6 +480,8 @@ window.Empire = (() => {
     BUILDINGS.forEach(b => {
       const btn = document.getElementById('buy-' + b.id);
       if (btn) btn.onclick = () => buyBuilding(b.id);
+      const mgrBtn = document.getElementById('mgr-' + b.id);
+      if (mgrBtn) mgrBtn.onclick = () => buyManager(b.id);
     });
 
     updateBuildingCosts();
@@ -289,19 +504,28 @@ window.Empire = (() => {
     const saved = Save.get();
     state = saved.empire;
 
+    // Ensure managers array exists
+    if (!state.managers) state.managers = {};
+
     // Calculate offline earnings
     const now = Date.now();
     const offlineSec = (now - state.lastTick) / 1000;
-    if (offlineSec > 10 && offlineSec < 86400) {
+    const capped = offlineSec > 86400;
+    const effectiveSec = Math.min(offlineSec, 86400);
+    if (effectiveSec > 10) {
       const rate = totalRate();
-      const offlineEarnings = Math.round(rate * offlineSec * 0.5); // 50% efficiency offline
+      const offlineEarnings = Math.round(rate * effectiveSec * 0.5);
       if (offlineEarnings > 0) {
         state.money += offlineEarnings;
         state.totalEarned += offlineEarnings;
         setTimeout(() => {
           const evDiv = document.getElementById('emp-event');
           if (evDiv) {
-            evDiv.innerHTML = `<div class="emp-event"><div class="ev-title">🌙 Guadagni Offline!</div><div class="ev-desc">Hai guagnato ${formatMoney(offlineEarnings)} mentre eri assente (${Math.round(offlineSec / 60)} min)</div></div>`;
+            const timeStr = capped
+              ? `${Math.round(effectiveSec / 3600)}h (max 24h)`
+              : `${Math.round(offlineSec / 60)} min`;
+            const capMsg = capped ? '<br><small style="color:var(--dim)">⚠️ Guadagni massimi raggiunti (24h). Torna presto!</small>' : '';
+            evDiv.innerHTML = `<div class="emp-event"><div class="ev-title">🌙 Guadagni Offline!</div><div class="ev-desc">Hai guadagnato ${formatMoney(offlineEarnings)} mentre eri assente (${timeStr})${capMsg}</div></div>`;
             setTimeout(() => { evDiv.innerHTML = ''; }, 5000);
           }
         }, 1000);
@@ -316,7 +540,6 @@ window.Empire = (() => {
     clearInterval(intervalId);
     intervalId = setInterval(gameLoop, 100);
 
-    // Random events every 30-90 seconds
     clearTimeout(eventTimeout);
     function scheduleEvent() {
       const delay = 30000 + Math.random() * 60000;
@@ -334,5 +557,9 @@ window.Empire = (() => {
     Save.save();
   }
 
-  return { startEmpire, stopEmpire, renderEmpire, buyUpgrade, prestige: doPrestige, formatMoney };
+  return {
+    startEmpire, stopEmpire, renderEmpire,
+    buyUpgrade, prestige: doPrestige,
+    chooseEvent, formatMoney
+  };
 })();

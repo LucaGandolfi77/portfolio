@@ -1,7 +1,12 @@
-// main.js — Router, dialoghi e UI
+// main.js — Router, dialoghi e UI + Sound + Streak + Achievements + Onboarding + Haptics
 (function() {
   const chapters = StoryData.chapters;
   const $ = id => document.getElementById(id);
+
+  // Haptic feedback (Vibration API)
+  function haptic(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+  }
 
   let currentView = 'menu'; // menu | game | empire
   let currentChapter = 0;
@@ -10,7 +15,41 @@
 
   // === INIT ===
   Save.load();
+  updateStreakDisplay();
   renderMenu();
+  setupSoundToggle();
+
+  // Onboarding per nuovi giocatori
+  Onboarding.start(() => {
+    // callback dopo onboarding (o subito se già visto)
+  });
+
+  // Check achievements all'avvio
+  setTimeout(() => Achievements.checkAndNotify(), 1000);
+
+  // === SOUND TOGGLE ===
+  function setupSoundToggle() {
+    const btn = $('btn-sound');
+    if (!btn) return;
+    btn.textContent = Sounds.isMuted() ? '🔇' : '🔊';
+    btn.onclick = () => {
+      const on = Sounds.toggle();
+      btn.textContent = on ? '🔊' : '🔇';
+      if (on) Sounds.play('click');
+    };
+  }
+
+  // === STREAK DISPLAY ===
+  function updateStreakDisplay() {
+    const el = $('streak-display');
+    if (!el) return;
+    const streak = Save.getStreak();
+    if (streak && streak.count > 0) {
+      el.innerHTML = `<div class="streak-badge ${streak.count >= 3 ? 'fire' : ''}">🔥 ${streak.count}g</div>`;
+    } else {
+      el.innerHTML = '';
+    }
+  }
 
   // === MENU ===
   function renderMenu() {
@@ -18,6 +57,8 @@
     Empire.stopEmpire();
     $('menu-view').style.display = '';
     $('game-view').style.display = 'none';
+
+    updateStreakDisplay();
 
     const saved = Save.get();
     const btns = $('menu-actions');
@@ -40,9 +81,29 @@
       html += `<button class="btn" id="btn-empire-menu" style="border-color:var(--purple);background:linear-gradient(135deg,#F3E5F5,#E1BEE7)">👑 Impero di Soldania</button>`;
     }
 
+    // Achievements button
+    html += `<button class="btn" id="btn-achievements" style="border-color:var(--gold);background:linear-gradient(135deg,#FFF8E1,#FFE082)">🏆 Achievements (${Achievements.count()}/${Achievements.total()})</button>`;
+
+    // Leagues button
+    const leagueScore = Leagues.getPlayerScore(saved);
+    const league = Leagues.getLeagueForScore(leagueScore);
+    html += `<button class="btn" id="btn-leagues" style="border-color:${league.color};background:linear-gradient(135deg,${league.color}22,${league.color}44)">${league.emoji} Leagues — ${league.name}</button>`;
+
+    // Store button
+    if (!Monetization.isPremium()) {
+      html += `<button class="btn" id="btn-store" style="border-color:var(--green);background:linear-gradient(135deg,#E8F5E9,#C8E6C9)">🛒 Negozio</button>`;
+    }
+
+    // Language selector
+    const currentLang = I18n.getLanguage();
+    const langInfo = I18n.LANGUAGES[currentLang];
+    html += `<button class="btn small" id="btn-lang" style="border-color:var(--dim);font-size:11px;padding:6px 12px">${langInfo.flag} ${langInfo.nativeName}</button>`;
+
     btns.innerHTML = html;
 
     $('btn-new').onclick = () => {
+      Sounds.play('click');
+      haptic(10);
       const hasProgress = Save.get().completedChapters.length > 0;
       if (hasProgress && !confirm('Vuoi ricominciare da capo? Il progresso attuale verrà cancellato.')) return;
       Save.reset();
@@ -51,10 +112,156 @@
     };
 
     const continueBtn = document.getElementById('btn-continue');
-    if (continueBtn) continueBtn.onclick = () => startChapter(saved.currentChapter || 0);
+    if (continueBtn) continueBtn.onclick = () => {
+      Sounds.play('click');
+      startChapter(saved.currentChapter || 0);
+    };
 
     const empireBtn = document.getElementById('btn-empire-menu');
-    if (empireBtn) empireBtn.onclick = startEmpireView;
+    if (empireBtn) empireBtn.onclick = () => {
+      Sounds.play('click');
+      startEmpireView();
+    };
+
+    const achBtn = document.getElementById('btn-achievements');
+    if (achBtn) achBtn.onclick = () => {
+      Sounds.play('click');
+      showAchievementsPanel();
+    };
+
+    const leaguesBtn = document.getElementById('btn-leagues');
+    if (leaguesBtn) leaguesBtn.onclick = () => {
+      Sounds.play('click');
+      showLeaguesPanel();
+    };
+
+    const storeBtn = document.getElementById('btn-store');
+    if (storeBtn) storeBtn.onclick = () => {
+      Sounds.play('click');
+      showStorePanel();
+    };
+
+    const langBtn = document.getElementById('btn-lang');
+    if (langBtn) langBtn.onclick = () => {
+      Sounds.play('click');
+      showLanguagePanel();
+    };
+  }
+
+  // === ACHIEVEMENTS PANEL ===
+  function showAchievementsPanel() {
+    const all = Achievements.getAll();
+    const pct = Achievements.pct();
+    const grid = all.map(a => `
+      <div class="ach-item ${a.unlocked ? 'unlocked' : 'locked'}">
+        <div class="ach-emoji">${a.icon}</div>
+        <div class="ach-name">${a.title}</div>
+        <div class="ach-d">${a.desc}</div>
+      </div>
+    `).join('');
+
+    $('modal-icon').textContent = '🏆';
+    $('modal-title').textContent = 'Achievements';
+    $('modal-txt').innerHTML = `<div class="ach-progress">${pct}% completato (${Achievements.count()}/${Achievements.total()})</div><div class="ach-grid">${grid}</div>`;
+    $('modal-acts').innerHTML = `
+      <button class="btn small" id="modal-share" style="border-color:var(--gold);background:linear-gradient(135deg,#FFF8E1,#FFE082)">📤 Condividi</button>
+      <button class="btn primary" id="modal-close">Chiudi</button>
+    `;
+    $('modal').classList.add('on');
+
+    document.getElementById('modal-close').onclick = () => {
+      $('modal').classList.remove('on');
+    };
+    document.getElementById('modal-share').onclick = () => {
+      Sounds.play('click');
+      Share.shareProgress();
+    };
+  }
+
+  // === LEAGUES PANEL ===
+  function showLeaguesPanel() {
+    const saved = Save.get();
+    const leaguesHtml = Leagues.renderLeaguesPanel(saved);
+
+    $('modal-icon').textContent = '⚔️';
+    $('modal-title').textContent = 'Leagues';
+    $('modal-txt').innerHTML = leaguesHtml;
+    $('modal-acts').innerHTML = `
+      <button class="btn primary" id="modal-close">Chiudi</button>
+    `;
+    $('modal').classList.add('on');
+
+    document.getElementById('modal-close').onclick = () => {
+      $('modal').classList.remove('on');
+    };
+  }
+
+  function checkLeaguePromotion() {
+    const saved = Save.get();
+    const result = Leagues.checkPromotion(saved);
+    if (result) {
+      saved.league = result.to.id;
+      Save.save();
+      setTimeout(() => {
+        $('modal-icon').textContent = result.promoted ? '🎉' : '📉';
+        $('modal-title').textContent = result.promoted ? 'Promozione!' : 'Retrocessione';
+        $('modal-txt').innerHTML = `
+          <div style="text-align:center">
+            <div style="font-size:48px;margin:12px 0">${result.to.emoji}</div>
+            <div style="font-size:16px;font-weight:800;color:${result.to.color}">
+              ${result.from.emoji} ${result.from.name} → ${result.to.emoji} ${result.to.name}
+            </div>
+            ${result.reward > 0 ? `<div style="font-size:12px;color:var(--green);margin-top:8px">+€${result.reward} bonus!</div>` : ''}
+          </div>`;
+        $('modal-acts').innerHTML = `<button class="btn primary" id="modal-close">Continua</button>`;
+        $('modal').classList.add('on');
+        document.getElementById('modal-close').onclick = () => {
+          $('modal').classList.remove('on');
+        };
+        if (result.promoted) {
+          Sounds.play('levelup');
+          haptic([10, 50, 10, 50, 10]);
+          Save.addMoney(result.reward);
+        } else {
+          Sounds.play('wrong');
+          haptic([30, 50, 30]);
+        }
+      }, 500);
+    }
+  }
+
+  // === STORE PANEL ===
+  function showStorePanel() {
+    const storeHtml = Monetization.renderStorePanel();
+
+    $('modal-icon').textContent = '🛒';
+    $('modal-title').textContent = 'Negozio';
+    $('modal-txt').innerHTML = storeHtml;
+    $('modal-acts').innerHTML = `
+      <button class="btn primary" id="modal-close">Chiudi</button>
+    `;
+    $('modal').classList.add('on');
+
+    document.getElementById('modal-close').onclick = () => {
+      $('modal').classList.remove('on');
+    };
+  }
+
+  // === LANGUAGE PANEL ===
+  function showLanguagePanel() {
+    const langHtml = I18n.renderLanguageSelector();
+
+    $('modal-icon').textContent = '🌍';
+    $('modal-title').textContent = 'Lingua / Language';
+    $('modal-txt').innerHTML = `<div style="padding:8px">${langHtml}</div>`;
+    $('modal-acts').innerHTML = `
+      <button class="btn primary" id="modal-close">Chiudi</button>
+    `;
+    $('modal').classList.add('on');
+
+    document.getElementById('modal-close').onclick = () => {
+      $('modal').classList.remove('on');
+    };
   }
 
   // === START CHAPTER ===
@@ -73,6 +280,9 @@
     $('chapter-title').textContent = ch.icon + ' ' + ch.title;
     renderChapterBar();
     updateProgress();
+
+    Save.setCurrentChapter(idx);
+    Sounds.play('chapter');
 
     // Start dialogue
     dialogueIdx = 0;
@@ -93,7 +303,10 @@
     bar.querySelectorAll('.chap:not(.locked)').forEach(el => {
       el.onclick = () => {
         const idx = +el.dataset.ch;
-        if (Save.isChapterUnlocked(idx)) startChapter(idx);
+        if (Save.isChapterUnlocked(idx)) {
+          Sounds.play('click');
+          startChapter(idx);
+        }
       };
     });
     // Auto-scroll to current chapter
@@ -129,16 +342,27 @@
     $('story-text').textContent = '';
     $('story-lesson').style.display = 'none';
 
-    // Typewriter effect
+    // Typewriter effect with skip-on-tap
     let ti = 0;
+    let typeComplete = false;
     const typeTimer = setInterval(() => {
       if (ti < d.text.length) {
         $('story-text').textContent += d.text[ti];
         ti++;
       } else {
         clearInterval(typeTimer);
+        typeComplete = true;
       }
     }, 18);
+
+    // Tap to complete typewriter instantly
+    $('story-text').onclick = () => {
+      if (!typeComplete) {
+        clearInterval(typeTimer);
+        $('story-text').textContent = d.text;
+        typeComplete = true;
+      }
+    };
 
     const isLast = dialogueIdx >= ch.dialogue.length - 1;
     $('story-acts').innerHTML = `
@@ -148,6 +372,7 @@
 
     document.getElementById('story-next').onclick = () => {
       clearInterval(typeTimer);
+      Sounds.play('click');
       dialogueIdx++;
       showDialogue(ch);
     };
@@ -193,22 +418,38 @@
         document.getElementById('lesson-ok').onclick = () => {
           $('story-overlay').classList.remove('on');
           if (passed) {
+            Sounds.play('coin');
+            haptic([10, 30, 10]);
             Save.completeChapter(currentChapter);
-            Save.addMoney(score);
+            const multiplier = Monetization.getMoneyMultiplier();
+            Save.addMoney(Math.round(score * multiplier));
             updateProgress();
             renderChapterBar();
+            Achievements.checkAndNotify();
+            checkLeaguePromotion();
+            Monetization.showInterstitial();
             startChapter(currentChapter + 1);
           } else {
+            Sounds.play('wrong');
+            haptic([30, 50, 30]);
             startChapter(currentChapter);
           }
         };
       } else if (passed) {
+        Sounds.play('coin');
+        haptic([10, 30, 10]);
         Save.completeChapter(currentChapter);
-        Save.addMoney(score);
+        const multiplier = Monetization.getMoneyMultiplier();
+        Save.addMoney(Math.round(score * multiplier));
         updateProgress();
         renderChapterBar();
+        Achievements.checkAndNotify();
+        checkLeaguePromotion();
+        Monetization.showInterstitial();
         startChapter(currentChapter + 1);
       } else {
+        Sounds.play('wrong');
+        haptic([30, 50, 30]);
         startChapter(currentChapter);
       }
     });
@@ -228,6 +469,7 @@
 
   // === BACK TO MENU ===
   $('btn-menu').onclick = () => {
+    Sounds.play('click');
     Empire.stopEmpire();
     renderMenu();
   };

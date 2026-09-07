@@ -161,7 +161,7 @@ window.StoryData = {
         { who: 'bartolo', text: 'Le obbligazioni sono il "fondo di sicurezza" del tuo portafoglio! Quando le azioni scendono, le obbligazioni spesso salgono.' }
       ],
       lesson: 'OBBLIGAZIONE = presti soldi e ricevi interessi! 📜\nSono più sicure delle azioni ma rendono meno\nUn portafoglio bilanciato = Azioni + Obbligazioni\nGovernative (sicure) vs Corporate (più rendimento)',
-      minigame: 'cesti'
+      minigame: 'obbligazioni'
     },
     {
       id: 'tasse',
@@ -211,6 +211,67 @@ window.StoryData = {
       ],
       lesson: 'PAGA PRIMA TE STESSO! 🏖️\nMetti da parte il 10-15% OGNI mese\nIniziare a 25 anni ≠ iniziare a 40: il compound interest è potentissimo\nOggi: €200/mese → Pensione: €500.000+!',
       minigame: 'pensioni'
+    },
+    {
+      id: 'criptovalute',
+      title: 'Le Criptovalute',
+      icon: '₿',
+      concept: 'Blockchain, Bitcoin e rischi delle cripto',
+      dialogue: [
+        { who: 'lia', text: 'Tutti parlano di Bitcoin e criptovalute! Posso diventare ricco?' },
+        { who: 'bartolo', text: 'Le CRIPTO sono come il Far West finanziario! 🤠 Potenziale alto, ma anche rischi enormi. Il Bitcoin è nato nel 2009 e vale oggi più di €50.000, ma è sceso del 80% più di una volta!' },
+        { who: 'contabilia', text: '📚 SCHEDA DELLA MAGA: Le cripto sono valute digitali basate su BLOCKCHAIN — un registro pubblico decentralizzato. Vantaggi: trasparenza, nessun intermediario. Rischii: volatilità estrema, truffe, perdita di chiavi private. Regola d\'oro: NON investire più di quanto puoi permetterti di perdere al 100%!' },
+        { who: 'bartolo', text: 'La regola delle cripto: max 5-10% del tuo portafoglio in cripto, e solo se hai già un portafoglio diversificato in azioni e obbligazioni!' },
+        { who: 'lia', text: 'Quindi le cripto sono solo una piccola parte di un buon piano finanziario!' }
+      ],
+      lesson: 'CRIPTO = alto rischio, alto potenziale! ₿\nMax 5-10% del portafoglio\nMai investire più di quanto puoi perdere\nBlockchain è rivoluzionaria, ma il mercato è volatile',
+      minigame: 'boss'
+    },
+    {
+      id: 'immobili',
+      title: 'Immobili e Affitti',
+      icon: '🏠',
+      concept: 'Investire in immobili, rendita passiva e mutui',
+      dialogue: [
+        { who: 'lia', text: 'Voglio comprare casa un giorno! Ma costano una fortuna...' },
+        { who: 'bartolo', text: 'Gli IMMOBILI sono un investimento fantastico! 🏠 Puoi comprare per vivere (risparmi l\'affitto) oppure per affittare (rendita passiva). Ma attenzione: il MUTUO è un debito che paghi per 20-30 anni!' },
+        { who: 'contabilia', text: '📚 SCHEDA DELLA MAGA: Regola dell\'immobiliare:\n📊 Prezzo / Affitto annuo = Indice P/E\nSe un appartamento costa €200.000 e l\'affitto è €10.000/anno, il P/E è 20 — accettabile!\nIl rendimento netto è tipicamente 3-6% annuo (dopo tasse e spese).\nAttenzione: spese impreviste (manutenzione, tasse, vuoti)!' },
+        { who: 'bartolo', text: 'La regola d\'oro: non comprare se il mutuo supera il 30% del tuo stipendio mensile! E ricorda: una casa non è sempre un investimento — è anche un posto dove vivi!' },
+        { who: 'lia', text: 'Bilanciare sogno e realtà... ecco la vera lezione!' }
+      ],
+      lesson: 'IMMOBILI = investimento a lungo termine! 🏠\nRendita passiva da affitti\nAttenzione al mutuo: max 30% dello stipendio\nNon è solo investimento: è anche casa tua',
+      minigame: 'simulatore'
+    },
+    {
+      id: 'inflazion avanzata',
+      title: 'L\'Inflazione Avanzata',
+      icon: '🐉',
+      concept: 'Iperinflazione, deflazione e potere d\'acquisto',
+      dialogue: [
+        { who: 'inflazion', text: 'Mi hai sconfitto una volta, ma tornerò! 🐉 L\'INFLAZIONE è il mio vero potere! Sai cos\'è l\'IPERINFLAZIONE?' },
+        { who: 'bartolo', text: 'Quando l\'inflazione supera il 50% al Mese, si chiama iperinflazione! 💀 In Venezuela nel 2018, i prezzi raddoppiavano ogni 19 giorni! Un caffè costava miliardi di bolivar!' },
+        { who: 'contabilia', text: '📚 SCHEDA DELLA MAGA: Iperinflazione:\n📈 Prezzi raddoppiano ogni poche settimane\n💰 La moneta perde valore rapidamente\n🏦 Le banche centrali stampano troppa moneta\nSoluzione: investire in beni reali (oro, immobili, azioni) che mantengono il valore!' },
+        { who: 'lia', text: 'E la DEFLAZIONE? I prezzi scendono, è buono!' },
+        { who: 'bartolo', text: 'ATTENZIONE! La deflazione sembra buona ma è pericolosa! 📉 Se i prezzi scendono, le aziende guadagnano meno, licenziano gente, e l\'economia si ferma. Il Giappone ha avuto deflazione per 20 anni!' },
+        { who: 'contabilia', text: 'L\'obiettivo delle banche centrali è un\'inflazione del 2-3%: abbastanza da stimolare la crescita, ma non abbastanza da distruggere il potere d\'acquisto!' }
+      ],
+      lesson: 'INFLAZIONE = nemico del risparmio! 🐉\nIperinflazione = catastrofe (50%+ al mese)\nDeflazione = pericolosa per l\'economia\nObiettivo ideale: 2-3% annuo',
+      minigame: 'boss'
+    },
+    {
+      id: 'etica finanziaria',
+      title: 'Etica e Finanza',
+      icon: '⚖️',
+      concept: 'Investimenti sostenibili, responsabilità sociale e greenwashing',
+      dialogue: [
+        { who: 'lia', text: 'Voglio investire, ma non voglio danneggiare il pianeta! 🌍' },
+        { who: 'bartolo', text: 'ESATTO! Esistono gli investimenti ESG — Ambientali, Sociali e di Governance! 🌱 Investi in aziende che rispettano l\'ambiente, trattano bene i dipendenti, e sono trasparenti!' },
+        { who: 'contabilia', text: '📚 SCHEDA DELLA MAGA: Investimenti ESG:\n🌿 Ambientale: aziende green, rinnovabili, basso inquinamento\n👥 Sociale: diritti dei lavoratori, comunità, diversità\n🏛️ Governance: trasparenza, etica, anticorruzione\nGreenwashing: attenzione! Alcune aziende fingono di essere green ma non lo sono!' },
+        { who: 'bartolo', text: 'I fondi ESG rendono quanto quelli tradizionali! Studi dimostrano che le aziende etiche performano meglio nel lungo periodo! 💚' },
+        { who: 'lia', text: 'Investire nel bene... è la strategia migliore!' }
+      ],
+      lesson: 'FINANZA ETICA = investi nel futuro! ⚖️\nESG = Ambientale + Sociale + Governance\nI fondi ESG rendono quanto quelli tradizionali\nAttenzione al GREENWASHING (finta sostenibilità)',
+      minigame: 'etf'
     }
   ]
 };

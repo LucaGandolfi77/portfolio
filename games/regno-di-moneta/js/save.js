@@ -1,4 +1,4 @@
-// save.js — Persistenza con localStorage
+// save.js — Persistenza con localStorage + Streak System
 window.Save = (() => {
   const KEY = 'rdm_save_v1';
 
@@ -7,6 +7,7 @@ window.Save = (() => {
     completedChapters: [],
     currentChapter: 0,
     empireUnlocked: false,
+    streak: { count: 0, lastDate: null, bestStreak: 0 },
     empire: {
       money: 0,
       buildings: {},
@@ -26,9 +27,15 @@ window.Save = (() => {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const saved = JSON.parse(raw);
-        data = { ...defaults(), ...saved, empire: { ...defaults().empire, ...(saved.empire || {}) } };
+        data = {
+          ...defaults(),
+          ...saved,
+          streak: { ...defaults().streak, ...(saved.streak || {}) },
+          empire: { ...defaults().empire, ...(saved.empire || {}) }
+        };
       }
     } catch(e) { data = defaults(); }
+    updateStreak();
     return data;
   }
 
@@ -50,7 +57,7 @@ window.Save = (() => {
   function completeChapter(idx) {
     if (!data.completedChapters.includes(idx)) {
       data.completedChapters.push(idx);
-      if (idx >= 5) data.empireUnlocked = true; // boss finale al capitolo 6 sblocca l'impero
+      if (idx >= 5) data.empireUnlocked = true;
       save();
     }
   }
@@ -65,11 +72,36 @@ window.Save = (() => {
   }
 
   function progress(total) {
-    const t = total || 13;
+    const t = total || 18;
     return Math.round((data.completedChapters.length / t) * 100);
+  }
+
+  // === STREAK SYSTEM ===
+  function updateStreak() {
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    if (!data.streak) data.streak = { count: 0, lastDate: null, bestStreak: 0 };
+    if (data.streak.lastDate === today) return; // già aggiornato oggi
+    if (data.streak.lastDate === yesterday) {
+      data.streak.count++;
+    } else if (data.streak.lastDate !== today) {
+      data.streak.count = 1;
+    }
+    data.streak.lastDate = today;
+    data.streak.bestStreak = Math.max(data.streak.bestStreak, data.streak.count);
+  }
+
+  function getStreak() {
+    updateStreak();
+    return data.streak;
   }
 
   function reset() { data = defaults(); save(); }
 
-  return { load, save, get, setMoney, addMoney, completeChapter, setCurrentChapter, isChapterDone, isChapterUnlocked, progress, reset };
+  return {
+    load, save, get, setMoney, addMoney,
+    completeChapter, setCurrentChapter,
+    isChapterDone, isChapterUnlocked,
+    progress, reset, getStreak
+  };
 })();
