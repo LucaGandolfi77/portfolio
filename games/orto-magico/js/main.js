@@ -4,6 +4,7 @@
 // Stato persistito su localStorage. Ottimizzato iPhone + GitHub Pages.
 
 const STORAGE_KEY = 'orto-magico-state-v2';
+const _m = typeof Monetization !== 'undefined' ? Monetization.init('orto-magico') : null;
 
 // ── Seed definitions ──
 const SEEDS = {
@@ -77,6 +78,19 @@ let gardenSelectOpen = false;
 // ── Helpers ──
 function fmt(n) { return (n||0).toLocaleString('it-IT'); }
 function hasUpgrade(id) { return gameState.upgrades.includes(id); }
+function isSeedLocked(seedId) {
+  if (!_m || _m.isFull()) return false;
+  const freeSeeds = ['lettuce', 'carrot', 'strawberry'];
+  return !freeSeeds.includes(seedId);
+}
+function isPlotLocked() {
+  if (!_m || _m.isFull()) return false;
+  return gameState.plots.length >= 4;
+}
+function isUpgradeLocked(tier) {
+  if (!_m || _m.isFull()) return false;
+  return tier >= 2;
+}
 
 // ── Header ──
 function renderHeader() {
@@ -90,6 +104,7 @@ function renderHeader() {
         <span class="stat" title="Monete">💰 ${fmt(gameState.coins)}</span>
         <span class="stat gems" title="Gemme">💎 ${fmt(gameState.gems)}</span>
         <span class="stat" title="Raccolte">🌾 ${fmt(gameState.totalHarvests)}</span>
+        ${_m && !_m.isFull() ? '<button class="stat full-game-btn" onclick="showFullGameOverlay()" title="Sblocca tutto">🔓 $4.99</button>' : ''}
       </div>
       <div class="header-level">
         <div class="lvl-badge">Liv. ${fmt(gameState.level)}</div>
@@ -110,15 +125,20 @@ function renderGarden(container) {
   // Buy new plot button - always show if there are plots left to unlock
   if (gameState.plots.length < gameState.maxPlots) {
     const canAfford = gameState.coins >= gameState.nextPlotCost;
+    const plotLocked = isPlotLocked();
     const buyBtn = document.createElement('button');
-    buyBtn.className = 'plot plot-buy';
-    if (!canAfford) buyBtn.style.opacity = '0.5';
+    buyBtn.className = 'plot plot-buy' + (plotLocked ? ' mono-locked' : '');
+    if (!canAfford && !plotLocked) buyBtn.style.opacity = '0.5';
     buyBtn.innerHTML = `
-      <span class="plot-buy-emoji">${canAfford ? '🌱' : '🔒'}</span>
-      <span class="plot-buy-label">Nuovo campo</span>
-      <span class="plot-buy-cost">${fmt(gameState.nextPlotCost)} 💰</span>
+      <span class="plot-buy-emoji">${plotLocked ? '🔒' : canAfford ? '🌱' : '🔒'}</span>
+      <span class="plot-buy-label">${plotLocked ? 'Full Game' : 'Nuovo campo'}</span>
+      <span class="plot-buy-cost">${plotLocked ? '$4.99' : fmt(gameState.nextPlotCost) + ' 💰'}</span>
     `;
-    buyBtn.onclick = () => { if (canAfford) buyNewPlot(); else showToast(`Servono ${fmt(gameState.nextPlotCost)}💰 per il prossimo campo`); };
+    buyBtn.onclick = () => {
+      if (plotLocked) { showFullGameOverlay(); return; }
+      if (canAfford) buyNewPlot();
+      else showToast(`Servono ${fmt(gameState.nextPlotCost)}💰 per il prossimo campo`);
+    };
     grid.appendChild(buyBtn);
   }
 
@@ -134,14 +154,18 @@ function renderGarden(container) {
 
     let actions = '';
     if (isEmpty) {
+      const seedOptions = Object.keys(SEEDS).map(sid => {
+        const locked = isSeedLocked(sid);
+        return `<option value="${sid}" ${locked ? 'disabled' : ''}>${SEEDS[sid].emoji} ${SEEDS[sid].name} (${fmt(SEEDS[sid].cost)}💰)${locked ? ' 🔒' : ''}</option>`;
+      }).join('');
       actions = `
         <div class="plot-actions">
           <select class="plot-seed-select"
-            onchange="plantSeed('${plot.id}', this.value); gardenSelectOpen = false;"
+            onchange="if(isSeedLocked(this.value)){showFullGameOverlay();this.value='';return;}plantSeed('${plot.id}', this.value); gardenSelectOpen = false;"
             onfocus="gardenSelectOpen = true;"
             onblur="setTimeout(() => { gardenSelectOpen = false; }, 300);">
             <option value="">Scegli seme...</option>
-            ${Object.keys(SEEDS).map(sid => `<option value="${sid}">${SEEDS[sid].emoji} ${SEEDS[sid].name} (${fmt(SEEDS[sid].cost)}💰)</option>`).join('')}
+            ${seedOptions}
           </select>
         </div>
       `;
@@ -200,26 +224,29 @@ function renderShop() {
       ${tiers.map(t => {
         const items = grouped[t.level] || [];
         if (!items.length) return '';
+        const tierLocked = isUpgradeLocked(t.level);
         return `
-          <div class="shop-tier">
-            <div class="shop-tier-title">${t.emoji} ${t.name}</div>
+          <div class="shop-tier${tierLocked ? ' mono-locked' : ''}">
+            <div class="shop-tier-title">${t.emoji} ${t.name} ${tierLocked ? '🔒 FULL GAME' : ''}</div>
             ${items.map(item => {
               const owned = hasUpgrade(item.id);
               const canAfford = gameState.coins >= item.cost && gameState.gems >= item.costGem;
               return `
-                <div class="shop-item ${owned ? 'shop-owned' : ''}">
+                <div class="shop-item ${owned ? 'shop-owned' : ''}${tierLocked ? ' mono-locked' : ''}">
                   <span class="shop-emoji">${item.emoji}</span>
                   <div class="shop-info">
                     <div class="shop-name">${item.name} ${owned ? '<span class="shop-tag">Posseduto</span>' : ''}</div>
                     <div class="shop-desc">${item.desc}</div>
                     <div class="shop-stats">
-                      ${owned ? '' : `${fmt(item.cost)} 💰${item.costGem > 0 ? ` + ${item.costGem} 💎` : ''}`}
+                      ${owned ? '' : tierLocked ? '🔒 Full Game' : `${fmt(item.cost)} 💰${item.costGem > 0 ? ` + ${item.costGem} 💎` : ''}`}
                     </div>
                   </div>
                   <div class="shop-buy">
                     ${owned
                       ? '<button disabled>✓</button>'
-                      : `<button ${canAfford ? '' : 'disabled'} onclick="buyUpgrade('${item.id}')">Compra</button>`}
+                      : tierLocked
+                        ? `<button onclick="showFullGameOverlay()">Sblocca</button>`
+                        : `<button ${canAfford ? '' : 'disabled'} onclick="buyUpgrade('${item.id}')">Compra</button>`}
                   </div>
                 </div>
               `;
@@ -563,6 +590,29 @@ function showWelcomeBack() {
 
   if (earnings > 0) {
     setTimeout(() => showToast(`Bentornato! Hai guadagnato ${fmt(earnings)}💰 in ${mins}min offline`), 500);
+  }
+}
+
+// ── Full Game Overlay ──
+function showFullGameOverlay() {
+  if (_m && typeof _m.showUpgrade === 'function') {
+    _m.showUpgrade({
+      title: 'ORTO MAGICO FULL',
+      subtitle: 'Sblocca tutto il tuo giardino',
+      features: [
+        {ic:'🌱',text:'11 varietà di piante (Lattuga, Orchidea, Cactus...)'},
+        {ic:'🏞️',text:'12 campi (massimo 4 nel Free)'},
+        {ic:'⚡',text:'Upgrade Avanzato e Premium'},
+        {ic:'🤖',text:'Mietitrice e Seminatrice automatiche'},
+        {ic:'🧊',text:'Progresso offline fino a 24 ore'},
+      ],
+      onPurchase: (tier) => {
+        if (tier === 'full') {
+          showToast('🎉 FULL GAME SBLOCCATO! Buon giardino!');
+          render();
+        }
+      }
+    });
   }
 }
 

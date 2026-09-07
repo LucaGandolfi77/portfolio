@@ -96,7 +96,11 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
 .mbtn.c4{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#3b2c00}
 .mbtn.auto{background:linear-gradient(135deg,#334155,#0f172a)}
 .mbtn.auto.onx{background:linear-gradient(135deg,#22d3ee,#8b5cf6)}
+.mbtn.full{background:linear-gradient(135deg,#8b5cf6,#ec4899);font-size:17px;padding:14px 18px}
+.mbtn.full.owned{background:linear-gradient(135deg,#22c55e,#16a34a);opacity:.85}
 .lock{background:rgba(0,0,0,.28);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:900}
+.mono-locked{position:relative}
+.mono-locked::after{content:'🔒';position:absolute;top:8px;right:8px;font-size:16px;z-index:2}
 .backrow{width:min(430px,94vw);display:flex;justify-content:flex-start}
 .bback{background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.35);color:#fff;
   border-radius:14px;padding:10px 18px;font-weight:900;font-size:14px;cursor:pointer}
@@ -204,6 +208,7 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
     <button class="mbtn c3" id="mHeroes">🧙 PERSONAGGI<small>ogni eroe, un difetto carino</small></button>
     <button class="mbtn c4" id="mAccs">💍 ACCESSORI<small>bomboniere da battaglia</small></button>
     <button class="mbtn auto" id="mAuto"><span>🤖 MODALITÀ AUTO<small id="autoSub">joca da solo, tu guardi</small></span><span class="lock" id="autoLock">🪙 2500</span></button>
+    <button class="mbtn full" id="mFull"><span>🔓 FULL GAME<small>Sblocca tutto: armi, eroi, accessori, auto</small></span><span class="lock" id="fullPrice">$4.99</span></button>
   </nav>
   <div class="statgrid" style="margin-top:6px">
     <div class="stat"><b id="sRuns">0</b>RUN FATTE</div>
@@ -264,9 +269,11 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
   <button class="mbtn play" id="sumHome" style="margin-top:8px">🏠 TORNA ALLA BASE</button>
 </div>
 
+<script src="../monetization.js"></script>
 <script>
 (function(){
 "use strict";
+const m=Monetization.init('arrowmatic');
 const $=id=>document.getElementById(id);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const ri=(a,b)=>Math.floor(rnd(a,b+1));
@@ -1278,6 +1285,13 @@ function refreshHub(){
   $('autoLock').textContent=SV.auto.unlocked?(SV.auto.on?'ATTIVA ✅':'SPENTA'):'🪙'+AUTO_PRICE;
   $('mAuto').classList.toggle('onx',SV.auto.on&&SV.auto.unlocked);
   $('autoSub').textContent=SV.auto.unlocked?'l\'IA farma per te':'sbloccala e rilassati';
+  // Full game button
+  const fullBtn=$('mFull');
+  if(m.isFull()){
+    fullBtn.classList.add('owned');
+    fullBtn.querySelector('small').textContent='Tutto sbloccato! ✅';
+    fullBtn.querySelector('.lock').textContent='✅ SBLOCCATO';
+  }
 }
 function GAME_fmt(n){return Math.floor(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
 
@@ -1302,18 +1316,21 @@ function buildUpgrades(){
 }
 function buildWeapons(){
   const box=$('weapList');box.innerHTML='';
-  Object.entries(WEAPONS).forEach(([k,w])=>{
+  Object.entries(WEAPONS).forEach(([k,w],idx)=>{
     const owned=SV.weapons.owned.includes(k),sel=SV.weapons.sel===k;
     const afford=SV.coins>=w.cost;
+    const locked=!m.isFull()&&idx>0;
     const row=document.createElement('button');
-    row.className='item'+(sel?' sel':'');
+    row.className='item'+(sel?' sel':'')+(locked?' mono-locked':'');
     row.innerHTML=`<span class="ic">${w.ic}</span>
       <span class="tx"><span class="nm">${w.name}${sel?' ✅':''}</span>
       <span class="ds">${w.desc}<br>dmg ${w.dmg} · ${w.rate}/s${w.pierce?' · trafora '+w.pierce:''}${w.aoe?' · esplosione':''}${w.return?' · ritorna':''}</span></span>
       ${sel?'<span class="pr">IN USO</span>':owned?'<span class="pr">POSSIEDI</span>':
+        locked?`<span class="pr">🔒 FULL</span>`:
         `<span class="pr ${afford?'':'no'}">${GAME_fmt(w.cost)} 🪙</span>`}`;
     row.onclick=()=>{
       if(sel)return;
+      if(locked){m.showPaywall({title:'Arma Bloccata',subtitle:'Sblocca '+w.name+' con il Full Game',features:[{ic:'🏹',text:'5 armi uniche'},{ic:'🧙',text:'4 eroi con perk'},{ic:'💍',text:'4 accessori'}]});return;}
       if(owned){SV.weapons.sel=k;save();AU.select2();buildWeapons();return;}
       if(!afford){AU.hit();return;}
       SV.coins-=w.cost;SV.weapons.owned.push(k);SV.weapons.sel=k;save();AU.coin();buildWeapons();refreshHub();
@@ -1324,17 +1341,20 @@ function buildWeapons(){
 AU.select2=function(){AU.tone('sine',600,900,.1,.14)};
 function buildHeroes(){
   const box=$('heroList');box.innerHTML='';
-  Object.entries(HEROES).forEach(([k,h])=>{
+  Object.entries(HEROES).forEach(([k,h],idx)=>{
     const owned=SV.heroes.owned.includes(k),sel=SV.heroes.sel===k;
     const afford=SV.coins>=h.cost;
+    const locked=!m.isFull()&&idx>0;
     const row=document.createElement('button');
-    row.className='item'+(sel?' sel':'');
+    row.className='item'+(sel?' sel':'')+(locked?' mono-locked':'');
     row.innerHTML=`<span class="ic">${h.ic}</span>
       <span class="tx"><span class="nm">${h.name}${sel?' ✅':''}</span><span class="ds">${h.desc}</span></span>
       ${sel?'<span class="pr">SELEZ.</span>':owned?'<span class="pr">POSSIEDI</span>':
+        locked?`<span class="pr">🔒 FULL</span>`:
         `<span class="pr ${afford?'':'no'}">${GAME_fmt(h.cost)} 🪙</span>`}`;
     row.onclick=()=>{
       if(sel)return;
+      if(locked){m.showPaywall({title:'Eroe Bloccato',subtitle:'Sblocca '+h.name+' con il Full Game',features:[{ic:'🏹',text:'5 armi uniche'},{ic:'🧙',text:'4 eroi con perk'},{ic:'💍',text:'4 accessori'}]});return;}
       if(owned){SV.heroes.sel=k;save();AU.select2();buildHeroes();return;}
       if(!afford){AU.hit();return;}
       SV.coins-=h.cost;SV.heroes.owned.push(k);SV.heroes.sel=k;save();AU.coin();buildHeroes();refreshHub();
@@ -1344,18 +1364,21 @@ function buildHeroes(){
 }
 function buildAccs(){
   const box=$('accList');box.innerHTML='';
-  Object.entries(ACCS).forEach(([k,a])=>{
+  Object.entries(ACCS).forEach(([k,a],idx)=>{
     const owned=SV.accs.owned.includes(k),eq=SV.accs.eq.includes(k);
     const afford=SV.coins>=a.cost;
     const eqFull=SV.accs.eq.length>=2;
+    const locked=!m.isFull();
     const row=document.createElement('button');
-    row.className='item'+(eq?' sel':'');
+    row.className='item'+(eq?' sel':'')+(locked?' mono-locked':'');
     row.innerHTML=`<span class="ic">${a.ic}</span>
       <span class="tx"><span class="nm">${a.name}${eq?' ✅ EQUIP':''}</span><span class="ds">${a.desc}</span></span>
       ${eq?'<span class="pr">TOGLI</span>':owned?`<span class="pr ${eqFull?'no':''}">EQUIPPAGIA</span>`:
+        locked?`<span class="pr">🔒 FULL</span>`:
         `<span class="pr ${afford?'':'no'}">${GAME_fmt(a.cost)} 🪙</span>`}`;
     row.onclick=()=>{
       if(eq){SV.accs.eq=SV.accs.eq.filter(x=>x!==k);save();AU.select2();buildAccs();return;}
+      if(locked){m.showPaywall({title:'Accessorio Bloccato',subtitle:'Sblocca '+a.name+' con il Full Game',features:[{ic:'🏹',text:'5 armi uniche'},{ic:'🧙',text:'4 eroi con perk'},{ic:'💍',text:'4 accessori'}]});return;}
       if(!owned){
         if(!afford){AU.hit();return;}
         SV.coins-=a.cost;SV.accs.owned.push(k);save();AU.coin();refreshHub();
@@ -1401,6 +1424,9 @@ function bindUI(){
   $('mAccs').onclick=()=>{$('aCoins').textContent=GAME_fmt(SV.coins);buildAccs();showScreen('scrAccs');};
   $('mAuto').onclick=()=>{
     if(!SV.auto.unlocked){
+      if(!m.isFull()){
+        if(SV.coins<AUTO_PRICE){UItoast('Ti servono 🪙'+AUTO_PRICE+' per la pigrizia definitiva!');AU.hit();return;}
+      }
       if(SV.coins<AUTO_PRICE){UItoast('Ti servono 🪙'+AUTO_PRICE+' per la pigrizia definitiva!');AU.hit();return;}
       SV.coins-=AUTO_PRICE;SV.auto.unlocked=true;SV.auto.on=true;save();AU.lego();
       UItoast('🤖 MODALITÀ AUTO SBLOCCATA! Sei ufficialmente ricco e pigro.');
@@ -1408,6 +1434,26 @@ function bindUI(){
     }
     SV.auto.on=!SV.auto.on;save();AU.select2();refreshHub();
     UItoast(SV.auto.on?'🤖 Auto ON: l\'IA giocherà per te':'Auto OFF: bentornato sudore');
+  };
+  $('mFull').onclick=()=>{
+    if(m.isFull()){UItoast('Hai già il Full Game! 🎉');return;}
+    m.showUpgrade({
+      title:'ARROWMATIC FULL',
+      subtitle:'Sblocca tutto il potenziale dell\'eroe pigro',
+      features:[
+        {ic:'🏹',text:'5 armi (Bastone, Boomerang, Cannone...)'},
+        {ic:'🧙',text:'4 eroi con perk uniche'},
+        {ic:'💍',text:'4 accessori da battaglia'},
+        {ic:'🤖',text:'Modalità Auto (gioca da solo)'},
+        {ic:'🗺️',text:'Tutti i 6 capitoli'},
+      ],
+      onPurchase:(tier)=>{
+        if(tier==='full'){
+          UItoast('🎉 FULL GAME SBLOCCATO! Buon divertimento!');
+          refreshHub();buildWeapons();buildHeroes();buildAccs();
+        }
+      }
+    });
   };
   document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>{showScreen('scrTitle');refreshHub();});
   // pausa: ignora tap accidentali mentre il joystick è attivo (multi-touch involontario)

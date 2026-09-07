@@ -2,6 +2,7 @@
 'use strict';
 
 (() => {
+  const _m = typeof Monetization !== 'undefined' ? Monetization.init('dererumgatta') : null;
   let S = SaveSys.load();
   let currentSeason = 'primavera';
 
@@ -20,6 +21,14 @@
     const idx = FLOWERS.findIndex(f => f.id === id);
     if (idx <= 0) return true;
     return bloomed(FLOWERS[idx - 1].id);
+  }
+  function isFlowerLocked(flower) {
+    if (!_m || _m.isFull()) return false;
+    return flower.season !== 'primavera';
+  }
+  function isChapterLocked(chapterIdx) {
+    if (!_m || _m.isFull()) return false;
+    return chapterIdx > 0;
   }
   function purrLevel() {
     const n = Object.keys(S.flowers).length;
@@ -93,6 +102,30 @@
     mute.addEventListener('click', () => {
       S.muted = !S.muted; AudioSys.setMuted(S.muted); save(); renderMenu();
     });
+    // Full Game button
+    if (_m && !_m.isFull()) {
+      const fullBtn = el('button', 'btn full-game-btn', actions);
+      fullBtn.textContent = '🔓 Full Game — Sblocca tutto ($4.99)';
+      fullBtn.addEventListener('click', () => {
+        _m.showUpgrade({
+          title: 'DE RERUM GATTA FULL',
+          subtitle: 'Accedi a tutto il giardino dell\'universo',
+          features: [
+            {ic:'🌸',text:'18 fiori (Estate, Autunno, Inverno)'},
+            {ic:'📕',text:'6 capitoli narrativi'},
+            {ic:'💌',text:'6 lettere d\'amore'},
+            {ic:'🌿',text:'Erbario completo'},
+            {ic:'🌌',text:'12 costellazioni'},
+          ],
+          onPurchase: (tier) => {
+            if (tier === 'full') {
+              renderMenu();
+              openGarden();
+            }
+          }
+        });
+      });
+    }
   }
 
   /* ---------- notte / giorno ---------- */
@@ -133,13 +166,28 @@
     beds.innerHTML = '';
     const flowers = FLOWERS.filter(f => f.season === currentSeason);
     flowers.forEach(f => {
-      const card = el('button', 'flower-card', beds);
-      const state = bloomed(f.id) ? 'fiore' : (isAvailable(f.id) ? 'germoglio' : 'seme');
-      card.classList.add('st-' + state);
-      card.innerHTML = '<div class="f-emoji">' + (state === 'fiore' ? f.emoji : state === 'germoglio' ? '🌱' : '🌰') + '</div>' +
+      const locked = isFlowerLocked(f);
+      const card = el('button', 'flower-card' + (locked ? ' mono-locked' : ''), beds);
+      const state = locked ? 'locked' : (bloomed(f.id) ? 'fiore' : (isAvailable(f.id) ? 'germoglio' : 'seme'));
+      card.classList.add('st-' + (locked ? 'seme' : state));
+      card.innerHTML = '<div class="f-emoji">' + (locked ? '🔒' : state === 'fiore' ? f.emoji : state === 'germoglio' ? '🌱' : '🌰') + '</div>' +
         '<div class="f-name">' + f.name + '</div>' +
-        '<div class="f-cat">' + (state === 'fiore' ? '🌸 in fiore' : state === 'germoglio' ? '🐾 da curare' : '🔒 chiuso') + '</div>';
-      if (state !== 'seme') {
+        '<div class="f-cat">' + (locked ? '🔓 Full Game' : state === 'fiore' ? '🌸 in fiore' : state === 'germoglio' ? '🐾 da curare' : '🔒 chiuso') + '</div>';
+      if (locked) {
+        card.addEventListener('click', () => {
+          AudioSys.click();
+          _m.showPaywall({
+            title: 'Fiore Bloccato',
+            subtitle: 'Sblocca "' + f.name + '" con il Full Game',
+            features: [
+              {ic:'🌸',text:'18 fiori in 4 stagioni'},
+              {ic:'📕',text:'6 capitoli narrativi'},
+              {ic:'💌',text:'6 lettere d\'amore'},
+              {ic:'🌿',text:'Erbario completo'},
+            ]
+          });
+        });
+      } else if (state !== 'seme') {
         card.addEventListener('click', () => {
           AudioSys.click();
           if (state === 'fiore') showConcept(f.id);
@@ -615,13 +663,30 @@
     show('screen-chapters');
     const list = $('chapters-list');
     list.innerHTML = '';
-    CHAPTERS.forEach(ch => {
+    CHAPTERS.forEach((ch, idx) => {
       const done = chapterDone(ch);
-      const card = el('button', 'chapter-card' + (done ? ' done' : ''), list);
-      card.innerHTML = '<div class="ch-emoji">' + ch.emoji + '</div>' +
+      const locked = isChapterLocked(idx);
+      const card = el('button', 'chapter-card' + (done ? ' done' : '') + (locked ? ' mono-locked' : ''), list);
+      card.innerHTML = '<div class="ch-emoji">' + (locked ? '🔒' : ch.emoji) + '</div>' +
         '<div class="ch-body"><div class="ch-num">' + ch.num + (done ? ' ✅' : '') + '</div>' +
-        '<div class="ch-name">' + ch.name + '</div><div class="ch-desc">' + ch.desc + '</div></div>';
-      card.addEventListener('click', () => showStory(LETTERS[ch.letter], 'chapters'));
+        '<div class="ch-name">' + ch.name + '</div><div class="ch-desc">' + (locked ? '🔓 Full Game per sbloccare' : ch.desc) + '</div></div>';
+      if (locked) {
+        card.addEventListener('click', () => {
+          AudioSys.click();
+          _m.showPaywall({
+            title: 'Capitolo Bloccato',
+            subtitle: 'Sblocca "' + ch.name + '" con il Full Game',
+            features: [
+              {ic:'🌸',text:'18 fiori in 4 stagioni'},
+              {ic:'📕',text:'6 capitoli narrativi'},
+              {ic:'💌',text:'6 lettere d\'amore'},
+              {ic:'🌿',text:'Erbario completo'},
+            ]
+          });
+        });
+      } else {
+        card.addEventListener('click', () => showStory(LETTERS[ch.letter], 'chapters'));
+      }
     });
   }
 
@@ -653,13 +718,31 @@
     wrap.innerHTML = '';
     list.forEach((l, i) => {
       const isFinale = l === LETTERS.finale;
-      const unlocked = i === 0 || S.walkDone ||
+      const isFree = i === 0;
+      const locked = !isFree && (!_m || !_m.isFull());
+      const unlocked = isFree || (S.walkDone ||
         (isFinale ? Object.keys(S.flowers).length >= FLOWERS.length
-                  : seasonBloomed(SEASONS[i - 1] ? SEASONS[i - 1].id : ''));
-      const card = el('button', 'letter-card' + (unlocked ? '' : ' locked'), wrap);
-      card.innerHTML = '<div class="letter-emoji">' + l.emoji + '</div><div class="letter-from">' + l.from + '</div>' +
-        '<div class="letter-preview">' + (unlocked ? l.text.split('\n')[0] + '…' : '🔒 Si sblocca con la stagione') + '</div>';
-      if (unlocked) card.addEventListener('click', () => showStory(l, 'letters'));
+                  : seasonBloomed(SEASONS[i - 1] ? SEASONS[i - 1].id : '')));
+      const card = el('button', 'letter-card' + (unlocked && !locked ? '' : ' locked') + (locked ? ' mono-locked' : ''), wrap);
+      card.innerHTML = '<div class="letter-emoji">' + (locked ? '🔒' : l.emoji) + '</div><div class="letter-from">' + l.from + '</div>' +
+        '<div class="letter-preview">' + (locked ? '🔓 Full Game per leggere' : unlocked ? l.text.split('\n')[0] + '…' : '🔒 Si sblocca con la stagione') + '</div>';
+      if (locked) {
+        card.addEventListener('click', () => {
+          AudioSys.click();
+          _m.showPaywall({
+            title: 'Lettera Bloccata',
+            subtitle: 'Leggi tutte le lettere con il Full Game',
+            features: [
+              {ic:'🌸',text:'18 fiori in 4 stagioni'},
+              {ic:'📕',text:'6 capitoli narrativi'},
+              {ic:'💌',text:'6 lettere d\'amore'},
+              {ic:'🌿',text:'Erbario completo'},
+            ]
+          });
+        });
+      } else if (unlocked) {
+        card.addEventListener('click', () => showStory(l, 'letters'));
+      }
     });
   }
 
