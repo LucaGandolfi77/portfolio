@@ -1,67 +1,88 @@
 import { PARTY_INFO, TUTORIAL_LOG } from "./story.js";
+import { t, L } from "./lang.js";
 
 const $ = (id) => document.getElementById(id);
 
-const ENEMIES = {
-  echo: { key: "echo", name: "L'Eco del Guardiano", hp: 185, atk: [16, 22], accent: 0xb78ad4 },
-  dimenticata: {
-    key: "dimenticata", name: "La Dimenticata", hp: 245, atk: [17, 23], accent: 0x7ad4d0,
-    mid: { pct: 0.5, heal: 0 }, phase2Banner: "IL LAMENTO", phase2Mul: 1.15
-  },
-  velma: {
-    key: "velma", name: "La Maestra del Chiaroscuro", hp: 300, atk: [19, 26], accent: 0xcfd4e6,
-    mid: { pct: 0.5, heal: 45 }, phase2Banner: "LA TELA DEL GIUDIZIO", phase2Mul: 1.2
-  },
-  giudice: {
-    key: "giudice", name: "Il Giudice di Bronzo", hp: 280, atk: [18, 24], accent: 0xd4c48a,
-    mid: { pct: 0.5, heal: 30 }, phase2Banner: "IL VERSO DEL COLPEVOLE", phase2Mul: 1.2
-  },
-  custode: {
-    key: "custode", name: "Il Custode del Rintocco", hp: 350, atk: [20, 30], accent: 0xf2d389,
-    mid: { pct: 0.5, heal: 60 }, phase2Banner: "L'ULTIMO GIUDIZIO", phase2Mul: 1.25
-  }
-};
+const ENEMY_KEYS = ["echo", "dimenticata", "velma", "giudice", "custode"];
+const ENEMY_NAMES_IT = ["L'Eco del Guardiano", "La Dimenticata", "La Maestra del Chiaroscuro", "Il Giudice di Bronzo", "Il Custode del Rintocco"];
+const ENEMY_NAMES_EN = ["The Guardian's Echo", "The Forgotten One", "The Chiaroscuro Master", "The Bronze Judge", "The Keeper of the Toll"];
+const PHASE2_BANNERS_IT = ["IL LAMENTO", "LA TELA DEL GIUDIZIO", "IL VERSO DEL COLPEVOLE", "L'ULTIMO GIUDIZIO"];
+const PHASE2_BANNERS_EN = ["THE LAMENT", "THE CANVAS OF JUDGMENT", "THE GUILTY VERSE", "THE LAST JUDGMENT"];
+const ENEMY_HP = [185, 245, 300, 280, 350];
+const ENEMY_ATK = [[16, 22], [17, 23], [19, 26], [18, 24], [20, 30]];
+const ENEMY_ACCENT = [0xb78ad4, 0x7ad4d0, 0xcfd4e6, 0xd4c48a, 0xf2d389];
+const ENEMY_MID = [
+  null,
+  { pct: 0.5, heal: 0 },
+  { pct: 0.5, heal: 45 },
+  { pct: 0.5, heal: 30 },
+  { pct: 0.5, heal: 60 }
+];
+const PHASE2_MUL = [1, 1.15, 1.2, 1.2, 1.25];
+const ENEMY_KINDS = ["echo", "lament", "painter", "judge", "keeper"];
 
-const SKILLS = {
+function getEnemyName(idx) { return langCode === "en" ? ENEMY_NAMES_EN[idx] : ENEMY_NAMES_IT[idx]; }
+function getPhase2Banner(idx) { return langCode === "en" ? PHASE2_BANNERS_EN[idx] : PHASE2_BANNERS_IT[idx]; }
+
+function buildEnemy(key) {
+  const idx = ENEMY_KEYS.indexOf(key);
+  return {
+    key, idx, name: getEnemyName(idx), hp: ENEMY_HP[idx], atk: ENEMY_ATK[idx],
+    accent: ENEMY_ACCENT[idx], mid: ENEMY_MID[idx] ? { ...ENEMY_MID[idx] } : null,
+    phase2Banner: getPhase2Banner(idx), phase2Mul: PHASE2_MUL[idx]
+  };
+}
+
+let langCode = "it";
+
+const SKILL_KEYS = {
   elia: [
-    { id: "strike", name: "Lama del Ricordo", cost: 0, kind: "damage", power: [16, 22] },
-    { id: "perduto", name: "Rintocco Perduto", cost: 18, kind: "damage", power: [33, 41] }
+    { id: "strike", nameKey: "lamaDelRicordo", cost: 0, kind: "damage", power: [16, 22] },
+    { id: "perduto", nameKey: "rintoccoPerduto", cost: 18, kind: "damage", power: [33, 41] }
   ],
   toma: [
-    { id: "pugno", name: "Pugno della Vigilanza", cost: 0, kind: "damage", power: [10, 14] },
-    { id: "shield", name: "Scudo del Guardiano", cost: 10, kind: "shield", dur: 1 },
-    { id: "oblio", name: "Oblio", cost: 14, kind: "damage", power: [20, 27], debuff: 1 }
+    { id: "pugno", nameKey: "pugnoDellaVigilanza", cost: 0, kind: "damage", power: [10, 14] },
+    { id: "shield", nameKey: "scudoDelGuardiano", cost: 10, kind: "shield", dur: 1 },
+    { id: "oblio", nameKey: "oblio", cost: 14, kind: "damage", power: [20, 27], debuff: 1 }
   ],
   iria: [
-    { id: "nota", name: "Nota Tagliente", cost: 0, kind: "damage", power: [9, 13] },
-    { id: "melody", name: "Melodia", cost: 12, kind: "heal", power: [22, 28] },
-    { id: "risonanza", name: "Risonanza", cost: 14, kind: "buff", dur: 2 }
+    { id: "nota", nameKey: "notaTagliente", cost: 0, kind: "damage", power: [9, 13] },
+    { id: "melody", nameKey: "melodia", cost: 12, kind: "heal", power: [22, 28] },
+    { id: "risonanza", nameKey: "risonanza", cost: 14, kind: "buff", dur: 2 }
   ]
 };
 
-const BONUS_SKILLS = {
-  renzo: { key: "toma", skill: { id: "vigilia", name: "Veglia Infinita", cost: 12, kind: "buff", dur: 2 } },
-  nino: { key: "iria", skill: { id: "ninna", name: "Ninna Nanna", cost: 16, kind: "heal", power: [40, 48] } },
-  argo: { key: "elia", skill: { id: "nome", name: "Nome Scolpito", cost: 16, kind: "damage", power: [30, 38] } },
-  araldo: { key: "toma", skill: { id: "redenzione", name: "Redenzione", cost: 18, kind: "heal", power: [26, 32], all: true } },
-  notturno: { key: "elia", skill: { id: "mezzanotte", name: "Rintocco della Mezzanotte", cost: 22, kind: "damage", power: [42, 50] } }
+const BONUS_SKILL_KEYS = {
+  renzo: { key: "toma", skill: { id: "vigilia", nameKey: "vegliaInfinita", cost: 12, kind: "buff", dur: 2 } },
+  nino: { key: "iria", skill: { id: "ninna", nameKey: "ninnaNanna", cost: 16, kind: "heal", power: [40, 48] } },
+  argo: { key: "elia", skill: { id: "nome", nameKey: "nomeScolpito", cost: 16, kind: "damage", power: [30, 38] } },
+  araldo: { key: "toma", skill: { id: "redenzione", nameKey: "redenzione", cost: 18, kind: "heal", power: [26, 32], all: true } },
+  notturno: { key: "elia", skill: { id: "mezzanotte", nameKey: "rintoccoDellaMezzanotte", cost: 22, kind: "damage", power: [42, 50] } }
 };
+
+function resolveSkillName(sk) { return t(sk.nameKey); }
+function getSkills(lang) { return SKILL_KEYS; }
+function getBonusSkills() { return BONUS_SKILL_KEYS; }
 
 const PARTY_KEYS = ["elia", "toma", "iria"];
 
 const GOLD_LO = 0.35, GOLD_HI = 0.65;
 
-export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bonus = {} }) {
+export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bonus = {}, lang = "it" }) {
+  langCode = lang;
   const DBG = (...a) => console.log("[BATTLE]", ...a);
   DBG("createCombat enemyKey=", enemyKey, "bonus=", Object.keys(bonus).join(",") || "none");
   const B = bonus || {};
   const essenceMax = 100 + (B.adele ? 10 : 0) + (B.renzo ? 15 : 0) + (B.sibilla ? 10 : 0);
   const skills = {};
-  for (const k of PARTY_KEYS) skills[k] = [...SKILLS[k]];
-  for (const b in BONUS_SKILLS) {
-    if (B[b]) skills[BONUS_SKILLS[b].key].push(BONUS_SKILLS[b].skill);
+  for (const k of PARTY_KEYS) skills[k] = SKILL_KEYS[k].map(sk => ({ ...sk, name: resolveSkillName(sk) }));
+  for (const b in BONUS_SKILL_KEYS) {
+    if (B[b]) {
+      const bs = BONUS_SKILL_KEYS[b];
+      skills[bs.key].push({ ...bs.skill, name: resolveSkillName(bs.skill) });
+    }
   }
-  const enemy = { ...ENEMIES[enemyKey] };
+  const enemy = buildEnemy(enemyKey);
   enemy._maxHp = enemy.hp;
   const partyHp = B.cera ? 12 : 0;
   const party = {};
@@ -96,7 +117,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
   renderEnemy();
   renderEssence();
   renderActions();
-  showBanner("Il tuo turno");
+  showBanner(L().yourTurn);
   DBG("createCombat done, phase=", state.phase);
 
   const api = {
@@ -219,7 +240,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
         label.textContent = skill.name;
         const cost = document.createElement("span");
         cost.className = "ab-cost";
-        cost.textContent = skill.cost > 0 ? `Essenza ${skill.cost}` : "gratis";
+        cost.textContent = skill.cost > 0 ? `${L().essenz} ${skill.cost}` : L().grat;
         btn.appendChild(owner);
         btn.appendChild(label);
         btn.appendChild(cost);
@@ -293,7 +314,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
       DBG("runAction CALL applyEnemyDamage");
       applyEnemyDamage(dmg, true);
       DBG("runAction RETURNED applyEnemyDamage, calling log");
-      log(`${p.name} colpisce: ${dmg} danni`, "strong");
+      log(`${p.name} ${L().colpisce}: ${dmg} ${L().danni}`, "strong");
       DBG("runAction RETURNED log");
     } else if (skill.kind === "heal") {
       DBG("runAction awaiting scene.play heal...");
@@ -310,7 +331,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
         }
         scene.healGlow(key);
         DBG("runAction heal all +", amt);
-        log(`${p.name} redime: tutto il party recupera ${amt} PV`, "good");
+        log(`${p.name} ${L().redime}: ${L().tuttoIlParty} ${amt} ${L().PV}`, "good");
       } else {
         const target = lowestHp();
         const wasDead = party[target].hp <= 0;
@@ -319,21 +340,21 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
         scene.healGlow(target);
         updateHp(target);
         DBG("runAction heal", target, "+", amt);
-        log(`${p.name} suona: ${party[target].name} recupera ${amt} PV`, "good");
+        log(`${p.name} ${L().suona}: ${party[target].name} ${L().recupera} ${amt} ${L().PV}`, "good");
       }
     } else if (skill.kind === "shield") {
       DBG("runAction awaiting scene.play shield...");
       await scene.play(key, "idle", 400);
       state.shield = Math.max(state.shield, skill.dur + 1);
       DBG("runAction shield set", state.shield);
-      log(`${p.name} alza lo Scudo del Guardiano`, "good");
+      log(`${p.name} ${L().alzaLoScudo}`, "good");
     } else if (skill.kind === "buff") {
       DBG("runAction awaiting scene.play buff...");
       await scene.play(key, "idle", 400);
       state.atkUpDur = Math.max(state.atkUpDur, skill.dur);
       state.atkUp = state.atkUpDur;
       DBG("runAction buff atkUp=", state.atkUp);
-      log(`${p.name} desta la Risonanza: attacco potenziato`, "good");
+      log(`${p.name} ${L().destaLaRisonanza}`, "good");
     }
 
     DBG("runAction awaiting sleep(350)...");
@@ -389,12 +410,13 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
     DBG("beginEnemyTurn essence=", state.essence, "phase2=", state.phase2);
 
     if (!state.tutorialDone) {
-      for (const line of TUTORIAL_LOG) log(line);
+      const tut = L().tutorial;
+      for (const line of tut) log(line);
       state.tutorialDone = true;
     }
 
     renderActions();
-    showBanner(state.phase2 ? (enemy.phase2Banner || "L'ULTIMO GIUDIZIO") : "L'attacco nemico");
+    showBanner(state.phase2 ? (enemy.phase2Banner || L().phase2) : L().enemyTurn);
     DBG("beginEnemyTurn awaiting sleep(700)...");
     await sleep(700);
     DBG("beginEnemyTurn sleep done, paused=", paused);
@@ -436,23 +458,23 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
       const counter = Math.round(raw * 0.55);
       DBG("resolveParry counter=", counter);
       applyEnemyDamage(counter, true);
-      log("PARATA PERFETTA! Colpo annullato.", "good");
-      if (counter > 0) log(`Contrattacco: ${counter} danni al nemico.`, "strong");
+      log(L().parataPerfetta, "good");
+      if (counter > 0) log(`${L().contrattacco}: ${counter} ${L().danni}.`, "strong");
     } else {
       if (state.shield > 0) {
         dmg = Math.round(dmg * 0.3);
         state.shield = 0;
-        log("Lo Scudo del Guardiano assorbe il colpo.", "good");
+        log(L().assorbeIlColpo, "good");
       }
       if (state.enemyAtkDown > 0) {
         dmg = Math.round(dmg * 0.7);
-        log("Oblio indebolisce l'attacco.", "good");
+        log(L().oblioIndebolisce, "good");
       }
       if (wasPressed) {
         dmg = Math.round(dmg * 0.4);
-        log(`Parata imperfetta: subisci ${dmg} danni.`, "strong");
+        log(`${L().parataImperfetta}: ${dmg} ${L().danni}.`, "strong");
       } else {
-        log(`${party[target].name} subisce ${dmg} danni.`, "danger");
+        log(`${party[target].name} ${L().colpisce} ${dmg} ${L().danni}.`, "danger");
       }
       DBG("resolveParry damageParty", target, dmg);
       damageParty(target, dmg);
@@ -468,7 +490,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
     if (!paused && !midPaused) {
       if (state.phase2Done) { DBG("resolveParry -> maybeMid"); await maybeMid(); }
       if (!paused && !isVictory() && !isDefeat()) {
-        showBanner("Il tuo turno");
+        showBanner(L().yourTurn);
         state.phase = "player";
         DBG("resolveParry -> player phase, renderActions");
         renderActions();
@@ -515,7 +537,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
     if (enemy.mid && enemy.mid.heal) {
       enemy.hp = Math.min(enemy._maxHp, enemy.hp + enemy.mid.heal);
       updateEnemy();
-      log(`${enemy.name} si rialza, più feroce di prima.`, "strong");
+      log(`${enemy.name} ${L().enemyRecovers}`, "strong");
     }
     state.phase2 = true;
     DBG("maybeMid done, enemy.hp=", enemy.hp);
@@ -596,7 +618,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
   async function handleVictory() {
     DBG("handleVictory");
     state.phase = "victory";
-    log("Il nemico crolla.", "strong");
+    log(L().enemyDefeated, "strong");
     scene.ko("enemy");
     await sleep(900);
     DBG("handleVictory calling onWin");
@@ -606,7 +628,7 @@ export function createCombat({ scene, enemyKey, onWin, onDefeat, onMidFight, bon
   async function handleDefeat() {
     DBG("handleDefeat");
     state.phase = "defeat";
-    log("Il gruppo è caduto…", "danger");
+    log(L().partyFallen, "danger");
     await sleep(700);
     DBG("handleDefeat calling onDefeat");
     onDefeat();

@@ -8,10 +8,14 @@ import {
   ADELE_BEATS, CERA_BEATS, NOTTURNO_BEATS, SIBILLA_BEATS,
   MID_BEATS, CHOICE_TEXT, CHOICES, ENDINGS
 } from "./story.js";
+import { t, L, setLang, getLang } from "./lang.js";
+import { initTouch, getJoystickDir, preventDoubleTapZoom, haptic } from "./touch.js";
+import { isZoneUnlocked, showPurchaseOverlay } from "./monetization.js";
 
 /* ═══════════════ SAVE + AUDIO ═══════════════ */
 let gameState = null;
 let playStartTime = 0;
+let langCode = "it";
 
 const ZONES = [
   {
@@ -23,7 +27,8 @@ const ZONES = [
       { kind: "npc", key: "adele", type: "adele", pos: { x: -4.6, z: 4.2 } },
       { kind: "enemy", type: "echo", pos: { x: -8.5, z: -4.5 } }
     ],
-    banner: "La soglia della Torre dei Rintocchi"
+    banner: "La soglia della Torre dei Rintocchi",
+    bannerEn: "Threshold of the Tower of Tolls"
   },
   {
     id: "sala",
@@ -34,7 +39,8 @@ const ZONES = [
       { kind: "npc", key: "cera", type: "cera", pos: { x: -4.6, z: 4.2 } },
       { kind: "enemy", type: "dimenticata", pos: { x: -8.5, z: -4.5 } }
     ],
-    banner: "La Sala dei Nomi"
+    banner: "La Sala dei Nomi",
+    bannerEn: "Hall of Names"
   },
   {
     id: "galleria",
@@ -44,7 +50,8 @@ const ZONES = [
       { kind: "npc", key: "argo", type: "argo", pos: { x: 6.2, z: -0.5 } },
       { kind: "enemy", type: "velma", pos: { x: -8.5, z: -4.5 } }
     ],
-    banner: "La Galleria delle Voci"
+    banner: "La Galleria delle Voci",
+    bannerEn: "Gallery of Voices"
   },
   {
     id: "cripta",
@@ -55,7 +62,8 @@ const ZONES = [
       { kind: "npc", key: "notturno", type: "notturno", pos: { x: -4.6, z: 4.2 } },
       { kind: "enemy", type: "giudice", pos: { x: -8.5, z: -4.5 } }
     ],
-    banner: "La Cripta dei Debiti"
+    banner: "La Cripta dei Debiti",
+    bannerEn: "Crypt of Debts"
   },
   {
     id: "vetta",
@@ -65,7 +73,8 @@ const ZONES = [
       { kind: "npc", key: "sibilla", type: "sibilla", pos: { x: 4.6, z: -0.5 } },
       { kind: "enemy", type: "custode", pos: { x: -8.5, z: -4.5 } }
     ],
-    banner: "La vetta: il Custode del Rintocco"
+    banner: "La vetta: il Custode del Rintocco",
+    bannerEn: "The Summit: Keeper of the Toll"
   }
 ];
 
@@ -171,9 +180,16 @@ function setExploring(on) {
   }
 }
 
-function startZone(index) {
+async function startZone(index) {
   zoneIndex = index;
   const zone = ZONES[index];
+
+  // Zone unlock check
+  if (!isZoneUnlocked(index)) {
+    const unlocked = await showPurchaseOverlay(index, getLang());
+    if (!unlocked) { showScreen("start-screen"); return; }
+  }
+
   currentEnemyKey = zone.figures.find((f) => f.kind === "enemy").type;
   showScreen("game-screen");
   scene.resize();
@@ -187,7 +203,8 @@ function startZone(index) {
   }
   scene.updatePlayer(0.001, { x: 0, z: 0 });
   setExploring(true);
-  flashBanner(zone.banner, 2200);
+  const banner = langCode === "en" ? zone.bannerEn : zone.banner;
+  flashBanner(banner, 2200);
   AudioSys.playTheme(zone.theme);
   saveGame();
 }
@@ -236,6 +253,7 @@ function beginBattle(key) {
     scene,
     enemyKey: key,
     bonus: flags,
+    lang: getLang(),
     onWin,
     onDefeat,
     onMidFight: () => narrate(MID_BEATS[key] || [])
@@ -308,6 +326,11 @@ function boot() {
     $("continue-btn").style.display = '';
   }
 
+  // Language detection
+  const savedLang = localStorage.getItem("echoes_lang") || "it";
+  setLang(savedLang);
+  updateUI();
+
   $("play-btn").addEventListener("click", startGame);
   $("continue-btn").addEventListener("click", continueGame);
   $("restart-btn").addEventListener("click", () => location.reload());
@@ -315,9 +338,13 @@ function boot() {
   $("mute-btn").addEventListener("click", () => {
     AudioSys.ensure();
     AudioSys.setMuted(!AudioSys.isMuted());
-    $("mute-btn").textContent = AudioSys.isMuted() ? '🔇 Spenti' : '🔊 Suoni';
+    $("mute-btn").textContent = AudioSys.isMuted() ? L().menuSpenti : L().menuSuoni;
     if (gameState) { gameState.muted = AudioSys.isMuted(); }
   });
+
+  // Touch optimization
+  initTouch();
+  preventDoubleTapZoom();
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("resize", () => scene && scene.resize());
@@ -336,6 +363,15 @@ function boot() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
+}
+
+function updateUI() {
+  $("play-btn").textContent = L().playBtn;
+  $("continue-btn").textContent = L().continueBtn;
+  $("mute-btn").textContent = AudioSys.isMuted ? L().menuSpenti : L().menuSuoni;
+  document.querySelector(".title-kicker").textContent = L().subtitle;
+  document.querySelector(".title-sub").textContent = L().desc;
+  document.querySelector(".title-hint").textContent = L().titleHint;
 }
 
 function initGameState(overrides) {
