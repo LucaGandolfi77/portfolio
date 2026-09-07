@@ -207,7 +207,7 @@ def make_feature_graphic():
 
 
 def generate():
-    game_dir = os.path.join(BASE_DIR, 'echoes-of-the-last-dawn')
+    game_dir = os.path.join(BASE_DIR, 'games', 'echoes-of-the-last-dawn')
     icons_dir = os.path.join(game_dir, 'icons')
     resources_dir = os.path.join(game_dir, 'resources')
     os.makedirs(icons_dir, exist_ok=True)
