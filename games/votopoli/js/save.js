@@ -27,7 +27,14 @@ window.Save = (() => {
     mayorTax: 20,
     mayorFavors: [],
     moveCount: 0,
-    totalBusinessLevels: 0
+    totalBusinessLevels: 0,
+    minigameWins: 0,
+    newsFeed: [],
+    dailyChallenges: { date: '', challenges: [], streak: 0, totalCompleted: 0 },
+    prestigeCount: 0,
+    prestigeMultiplier: 1,
+    cityServices: {},
+    party: null
   };
 
   function get() {

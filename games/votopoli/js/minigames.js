@@ -1,7 +1,5 @@
 // minigames.js — 5 minigiochi satirici
 window.Minigames = (() => {
-  function haptic(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch(e) {} }
-
   function formatMoney(n) { return Save.formatMoney(n); }
 
   // === 1. DIBATTO TV — quiz satirici ===
@@ -47,12 +45,12 @@ window.Minigames = (() => {
           if (i === q.c) {
             btn.classList.add('correct');
             if (window.Sounds) window.Sounds.play('correct');
-            haptic([10, 30, 10]);
+            Haptic.select();
             score++;
           } else {
             btn.classList.add('wrong');
             if (window.Sounds) window.Sounds.play('wrong');
-            haptic([30, 50, 30]);
+            Haptic.heavy();
             ansEl.children[q.c].classList.add('correct');
           }
           setTimeout(() => { round++; render(); }, 800);
@@ -212,16 +210,16 @@ window.Minigames = (() => {
           score += action.points;
           msg.textContent = '🎯 PERFETTO! +' + action.points;
           msg.style.color = 'var(--green)';
-          haptic([10, 30, 10]);
+          Haptic.select();
         } else if (good) {
           score += Math.round(action.points / 2);
           msg.textContent = '👍 Bene! +' + Math.round(action.points / 2);
           msg.style.color = 'var(--gold)';
-          haptic(15);
+          Haptic.tap();
         } else {
           msg.textContent = '❌ Errore! 0 punti';
           msg.style.color = 'var(--red)';
-          haptic([30, 50, 30]);
+          Haptic.heavy();
         }
 
         setTimeout(() => { round++; render(); }, 1000);
@@ -279,10 +277,10 @@ window.Minigames = (() => {
         if (i.y === 5 && i.x === pos) {
           if (i.type === 'money') {
             score += i.value;
-            haptic(5);
+            Haptic.light();
           } else if (i.type === 'tax') {
             lives--;
-            haptic([20, 40, 20]);
+            Haptic.error();
           }
           i.y = 10;
         }
@@ -377,7 +375,7 @@ window.Minigames = (() => {
     function flipCard(idx) {
       if (flipped.length >= 2 || flipped.includes(idx) || matched.includes(idx)) return;
       flipped.push(idx);
-      haptic(5);
+      Haptic.light();
 
       if (flipped.length === 2) {
         const [a, b] = flipped;
@@ -385,14 +383,14 @@ window.Minigames = (() => {
           matched.push(a, b);
           pairs++;
           score += 5;
-          haptic([10, 30, 10]);
+          Haptic.select();
           if (pairs === cards.length / 2) {
             score += 10;
             setTimeout(() => { round++; setupRound(); render(); }, 600);
             return;
           }
         } else {
-          haptic([20, 40, 20]);
+          Haptic.error();
         }
         setTimeout(() => { flipped = []; render(); }, 600);
       } else {
@@ -404,12 +402,124 @@ window.Minigames = (() => {
     render();
   }
 
+  // === 6. DEBATE BINGO — griglia 4x4 di frasi politiche ===
+  function startDebateBingo(area, onComplete) {
+    let score = 0, timeLeft = 60;
+    const phrases = [
+      'Cambierò le cose', 'Per il popolo', 'Basta con la corruzione',
+      'Lavoreremo insieme', 'Un futuro migliore', 'Le donne prima',
+      'I giovani', 'Ridurre le tasse', 'Più servizi',
+      'Trasparenza totale', 'Democrazia vera', 'Per la famiglia',
+      'Stop alla burocrazia', 'Innovazione', 'Sviluppo sostenibile',
+      'Pace e lavoro'
+    ];
+    const grid = phrases.sort(() => Math.random() - 0.5).slice(0, 16);
+    let marked = new Set();
+
+    function render() {
+      const cells = grid.map((p, i) => {
+        const isMarked = marked.has(i);
+        const row = Math.floor(i / 4);
+        const col = i % 4;
+        return `<div class="bingo-cell ${isMarked ? 'marked' : ''}" data-idx="${i}" style="width:23%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:${isMarked ? 'var(--gold-light)' : 'var(--card)'};border:1px solid ${isMarked ? 'var(--gold)' : 'var(--line)'};border-radius:6px;font-size:8px;text-align:center;padding:2px;cursor:pointer">${p}</div>`;
+      }).join('');
+
+      area.innerHTML = `
+        <div class="mg-card">
+          <div class="mg-title">🗣️ Debate Bingo</div>
+          <div class="mg-sub">⚡⏱️ ${timeLeft}s · Punti: ${score}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:8px 0">${cells}</div>
+          <div style="font-size:10px;color:var(--dim);text-align:center">Tocca le frasi che senti nel dibattito!</div>
+        </div>`;
+
+      area.querySelectorAll('.bingo-cell').forEach(el => {
+        el.onclick = () => {
+          const idx = parseInt(el.dataset.idx);
+          if (marked.has(idx)) { marked.delete(idx); score -= 2; }
+          else { marked.add(idx); score += 5; Haptic.light(); }
+          if (score < 0) score = 0;
+          render();
+        };
+      });
+    }
+
+    const timer = setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) { clearInterval(timer); onComplete(score >= 2, score); return; }
+      render();
+    }, 1000);
+
+    render();
+  }
+
+  // === 7. TAX FRAUD DODGE — runner: schiva i controllori ===
+  function startTaxDodge(area, onComplete) {
+    let score = 0, timeLeft = 30, playerPos = 1;
+    const lanes = 3;
+    let obstacles = [], coins = [];
+
+    function spawn() {
+      if (Math.random() < 0.4) obstacles.push({ lane: Math.floor(Math.random() * lanes), y: 0 });
+      if (Math.random() < 0.3) coins.push({ lane: Math.floor(Math.random() * lanes), y: 0 });
+    }
+
+    function render() {
+      let road = '';
+      for (let row = 0; row < 6; row++) {
+        let cells = '';
+        for (let lane = 0; lane < lanes; lane++) {
+          const isPlayer = row === 4 && lane === playerPos;
+          const isObs = obstacles.some(o => o.lane === lane && o.y === row);
+          const isCoin = coins.some(c => c.lane === lane && c.y === row);
+          cells += `<div style="width:60px;height:40px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:4px;font-size:16px;background:${isPlayer ? 'var(--gold-light)' : 'var(--card)'}">${isPlayer ? '🏃' : isObs ? '👮' : isCoin ? '💰' : ''}</div>`;
+        }
+        road += `<div style="display:flex;gap:4px;justify-content:center;margin:2px 0">${cells}</div>`;
+      }
+
+      area.innerHTML = `
+        <div class="mg-card">
+          <div class="mg-title">🏃 Tax Fraud Dodge</div>
+          <div class="mg-sub">⏱️ ${timeLeft}s · Punti: ${score}</div>
+          ${road}
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+            <button class="mg-btn" id="td-left" style="width:auto;padding:8px 16px">⬅️</button>
+            <button class="mg-btn" id="td-up" style="width:auto;padding:8px 16px">⬆️</button>
+            <button class="mg-btn" id="td-right" style="width:auto;padding:8px 16px">➡️</button>
+          </div>
+        </div>`;
+
+      document.getElementById('td-left').onclick = () => { if (playerPos > 0) { playerPos--; Haptic.light(); } render(); };
+      document.getElementById('td-right').onclick = () => { if (playerPos < lanes - 1) { playerPos++; Haptic.light(); } render(); };
+      document.getElementById('td-up').onclick = () => { score += 2; Haptic.tap(); render(); };
+    }
+
+    const gameLoop = setInterval(() => {
+      spawn();
+      obstacles.forEach(o => o.y++);
+      coins.forEach(c => c.y++);
+      obstacles = obstacles.filter(o => o.y < 7);
+      coins = coins.filter(c => c.y < 7);
+
+      obstacles.forEach(o => { if (o.y === 4 && o.lane === playerPos) { score -= 5; Haptic.error(); } });
+      coins = coins.filter(c => { if (c.y === 4 && c.lane === playerPos) { score += 8; Haptic.tap(); return false; } return true; });
+      if (score < 0) score = 0;
+
+      timeLeft--;
+      if (timeLeft <= 0) { clearInterval(gameLoop); onComplete(score >= 20, score); return; }
+      render();
+    }, 400);
+
+    render();
+  }
+
   const GAMES = [
     { id: 'dibattito',   name: 'Dibattito TV',      emoji: '🎤', desc: 'Quiz satirici sul mondo politico',      fn: startDibattito,   minScore: 20, cost: 10 },
     { id: 'burocrazia',  name: 'Schiva la Burocrazia', emoji: '📋', desc: 'Schiva bollette, moduli e timbri', fn: startBurocrazia,  minScore: 15, cost: 10 },
     { id: 'campagna',    name: 'Campagna Elettorale', emoji: '🤝', desc: 'Stringi mani e bacia bambini',         fn: startCampagna,    minScore: 80, cost: 15 },
     { id: 'bustapaga',   name: 'Busta Paga',         emoji: '💸', desc: 'Cattura i soldi, evita le tasse',      fn: startBustaPaga,   minScore: 30, cost: 10 },
-    { id: 'memoria',     name: 'Promesse da Marinaio', emoji: '🧠', desc: 'Memorizza le promesse elettorali', fn: startMemoria,     minScore: 20, cost: 15 }
+    { id: 'memoria',     name: 'Promesse da Marinaio', emoji: '🧠', desc: 'Memorizza le promesse elettorali', fn: startMemoria,     minScore: 20, cost: 15 },
+    { id: 'debatebingo', name: 'Debate Bingo',        emoji: '🗣️', desc: 'Bingo delle frasi politiche',       fn: startDebateBingo, minScore: 2,  cost: 15 },
+    { id: 'taxdodge',    name: 'Tax Fraud Dodge',     emoji: '🏃', desc: 'Schiva i controllori del fisco',    fn: startTaxDodge,    minScore: 20, cost: 10 }
   ];
 
   function start(gameId, area, onComplete) {

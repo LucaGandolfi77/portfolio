@@ -3,13 +3,33 @@
   const $ = id => document.getElementById(id);
   let state, currentView = 'menu', electionData = null, eventTimer = null;
 
+  // === NEWS FEED ===
+  function addNews(text, emoji) {
+    state = Save.get();
+    state.newsFeed.unshift({ text, emoji, ts: Date.now() });
+    if (state.newsFeed.length > 20) state.newsFeed = state.newsFeed.slice(0, 20);
+    Save.save(state);
+  }
+
+  function renderNewsFeed(max) {
+    state = Save.get();
+    if (!state.newsFeed.length) return '<div style="font-size:11px;color:var(--dim);text-align:center;padding:12px">Nessuna novità ancora!</div>';
+    return state.newsFeed.slice(0, max || 5).map(n =>
+      `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+        <span style="font-size:16px">${n.emoji}</span>
+        <span style="font-size:11px;flex:1">${n.text}</span>
+      </div>`
+    ).join('');
+  }
+
   // === INIT ===
   Save.save(); // ensure key exists
   state = Save.get();
+  if (state.settings.darkMode) document.body.classList.add('dark-mode');
   renderMenu();
+  Onboarding.start();
 
-  // === HAPTICS ===
-  function haptic(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch(e) {} }
+  // === HAPTICS (using Haptic module) ===
 
   // === FORMAT ===
   function fmt(n) { return Save.formatMoney(n); }
@@ -37,13 +57,18 @@
           <button class="btn" id="btn-map" style="border-color:var(--blue)">🌍 Mappa del Mondo</button>
           <button class="btn" id="btn-store" style="border-color:var(--green)">🛒 Negozio</button>
         </div>
+        <div style="display:flex;gap:8px;max-width:280px;margin:12px auto 0">
+          <button class="btn small ghost" id="btn-settings" style="flex:1">⚙️ Impostazioni</button>
+          <button class="btn small ghost" id="btn-news-menu" style="flex:1">📰 Novità</button>
+        </div>
         <div style="margin-top:20px;font-size:10px;color:var(--dim)">
           ${hasProgress ? `💰 ${fmt(saved.money)} | 🗳️ ${saved.influence} influenza | 🏠 ${home.emoji} ${home.name}` : ''}
+          ${window.Achievements ? `<br>🏆 Obiettivi: ${Achievements.count()}/${Achievements.total()}` : ''}
         </div>
       </div>`;
 
     $('btn-new').onclick = () => {
-      Sounds.play('click'); haptic(10);
+      Sounds.play('click'); Haptic.tap();
       if (hasProgress && !confirm('Ricominciare? Il progresso attuale verrà cancellato.')) return;
       state = Save.reset();
       startNewGame();
@@ -51,20 +76,30 @@
 
     if (hasProgress) {
       $('btn-continue').onclick = () => {
-        Sounds.play('click'); haptic(10);
+        Sounds.play('click'); Haptic.tap();
         state = Save.get();
         enterCity();
       };
     }
 
     $('btn-map').onclick = () => {
-      Sounds.play('click'); haptic(10);
+      Sounds.play('click'); Haptic.tap();
       showWorldMap();
     };
 
     $('btn-store').onclick = () => {
-      Sounds.play('click'); haptic(10);
+      Sounds.play('click'); Haptic.tap();
       showStore();
+    };
+
+    $('btn-settings').onclick = () => {
+      Sounds.play('click'); Haptic.tap();
+      showSettings();
+    };
+
+    $('btn-news-menu').onclick = () => {
+      Sounds.play('click'); Haptic.tap();
+      showNewsFeed();
     };
   }
 
@@ -103,7 +138,7 @@
     $('game-area').querySelectorAll('.city-card').forEach(el => {
       el.onclick = () => {
         const cityId = el.dataset.city;
-        Sounds.play('vote'); haptic([10, 30, 10]);
+        Sounds.play('vote'); Haptic.select();
         state.city = cityId;
         const city = World.getCity(cityId);
         state.country = city.country;
@@ -125,11 +160,43 @@
 
     state = Save.get();
     Housing.applyHomeBonus(state);
+    // Apply party offline bonus
+    if (window.Party) {
+      const extraHours = Party.getExtraOfflineHours(state);
+      if (extraHours > 0) state.homeOfflineHours = (state.homeOfflineHours || 2) + extraHours;
+    }
+    // Apply city service energy bonus
+    if (window.CityServices) {
+      const svcEnergy = CityServices.getEnergyBonus(state);
+      if (svcEnergy > 0) state.maxEnergy = Math.max(state.maxEnergy, 50 + svcEnergy);
+    }
+    Challenges.generate(state);
+    Challenges.checkProgress(state);
+
+    // Seasonal event chance (10% on enter)
+    if (window.Seasons && Math.random() < 0.1) {
+      const seasonEvent = Seasons.applySeasonalBonus(state);
+      if (seasonEvent) {
+        Save.save(state);
+        setTimeout(() => {
+          const evDiv = document.createElement('div');
+          evDiv.className = 'event-toast';
+          evDiv.innerHTML = `
+            <div style="font-size:24px;margin-bottom:8px">${seasonEvent.emoji}</div>
+            <div style="font-size:13px;font-weight:700">${seasonEvent.title}</div>
+            <div style="font-size:11px;color:var(--dim)">${seasonEvent.msg}</div>`;
+          document.body.appendChild(evDiv);
+          setTimeout(() => evDiv.remove(), 4000);
+        }, 1500);
+      }
+    }
 
     const idle = Economy.applyIdleEarnings(state);
     if (idle.earned > 0) {
       Save.save(state);
-      showOfflineEarnings(idle.earned, idle.tax, idle.offline);
+      if (window.Achievements) Achievements.checkAndNotify();
+      const elapsed = Date.now() - (state.lastTick || Date.now());
+      showOfflineEarnings(idle.earned, idle.tax, idle.influence || 0, elapsed, idle.offline);
     }
 
     if (eventTimer) clearInterval(eventTimer);
@@ -161,13 +228,18 @@
     if (pollsOpen && canLocalVote) electionBadge = '<span class="badge pulse">🗳️ ELEZIONI LOCALI APERT!</span>';
     if (canNationalVote) electionBadge = '<span class="badge pulse" style="background:var(--purple)">🏛️ ELEZIONI NAZIONALI!</span>';
 
+    const seasonHtml = window.Seasons ? Seasons.render() : '';
+    const party = window.Party ? Party.getCurrent(state) : null;
+    const partyBadge = party ? `<span style="font-size:11px;margin-left:8px">${party.emoji} ${party.name}</span>` : '';
+    const prestigeBadge = (state.prestigeCount || 0) > 0 ? `<span style="font-size:11px;color:var(--gold);margin-left:8px">📜 x${(state.prestigeMultiplier || 1).toFixed(2)}</span>` : '';
+
     $('game-area').innerHTML = `
       <div style="padding:12px">
         <div class="city-header">
           <div style="font-size:32px">${country.flag}</div>
           <div style="flex:1">
             <div style="font-size:18px;font-weight:800">${city.name}</div>
-            <div style="font-size:10px;color:var(--dim)">${home.emoji} ${home.name} · Tier ${city.tier}</div>
+            <div style="font-size:10px;color:var(--dim)">${home.emoji} ${home.name} · Tier ${city.tier}${partyBadge}${prestigeBadge}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:14px;font-weight:700;color:var(--gold)">${fmt(state.money)}</div>
@@ -177,10 +249,14 @@
 
         ${electionBadge}
 
+        <div style="margin:6px 0">${seasonHtml}</div>
+
         <div class="stat-row"><span>📈 Income</span><span class="stat-val">+${fmt(gross)}/s (${fmt(net)} netti)</span></div>
         <div class="stat-row"><span>🏛️ Tasse</span><span class="stat-val">${taxRate}%</span></div>
         <div class="stat-row"><span>🗳️ Influenza</span><span class="stat-val">${state.influence} (+${infRate}/s)</span></div>
         <div class="stat-row"><span>📰 Scandali</span><span class="stat-val">${state.scandals}</span></div>
+
+        ${Challenges.render(state)}
 
         <div class="nav-grid">
           <button class="nav-btn" id="nav-home">🏠 Casa</button>
@@ -189,6 +265,14 @@
           <button class="nav-btn" id="nav-minigames">🎮 Minigiochi</button>
           <button class="nav-btn" id="nav-citizens">👥 Cittadini</button>
           <button class="nav-btn" id="nav-move">🗺️ Trasferisci</button>
+        </div>
+
+        <div style="display:flex;justify-content:center;gap:16px;margin:4px 0 8px">
+          <button id="nav-settings" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--dim)">⚙️</button>
+          <button id="nav-news" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--dim)">📰</button>
+          <button id="nav-party" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--dim)">🏛️</button>
+          <button id="nav-services" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--dim)">🏗️</button>
+          <button id="nav-prestige" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--dim)">📜</button>
         </div>
 
         <div style="font-size:10px;color:var(--dim);text-align:center;margin-top:12px">
@@ -203,18 +287,60 @@
     $('nav-minigames').onclick = () => { Sounds.play('click'); showMinigames(); };
     $('nav-citizens').onclick = () => { Sounds.play('click'); showCitizens(); };
     $('nav-move').onclick = () => { Sounds.play('click'); showMove(); };
+    $('nav-settings').onclick = () => { Sounds.play('click'); showSettings(); };
+    $('nav-news').onclick = () => { Sounds.play('click'); showNewsFeed(); };
+    $('nav-party').onclick = () => { Sounds.play('click'); showParty(); };
+    $('nav-services').onclick = () => { Sounds.play('click'); showCityServices(); };
+    $('nav-prestige').onclick = () => { Sounds.play('click'); showPrestige(); };
   }
 
-  function showOfflineEarnings(earned, tax, wasOffline) {
+  function showOfflineEarnings(earned, tax, influence, elapsed, wasOffline) {
     if (!wasOffline) return;
-    const evDiv = document.createElement('div');
-    evDiv.className = 'event-toast';
-    evDiv.innerHTML = `
-      <div style="font-size:24px;margin-bottom:8px">🌙</div>
-      <div style="font-size:13px;font-weight:700">Guadagni Offline!</div>
-      <div style="font-size:11px;color:var(--dim)">Hai guadagnato ${fmt(earned)} (tasse: ${fmt(tax)})</div>`;
-    document.body.appendChild(evDiv);
-    setTimeout(() => evDiv.remove(), 4000);
+
+    function formatDuration(ms) {
+      const sec = Math.floor(ms / 1000);
+      const min = Math.floor(sec / 60);
+      const hr = Math.floor(min / 60);
+      if (hr > 0) return `${hr}h ${min % 60}m`;
+      if (min > 0) return `${min}m ${sec % 60}s`;
+      return `${sec}s`;
+    }
+
+    const timeAway = formatDuration(elapsed);
+    const net = earned;
+    const perMin = elapsed > 60000 ? Math.round((earned / (elapsed / 1000)) * 60) : earned;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s';
+    overlay.innerHTML = `
+      <div style="background:var(--card);border-radius:16px;padding:20px;max-width:300px;width:90%;text-align:center;transform:translateY(20px);transition:transform 0.3s">
+        <div style="font-size:48px;margin:8px 0">🌙</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px">Bentornato!</div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:12px">Assente per ${timeAway}</div>
+
+        <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:12px">
+          <div class="stat-row"><span>💰 Guadagni lordi</span><span class="stat-val">${fmt(earned + tax)}</span></div>
+          <div class="stat-row"><span>🏛️ Tasse</span><span class="stat-val" style="color:var(--red)">-${fmt(tax)}</span></div>
+          <div class="stat-row" style="border:none"><span>✅ Netto</span><span class="stat-val" style="color:var(--green);font-size:14px">${fmt(net)}</span></div>
+          ${influence > 0 ? `<div class="stat-row" style="border:none"><span>🗳️ Influenza</span><span class="stat-val" style="color:var(--blue)">+${influence}</span></div>` : ''}
+          <div style="font-size:9px;color:var(--dim);margin-top:4px">${fmt(perMin)}/min</div>
+        </div>
+
+        <button class="btn primary" id="offline-collect" style="width:100%">💰 Raccogli</button>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      overlay.querySelector('div:last-child').style.transform = 'translateY(0)';
+    });
+
+    document.getElementById('offline-collect').onclick = () => {
+      Haptic.success();
+      overlay.style.opacity = '0';
+      overlay.querySelector('div:last-child').style.transform = 'translateY(20px)';
+      setTimeout(() => overlay.remove(), 300);
+    };
   }
 
   // === HOME ===
@@ -243,9 +369,10 @@
 
     const upgradeBtn = document.getElementById('btn-upgrade');
     if (upgradeBtn) upgradeBtn.onclick = () => {
-      Sounds.play('levelup'); haptic([10, 30, 10, 30, 10]);
+      Sounds.play('levelup'); Haptic.heavy();
       Housing.upgrade(state);
       Save.save(state);
+      if (window.Achievements) Achievements.checkAndNotify();
       showHome();
     };
     document.getElementById('btn-back').onclick = () => { Sounds.play('click'); enterCity(); };
@@ -286,8 +413,10 @@
           state.money -= cost;
           state.businesses[b.id] = level + 1;
           state.totalBusinessLevels++;
-          Sounds.play('buy'); haptic(10);
+          Sounds.play('buy'); Haptic.tap();
           Save.save(state);
+          addNews(`Hai comprato ${b.name} per ${fmt(cost)}!`, b.emoji);
+          if (window.Achievements) Achievements.checkAndNotify();
           showBusinesses();
         }
       };
@@ -393,13 +522,14 @@
           <button class="btn primary" id="btn-vote" ${playerVote ? '' : 'disabled'} style="margin-top:12px;width:100%">
             🗳️ Vota ${playerVote ? '' : '(scegli un candidato)'}
           </button>
-          <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
+        <button class="btn ghost" id="btn-share-ach" style="margin-top:6px;width:100%">📤 Condividi Progressi</button>
+        <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
         </div>`;
 
       document.querySelectorAll('.candidate-card').forEach(el => {
         el.onclick = () => {
           playerVote = el.dataset.id;
-          Sounds.play('click'); haptic(5);
+          Sounds.play('click'); Haptic.light();
           render();
         };
       });
@@ -407,12 +537,13 @@
       const donateBtn = document.getElementById('btn-vote');
       if (donateBtn) donateBtn.onclick = () => {
         if (!playerVote) return;
-        Sounds.play('vote'); haptic([10, 30, 10, 30, 10]);
+        Sounds.play('vote'); Haptic.heavy();
         state.influence -= donationAmount;
         state.votesCast++;
         state.lastElection = new Date().toISOString();
         if (type === 'national') state.lastNationalElection = new Date().toISOString();
         Save.save(state);
+        if (window.Achievements) Achievements.checkAndNotify();
         resolveAndShow(data, playerVote, donationAmount, type);
       };
 
@@ -423,7 +554,7 @@
           if (state.influence >= a) {
             donationAmount += a;
             state.influence -= a;
-            Sounds.play('coin'); haptic(5);
+            Sounds.play('coin'); Haptic.light();
             render();
           }
         };
@@ -459,9 +590,22 @@
       </div>`;
     }
 
+    // Check if player's candidate won
+    const playerWon = result.winner.id === playerVote;
+    if (playerWon) state.electionsWon++;
+
+    // Party free favor
+    if (window.Party && Party.hasFreeFavor(state) && playerWon) {
+      state.favorCount++;
+      html += `<div style="margin-top:8px;padding:10px;background:var(--green-light);border-radius:8px;font-size:12px">
+        🎁 Favore gratuito dal tuo partito!
+      </div>`;
+    }
+
     scandals.forEach(s => {
       state.money -= s.value;
       state.scandals++;
+      addNews(s.title, '📰');
       html += `<div style="margin-top:8px;padding:10px;background:var(--red-light);border-radius:8px;font-size:12px">
         📰 ${s.title}
       </div>`;
@@ -473,11 +617,18 @@
 
     Save.save(state);
     Sounds.play('election');
+    addNews(`${result.winner.name} vince le elezioni ${type === 'national' ? 'nazionali' : 'locali'} con il ${result.winner.party}`, result.winner.partyEmoji);
+    if (window.Achievements) Achievements.checkAndNotify();
 
     html += `<button class="btn primary" id="btn-ok" style="margin-top:12px;width:100%">Continua</button>`;
+    html += `<button class="btn ghost" id="btn-share-election" style="margin-top:6px;width:100%">📤 Condividi Risultato</button>`;
     html += '</div>';
     $('game-area').innerHTML = html;
     document.getElementById('btn-ok').onclick = () => { Sounds.play('click'); enterCity(); };
+    document.getElementById('btn-share-election').onclick = () => {
+      Haptic.tap();
+      Share.shareElection(result, World.getCity(state.city).name);
+    };
   }
 
   function applyFavorEffect(favor) {
@@ -526,7 +677,7 @@
         if (state.energy < g.cost) return;
         state.energy -= g.cost;
         Save.save(state);
-        Sounds.play('click'); haptic(10);
+        Sounds.play('click'); Haptic.tap();
         startMinigame(g);
       };
     });
@@ -536,20 +687,25 @@
   function startMinigame(game) {
     const area = $('game-area');
     Minigames.start(game.id, area, (passed, score) => {
-      const reward = passed ? score : Math.round(score * 0.3);
-      state.money += reward * Monetization.getMultiplier();
+      const baseReward = passed ? score : Math.round(score * 0.3);
+      const partyMgBonus = window.Party ? Party.getMinigameBonus(state) : 0;
+      const reward = Math.round(baseReward * (1 + partyMgBonus / 100) * Monetization.getMultiplier());
+      state.money += reward;
       if (passed) {
-        Sounds.play('coin'); haptic([10, 30, 10]);
+        state.minigameWins = (state.minigameWins || 0) + 1;
+        Sounds.play('coin'); Haptic.select();
+        addNews(`Hai completato ${game.name}! +${fmt(reward)}€`, '🎮');
       } else {
-        Sounds.play('wrong'); haptic([20, 40, 20]);
+        Sounds.play('wrong'); Haptic.error();
       }
       Save.save(state);
+      if (window.Achievements) Achievements.checkAndNotify();
       setTimeout(() => {
         area.innerHTML = `
           <div class="mg-card" style="text-align:center">
             <div style="font-size:48px;margin:16px 0">${passed ? '🎉' : '😔'}</div>
             <div style="font-size:16px;font-weight:800">${passed ? 'Completato!' : 'Non ce l\'hai fatta!'}</div>
-            <div style="font-size:12px;color:var(--dim);margin:8px 0">Punti: ${score} · Premio: ${fmt(reward * Monetization.getMultiplier())}</div>
+            <div style="font-size:12px;color:var(--dim);margin:8px 0">Punti: ${score} · Premio: ${fmt(reward)}</div>
             <button class="btn primary" id="mg-ok">Continua</button>
           </div>`;
         document.getElementById('mg-ok').onclick = () => { Sounds.play('click'); showMinigames(); };
@@ -612,13 +768,15 @@
         const cityId = el.dataset.city;
         const cost = World.getMoveCost(state.city, cityId);
         if (state.money < cost) return;
-        Sounds.play('move'); haptic([10, 30, 10]);
+        Sounds.play('move'); Haptic.select();
         state.money -= cost;
         state.city = cityId;
         const city = World.getCity(cityId);
         state.country = city.country;
         state.moveCount++;
         Save.save(state);
+        addNews(`Ti sei trasferito a ${World.getCity(cityId).name}!`, '🗺️');
+        if (window.Achievements) Achievements.checkAndNotify();
         enterCity();
       };
     });
@@ -655,7 +813,7 @@
 
     document.querySelectorAll('.map-dot').forEach(dot => {
       dot.onclick = () => {
-        Sounds.play('click'); haptic(5);
+        Sounds.play('click'); Haptic.light();
         showCountryDetail(dot.dataset.country);
       };
     });
@@ -685,6 +843,190 @@
         <div style="font-size:12px;font-weight:700;margin-bottom:4px">Città</div>
         <div style="display:flex;flex-direction:column;gap:4px">${citiesHtml}</div>
       </div>`;
+  }
+
+  // === SETTINGS ===
+  function showSettings() {
+    state = Save.get();
+    $('game-area').innerHTML = `
+      <div style="padding:12px">
+        <div style="font-size:18px;font-weight:800;margin-bottom:12px">⚙️ Impostazioni</div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)">
+          <div><div style="font-size:13px;font-weight:700">🔊 Effetti Sonori</div>
+          <div style="font-size:10px;color:var(--dim)">Suoni di voto, acquisto, ecc.</div></div>
+          <label class="toggle"><input type="checkbox" id="opt-sound" ${state.settings.sound ? 'checked' : ''}><span class="toggle-slider"></span></label>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)">
+          <div><div style="font-size:13px;font-weight:700">🌙 Modalità Scura</div>
+          <div style="font-size:10px;color:var(--dim)">Tema scuro per gli occhi</div></div>
+          <label class="toggle"><input type="checkbox" id="opt-dark" ${state.settings.darkMode ? 'checked' : ''}><span class="toggle-slider"></span></label>
+        </div>
+
+        <div style="padding:12px 0;border-bottom:1px solid var(--line)">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 Obiettivi</div>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:6px">${window.Achievements ? Achievements.count() + '/' + Achievements.total() + ' completati (' + Achievements.pct() + '%)' : 'Non disponibili'}</div>
+          <button class="btn small ghost" id="btn-show-ach" ${window.Achievements ? '' : 'disabled'}>📋 Vedi tutti</button>
+        </div>
+
+        <div style="padding:12px 0;border-bottom:1px solid var(--line)">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px">📊 Statistiche</div>
+          <div style="font-size:11px;color:var(--dim)">💰 Totale guadagnato: ${fmt(state.totalEarned)}</div>
+          <div style="font-size:11px;color:var(--dim)">🗳️ Voti espressi: ${state.votesCast}</div>
+          <div style="font-size:11px;color:var(--dim)">🏛️ Elezioni vinte: ${state.electionsWon}</div>
+          <div style="font-size:11px;color:var(--dim)">🏙️ Trasferimenti: ${state.moveCount}</div>
+          <div style="font-size:11px;color:var(--dim)">📰 Scandali: ${state.scandals}</div>
+          <div style="font-size:11px;color:var(--dim)">🎮 Minigiochi vinti: ${state.minigameWins || 0}</div>
+        </div>
+
+        <div style="padding:12px 0">
+          <button class="btn small ghost" id="btn-reset-tutorial">🔄 Mostra tutorial di nuovo</button>
+        </div>
+
+        <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
+      </div>`;
+
+    document.getElementById('opt-sound').onchange = (e) => {
+      state.settings.sound = e.target.checked;
+      Save.save(state);
+      if (window.Sounds) Sounds.setEnabled(e.target.checked);
+    };
+
+    document.getElementById('opt-dark').onchange = (e) => {
+      state.settings.darkMode = e.target.checked;
+      Save.save(state);
+      document.body.classList.toggle('dark-mode', e.target.checked);
+    };
+
+    const achBtn = document.getElementById('btn-show-ach');
+    if (achBtn) achBtn.onclick = () => { Sounds.play('click'); showAchievements(); };
+
+    document.getElementById('btn-reset-tutorial').onclick = () => {
+      Onboarding.reset();
+      Sounds.play('click');
+      Onboarding.start(() => { renderMenu(); });
+    };
+
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); if (currentView === 'city') enterCity(); else renderMenu(); };
+  }
+
+  // === ACHIEVEMENTS LIST ===
+  function showAchievements() {
+    if (!window.Achievements) return;
+    const all = Achievements.getAll();
+    const html = all.map(a => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--line);${a.unlocked ? '' : 'opacity:0.4'}">
+        <div style="font-size:24px">${a.unlocked ? a.icon : '🔒'}</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700">${a.title}</div>
+          <div style="font-size:10px;color:var(--dim)">${a.desc}</div>
+        </div>
+        ${a.unlocked ? '<div style="font-size:10px;color:var(--green)">✅</div>' : ''}
+      </div>`).join('');
+
+    $('game-area').innerHTML = `
+      <div style="padding:12px">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px">🏆 Obiettivi</div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:12px">${Achievements.count()}/${Achievements.total()} completati (${Achievements.pct()}%)</div>
+        <div style="max-height:65vh;overflow-y:auto">${html}</div>
+        <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
+      </div>`;
+
+    document.getElementById('btn-share-ach').onclick = () => { Haptic.tap(); Share.shareProgress(state); };
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); showSettings(); };
+  }
+
+  // === NEWS FEED ===
+  function showNewsFeed() {
+    $('game-area').innerHTML = `
+      <div style="padding:12px">
+        <div style="font-size:18px;font-weight:800;margin-bottom:12px">📰 Novità</div>
+        <div style="max-height:65vh;overflow-y:auto">${renderNewsFeed(20)}</div>
+        <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
+      </div>`;
+
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); if (currentView === 'city') enterCity(); else renderMenu(); };
+  }
+
+  // === PRESTIGE ===
+  function showPrestige() {
+    state = Save.get();
+    $('game-area').innerHTML = Prestige.render(state);
+
+    const prestigeBtn = document.getElementById('btn-prestige');
+    if (prestigeBtn) prestigeBtn.onclick = () => {
+      if (!confirm('Sei sicuro? Perderai soldi, business, casa e influenza. Guadagnerai un moltiplicatore permanente!')) return;
+      Haptic.heavy();
+      const success = Prestige.doPrestige(state);
+      if (success) {
+        Save.save(state);
+        Sounds.play('levelup');
+        addNews('Democrazia Totale! Prestige x' + state.prestigeCount + '!', '📜');
+        enterCity();
+      }
+    };
+
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); enterCity(); };
+  }
+
+  // === CITY SERVICES ===
+  function showCityServices() {
+    state = Save.get();
+    const city = World.getCity(state.city);
+
+    $('game-area').innerHTML = `
+      <div style="padding:12px">
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px">🏗️ Servizi Civici</div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:12px">Investi le tasse per migliorare la città</div>
+        ${CityServices.render(state, city.tier)}
+        <button class="btn ghost" id="btn-back" style="margin-top:8px;width:100%">← Indietro</button>
+      </div>`;
+
+    CityServices.SERVICES.forEach(s => {
+      const btn = document.getElementById('svc-' + s.id);
+      if (btn) btn.onclick = () => {
+        if (CityServices.buy(state, s.id)) {
+          Sounds.play('levelup'); Haptic.heavy();
+          Save.save(state);
+          addNews(`Servizio cittadino costruito: ${s.emoji} ${s.name}!`, s.emoji);
+          showCityServices();
+        }
+      };
+    });
+
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); enterCity(); };
+  }
+
+  // === PARTY ===
+  function showParty() {
+    state = Save.get();
+    $('game-area').innerHTML = Party.render(state);
+
+    document.querySelectorAll('[data-party]').forEach(el => {
+      el.onclick = () => {
+        const partyId = el.dataset.party;
+        Haptic.tap();
+        if (state.party === partyId) return;
+        Party.join(state, partyId);
+        Save.save(state);
+        Sounds.play('vote');
+        const p = Party.get(partyId);
+        addNews(`Ti sei unito al ${p.emoji} ${p.name}!`, p.emoji);
+        showParty();
+      };
+    });
+
+    const leaveBtn = document.getElementById('btn-leave-party');
+    if (leaveBtn) leaveBtn.onclick = () => {
+      Haptic.tap();
+      Party.leave(state);
+      Save.save(state);
+      Sounds.play('click');
+      showParty();
+    };
+
+    document.getElementById('btn-back').onclick = () => { Sounds.play('click'); enterCity(); };
   }
 
   // === STORE ===

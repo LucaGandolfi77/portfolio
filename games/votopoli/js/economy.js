@@ -44,10 +44,29 @@ window.Economy = (() => {
 
   function totalRate(state) {
     let total = 0;
+    const partyBizBonus = window.Party ? Party.getBusinessBonus(state) : 0;
+    const svcIncomeBoost = window.CityServices ? CityServices.getIncomeBoost(state) : 0;
+    const prestigeMult = state.prestigeMultiplier || 1;
+
     BUSINESSES.forEach(b => {
       const level = state.businesses[b.id] || 0;
-      if (level > 0) total += calcBuildingRate(b, level, state.country);
+      if (level > 0) {
+        let rate = calcBuildingRate(b, level, state.country);
+        // Party business bonus
+        if (partyBizBonus > 0 && Party.getCurrent(state)) {
+          const party = Party.getCurrent(state);
+          if (party && party.bonusType && party.bonusType === b.type) {
+            rate *= (1 + partyBizBonus / 100);
+          }
+        }
+        // City service income boost
+        if (svcIncomeBoost > 0) rate *= (1 + svcIncomeBoost / 100);
+        total += rate;
+      }
     });
+
+    // Apply prestige multiplier
+    total *= prestigeMult;
     return total;
   }
 
@@ -57,7 +76,9 @@ window.Economy = (() => {
     const country = World.getCountry(city.country);
     const baseTax = country ? country.taxBase : 20;
     const mayorTax = state.mayorTax || 0;
-    return Math.min(80, baseTax + mayorTax);
+    const svcRelief = window.CityServices ? CityServices.getTaxRelief(state) : 0;
+    const partyRelief = window.Party ? Party.getTaxRelief(state) : 0;
+    return Math.min(80, Math.max(0, baseTax + mayorTax - svcRelief - partyRelief));
   }
 
   function netIncome(state) {
