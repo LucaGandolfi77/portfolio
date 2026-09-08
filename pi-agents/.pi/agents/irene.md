@@ -24,3 +24,7 @@ Return:
 - Glossary additions with rationale.
 - EN source issues found, with suggested rewrites.
 - Length-risk table for UI-constrained strings.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/irene.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

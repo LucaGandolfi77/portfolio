@@ -24,3 +24,7 @@ Return:
 - Checklist table with evidence per item.
 - Rejection-risk list ranked by likelihood with mitigations.
 - Exact next commands or console steps remaining.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/enzo.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

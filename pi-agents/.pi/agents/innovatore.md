@@ -25,3 +25,7 @@ Return:
 - Top 3 recommendations with rationale and next action (proceed to Discovery / iterate on concept / kill).
 - Kill list with specific reasons.
 - Risk register for recommended concepts: what could go wrong and how to mitigate.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/innovatore.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

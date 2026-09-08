@@ -24,3 +24,7 @@ Return:
 - 3-scenario projection table: downloads, conversion, ARPU, net revenue, break-even.
 - Cost sheet: store fees, dev accounts ($25 Play one-time, $99/yr Apple), tooling, hosting.
 - Risks ranked by financial impact with mitigations.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/nico.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

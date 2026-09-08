@@ -23,3 +23,7 @@ Return:
 - Keyword list with intent/competition notes.
 - A/B test proposals with hypothesis and metric.
 - Compliance warnings if any claim is risky.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/carla.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

@@ -24,3 +24,7 @@ Return:
 - Files changed with one-line rationale each.
 - Validation output: pass/fail per command with key output lines.
 - Anything intentionally left out and why.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/fabio.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

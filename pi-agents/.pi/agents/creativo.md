@@ -25,3 +25,7 @@ Return:
 - 5+ concept ideas per brief, each with: name, one-line pitch, target user fantasy, core mechanic/interaction, emotional arc, visual mood, "why now", estimated complexity (low/medium/high).
 - Ranked shortlist of top 3 with rationale.
 - Explicit unknowns: what evidence would confirm or kill each idea.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/creativo.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

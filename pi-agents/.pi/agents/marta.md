@@ -24,3 +24,7 @@ Return:
 - 3-5 content concepts with hook lines and why each should work.
 - Influencer/community target list with relevance rationale.
 - Post-launch metrics loop: what to measure at 24h/7d/30d and decision triggers.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/marta.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

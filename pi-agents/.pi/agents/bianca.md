@@ -23,3 +23,7 @@ Return:
 - Market-size range with method note.
 - Opportunity gaps, ranked by expected impact vs effort.
 - Sources with URLs and access date.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/bianca.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

@@ -56,6 +56,13 @@ self.addEventListener('notificationclick', e => {
   }
 })
 
+/* Widget click: open the app when widget is tapped */
+self.addEventListener('message', e => {
+  if (e.data && (e.data.widget || e.data.action === 'open')) {
+    e.waitUntil(clients.openWindow('/app/'))
+  }
+})
+
 /* Share Target — handle shared files via POST */
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)

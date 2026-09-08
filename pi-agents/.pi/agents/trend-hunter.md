@@ -25,3 +25,7 @@ Return:
 - Opportunity gaps ranked by "ease of exploitation" × "market impact".
 - "Why now" analysis for each opportunity: what changed recently that makes this viable.
 - Items needing live verification, with suggested sources.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/trend-hunter.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.
