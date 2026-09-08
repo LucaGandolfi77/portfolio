@@ -1,0 +1,1 @@
+const App={init(){console.log('Silent Voice Reader scaffold initialized — privacy-first, offline PWA.')},load(){}};document.addEventListener('DOMContentLoaded',()=>App.init());
