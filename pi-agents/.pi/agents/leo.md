@@ -24,3 +24,7 @@ Return:
 - Data Safety / App Privacy form answers mapped to code evidence.
 - Permission-justification strings (EN) for store submission.
 - Risk list: what could trigger store rejection or a GDPR complaint, with fixes.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/leo.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

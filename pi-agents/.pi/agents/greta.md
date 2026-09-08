@@ -23,3 +23,7 @@ Return:
 - Table: command → pass/fail/deferred → evidence (exit code, key output).
 - Failure buckets and suspected layer (code/config/environment).
 - What was not tested and why it matters.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/greta.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

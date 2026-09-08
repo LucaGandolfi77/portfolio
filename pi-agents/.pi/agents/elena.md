@@ -24,3 +24,7 @@ Return:
 - Friction list ranked by severity with concrete fixes.
 - Onboarding proposal (max 3-4 steps) with skip affordance.
 - Accessibility checklist results.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/elena.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

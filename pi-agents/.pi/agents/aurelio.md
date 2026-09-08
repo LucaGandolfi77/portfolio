@@ -23,3 +23,7 @@ Rules:
 Return:
 - Structured PRD/spec with sections: Problem, Audience, Solution, MVP scope, Out-of-scope, Metrics, Risks, Store-review notes.
 - Explicit unknowns and what evidence would resolve them.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/aurelio.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.

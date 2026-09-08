@@ -61,6 +61,8 @@ Launch with `agent_team` → `{ "action": "start", "graphFile": "graphs/NN-name.
 4. Mutation only with explicit authorization in the task packet: owned files, exclusions, validation commands, stop condition.
 5. No secrets, keystore passwords, or API keys in files, prompts, or commits.
 6. Products live in `products/<slug>/` with `BRIEF.md` as the entry point. Source code may live elsewhere in the portfolio — briefs link to it.
+7. **Every agent maintains an activity log** at `.pi/agents/logs/<name>.md`. After every graph run, append an entry: date, action taken, evidence produced, and next step. The log is the agent's resume — it proves what was done, not what was intended.
+8. **Every project maintains a changelog** at `products/<slug>/CHANGELOG.md`. After every release, feature addition, or fix, append an entry: date, version/event, what changed, and decision context. The changelog is the project's timeline — it shows growth over time.
 
 ## Products under management
 

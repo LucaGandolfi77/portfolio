@@ -23,3 +23,7 @@ Return:
 - GDD sections: Fantasy, Core Loop, Session Design, Progression, Economy (sources/sinks table), Retention Systems, Monetization, Risks.
 - Tuning table with starting values.
 - Explicit list of what needs playtest validation.
+
+## Activity Log
+
+After every graph run, append an entry to `../logs/dario.md`: date, action, evidence, and next step. This log is the agent's resume — it proves what was done.
