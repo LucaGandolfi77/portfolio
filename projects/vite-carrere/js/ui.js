@@ -12,6 +12,7 @@ var UI = (function () {
     Engine.on("narrativeComplete", showMinigameOrQuote);
     Engine.on("quoteCollected", showQuotePopup);
     Engine.on("minigameComplete", onMinigameComplete);
+    Engine.on("achievementEarned", showAchievementPopup);
     setupButtons();
     render();
   }
@@ -58,14 +59,6 @@ var UI = (function () {
 
   function setupButtons() {
     document.addEventListener("click", initAudio, { once: true });
-
-    var skipBtn = document.getElementById("skip-btn");
-    if (skipBtn) {
-      skipBtn.addEventListener("click", function () {
-        if (typewriterTimer) { clearInterval(typewriterTimer); typewriterTimer = null; }
-        Engine.skipNarrative();
-      });
-    }
   }
 
   function render() {
@@ -77,11 +70,12 @@ var UI = (function () {
       case "chapter": showChapter(s); break;
       case "quaderno": showQuaderno(); break;
       case "finale": showFinale(); break;
+      case "achievements": showAchievements(); break;
     }
   }
 
   function hideAll() {
-    ["title-screen", "map-screen", "chapter-screen", "quaderno-screen", "finale-screen"].forEach(function (id) {
+    ["title-screen", "map-screen", "chapter-screen", "quaderno-screen", "finale-screen", "achievements-screen"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.add("hidden");
     });
@@ -96,27 +90,29 @@ var UI = (function () {
     var el = document.getElementById("map-screen");
     if (!el) return;
     var s = Engine.getState();
+    var ch = I18n.chapterLang();
     var html = '<div class="map-header">';
-    html += '<h2 class="map-title">Le opere</h2>';
-    html += '<div class="map-progress">' + s.completedChapters.length + '/' + DATA.CHAPTERS.length + ' capitoli</div>';
+    html += '<h2 class="map-title">' + I18n.t("mapTitle") + '</h2>';
+    html += '<div class="map-progress">' + s.completedChapters.length + '/' + ch.CHAPTERS.length + ' ' + I18n.t("mapChapters") + '</div>';
     html += '</div><div class="map-chapters">';
-    DATA.CHAPTERS.forEach(function (ch, i) {
+    ch.CHAPTERS.forEach(function (c, i) {
       var unlocked = s.unlockedChapters.includes(i);
       var done = s.completedChapters.includes(i);
       var cls = "map-chapter" + (done ? " done" : "") + (unlocked ? "" : " locked");
       html += '<button class="' + cls + '" data-chapter="' + i + '" ' + (unlocked ? '' : 'disabled') + '>';
-      html += '<div class="mc-year">' + ch.year + '</div>';
-      html += '<div class="mc-title">' + ch.title + '</div>';
-      html += '<div class="mc-book">' + ch.book + '</div>';
+      html += '<div class="mc-year">' + c.year + '</div>';
+      html += '<div class="mc-title">' + c.title + '</div>';
+      html += '<div class="mc-book">' + c.book + '</div>';
       if (done) html += '<div class="mc-check">✓</div>';
       if (!unlocked) html += '<div class="mc-lock">🔒</div>';
       html += '</button>';
     });
     html += '</div>';
     if (Engine.allChaptersDone()) {
-      html += '<button class="map-finale-btn" id="go-finale">📖 Apri il finale</button>';
+      html += '<button class="map-finale-btn" id="go-finale">' + I18n.t("mapFinale") + '</button>';
     }
-    html += '<button class="map-quaderno-btn" id="go-quaderno">📓 Il Quaderno (' + s.collectedQuotes.length + '/' + DATA.CHAPTERS.length + ')</button>';
+    html += '<button class="map-quaderno-btn" id="go-quaderno">' + I18n.t("mapQuaderno") + ' (' + s.collectedQuotes.length + '/' + ch.CHAPTERS.length + ')</button>';
+    html += '<button class="map-ach-btn" id="go-achievements">🏆 ' + (I18n.get() === "it" ? "Obiettivi" : "Achievements") + ' (' + s.achievements.length + '/15)</button>';
     el.innerHTML = html;
     el.classList.remove("hidden");
 
@@ -130,24 +126,26 @@ var UI = (function () {
     if (finBtn) finBtn.addEventListener("click", function () { playFinale(); Engine.showFinale(); });
     var qBtn = el.querySelector("#go-quaderno");
     if (qBtn) qBtn.addEventListener("click", function () { Engine.showQuaderno(); });
+    var achBtn = el.querySelector("#go-achievements");
+    if (achBtn) achBtn.addEventListener("click", function () { Engine.setScreen("achievements"); });
   }
 
   function showChapter(s) {
     var el = document.getElementById("chapter-screen");
     if (!el) return;
-    var ch = DATA.CHAPTERS[s.currentChapter];
+    var ch = I18n.chapterLang().CHAPTERS[s.currentChapter];
     if (!ch) return;
 
     var html = '<div class="ch-header">';
-    html += '<button class="ch-back" id="ch-back">← Mappa</button>';
+    html += '<button class="ch-back" id="ch-back">' + I18n.t("chBack") + '</button>';
     html += '<div class="ch-book-info"><span class="ch-year">' + ch.year + '</span> · ' + ch.book + '</div>';
     html += '</div>';
     html += '<h2 class="ch-title">' + ch.title + '</h2>';
     html += '<div class="ch-subtitle">' + ch.subtitle + '</div>';
 
     html += '<div class="ch-narrative" id="ch-narrative"></div>';
-    html += '<button class="ch-advance" id="ch-advance">Continua →</button>';
-    html += '<button class="ch-skip" id="skip-btn">Salta →</button>';
+    html += '<button class="ch-advance" id="ch-advance">' + I18n.t("chContinue") + '</button>';
+    html += '<button class="ch-skip" id="skip-btn">' + I18n.t("chSkip") + '</button>';
 
     html += '<div class="ch-minigame hidden" id="ch-minigame"></div>';
     html += '<div class="ch-quote hidden" id="ch-quote"></div>';
@@ -163,13 +161,17 @@ var UI = (function () {
       playPageTurn();
       Engine.advanceNarrative();
     });
+    el.querySelector("#skip-btn").addEventListener("click", function () {
+      if (typewriterTimer) { clearInterval(typewriterTimer); typewriterTimer = null; }
+      Engine.skipNarrative();
+    });
 
     renderNarrative();
   }
 
   function renderNarrative() {
     var s = Engine.getState();
-    var ch = DATA.CHAPTERS[s.currentChapter];
+    var ch = I18n.chapterLang().CHAPTERS[s.currentChapter];
     if (!ch) return;
     var el = document.getElementById("ch-narrative");
     var advBtn = document.getElementById("ch-advance");
@@ -193,13 +195,13 @@ var UI = (function () {
 
     if (advBtn) {
       var isLast = s.narrativeIndex >= ch.narrative.length - 1;
-      advBtn.textContent = isLast ? "Ascolta la citazione →" : "Continua →";
+      advBtn.textContent = isLast ? I18n.t("chListenQuote") : I18n.t("chContinue");
     }
   }
 
   function showMinigameOrQuote() {
     var s = Engine.getState();
-    var ch = DATA.CHAPTERS[s.currentChapter];
+    var ch = I18n.chapterLang().CHAPTERS[s.currentChapter];
     if (!ch) return;
     var narrativeEl = document.getElementById("ch-narrative");
     var advBtn = document.getElementById("ch-advance");
@@ -223,7 +225,7 @@ var UI = (function () {
     if (ch.quote.page) quoteEl.innerHTML += ', ' + ch.quote.page;
     quoteEl.innerHTML += '</div>';
     quoteEl.innerHTML += '</div>';
-    quoteEl.innerHTML += '<button class="quote-continue" id="quote-start-mg">Prosegui al gioco →</button>';
+    quoteEl.innerHTML += '<button class="quote-continue" id="quote-start-mg">' + I18n.t("quoteContinue") + '</button>';
     quoteEl.classList.remove("hidden");
 
     document.getElementById("quote-start-mg").addEventListener("click", function () {
@@ -244,7 +246,7 @@ var UI = (function () {
     if (ch.quote.page) quoteEl.innerHTML += ', ' + ch.quote.page;
     quoteEl.innerHTML += '</div>';
     quoteEl.innerHTML += '</div>';
-    quoteEl.innerHTML += '<button class="quote-continue" id="quote-done">Torna alla mappa →</button>';
+    quoteEl.innerHTML += '<button class="quote-continue" id="quote-done">' + I18n.t("quoteBackMap") + '</button>';
     quoteEl.classList.remove("hidden");
     document.getElementById("quote-done").addEventListener("click", function () {
       playPageTurn();
@@ -256,14 +258,14 @@ var UI = (function () {
     playCollect();
     var popup = document.getElementById("quote-popup");
     if (!popup) return;
-    popup.innerHTML = '<div class="qp-inner">📓 Citazione raccolta!<br><span class="qp-title">' + ch.title + '</span></div>';
+    popup.innerHTML = '<div class="qp-inner">' + I18n.t("quoteCollected") + '<br><span class="qp-title">' + ch.title + '</span></div>';
     popup.classList.add("show");
     setTimeout(function () { popup.classList.remove("show"); }, 2000);
   }
 
   function onMinigameComplete(data) {
     var s = Engine.getState();
-    var ch = DATA.CHAPTERS[s.currentChapter];
+    var ch = I18n.chapterLang().CHAPTERS[s.currentChapter];
     if (!ch) return;
     var minigameEl = document.getElementById("ch-minigame");
     var quoteEl = document.getElementById("ch-quote");
@@ -275,27 +277,28 @@ var UI = (function () {
     var el = document.getElementById("quaderno-screen");
     if (!el) return;
     var s = Engine.getState();
+    var ch = I18n.chapterLang();
     var html = '<div class="q-header">';
-    html += '<button class="q-back" id="q-back">← Mappa</button>';
-    html += '<h2 class="q-title">📓 Il Quaderno</h2>';
+    html += '<button class="q-back" id="q-back">' + I18n.t("chBack") + '</button>';
+    html += '<h2 class="q-title">' + I18n.t("quadernoTitle") + '</h2>';
     html += '</div>';
 
-    DATA.CHAPTERS.forEach(function (ch) {
-      var collected = s.collectedQuotes.includes(ch.id);
+    ch.CHAPTERS.forEach(function (c) {
+      var collected = s.collectedQuotes.includes(c.id);
       html += '<div class="q-entry' + (collected ? '' : ' locked') + '">';
       if (collected) {
-        html += '<div class="q-book">' + ch.book + ' (' + ch.year + ')</div>';
-        html += '<div class="q-quote">"' + ch.quote.text + '"</div>';
-        html += '<div class="q-page">' + ch.quote.page + '</div>';
+        html += '<div class="q-book">' + c.book + ' (' + c.year + ')</div>';
+        html += '<div class="q-quote">"' + c.quote.text + '"</div>';
+        html += '<div class="q-page">' + c.quote.page + '</div>';
       } else {
-        html += '<div class="q-locked">🔒 Citazione non ancora raccolta</div>';
+        html += '<div class="q-locked">' + I18n.t("quadernoLocked") + '</div>';
       }
       html += '</div>';
     });
 
     html += '<div class="q-moral">';
-    html += '<div class="q-moral-text">La letteratura non è dottrina. È narrazione.';
-    html += '«La fede è un mistero della persona, la religione è una narrazione collettiva.»</div>';
+    html += '<div class="q-moral-text">' + I18n.t("quadernoMoral");
+    html += '<br>«' + I18n.t("quadernoMoralQuote") + '»</div>';
     html += '<div class="q-moral-attr">— Emmanuel Carrère</div>';
     html += '</div>';
 
@@ -308,7 +311,7 @@ var UI = (function () {
   function showFinale() {
     var el = document.getElementById("finale-screen");
     if (!el) return;
-    var f = DATA.FINALE;
+    var f = I18n.chapterLang().FINALE;
     var html = '<div class="finale-container">';
     html += '<div class="finale-book" id="finale-book">';
     html += '<div class="finale-lines" id="finale-lines"></div>';
@@ -318,8 +321,8 @@ var UI = (function () {
     html += '<div class="finale-moral-text">' + f.moral + '</div>';
     html += '<div class="finale-final">' + f.final + '</div>';
     html += '<div class="finale-cta">' + f.callToAction + '</div>';
-    html += '<button class="finale-share" id="finale-share">📤 Condividi</button>';
-    html += '<button class="finale-restart" id="finale-restart">📖 Ricomincia</button>';
+    html += '<button class="finale-share" id="finale-share">' + I18n.t("finaleShare") + '</button>';
+    html += '<button class="finale-restart" id="finale-restart">' + I18n.t("finaleRestart") + '</button>';
     html += '</div></div>';
     el.innerHTML = html;
     el.classList.remove("hidden");
@@ -347,9 +350,16 @@ var UI = (function () {
       if (shareBtn) {
         shareBtn.addEventListener("click", function () {
           if (navigator.share) {
-            navigator.share({ title: "VITE — Emmanuel Carrère", text: f.shareText }).catch(function () { });
+            navigator.share({ title: I18n.t("shareBookTitle"), text: f.shareText }).catch(function () { });
           } else if (navigator.clipboard) {
-            navigator.clipboard.writeText(f.shareText).then(function () { alert("Copiato!"); });
+            navigator.clipboard.writeText(f.shareText).then(function () {
+              var popup = document.getElementById("quote-popup");
+              if (popup) {
+                popup.innerHTML = '<div class="qp-inner">' + I18n.t("copied") + '</div>';
+                popup.classList.add("show");
+                setTimeout(function () { popup.classList.remove("show"); }, 2000);
+              }
+            });
           }
         });
       }
@@ -360,11 +370,46 @@ var UI = (function () {
     }, f.lines.length * 1500 + 1000);
   }
 
+  function showAchievements() {
+    var el = document.getElementById("achievements-screen");
+    if (!el) return;
+    var achievements = Engine.getAchievements();
+    var earned = achievements.filter(function (a) { return a.earned; }).length;
+    var html = '<div class="ach-header">';
+    html += '<button class="ach-back" id="ach-back">' + I18n.t("chBack") + '</button>';
+    html += '<h2 class="ach-title">🏆 ' + (I18n.get() === "it" ? "Obiettivi" : "Achievements") + '</h2>';
+    html += '</div>';
+    html += '<div class="ach-progress">' + earned + '/' + achievements.length + (I18n.get() === "it" ? " ottenuti" : " earned") + '</div>';
+    html += '<div class="ach-grid">';
+    achievements.forEach(function (a) {
+      html += '<div class="ach-card' + (a.earned ? '' : ' locked') + '">';
+      html += '<div class="ach-card-icon">' + a.icon + '</div>';
+      html += '<div class="ach-card-title">' + a.title + '</div>';
+      html += '<div class="ach-card-desc">' + a.desc + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+    el.classList.remove("hidden");
+    el.querySelector("#ach-back").addEventListener("click", function () { Engine.setScreen("map"); });
+  }
+
+  function showAchievementPopup(ids) {
+    if (!ids || ids.length === 0) return;
+    var achievements = Engine.getAchievements();
+    var popup = document.getElementById("achievement-popup");
+    if (!popup) return;
+    var a = achievements.find(function (x) { return x.id === ids[0]; });
+    if (!a) return;
+    popup.innerHTML = '<div class="achievement-icon">' + a.icon + '</div>' +
+      '<div class="achievement-label">' + (I18n.get() === "it" ? "OBIETTIVO RAGGIUNTO" : "ACHIEVEMENT UNLOCKED") + '</div>' +
+      '<div class="achievement-title">' + a.title + '</div>' +
+      '<div class="achievement-desc">' + a.desc + '</div>';
+    popup.classList.add("show");
+    playCollect();
+    setTimeout(function () { popup.classList.remove("show"); }, 3000);
+  }
+
   return { init: init };
 
 })();
-
-document.addEventListener("DOMContentLoaded", function () {
-  Engine.init();
-  UI.init();
-});

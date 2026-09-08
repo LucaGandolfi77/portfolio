@@ -28,7 +28,7 @@ var Minigames = (function () {
       html += '<button class="puzzle-tile' + (empty ? ' empty' : '') + '" data-idx="' + i + '">' + vis + '</button>';
     });
     html += '</div>';
-    html += '<div class="puzzle-moves" style="text-align:center;margin-top:8px;font-size:13px;color:var(--dim)">Mosse: <span id="puzzle-moves">0</span></div>';
+    html += '<div class="puzzle-moves" style="text-align:center;margin-top:8px;font-size:13px;color:var(--dim)">' + I18n.t("puzzleMoves") + ' <span id="puzzle-moves">0</span></div>';
     el.innerHTML = html;
     el.querySelectorAll('.puzzle-tile:not(.empty)').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -68,7 +68,7 @@ var Minigames = (function () {
     var found = 0;
     var html = '<div class="diff-header"><span id="diff-progress">1/' + config.rounds + '</span></div>';
     html += '<div class="diff-scene" id="diff-scene"></div>';
-    html += '<div class="diff-found" id="diff-found">Trovati: 0/' + config.rounds + '</div>';
+    html += '<div class="diff-found" id="diff-found">' + I18n.t("diffFound") + ' 0/' + config.rounds + '</div>';
     el.innerHTML = html;
     renderRound();
     function renderRound() {
@@ -81,7 +81,7 @@ var Minigames = (function () {
       var objects = ['Barca', 'Albero', 'Sedia', 'Gatto', 'Lampada', 'Casa', 'Nuvola', 'Stella', 'Cuore', 'Casa'];
       var changedObj = objects[current % objects.length];
       var html = '<div class="diff-room">';
-      html += '<div class="diff-room-title">Ronda ' + (current + 1) + '</div>';
+      html += '<div class="diff-room-title">' + I18n.t("diffRound") + ' ' + (current + 1) + '</div>';
       html += '<div class="diff-objects">';
       var shuffled = objects.slice().sort(function () { return Math.random() - 0.5; });
       shuffled.forEach(function (obj) {
@@ -99,7 +99,7 @@ var Minigames = (function () {
         btn.addEventListener('click', function () {
           if (this.dataset.name === item.name || this.classList.contains('has-item')) {
             found++;
-            el.querySelector('#diff-found').textContent = 'Trovati: ' + found + '/' + config.rounds;
+            el.querySelector('#diff-found').textContent = I18n.t("diffFound") + ' ' + found + '/' + config.rounds;
           }
           current++;
           renderRound();
@@ -121,8 +121,8 @@ var Minigames = (function () {
     html += '<div class="swipe-progress" id="swipe-progress">1/' + total + '</div>';
     html += '<div class="swipe-card" id="swipe-card"><div class="swipe-text"></div></div>';
     html += '<div class="swipe-actions">';
-    html += '<button class="swipe-btn left" id="swipe-left">← Finzione</button>';
-    html += '<button class="swipe-btn right" id="swipe-right">Realtà →</button>';
+    html += '<button class="swipe-btn left" id="swipe-left">' + I18n.t("swipeLeft") + '</button>';
+    html += '<button class="swipe-btn right" id="swipe-right">' + I18n.t("swipeRight") + '</button>';
     html += '</div></div>';
     el.innerHTML = html;
     renderCard();
@@ -154,14 +154,14 @@ var Minigames = (function () {
   function createTower(el, config, onDone) {
     var lies = config.lies.slice();
     var removed = 0;
-    var html = '<div class="tower-title">La verità sotto le bugie</div>';
+    var html = '<div class="tower-title">' + I18n.t("towerTitle") + '</div>';
     html += '<div class="tower-stack" id="tower-stack">';
     lies.forEach(function (lie, i) {
       html += '<button class="tower-block" data-idx="' + i + '" style="--i:' + i + '">';
       html += '<span class="tower-lie">' + lie + '</span></button>';
     });
     html += '</div>';
-    html += '<div class="tower-hint">Rimuovi le bugie dall\'alto in basso, nell\'ordine in cui sono state costruite.</div>';
+    html += '<div class="tower-hint">' + I18n.t("towerHint") + '</div>';
     html += '<div class="tower-revealed" id="tower-revealed"></div>';
     el.innerHTML = html;
     var expected = 0;
@@ -174,10 +174,10 @@ var Minigames = (function () {
           removed++;
           var rev = el.querySelector('#tower-revealed');
           if (expected === lies.length) {
-            rev.innerHTML = '<div class="tower-truth">Non era nient\'altro.</div>';
+            rev.innerHTML = '<div class="tower-truth">' + I18n.t("towerTruth") + '</div>';
             setTimeout(function () { onDone({ removed: removed }); }, 1200);
           } else {
-            rev.innerHTML += '<div class="tower-truth">"' + lies[i] + '" — rimosso</div>';
+            rev.innerHTML += '<div class="tower-truth">"' + lies[i] + '" ' + I18n.t("towerRemoved") + '</div>';
           }
         } else {
           this.classList.add('shake');
@@ -196,14 +196,14 @@ var Minigames = (function () {
       var tmp = indices[s]; indices[s] = indices[r]; indices[r] = tmp;
     }
     var placed = [];
-    var html = '<div class="frag-title">Ricostruisci il testo</div>';
+    var html = '<div class="frag-title">' + I18n.t("fragTitle") + '</div>';
     html += '<div class="frag-source" id="frag-source">';
     indices.forEach(function (origIdx) {
       html += '<button class="frag-piece" data-orig="' + origIdx + '">' + frags[origIdx] + '</button>';
     });
     html += '</div>';
     html += '<div class="frag-target" id="frag-target"></div>';
-    html += '<div class="frag-hint">Tocca i frammenti nell\'ordine giusto.</div>';
+    html += '<div class="frag-hint">' + I18n.t("fragHint") + '</div>';
     el.innerHTML = html;
     var expectedIdx = 0;
     el.querySelectorAll('.frag-piece').forEach(function (btn) {
@@ -230,9 +230,9 @@ var Minigames = (function () {
   function createGentle(el, config, onDone) {
     var collected = 0;
     var duration = config.roundDuration * 1000;
-    var words = DATA.GENTLE_WORDS.slice();
-    var html = '<div class="gentle-title">' + config.title + '</div>';
-    html += '<div class="gentle-desc">' + config.description + '</div>';
+    var words = (I18n.get() === "it" ? DATA : DATA_EN).GENTLE_WORDS.slice();
+    var html = '<div class="gentle-title">' + I18n.t("gentleTitle") + '</div>';
+    html += '<div class="gentle-desc">' + I18n.t("gentleDesc") + '</div>';
     html += '<div class="gentle-scene" id="gentle-scene"></div>';
     html += '<div class="gentle-collected" id="gentle-collected"></div>';
     el.innerHTML = html;
@@ -270,8 +270,8 @@ var Minigames = (function () {
     var total = config.cycles;
     var html = '<div class="breath-container">';
     html += '<div class="breath-circle" id="breath-circle"></div>';
-    html += '<div class="breath-label" id="breath-label">Preparati...</div>';
-    html += '<div class="breath-count" id="breath-count">Ciclo 0/' + total + '</div>';
+    html += '<div class="breath-label" id="breath-label">' + I18n.t("breathPrep") + '</div>';
+    html += '<div class="breath-count" id="breath-count">' + I18n.t("breathCycle") + ' 0/' + total + '</div>';
     html += '</div>';
     el.innerHTML = html;
     var circle = el.querySelector('#breath-circle');
@@ -280,22 +280,22 @@ var Minigames = (function () {
     setTimeout(runCycle, 1500);
     function runCycle() {
       if (cycle >= total) {
-        label.textContent = 'Hai completato tutti i cicli.';
+        label.textContent = I18n.t("breathDone");
         circle.className = 'breath-circle done';
         setTimeout(function () { onDone({ cycles: total }); }, 1000);
         return;
       }
       circle.className = 'breath-circle inhale';
-      label.textContent = 'Inspira...';
+      label.textContent = I18n.t("breathInhale");
       setTimeout(function () {
         circle.className = 'breath-circle hold';
-        label.textContent = 'Trattieni...';
+        label.textContent = I18n.t("breathHold");
         setTimeout(function () {
           circle.className = 'breath-circle exhale';
-          label.textContent = 'Espira...';
+          label.textContent = I18n.t("breathExhale");
           setTimeout(function () {
             cycle++;
-            count.textContent = 'Ciclo ' + cycle + '/' + total;
+            count.textContent = I18n.t("breathCycle") + ' ' + cycle + '/' + total;
             runCycle();
           }, config.exhale);
         }, config.hold);
@@ -305,23 +305,23 @@ var Minigames = (function () {
 
   function instructionFor(config) {
     var byType = {
-      puzzle: "Riordina le tessere toccandone una adiacente a quella vuota per spostarla. Completa la foto di famiglia quando i numeri sono in ordine (1, 2, 3… fino alla tessera vuota).",
-      spotDiff: "Osserva ogni scena con attenzione: un oggetto è cambiato o è sparito rispetto all'attesa. Toccarlo lo segna come trovato e passa alla ronda successiva.",
-      swipe: "Leggi ogni affermazione e decidi se è vera (Realtà →) o inventata (← Finzione). Il racconto di Carrère è pieno di dettagli veri che sembrano finzione: fidati del testo.",
-      tower: "La verità è sepolta sotto una pila di bugie. Toccale dall'alto verso il basso, nell'ordine in cui sono state costruite, per rimuoverle e rivelare la verità.",
-      fragments: "I frammenti del testo devono essere riordinati. Toccalli partendo da quello con cui inizia la frase e prosegui in sequenza fino a completare l'incipit.",
-      gentle: "Un gioco senza punteggio: parole di luce cadono lentamente, sfiorale per trattenerle un istante. Non c'è nulla da vincere, solo da ricordare.",
-      breathing: "Segui il cerchio e armonizza il respiro: inspira quando si espande, trattieni quando resta fermo, espira quando si contrae. Cinque cicli completi.",
-      listening: "Le parole appaiono brevemente e svaniscono: leggile di corsa, senza perdere il filo. Alla fine, scegli la parola che ti ha toccato di più."
+      puzzle: I18n.t("inst_puzzle"),
+      spotDiff: I18n.t("inst_spotDiff"),
+      swipe: I18n.t("inst_swipe"),
+      tower: I18n.t("inst_tower"),
+      fragments: I18n.t("inst_fragments"),
+      gentle: I18n.t("inst_gentle"),
+      breathing: I18n.t("inst_breathing"),
+      listening: I18n.t("inst_listing")
     };
-    return byType[config.type] || config.description || "Segui le indicazioni a schermo per completare il gioco.";
+    return byType[config.type] || config.description || "";
   }
 
   function createListening(el, config, onDone) {
     var idx = 0;
     var words = config.testimonies;
-    var html = '<div class="listen-title">' + config.title + '</div>';
-    html += '<div class="listen-desc">' + config.description + '</div>';
+    var html = '<div class="listen-title">' + I18n.t("listenTitle") + '</div>';
+    html += '<div class="listen-desc">' + I18n.t("listenDesc") + '</div>';
     html += '<div class="listen-word" id="listen-word"></div>';
     html += '<div class="listen-progress" id="listen-progress"></div>';
     el.innerHTML = html;

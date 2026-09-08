@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Generate VITE Carrère icons — Adelphi-style book."""
-import struct, zlib, os, math
+"""Generate VITE Carrère icons — Adelphi-style book, maskable-safe."""
+import struct, zlib, os
 
 def create_png(width, height, pixels):
     def chunk(chunk_type, data):
@@ -19,12 +19,15 @@ def create_png(width, height, pixels):
 def lerp(a, b, t):
     return int(a + (b - a) * t)
 
-def generate_icon(size):
+def generate_icon(size, maskable=False):
     pixels = bytearray(size * size * 4)
     bg_top = (247, 242, 231)
     bg_bot = (237, 229, 213)
     gold = (184, 146, 62)
     ink = (31, 36, 48)
+
+    safe_margin = 0.20 if maskable else 0
+
     for y in range(size):
         t = y / size
         br = lerp(bg_top[0], bg_bot[0], t)
@@ -32,16 +35,33 @@ def generate_icon(size):
         bb = lerp(bg_top[2], bg_bot[2], t)
         for x in range(size):
             idx = (y * size + x) * 4
-            cx, cy = size * 0.5, size * 0.48
-            dx = x - cx
-            dy = y - cy
-            dist = (dx*dx + dy*dy) ** 0.5
-            nw = size * 0.35
-            nh = size * 0.42
-            inBook = abs(dx) < nw and abs(dy) < nh
-            if inBook:
-                edge_x = abs(abs(dx) - nw) < size * 0.015
-                edge_y = abs(abs(dy) - nh) < size * 0.015
+
+            if maskable:
+                nx = (x - size * safe_margin) / (size * (1 - 2 * safe_margin))
+                ny = (y - size * safe_margin) / (size * (1 - 2 * safe_margin))
+                cx, cy = 0.5, 0.48
+                nw = 0.35
+                nh = 0.42
+                dx = nx - cx
+                dy = ny - cy
+                inBook = abs(dx) < nw and abs(dy) < nh
+            else:
+                cx, cy = size * 0.5, size * 0.48
+                dx = x - cx
+                dy = y - cy
+                nw = size * 0.35
+                nh = size * 0.42
+                inBook = abs(dx) < nw and abs(dy) < nh
+
+            if maskable and (x < size * safe_margin or x >= size * (1 - safe_margin) or
+                             y < size * safe_margin or y >= size * (1 - safe_margin)):
+                pixels[idx] = bg_top[0]
+                pixels[idx+1] = bg_top[1]
+                pixels[idx+2] = bg_top[2]
+                pixels[idx+3] = 255
+            elif inBook:
+                edge_x = abs(abs(dx) - nw) < (size * 0.015 if not maskable else 0.015)
+                edge_y = abs(abs(dy) - nh) < (size * 0.015 if not maskable else 0.015)
                 if edge_x or edge_y:
                     pixels[idx] = gold[0]; pixels[idx+1] = gold[1]; pixels[idx+2] = gold[2]; pixels[idx+3] = 255
                 elif abs(dx) > nw * 0.85:
@@ -50,7 +70,7 @@ def generate_icon(size):
                     pixels[idx+2] = lerp(ink[2], bg_bot[2], 0.1)
                     pixels[idx+3] = 255
                 else:
-                    spine = abs(dx) < size * 0.01
+                    spine = abs(dx) < (size * 0.01 if not maskable else 0.01)
                     if spine:
                         pixels[idx] = gold[0]; pixels[idx+1] = gold[1]; pixels[idx+2] = gold[2]; pixels[idx+3] = 255
                     else:
@@ -77,16 +97,21 @@ def generate_svg():
 if __name__ == '__main__':
     icons_dir = os.path.join(os.path.dirname(__file__), 'icons')
     os.makedirs(icons_dir, exist_ok=True)
+
     print("Generating icon-192.png...")
     with open(os.path.join(icons_dir, 'icon-192.png'), 'wb') as f:
-        f.write(generate_icon(192))
-    print("Generating icon-512.png...")
+        f.write(generate_icon(192, maskable=False))
+
+    print("Generating icon-512.png (maskable)...")
     with open(os.path.join(icons_dir, 'icon-512.png'), 'wb') as f:
-        f.write(generate_icon(512))
+        f.write(generate_icon(512, maskable=True))
+
     print("Generating apple-touch-icon.png (180)...")
     with open(os.path.join(icons_dir, 'apple-touch-icon.png'), 'wb') as f:
-        f.write(generate_icon(180))
+        f.write(generate_icon(180, maskable=False))
+
     print("Generating icon.svg...")
     with open(os.path.join(icons_dir, 'icon.svg'), 'w') as f:
         f.write(generate_svg())
-    print("Done!")
+
+    print("Done! Icons generated with maskable padding.")
