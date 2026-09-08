@@ -1,7 +1,10 @@
 import { useRef } from 'react'
 import { Download, Zap, Undo2, Redo2, RotateCcw, Maximize, Save, Upload, Blend, Wrench, Layers } from 'lucide-react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 import { getDesktop, dataUrlToFile } from '../desktop'
+import { LanguageToggle } from './LanguageToggle'
+import { ThemeToggle } from './ThemeToggle'
 
 interface AppHeaderProps {
   onResize?: () => void
@@ -15,14 +18,15 @@ interface AppHeaderProps {
 
 export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, onToggleLeft, onToggleRight }: AppHeaderProps) {
   const { layers, activeLayerId, setProcessing, historyIndex, history, undo, redo, resetAll, saveProject, loadProject } = useLayerStore()
+  const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const openProjectFile = async (file: File) => {
-    setProcessing(true, 'Caricamento progetto...')
+    setProcessing(true, t('headerLoading'))
     try {
       await loadProject(file)
     } catch (err) {
-      window.alert(`Impossibile caricare il progetto: ${err instanceof Error ? err.message : 'file non valido'}`)
+      window.alert(`${t('headerLoadError')} ${err instanceof Error ? err.message : t('headerLoadErrorFallback')}`)
     }
     setProcessing(false)
   }
@@ -50,16 +54,16 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
         <button
           className={`nav-toggle ${leftOpen ? 'active' : ''}`}
           onClick={onToggleLeft}
-          title="Strumenti"
-          aria-label="Apri/chiudi strumenti"
+          title={t('headerTools')}
+          aria-label={t('headerToolsAria')}
         >
           <Wrench size={18} />
         </button>
         <button
           className={`nav-toggle ${rightOpen ? 'active' : ''}`}
           onClick={onToggleRight}
-          title="Livelli"
-          aria-label="Apri/chiudi livelli"
+          title={t('headerLayers')}
+          aria-label={t('headerLayersAria')}
         >
           <Layers size={18} />
         </button>
@@ -79,7 +83,7 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
         <button
           className="btn"
           onClick={handleLoadClick}
-          title="Carica progetto"
+          title={t('headerLoadProject')}
         >
           <Upload size={16} />
         </button>
@@ -87,7 +91,7 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn"
           onClick={saveProject}
           disabled={layers.length === 0}
-          title="Salva progetto"
+          title={t('headerSaveProject')}
         >
           <Save size={16} />
         </button>
@@ -95,7 +99,7 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn"
           onClick={onFilter}
           disabled={!activeLayerId}
-          title="Filtri immagine"
+          title={t('headerFilters')}
         >
           <Blend size={16} />
         </button>
@@ -103,15 +107,15 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn"
           onClick={onResize}
           disabled={layers.length === 0}
-          title="Ridimensiona canvas"
+          title={t('headerResize')}
         >
           <Maximize size={16} />
         </button>
         <button
           className="btn"
-          onClick={() => { if (window.confirm('Cancellare tutto e ricominciare da capo?')) resetAll() }}
+          onClick={() => { if (window.confirm(t('headerResetConfirm'))) resetAll() }}
           disabled={layers.length === 0}
-          title="Reset tutto"
+          title={t('headerReset')}
         >
           <RotateCcw size={16} />
         </button>
@@ -119,7 +123,7 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn"
           onClick={undo}
           disabled={historyIndex <= 0}
-          title="Annulla (Ctrl+Z)"
+          title={t('headerUndo')}
         >
           <Undo2 size={16} />
         </button>
@@ -127,7 +131,7 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn"
           onClick={redo}
           disabled={historyIndex < 0 || historyIndex >= history.length - 1}
-          title="Ripristina (Ctrl+Shift+Z)"
+          title={t('headerRedo')}
         >
           <Redo2 size={16} />
         </button>
@@ -135,11 +139,13 @@ export function AppHeader({ onResize, onFilter, onExport, leftOpen, rightOpen, o
           className="btn btn-primary"
           onClick={onExport}
           disabled={layers.length === 0}
-          title="Esporta immagine"
+          title={t('headerExport')}
         >
           <Download size={16} />
-          <span>Esporta</span>
+          <span>{t('headerExportBtn')}</span>
         </button>
+        <LanguageToggle />
+        <ThemeToggle />
       </div>
     </header>
   )

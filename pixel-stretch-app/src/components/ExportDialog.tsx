@@ -3,6 +3,7 @@ import { X, Download } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
 import { compositeLayers } from '../utils/canvas'
 import { getDesktop } from '../desktop'
+import { useI18n } from '../i18n/context'
 
 type ExportFormat = 'image/png' | 'image/jpeg' | 'image/webp'
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ExportDialog({ open, onClose }: Props) {
+  const { t, tp } = useI18n()
   const { layers, canvasSize, setProcessing } = useLayerStore()
   const [scale, setScale] = useState(1)
   const [format, setFormat] = useState<ExportFormat>('image/png')
@@ -27,7 +29,7 @@ export function ExportDialog({ open, onClose }: Props) {
   if (!open) return null
 
   const handleExport = async () => {
-    setProcessing(true, 'Esportazione...')
+    setProcessing(true, t('exportProcessing'))
     try {
       const comp = compositeLayers(layers, canvasSize.width, canvasSize.height)
 
@@ -88,7 +90,7 @@ export function ExportDialog({ open, onClose }: Props) {
       // Delay revocation: immediate revoke can cancel the download in some browsers
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
-      window.alert(`Esportazione fallita: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
+      window.alert(`${t('exportError')} ${err instanceof Error ? err.message : t('exportErrorFallback')}`)
     } finally {
       setProcessing(false)
       onClose()
@@ -99,12 +101,12 @@ export function ExportDialog({ open, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Esporta</h3>
+          <h3>{t('exportTitle')}</h3>
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body">
           <label>
-            Nome file:
+            {t('exportFileName')}
             <input
               type="text"
               value={fileName}
@@ -113,7 +115,7 @@ export function ExportDialog({ open, onClose }: Props) {
             />
           </label>
           <label>
-            Formato:
+            {t('exportFormat')}
             <select value={format} onChange={e => setFormat(e.target.value as ExportFormat)}>
               <option value="image/png">PNG</option>
               <option value="image/jpeg">JPEG</option>
@@ -122,7 +124,7 @@ export function ExportDialog({ open, onClose }: Props) {
           </label>
           {format !== 'image/png' && (
             <label>
-              Qualità: {quality}%
+              {tp('exportQuality', { quality })}%
               <input
                 type="range"
                 min={10}
@@ -134,7 +136,7 @@ export function ExportDialog({ open, onClose }: Props) {
             </label>
           )}
           <label>
-            Scala:
+            {t('exportScale')}
             <select value={scale} onChange={e => setScale(Number(e.target.value))}>
               <option value={0.5}>0.5x ({Math.round(canvasSize.width * 0.5)} x {Math.round(canvasSize.height * 0.5)})</option>
               <option value={1}>1x ({canvasSize.width} x {canvasSize.height})</option>
@@ -143,7 +145,7 @@ export function ExportDialog({ open, onClose }: Props) {
             </select>
           </label>
           <button className="btn btn-primary btn-export" onClick={handleExport}>
-            <Download size={16} /> Esporta
+            <Download size={16} /> {t('exportBtn')}
           </button>
         </div>
       </div>

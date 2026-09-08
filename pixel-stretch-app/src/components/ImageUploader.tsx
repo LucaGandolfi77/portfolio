@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { Upload } from 'lucide-react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 import { getDesktop, dataUrlToFile } from '../desktop'
 
@@ -19,6 +20,7 @@ async function convertHeicToFile(file: File): Promise<File> {
 
 export function ImageUploader() {
   const { addLayer, setCanvasSize, setProcessing } = useLayerStore()
+  const { t } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const processFile = useCallback(
@@ -29,13 +31,13 @@ export function ImageUploader() {
 
       let file = rawFile
       if (isHeicFile) {
-        setProcessing(true, 'Conversione HEIC → JPEG...')
+        setProcessing(true, t('uploaderProcessing'))
         try {
           file = await convertHeicToFile(rawFile)
         } catch (err) {
           console.error('HEIC conversion failed:', err)
           setProcessing(false)
-          alert('Conversione HEIC fallita. Riprova con un altro file.')
+          alert(t('uploaderHeicError'))
           return
         }
         setProcessing(false)
@@ -50,7 +52,6 @@ export function ImageUploader() {
           w = Math.round(w * scale)
           h = Math.round(h * scale)
         }
-        // Only resize the canvas on the first upload
         const { layers } = useLayerStore.getState()
         if (layers.length === 0) setCanvasSize({ width: w, height: h })
         const canvas = document.createElement('canvas')
@@ -63,11 +64,11 @@ export function ImageUploader() {
       }
       img.onerror = () => {
         URL.revokeObjectURL(url)
-        alert('Impossibile aprire il file. Il formato potrebbe non essere supportato.')
+        alert(t('uploaderFormatError'))
       }
       img.src = url
     },
-    [addLayer, setCanvasSize, setProcessing]
+    [addLayer, setCanvasSize, setProcessing, t]
   )
 
   const handleFiles = useCallback(
@@ -113,8 +114,9 @@ export function ImageUploader() {
       onClick={handleClick}
     >
       <Upload size={48} strokeWidth={1} />
-      <p>Trascina un'immagine qui</p>
-      <p className="uploader-hint">JPG, PNG, HEIC, HEIF — oppure clicca per sfogliare</p>
+      <p>{t('uploaderDrag')}</p>
+      <p className="uploader-hint">{t('uploaderHint')}</p>
+      <p className="uploader-privacy">{t('uploaderPrivacy')}</p>
       <input
         ref={inputRef}
         type="file"

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Maximize } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
+import { useI18n } from '../i18n/context'
 
 const PRESETS = [
   { label: '1:1', w: 1, h: 1 },
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function CanvasResizeDialog({ open, onClose }: Props) {
+  const { t } = useI18n()
   const { layers, canvasSize, setCanvasSize } = useLayerStore()
   const [width, setWidth] = useState(canvasSize.width)
   const [height, setHeight] = useState(canvasSize.height)
@@ -51,7 +53,7 @@ export function CanvasResizeDialog({ open, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Ridimensiona Canvas</h3>
+          <h3>{t('resizeTitle')}</h3>
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body">
@@ -60,13 +62,13 @@ export function CanvasResizeDialog({ open, onClose }: Props) {
               className={`toggle-btn ${mode === 'custom' ? 'active' : ''}`}
               onClick={() => setMode('custom')}
             >
-              Personalizzato
+              {t('resizeCustom')}
             </button>
             <button
               className={`toggle-btn ${mode === 'fit' ? 'active' : ''}`}
               onClick={() => { setMode('fit'); fitToContent() }}
             >
-              <Maximize size={14} /> Adatta
+              <Maximize size={14} /> {t('resizeFit')}
             </button>
           </div>
 
@@ -74,7 +76,7 @@ export function CanvasResizeDialog({ open, onClose }: Props) {
             <>
               <div className="resize-inputs">
                 <label>
-                  Larghezza:
+                  {t('resizeWidth')}
                   <input
                     type="number"
                     min={1}
@@ -85,7 +87,7 @@ export function CanvasResizeDialog({ open, onClose }: Props) {
                   />
                 </label>
                 <label>
-                  Altezza:
+                  {t('resizeHeight')}
                   <input
                     type="number"
                     min={1}
@@ -111,7 +113,7 @@ export function CanvasResizeDialog({ open, onClose }: Props) {
           )}
 
           <button className="btn btn-primary btn-export" onClick={handleApply}>
-            Applica
+            {t('resizeApply')}
           </button>
         </div>
       </div>

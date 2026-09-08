@@ -11,8 +11,10 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
+import { useI18n } from '../i18n/context'
 
 export function LayerPanel() {
+  const { t, tp } = useI18n()
   const {
     layers,
     activeLayerId,
@@ -39,7 +41,7 @@ export function LayerPanel() {
     opacityBeforeDrag.current = null
     const current = useLayerStore.getState().layers.find(l => l.id === layerId)?.opacity
     if (before !== null && current !== undefined && before !== current) {
-      useLayerStore.getState().pushHistory('Opacità layer')
+      useLayerStore.getState().pushHistory(t('layerHistoryOpacity'))
     }
   }
 
@@ -52,7 +54,7 @@ export function LayerPanel() {
     setDragIdx(idx)
   }
   const onDragEnd = () => {
-    if (dragIdx !== null) useLayerStore.getState().pushHistory('Riordina layer')
+    if (dragIdx !== null) useLayerStore.getState().pushHistory(t('layerHistoryReorder'))
     setDragIdx(null)
   }
 
@@ -69,14 +71,14 @@ export function LayerPanel() {
   return (
     <div className="layer-panel">
       <div className="panel-header">
-        <h3>Layers</h3>
+        <h3>{t('layerTitle')}</h3>
         <div className="panel-header-actions">
           <button
             className="btn btn-icon"
             onClick={mergeDown}
             disabled={layers.length < 2 || !(layers.findIndex(l => l.id === activeLayerId) > 0)}
-            title="Unisci al layer sottostante"
-            aria-label="Unisci al layer sottostante"
+            title={t('layerMerge')}
+            aria-label={t('layerMerge')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
@@ -84,8 +86,8 @@ export function LayerPanel() {
             className="btn btn-icon"
             onClick={flattenLayers}
             disabled={layers.length < 2}
-            title="Appiattisci tutti i layer visibili"
-            aria-label="Appiattisci"
+            title={t('layerFlatten')}
+            aria-label={t('layerFlatten')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3z"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
           </button>
@@ -157,7 +159,7 @@ export function LayerPanel() {
                   onKeyUp={() => commitOpacityHistory(layer.id)}
                   className="opacity-slider"
                   onClick={e => e.stopPropagation()}
-                  aria-label={`Opacità ${layer.name}`}
+                  aria-label={tp('layerOpacity', { name: layer.name })}
                 />
                 {layer.id === activeLayerId && (
                   <select
@@ -170,13 +172,13 @@ export function LayerPanel() {
                     onClick={e => e.stopPropagation()}
                     aria-label={`Blend mode ${layer.name}`}
                   >
-                    <option value="source-over">Normale</option>
-                    <option value="multiply">Moltiplica</option>
-                    <option value="screen">Schermo</option>
-                    <option value="overlay">Sovrapponi</option>
-                    <option value="difference">Differenza</option>
-                    <option value="lighten">Schiarisci</option>
-                    <option value="darken">Scuosisci</option>
+                    <option value="source-over">{t('layerBlendNormal')}</option>
+                    <option value="multiply">{t('layerBlendMultiply')}</option>
+                    <option value="screen">{t('layerBlendScreen')}</option>
+                    <option value="overlay">{t('layerBlendOverlay')}</option>
+                    <option value="difference">{t('layerBlendDifference')}</option>
+                    <option value="lighten">{t('layerBlendLighten')}</option>
+                    <option value="darken">{t('layerBlendDarken')}</option>
                   </select>
                 )}
               </div>
@@ -189,11 +191,11 @@ export function LayerPanel() {
                       e.stopPropagation()
                       if (realIdx < layers.length - 1) {
                         reorderLayer(realIdx, realIdx + 1)
-                        useLayerStore.getState().pushHistory('Riordina layer')
+                        useLayerStore.getState().pushHistory(t('layerHistoryReorder'))
                       }
                     }}
-                    title="Sposta su"
-                    aria-label="Sposta su"
+                    title={t('layerMoveUp')}
+                    aria-label={t('layerMoveUp')}
                   >
                     <ChevronUp size={14} />
                   </button>
@@ -203,36 +205,36 @@ export function LayerPanel() {
                       e.stopPropagation()
                       if (realIdx > 0) {
                         reorderLayer(realIdx, realIdx - 1)
-                        useLayerStore.getState().pushHistory('Riordina layer')
+                        useLayerStore.getState().pushHistory(t('layerHistoryReorder'))
                       }
                     }}
-                    title="Sposta giù"
-                    aria-label="Sposta giù"
+                    title={t('layerMoveDown')}
+                    aria-label={t('layerMoveDown')}
                   >
                     <ChevronDown size={14} />
                   </button>
                 </span>
                 <button
                   onClick={e => { e.stopPropagation(); toggleVisibility(layer.id) }}
-                  title={layer.visible ? 'Nascondi' : 'Mostra'}
+                  title={layer.visible ? t('layerHide') : t('layerShow')}
                 >
                   {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); setLocked(layer.id, !layer.locked) }}
-                  title={layer.locked ? 'Sblocca' : 'Blocca'}
+                  title={layer.locked ? t('layerUnlock') : t('layerLock')}
                 >
                   {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); duplicateLayer(layer.id) }}
-                  title="Duplica"
+                  title={t('layerDuplicate')}
                 >
                   <Copy size={14} />
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); removeLayer(layer.id) }}
-                  title="Elimina"
+                  title={t('layerDelete')}
                   className="btn-delete"
                 >
                   <Trash2 size={14} />
@@ -244,8 +246,8 @@ export function LayerPanel() {
       </div>
       {layers.length === 0 && (
         <div className="layer-empty">
-          <p>Nessun layer.</p>
-          <p>Carica un'immagine per iniziare.</p>
+          <p>{t('layerEmpty')}</p>
+          <p>{t('layerEmptyHint')}</p>
         </div>
       )}
     </div>

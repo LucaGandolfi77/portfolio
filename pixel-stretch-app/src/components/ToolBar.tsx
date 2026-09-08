@@ -11,37 +11,40 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
+import { useI18n } from '../i18n/context'
 import type { Tool } from '../types'
+import type { StringKey } from '../i18n/strings'
 
-const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
-  { id: 'select', label: 'Seleziona', icon: <MousePointer2 size={18} /> },
-  { id: 'move', label: 'Muovi', icon: <Move size={18} /> },
-  { id: 'zoom', label: 'Zoom', icon: <Search size={18} /> },
-  { id: 'stretch-radial', label: 'Stretch Radiale', icon: <StretchHorizontal size={18} /> },
-  { id: 'stretch-radial-full', label: 'Stretch Radiale Full', icon: <RefreshCw size={18} /> },
-  { id: 'stretch-row', label: 'Stretch Riga', icon: <AlignVerticalSpaceAround size={18} /> },
-  { id: 'stretch-column', label: 'Stretch Colonna', icon: <ChevronsLeftRight size={18} /> },
-  { id: 'stretch-mirror', label: 'Stretch Mirror', icon: <FlipHorizontal size={18} /> },
-  { id: 'twirl', label: 'Twirl', icon: <RefreshCw size={18} /> },
-  { id: 'stretch-warp', label: 'Stretch Warp', icon: <Waypoints size={18} /> },
-  { id: 'warp-grid', label: 'Warp Griglia', icon: <Grid3x3 size={18} /> },
+const tools: { id: Tool; labelKey: StringKey; icon: React.ReactNode }[] = [
+  { id: 'select', labelKey: 'toolSelect', icon: <MousePointer2 size={18} /> },
+  { id: 'move', labelKey: 'toolMove', icon: <Move size={18} /> },
+  { id: 'zoom', labelKey: 'toolZoom', icon: <Search size={18} /> },
+  { id: 'stretch-radial', labelKey: 'toolStretchRadial', icon: <StretchHorizontal size={18} /> },
+  { id: 'stretch-radial-full', labelKey: 'toolStretchRadialFull', icon: <RefreshCw size={18} /> },
+  { id: 'stretch-row', labelKey: 'toolStretchRow', icon: <AlignVerticalSpaceAround size={18} /> },
+  { id: 'stretch-column', labelKey: 'toolStretchColumn', icon: <ChevronsLeftRight size={18} /> },
+  { id: 'stretch-mirror', labelKey: 'toolStretchMirror', icon: <FlipHorizontal size={18} /> },
+  { id: 'twirl', labelKey: 'toolTwirl', icon: <RefreshCw size={18} /> },
+  { id: 'stretch-warp', labelKey: 'toolStretchWarp', icon: <Waypoints size={18} /> },
+  { id: 'warp-grid', labelKey: 'toolWarpGrid', icon: <Grid3x3 size={18} /> },
 ]
 
 export function ToolBar() {
   const { tool, setTool } = useLayerStore()
+  const { t } = useI18n()
 
   return (
     <div className="toolbar">
       <div className="tool-group">
-        {tools.map(t => (
+        {tools.map(item => (
           <button
-            key={t.id}
-            className={`tool-btn ${tool === t.id ? 'active' : ''}`}
-            onClick={() => setTool(t.id)}
-            title={t.label}
+            key={item.id}
+            className={`tool-btn ${tool === item.id ? 'active' : ''}`}
+            onClick={() => setTool(item.id)}
+            title={t(item.labelKey)}
           >
-            {t.icon}
-            <span className="tool-label">{t.label}</span>
+            {item.icon}
+            <span className="tool-label">{t(item.labelKey)}</span>
           </button>
         ))}
       </div>

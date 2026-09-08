@@ -1,12 +1,14 @@
 import { useCallback } from 'react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 
 export function useBackgroundRemoval() {
   const { setProcessing } = useLayerStore()
+  const { t, tp } = useI18n()
 
   const removeBackground = useCallback(
     async (sourceCanvas: HTMLCanvasElement, layerName: string) => {
-      setProcessing(true, 'Scontorno in corso... scaricamento modello (prima volta ~40MB)')
+      setProcessing(true, t('bgProcessingFast'))
 
       try {
         const blob = await new Promise<Blob>((resolve, reject) => {
@@ -16,7 +18,7 @@ export function useBackgroundRemoval() {
           )
         })
 
-        setProcessing(true, 'Analisi immagine con modello AI...')
+        setProcessing(true, t('bgProcessingAI'))
 
         // Lazy-load the ~1MB+ SDK only when actually used (keeps first paint fast)
         const { removeBackground: imglyRemoveBackground } = await import('@imgly/background-removal')
@@ -26,11 +28,11 @@ export function useBackgroundRemoval() {
           proxyToWorker: true,
           progress: (key: string, current: number, total: number) => {
             const pct = total > 0 ? Math.round((current / total) * 100) : 0
-            setProcessing(true, `Scaricamento ${key}: ${pct}%`)
+            setProcessing(true, tp('bgDownloading', { key, pct }))
           },
         })
 
-        setProcessing(true, 'Creazione layer scontornato...')
+        setProcessing(true, t('bgCreating'))
 
         const img = await createImageBitmap(result)
         const out = document.createElement('canvas')
@@ -40,13 +42,13 @@ export function useBackgroundRemoval() {
         ctx.drawImage(img, 0, 0)
 
         setProcessing(false)
-        return { canvas: out, name: `${layerName} (scontornato)` }
+        return { canvas: out, name: `${layerName} (${t('bgCutout')})` }
       } catch (err) {
         setProcessing(false)
         throw err
       }
     },
-    [setProcessing]
+    [setProcessing, t, tp]
   )
 
   return { removeBackground }

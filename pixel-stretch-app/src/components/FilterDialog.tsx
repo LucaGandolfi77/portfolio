@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
 import { brightnessContrast, saturation, gaussianBlur } from '../effects/imageFilters'
+import { useI18n } from '../i18n/context'
 
 type FilterType = 'brightness' | 'saturation' | 'blur'
 
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function FilterDialog({ open, onClose }: Props) {
+  const { t } = useI18n()
   const { activeLayerId, layers, addLayer } = useLayerStore()
   const [filterType, setFilterType] = useState<FilterType>('brightness')
   const [brightness, setBrightness] = useState(0)
@@ -37,7 +39,7 @@ export function FilterDialog({ open, onClose }: Props) {
         break
     }
     if (result) {
-      addLayer(result, `${activeLayer.name} - Filtro`)
+      addLayer(result, `${activeLayer.name} - ${t('filterSuffix')}`)
     }
     onClose()
   }
@@ -46,7 +48,7 @@ export function FilterDialog({ open, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Filtri Immagine</h3>
+          <h3>{t('filterTitle')}</h3>
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body">
@@ -55,47 +57,47 @@ export function FilterDialog({ open, onClose }: Props) {
               className={`toggle-btn ${filterType === 'brightness' ? 'active' : ''}`}
               onClick={() => setFilterType('brightness')}
             >
-              Luminosità/Contrasto
+              {t('filterBrightness')}
             </button>
             <button
               className={`toggle-btn ${filterType === 'saturation' ? 'active' : ''}`}
               onClick={() => setFilterType('saturation')}
             >
-              Saturazione
+              {t('filterSaturation')}
             </button>
             <button
               className={`toggle-btn ${filterType === 'blur' ? 'active' : ''}`}
               onClick={() => setFilterType('blur')}
             >
-              Sfocatura
+              {t('filterBlur')}
             </button>
           </div>
 
           {filterType === 'brightness' && (
             <>
-              <label>Luminosità: {brightness}</label>
+              <label>{t('filterBrightnessLabel')} {brightness}</label>
               <input type="range" min={-100} max={100} value={brightness} onChange={e => setBrightness(Number(e.target.value))} className="modal-slider" />
-              <label>Contrasto: {contrast}</label>
+              <label>{t('filterContrastLabel')} {contrast}</label>
               <input type="range" min={-100} max={100} value={contrast} onChange={e => setContrast(Number(e.target.value))} className="modal-slider" />
             </>
           )}
 
           {filterType === 'saturation' && (
             <>
-              <label>Saturazione: {sat}%</label>
+              <label>{t('filterSaturationLabel')} {sat}%</label>
               <input type="range" min={-100} max={100} value={sat} onChange={e => setSat(Number(e.target.value))} className="modal-slider" />
             </>
           )}
 
           {filterType === 'blur' && (
             <>
-              <label>Raggio: {blurRadius}px</label>
+              <label>{t('filterRadiusLabel')} {blurRadius}px</label>
               <input type="range" min={1} max={20} value={blurRadius} onChange={e => setBlurRadius(Number(e.target.value))} className="modal-slider" />
             </>
           )}
 
           <button className="btn btn-primary btn-export" onClick={handleApply}>
-            Applica Filtro
+            {t('filterApply')}
           </button>
         </div>
       </div>

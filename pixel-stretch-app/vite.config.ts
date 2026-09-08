@@ -32,16 +32,26 @@ export default defineConfig({
         globIgnores: ['**/ort-*.wasm', '**/transformers-vendor-*', '**/heic-vendor-*', '**/ort-*.mjs'],
       },
       manifest: {
-        name: 'Pixel Stretch - Photo Editor',
+        name: 'Pixel Stretch — Photo Editor',
         short_name: 'Pixel Stretch',
-        description: 'Scontorna foto, applica effetti pixel stretch e gestisci livelli. Tutto offline.',
+        description: 'Pixel stretch effects + AI background removal. 11 tools, layers, offline. Your photos never leave your device.',
         theme_color: '#00c8ff',
         background_color: '#0d0d0d',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
+        categories: ['photography', 'design', 'graphics'],
         // Relative start_url/scope so installability works at any mount path.
         start_url: './',
         scope: './',
+        shortcuts: [
+          {
+            name: 'New Edit',
+            short_name: 'New',
+            url: './',
+            description: 'Start a new photo edit'
+          }
+        ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

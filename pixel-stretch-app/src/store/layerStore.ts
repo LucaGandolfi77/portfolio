@@ -2,6 +2,13 @@ import { create } from 'zustand'
 import type { Layer, Tool, CanvasSize, BlendMode, EasingCurve, WarpGrid, WarpGridPoint, SourceLine, StretchPreview } from '../types'
 import { getDefaultGridPoints } from '../effects/gridWarp'
 import { getDesktop } from '../desktop'
+import { makeT } from '../i18n/context'
+import type { Lang } from '../i18n/strings'
+
+function getT() {
+  const lang = (localStorage.getItem('pixel-stretch-lang') || 'it') as Lang
+  return makeT(lang)
+}
 
 let _id = 0
 const uid = () => `layer-${++_id}-${Date.now()}`
@@ -35,7 +42,7 @@ const INITIAL_HISTORY_ENTRY: HistoryEntry = {
   layers: [],
   activeLayerId: null,
   canvasSize: { width: 800, height: 600 },
-  label: 'Nuovo documento',
+  label: getT()('storeNewDocument'),
 }
 
 interface LayerStore {
@@ -154,7 +161,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
             : state.activeLayerId,
       }
     })
-    get().pushHistory('Elimina layer')
+    get().pushHistory(getT()('storeDeleteLayer'))
   },
 
   duplicateLayer: (id) => {
@@ -175,7 +182,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         l.id === id ? { ...l, visible: !l.visible } : l
       ),
     }))
-    get().pushHistory('Visibilità layer')
+    get().pushHistory(getT()('storeVisibility'))
   },
 
   // NOTE: no history push here — the opacity slider fires continuously;
@@ -193,7 +200,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         l.id === id ? { ...l, locked } : l
       ),
     }))
-    get().pushHistory(locked ? 'Blocca layer' : 'Sblocca layer')
+    get().pushHistory(locked ? getT()('storeLock') : getT()('storeUnlock'))
   },
 
   renameLayer: (id, name) => {
@@ -202,7 +209,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         l.id === id ? { ...l, name } : l
       ),
     }))
-    get().pushHistory('Rinomina layer')
+    get().pushHistory(getT()('storeRename'))
   },
 
   setLayerCompositeOperation: (id, op) => {
@@ -211,7 +218,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         l.id === id ? { ...l, compositeOperation: op } : l
       ),
     }))
-    get().pushHistory('Blend mode layer')
+    get().pushHistory(getT()('storeBlendMode'))
   },
 
   // NOTE: no history push here — drag&drop reorders fire continuously;
@@ -253,7 +260,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
       layers: state.layers.filter(l => l.id !== top.id),
       activeLayerId: bottom.id,
     }))
-    get().pushHistory('Unisci sotto')
+    get().pushHistory(getT()('storeMergeDown'))
   },
 
   flattenLayers: () => {
@@ -278,7 +285,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
     set({
       layers: [{
         id,
-        name: 'Appiattito',
+        name: getT()('storeFlattened'),
         canvas: out,
         visible: true,
         opacity: 1,
@@ -289,7 +296,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
       }],
       activeLayerId: id,
     })
-    get().pushHistory('Appiattisci')
+    get().pushHistory(getT()('storeFlatten'))
   },
 
   setTool: (tool) => {
@@ -308,7 +315,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
 
   setCanvasSize: (size) => {
     set({ canvasSize: size })
-    get().pushHistory('Ridimensiona canvas')
+    get().pushHistory(getT()('storeResize'))
   },
   setProcessing: (isProcessing, message = '') =>
     set({ isProcessing, processingMessage: message }),
@@ -351,7 +358,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
       zoom: 1,
       panOffset: { x: 0, y: 0 },
     })
-    get().pushHistory('Reset documento')
+    get().pushHistory(getT()('storeReset'))
   },
 
   saveProject: () => {
@@ -383,7 +390,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         desktop.saveFile({
           defaultName: `pixel-stretch-project-${Date.now()}.json`,
           data: buf,
-          filters: [{ name: 'Progetto Pixel Stretch', extensions: ['json'] }],
+          filters: [{ name: getT()('storeSaveFilter'), extensions: ['json'] }],
         })
       )
       return
@@ -401,7 +408,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
   loadProject: async (file: File) => {
     const text = await file.text()
     const data = JSON.parse(text)
-    if (!data.layers || !data.canvasSize) throw new Error('Progetto non valido')
+    if (!data.layers || !data.canvasSize) throw new Error(getT()('storeInvalidProject'))
 
     const layers: Layer[] = await Promise.all(
       data.layers.map(async (ld: any) => {
@@ -439,19 +446,21 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
       sourceLine: null,
       stretchPreview: null,
     })
-    get().pushHistory('Carica progetto')
+    get().pushHistory(getT()('storeLoadProject'))
   },
 
   getActiveLayer: () => get().layers.find(l => l.id === get().activeLayerId),
 
-  pushHistory: (label = 'Modifica') => {
+  pushHistory: (label?: string) => {
+    const t = getT()
+    const resolvedLabel = label ?? t('storeEdit')
     const { layers, activeLayerId, canvasSize, history, historyIndex } = get()
     const truncated = history.slice(0, historyIndex + 1)
     truncated.push({
       layers: [...layers],
       activeLayerId,
       canvasSize,
-      label,
+      label: resolvedLabel,
     })
     while (truncated.length > MAX_HISTORY) truncated.shift()
     // Evict oldest entries when estimated retained memory exceeds the cap

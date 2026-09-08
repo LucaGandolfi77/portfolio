@@ -1,10 +1,12 @@
 import { Scissors, Sparkles } from 'lucide-react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval'
 import { useBackgroundRemovalTransformers } from '../hooks/useBackgroundRemovalTransformers'
 
 export function BackgroundRemovalSection() {
   const { activeLayerId, layers, addLayer, isProcessing } = useLayerStore()
+  const { t } = useI18n()
   const { removeBackground: removeFast } = useBackgroundRemoval()
   const { removeBackground: removePrecise } = useBackgroundRemovalTransformers()
 
@@ -17,7 +19,7 @@ export function BackgroundRemovalSection() {
       if (result) addLayer(result.canvas, result.name)
     } catch (err) {
       console.error('Background removal (imgly) failed:', err)
-      alert('Scontorno rapido fallito. Riprova con "Preciso".')
+      alert(t('bgFastError'))
     }
   }
 
@@ -28,14 +30,14 @@ export function BackgroundRemovalSection() {
       if (result) addLayer(result.canvas, result.name)
     } catch (err) {
       console.error('Background removal (transformers) failed:', err)
-      alert('Scontorno preciso fallito. Verifica la connessione o riprova con "Rapido".')
+      alert(t('bgPreciseError'))
     }
   }
 
   return (
     <div className="bg-removal-section">
       <div className="section-header">
-        <h3>Scontorno</h3>
+        <h3>{t('bgTitle')}</h3>
       </div>
       <div className="bg-removal-buttons">
         <button
@@ -45,7 +47,7 @@ export function BackgroundRemovalSection() {
           title="@imgly IS-Net (~40MB, offline, AGPL)"
         >
           <Scissors size={16} />
-          <span>Rapido</span>
+          <span>{t('bgFast')}</span>
           <small>imgly</small>
         </button>
         <button
@@ -55,7 +57,7 @@ export function BackgroundRemovalSection() {
           title="Transformers.js ormbg (~44MB, Apache 2.0)"
         >
           <Sparkles size={16} />
-          <span>Preciso</span>
+          <span>{t('bgPrecise')}</span>
           <small>AI</small>
         </button>
       </div>

@@ -1,7 +1,9 @@
 import { History } from 'lucide-react'
 import { useLayerStore } from '../store/layerStore'
+import { useI18n } from '../i18n/context'
 
 export function HistoryPanel() {
+  const { t } = useI18n()
   const history = useLayerStore(s => s.history)
   const historyIndex = useLayerStore(s => s.historyIndex)
   const jumpToHistory = useLayerStore(s => s.jumpToHistory)
@@ -11,10 +13,10 @@ export function HistoryPanel() {
       <div className="panel-header">
         <h3>
           <History size={12} style={{ marginRight: 6, verticalAlign: -2 }} />
-          Cronologia
+          {t('historyTitle')}
         </h3>
       </div>
-      <div className="history-list" role="listbox" aria-label="Cronologia modifiche">
+      <div className="history-list" role="listbox" aria-label={t('historyAria')}>
         {history.map((entry, i) => (
           <button
             key={i}
@@ -22,7 +24,7 @@ export function HistoryPanel() {
             aria-selected={i === historyIndex}
             className={`history-item ${i === historyIndex ? 'active' : ''}`}
             onClick={() => jumpToHistory(i)}
-            title={`Vai allo stato: ${entry.label}`}
+            title={`${t('historyGoTo')} ${entry.label}`}
           >
             <span className="history-index">{i}</span>
             <span className="history-label">{entry.label}</span>

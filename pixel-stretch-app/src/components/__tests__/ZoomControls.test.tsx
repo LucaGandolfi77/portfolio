@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ZoomControls } from '../ZoomControls'
 import { useLayerStore } from '../../store/layerStore'
+import { renderWithI18n } from '../../test-utils'
 
 describe('ZoomControls', () => {
   beforeEach(() => {
@@ -10,13 +11,13 @@ describe('ZoomControls', () => {
   })
 
   it('renders zoom percentage', () => {
-    render(<ZoomControls />)
+    render(renderWithI18n(<ZoomControls />))
     expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
   it('zoomIn increases percentage', async () => {
     const user = userEvent.setup()
-    render(<ZoomControls />)
+    render(renderWithI18n(<ZoomControls />))
     const plusBtn = screen.getByTitle('Zoom in (+)')
     await user.click(plusBtn)
     expect(screen.getByText('125%')).toBeInTheDocument()
@@ -24,7 +25,7 @@ describe('ZoomControls', () => {
 
   it('zoomOut decreases percentage', async () => {
     const user = userEvent.setup()
-    render(<ZoomControls />)
+    render(renderWithI18n(<ZoomControls />))
     const minusBtn = screen.getByTitle('Zoom out (-)')
     await user.click(minusBtn)
     expect(screen.getByText('75%')).toBeInTheDocument()
@@ -33,15 +34,15 @@ describe('ZoomControls', () => {
   it('reset button resets to 100%', async () => {
     const user = userEvent.setup()
     useLayerStore.setState({ zoom: 3 })
-    render(<ZoomControls />)
+    render(renderWithI18n(<ZoomControls />))
     expect(screen.getByText('300%')).toBeInTheDocument()
-    const resetBtn = screen.getByTitle('Adatta alla vista (Ctrl+0)')
+    const resetBtn = screen.getByTitle('Fit to view (Ctrl+0)')
     await user.click(resetBtn)
     expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
   it('shows separator', () => {
-    const { container } = render(<ZoomControls />)
+    const { container } = render(renderWithI18n(<ZoomControls />))
     expect(container.querySelector('.zoom-separator')).toBeInTheDocument()
   })
 })

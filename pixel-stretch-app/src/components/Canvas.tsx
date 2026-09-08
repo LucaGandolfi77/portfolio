@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from 'react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 import { useModifierKeys } from '../hooks/useKeyboard'
 import { radialStretch, radialStretchFull, rowStretch, columnStretch, selectionWarp, mirrorStretch, twirlEffect } from '../effects/pixelStretch'
@@ -28,6 +29,7 @@ const TAP_SLOP = 4
 
 export function Canvas() {
   useModifierKeys()
+  const { t } = useI18n()
 
   const {
     layers,
@@ -543,7 +545,7 @@ export function Canvas() {
     }
 
     if (drag.mode === 'pan' || drag.mode === 'move-layer') {
-      if (drag.mode === 'move-layer') useLayerStore.getState().pushHistory('Sposta layer')
+      if (drag.mode === 'move-layer') useLayerStore.getState().pushHistory(t('canvasHistoryMove'))
       dragRef.current = null
       forceRender(n => n + 1)
       return
@@ -591,7 +593,7 @@ export function Canvas() {
           fn: 'radialStretch',
           canvas: activeLayer.canvas,
           args: [cx, cy, stretchH, stretchV, blendMode, easing],
-          name: `${activeLayer.name} - Stretch Radiale`,
+          name: `${activeLayer.name} - ${t('canvasLayerRadial')}`,
           fallback: () => radialStretch(activeLayer.canvas, cx, cy, stretchH, stretchV, blendMode, easing),
         }
       }
@@ -606,7 +608,7 @@ export function Canvas() {
           fn: 'radialStretchFull',
           canvas: activeLayer.canvas,
           args: [cx, cy, radius, blendMode, easing],
-          name: `${activeLayer.name} - Stretch Radiale Full`,
+          name: `${activeLayer.name} - ${t('canvasLayerRadialFull')}`,
           fallback: () => radialStretchFull(activeLayer.canvas, cx, cy, radius, blendMode, easing),
         }
       }
@@ -622,7 +624,7 @@ export function Canvas() {
           fn: 'twirlEffect',
           canvas: activeLayer.canvas,
           args: [cx, cy, intensity, blendMode, radius],
-          name: `${activeLayer.name} - Twirl`,
+          name: `${activeLayer.name} - ${t('canvasLayerTwirl')}`,
           fallback: () => twirlEffect(activeLayer.canvas, cx, cy, intensity, blendMode, radius),
         }
       }
@@ -635,7 +637,7 @@ export function Canvas() {
           fn: 'mirrorStretch',
           canvas: activeLayer.canvas,
           args: ['column', cx, dx, blendMode],
-          name: `${activeLayer.name} - Mirror Colonna`,
+          name: `${activeLayer.name} - ${t('canvasLayerMirrorCol')}`,
           fallback: () => mirrorStretch(activeLayer.canvas, 'column', cx, dx, blendMode),
         }
       } else if (dy > 2) {
@@ -644,7 +646,7 @@ export function Canvas() {
           fn: 'mirrorStretch',
           canvas: activeLayer.canvas,
           args: ['row', cy, dy, blendMode],
-          name: `${activeLayer.name} - Mirror Riga`,
+          name: `${activeLayer.name} - ${t('canvasLayerMirrorRow')}`,
           fallback: () => mirrorStretch(activeLayer.canvas, 'row', cy, dy, blendMode),
         }
       }
@@ -660,7 +662,7 @@ export function Canvas() {
           fn: 'selectionWarp',
           canvas: activeLayer.canvas,
           args: [selX, selY, selW, selH, dX, dY, blendMode],
-          name: `${activeLayer.name} - Stretch Warp`,
+          name: `${activeLayer.name} - ${t('canvasLayerWarp')}`,
           fallback: () => selectionWarp(activeLayer.canvas, selX, selY, selW, selH, dX, dY, blendMode),
         }
       }
@@ -677,7 +679,7 @@ export function Canvas() {
               fn: 'rowStretch',
               canvas: activeLayer.canvas,
               args: [row, stretchUp, stretchDown, blendMode, easing],
-              name: `${activeLayer.name} - Stretch Riga`,
+              name: `${activeLayer.name} - ${t('canvasLayerRow')}`,
               fallback: () => rowStretch(activeLayer.canvas, row, stretchUp, stretchDown, blendMode, easing),
             }
           }
@@ -691,7 +693,7 @@ export function Canvas() {
               fn: 'columnStretch',
               canvas: activeLayer.canvas,
               args: [col, stretchLeft, stretchRight, blendMode, easing],
-              name: `${activeLayer.name} - Stretch Colonna`,
+              name: `${activeLayer.name} - ${t('canvasLayerCol')}`,
               fallback: () => columnStretch(activeLayer.canvas, col, stretchLeft, stretchRight, blendMode, easing),
             }
           }
@@ -709,7 +711,7 @@ export function Canvas() {
     if (!plan) return
 
     applyingRef.current = true
-    store.setProcessing(true, 'Applicazione effetto...')
+    store.setProcessing(true, t('canvasProcessing'))
     try {
       let result: HTMLCanvasElement
       if (!isWorkerUnavailable()) {
@@ -730,7 +732,7 @@ export function Canvas() {
       store.setProcessing(false)
       forceRender(n => n + 1)
     }
-  }, [activeLayer, blendMode, easing, setStretchPreview, symmetricStretch])
+    }, [activeLayer, blendMode, easing, setStretchPreview, symmetricStretch, t])
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -798,9 +800,9 @@ export function Canvas() {
       const result = applyGridWarp(activeLayer.canvas, warpGrid.controlPoints, blendMode)
       const compOp: GlobalCompositeOperation | undefined =
         blendMode !== 'normal' && blendMode !== 'dissolve' ? blendMode : undefined
-      useLayerStore.getState().addLayer(result, `${activeLayer.name} - Warp Griglia`, compOp)
+      useLayerStore.getState().addLayer(result, `${activeLayer.name} - ${t('canvasLayerGrid')}`, compOp)
     }
-  }, [activeLayer, warpGrid.controlPoints, blendMode])
+  }, [activeLayer, warpGrid.controlPoints, blendMode, t])
 
   useEffect(() => {
     if (tool !== 'warp-grid' || !warpGrid.active) return
@@ -997,7 +999,7 @@ export function Canvas() {
     <div className="canvas-container" ref={containerRef}>
       {layers.length === 0 ? (
         <div className="canvas-empty">
-          <p>Carica un'immagine per iniziare</p>
+          <p>{t('canvasEmpty')}</p>
         </div>
       ) : (
         <div
@@ -1030,8 +1032,8 @@ export function Canvas() {
             <>
               <WarpGridOverlay canvasWidth={canvasSize.width} canvasHeight={canvasSize.height} onApply={applyGridWarpToActive} />
               <div className="warp-grid-actions">
-                <button className="btn btn-primary" onClick={applyGridWarpToActive}>Applica Warp</button>
-                <button className="btn" onClick={() => useLayerStore.getState().resetWarpGrid()}>Reset Griglia</button>
+                <button className="btn btn-primary" onClick={applyGridWarpToActive}>{t('canvasApplyWarp')}</button>
+                <button className="btn" onClick={() => useLayerStore.getState().resetWarpGrid()}>{t('canvasResetGrid')}</button>
               </div>
             </>
           )}

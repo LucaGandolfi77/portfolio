@@ -11,7 +11,10 @@ import { ExportDialog } from './components/ExportDialog'
 import { CanvasResizeDialog } from './components/CanvasResizeDialog'
 import { FilterDialog } from './components/FilterDialog'
 import { BackgroundRemovalSection } from './components/BackgroundRemovalSection'
+import { OnboardingTutorial } from './components/OnboardingTutorial'
+import { InstallBanner } from './components/InstallBanner'
 import { useLayerStore } from './store/layerStore'
+import { useI18n } from './i18n/context'
 import type { Tool } from './types'
 
 function useViewportHeight() {
@@ -35,35 +38,41 @@ function useViewportHeight() {
 type MobilePanel = 'none' | 'left' | 'right'
 
 /** Compact on-canvas instructions for mobile (the side panels are drawers). */
-const TOOL_HINTS: Partial<Record<Tool, string>> = {
-  select: 'Tocca un livello per selezionarlo, trascina per spostarlo',
-  move: 'Trascina per spostare la vista — pizzica per lo zoom',
-  zoom: 'Tocca per ingrandire — pizzica per lo zoom',
-  'stretch-radial': 'Trascina dal punto da stirare (orizzontale e verticale)',
-  'stretch-radial-full': 'Tocca il centro, poi trascina per impostare il raggio',
-  'stretch-row': '1) Tocca per scegliere la riga  2) Trascina per stirare',
-  'stretch-column': '1) Tocca per scegliere la colonna  2) Trascina per stirare',
-  'stretch-mirror': 'Tocca il punto sorgente, poi trascina per specchiare',
-  twirl: 'Tocca il centro, trascina per impostare l\u2019intensit\u00e0',
-  'stretch-warp': 'Trascina per selezionare l\u2019area da distorcere',
-  'warp-grid': 'Trascina i punti di controllo, poi Applica Warp',
+function useToolHints(): Partial<Record<Tool, string>> {
+  const { t } = useI18n()
+  return {
+    select: t('mobileHintSelect'),
+    move: t('mobileHintMove'),
+    zoom: t('mobileHintZoom'),
+    'stretch-radial': t('mobileHintRadial'),
+    'stretch-radial-full': t('mobileHintRadialFull'),
+    'stretch-row': t('mobileHintRow'),
+    'stretch-column': t('mobileHintColumn'),
+    'stretch-mirror': t('mobileHintMirror'),
+    twirl: t('mobileHintTwirl'),
+    'stretch-warp': t('mobileHintWarp'),
+    'warp-grid': t('mobileHintGrid'),
+  }
 }
 
 function MobileToolHint() {
   const tool = useLayerStore(s => s.tool)
   const sourceLine = useLayerStore(s => s.sourceLine)
   const layers = useLayerStore(s => s.layers)
+  const { t } = useI18n()
+  const TOOL_HINTS = useToolHints()
   if (layers.length === 0) return null
 
   let text = TOOL_HINTS[tool] ?? ''
   if (sourceLine && (tool === 'stretch-row' || tool === 'stretch-column')) {
-    text = `${sourceLine.type === 'row' ? 'Riga' : 'Colonna'} ${sourceLine.position} attiva — trascina per stirare (tocca altrove per cambiarla)`
+    const lineType = sourceLine.type === 'row' ? t('stretchRow') : t('stretchColumn')
+    text = `${lineType} ${sourceLine.position} ${t('mobileSourceActive')}`
   }
   if (!text) return null
 
   return (
     <div className="mobile-tool-hint">
-      <strong>{tool === 'stretch-row' || tool === 'stretch-column' ? 'Sorgente: ' : ''}</strong>
+      <strong>{tool === 'stretch-row' || tool === 'stretch-column' ? t('mobileSourceLabel') : ''}</strong>
       {text}
     </div>
   )
@@ -71,6 +80,7 @@ function MobileToolHint() {
 
 export default function App() {
   useViewportHeight()
+  usePasteHandler()
   const { layers } = useLayerStore()
   const [exportOpen, setExportOpen] = useState(false)
   const [resizeOpen, setResizeOpen] = useState(false)
@@ -81,6 +91,49 @@ export default function App() {
   useEffect(() => {
     if (exportOpen || resizeOpen || filterOpen) setMobilePanel('none')
   }, [exportOpen, resizeOpen, filterOpen])
+
+  function usePasteHandler() {
+  const { addLayer, setCanvasSize } = useLayerStore()
+  const { t } = useI18n()
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (!file) return
+          const img = new Image()
+          const url = URL.createObjectURL(file)
+          img.onload = () => {
+            let w = img.width
+            let h = img.height
+            if (w > 2000 || h > 2000) {
+              const scale = 2000 / Math.max(w, h)
+              w = Math.round(w * scale)
+              h = Math.round(h * scale)
+            }
+            const state = useLayerStore.getState()
+            if (state.layers.length === 0) setCanvasSize({ width: w, height: h })
+            const canvas = document.createElement('canvas')
+            canvas.width = w
+            canvas.height = h
+            const ctx = canvas.getContext('2d')!
+            ctx.drawImage(img, 0, 0, w, h)
+            addLayer(canvas, file.name.replace(/\.[^.]+$/, '') || t('uploaderPasted'))
+            URL.revokeObjectURL(url)
+          }
+          img.src = url
+          return
+        }
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [addLayer, setCanvasSize, t])
+}
 
   const togglePanel = (panel: 'left' | 'right') =>
     setMobilePanel(p => (p === panel ? 'none' : panel))
@@ -121,6 +174,8 @@ export default function App() {
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
       <CanvasResizeDialog open={resizeOpen} onClose={() => setResizeOpen(false)} />
       <FilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} />
+      <OnboardingTutorial />
+      <InstallBanner />
     </div>
   )
 }

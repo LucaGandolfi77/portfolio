@@ -1,8 +1,10 @@
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 
 export function ZoomControls() {
   const { zoom, zoomIn, zoomOut, resetView } = useLayerStore()
+  const { t } = useI18n()
 
   return (
     <div className="zoom-controls">
@@ -14,7 +16,7 @@ export function ZoomControls() {
         <ZoomIn size={16} />
       </button>
       <div className="zoom-separator" />
-      <button className="zoom-btn" onClick={resetView} title="Adatta alla vista (Ctrl+0)">
+      <button className="zoom-btn" onClick={resetView} title={t('zoomFit')}>
         <Maximize size={16} />
       </button>
     </div>

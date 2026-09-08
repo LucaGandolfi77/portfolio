@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { useI18n } from '../i18n/context'
 import { useLayerStore } from '../store/layerStore'
 
 let pipelineInstance: any = null
@@ -34,12 +35,13 @@ async function getPipeline() {
 
 export function useBackgroundRemovalTransformers() {
   const { setProcessing } = useLayerStore()
+  const { t } = useI18n()
   const abortRef = useRef(false)
 
   const removeBackground = useCallback(
     async (sourceCanvas: HTMLCanvasElement, layerName: string) => {
       abortRef.current = false
-      setProcessing(true, 'Caricamento modello Transformers.js (~44MB, prima volta)...')
+      setProcessing(true, t('bgPreciseLoading'))
 
       try {
         const blob = await new Promise<Blob>((resolve, reject) => {
@@ -49,17 +51,17 @@ export function useBackgroundRemovalTransformers() {
           )
         })
 
-        setProcessing(true, 'Analisi immagine con ormbg (Apache 2.0)...')
+        setProcessing(true, t('bgPreciseAnalysis'))
 
         const { pipe, RawImage } = await getPipeline()
-        if (abortRef.current) throw new Error('Operazione annullata')
+        if (abortRef.current) throw new Error(t('bgPreciseCancelled'))
 
         const image = await RawImage.fromBlob(blob)
         const result = await pipe(image)
 
-        if (abortRef.current) throw new Error('Operazione annullata')
+        if (abortRef.current) throw new Error(t('bgPreciseCancelled'))
 
-        setProcessing(true, 'Creazione layer scontornato...')
+        setProcessing(true, t('bgCreating'))
 
         const outCanvas = document.createElement('canvas')
         outCanvas.width = result.width
@@ -70,14 +72,14 @@ export function useBackgroundRemovalTransformers() {
         ctx.drawImage(imageData, 0, 0)
 
         setProcessing(false)
-        return { canvas: outCanvas, name: `${layerName} (scontornato AI)` }
+        return { canvas: outCanvas, name: `${layerName} (${t('bgPreciseCutout')})` }
       } catch (err: any) {
         setProcessing(false)
-        if (err?.message === 'Operazione annullata') return null
+        if (err?.message === t('bgPreciseCancelled')) return null
         throw err
       }
     },
-    [setProcessing]
+    [setProcessing, t]
   )
 
   return { removeBackground }
