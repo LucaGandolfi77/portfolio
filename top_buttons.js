@@ -19,11 +19,18 @@ if (!document.getElementById('site-top-bar')) {
 
     const style = document.createElement('style');
     style.textContent = `
-      #site-top-bar { position: fixed; top: 0; left: 0; right: 0; height: ${BAR_HEIGHT}px; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: rgba(11,107,154,0.95); color: #fff; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.25); backdrop-filter: blur(6px); }
+      #site-top-bar { position: fixed; top: 0; left: 0; right: 0; height: ${BAR_HEIGHT}px; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: linear-gradient(135deg, rgba(179,232,54,0.12), rgba(124,191,31,0.06)); color: #b3e836; z-index: 9999; box-shadow: 0 1px 12px rgba(179,232,54,0.1), 0 0 0 1px rgba(179,232,54,0.05) inset; backdrop-filter: blur(12px); border-bottom: 1px solid rgba(179,232,54,0.15); }
       #site-top-bar .site-top-left, #site-top-bar .site-top-right { display:flex; align-items:center; gap:8px; }
-      #site-top-bar .tb { padding: 8px 12px; border-radius: 8px; font-weight:700; border: none; cursor: pointer; background: rgba(255,255,255,0.08); color: #fff; }
-      #site-top-bar .tb:hover { background: rgba(255,255,255,0.12); }
+      #site-top-bar .tb { padding: 8px 14px; border-radius: 10px; font-weight:700; border: 1px solid rgba(179,232,54,0.15); cursor: pointer; background: rgba(179,232,54,0.06); color: #b3e836; transition: all 0.3s ease; backdrop-filter: blur(4px); }
+      #site-top-bar .tb:hover { background: rgba(179,232,54,0.15); border-color: rgba(179,232,54,0.3); box-shadow: 0 0 10px rgba(179,232,54,0.2); }
       body { --site-top-bar-height: ${BAR_HEIGHT}px; }
+      #site-top-bar::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,#b3e836,#7cbf1f,#b3e836,transparent); background-size:200% 100%; animation:topbar-shimmer 3s linear infinite; opacity:0.7; }
+      @keyframes topbar-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      [data-theme="light"] #site-top-bar { background: linear-gradient(135deg, rgba(75,125,28,0.1), rgba(124,191,31,0.05)); color: #4b7d1c; border-bottom-color: rgba(75,125,28,0.15); box-shadow: 0 1px 12px rgba(75,125,28,0.08), 0 0 0 1px rgba(75,125,28,0.04) inset; }
+      [data-theme="light"] #site-top-bar .tb { background: rgba(75,125,28,0.06); color: #4b7d1c; border-color: rgba(75,125,28,0.12); }
+      [data-theme="light"] #site-top-bar .tb:hover { background: rgba(75,125,28,0.15); border-color: rgba(75,125,28,0.3); color: #38601a; box-shadow: 0 0 10px rgba(75,125,28,0.15); }
+      [data-theme="light"] #site-top-bar::after { background: linear-gradient(90deg, transparent, #4b7d1c, #38601a, #4b7d1c, transparent); }
+      [data-theme="light"] #site-top-bar select { background: rgba(75,125,28,0.06); border-color: rgba(75,125,28,0.12); color: #4b7d1c; }
     `;
 
     // Create a fresh exit button (don't reuse existing DOM nodes to avoid leftover event listeners)

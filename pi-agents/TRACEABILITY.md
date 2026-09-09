@@ -1,122 +1,104 @@
-# FARO STUDIO — Project Traceability Feature (Updated Each Agent Action)
+# FARO STUDIO — Project Traceability
 
-## Purpose
-Each project gets an up-to-date table updated when agents implement. Includes GANTT-style trace and status per pipeline step.
+> ⚠️ **Auto-generated file.** Do not edit by hand — edits are overwritten on the next `bin/tracker.py build`. Edit the source records under `tracker/runs/` and `tracker/projects/`, then rebuild.
 
----
+*Generated 2026-09-09T11:20:24Z · 9 projects · 9 runs · 1 model(s) seen.*
 
-## Master Project Status Table
+## Master status table
 
-| Project / Slug | Pipeline Step | Agent / Run | Status | Completed Artifact | Blocker / Note |
+| Project | Pipeline stage | Runs | Latest run | Status | Blocker / next step |
 |---|---|---|---|---|---|
-| `mindful-break` | 06-ideate.json | package:scout / r1 | ✅ Complete | trend-scan-final.md | — |
-| `mindful-break` | 06-ideate.json | package:planner / r1 | ✅ Complete | ideate-final.md | 3 concepts ranked |
-| `mindful-break` | 06-ideate.json | package:critic / r1 | ✅ Complete | game-design-check-final.md | NOT-A-GAME confirmed |
-| `mindful-break` | 06-ideate.json | package:reviewer / r1 | ✅ Complete | evaluate-final.md | Score 4.20 / 5.0 |
-| `mindful-break` | 06-ideate.json | package:synthesizer / r1 | ✅ Complete | ideation-synthesis-final.md | Top 3 + kill list |
-| `ambient-lock-widget` | 01-discovery.json (r3) | package:scout | ✅ Complete | market-scan-final.md | 6 competitors called out |
-| `ambient-lock-widget` | 01-discovery.json (r3) | package:planner | ✅ Complete | prd-final.md | Conditional GO |
-| `ambient-lock-widget` | 01-discovery.json (r3) | package:reviewer | ✅ Complete | evaluate / score 4.10 | — |
-| `ambient-lock-widget` | 01-discovery.json (r3) | package:synthesizer | ❌ Failed (RPC) | — | Synthesis missing |
-| `silent-canvas` | 06-ideate.json | package:planner / r1 | ✅ Complete | ideate-final.md | Score 3.70 / 5.0 |
-| `silent-canvas` | 01-discovery.json | — | ⏸️ Not started | — | Blocked after ideation |
-| `community-knowledge-network` | 07-backend-ideate.json | package:synthesizer / r2 | ✅ Complete | ideation-synthesis-final.md | Score 8.4 / 5.0 |
-| `ai-project-orchestrator` | 07-backend-ideate.json | package:synthesizer / r2 | ✅ Complete | ideation-synthesis-final.md | Score 8.0 / 5.0 |
-| `ai-project-orchestrator` | 01-discovery.json (r5) | package:scout | ❌ Failed (RPC) | — | 3 retries (r5/r6/r7) |
-| `ai-project-orchestrator` | 01-discovery.json (r6) | package:scout | ❌ Failed (RPC) | — | 3 retries |
-| `ai-project-orchestrator` | 01-discovery.json (r7) | package:scout | ❌ Failed (RPC) | — | 3 retries — market-scan unreadable |
-| `mindful-break` | 01-discovery.json (r4) | package:scout / planner / reviewer / synthesizer | ✅ Complete | market-scan + prd + ux-sketch + synthesis | GO-WITH-CONDITIONS |
-| `mindful-break` | 02-build.json (r8) | package:worker | ✅ Complete | engineer-final.md | 5 fixes applied |
-| `mindful-break` | 02-build.json (r8) | package:validator | ✅ Complete | qa-proof-final.md | lint 0, manifest OK, store-ready |
-| `mindful-break` | 02-build.json (r8) | package:reviewer | ❌ Failed (RPC) | — | Review blocked; build evidence sufficient |
-| `mindful-break` | 02-build.json (r8) | package:validator (release-gate) | ⛔ Blocked | — | Dependency: review failed |
-| `mindful-break` | 03-release.json (r9) | package:validator / scout / docs-auditor / synthesizer | ⚠️ Partial | privacy-audit ✅, qa-validate running, storefront-check ❌, synthesis completed (wrong-product memo from r9) | Final synthesis produced for wrong product (WikiThriving) — evidence incomplete for mindful-break |
+| `ai-project-orchestrator` | 🔎 discovery | 4 | r7-ai-project-orchestrator (failed) | ⛔ blocked | market-scan step unreliable under current model — needs working lane or manual competitor table |
+| `ambient-lock-widget` | 🔎 discovery | 1 | r3-ambient-lock-widget (partial) | ⚠️ partial | 4 open items: Apple TWA/widget docs, icon format, competitor check, mic UX |
+| `community-knowledge-network` | 🚀 sprint | 1 | r2-backend-ideate (complete) | ⏸️ idle | graphs/01-discovery.json |
+| `mindful-break` | 🧪 release | 4 | r9-mindful-break (partial) | ⚠️ partial | Final synthesis (r9) produced for WikiThriving instead of Mindful Break |
+| `pixel-stretch` | 🟢 live | 0 | — (—) | 🟢 live | Grow: ASO audit graphs/04-aso-audit.json |
+| `shhh-reader` | 🟢 live | 0 | — (—) | 🟢 live | Grow: ASO audit graphs/04-aso-audit.json |
+| `silent-canvas` | 💡 ideate | 1 | r1-mindful-break (complete) | ⏸️ idle | Write BRIEF.md → graphs/01-discovery.json |
+| `vite-carrere` | 🟢 live | 0 | — (—) | 🟢 live | Grow: ASO audit graphs/04-aso-audit.json |
+| `wikithriving` | 🟢 live | 0 | — (—) | 🟢 live | — |
 
----
+## Runs
 
-## GANTT-Style Timeline (start → terminal per lane)
+| Run | Project(s) | Graph | Start | End | Status | Steps (ok/fail/blk) | Verdict |
+|---|---|---|---|---|---|---|---|
+| r1-mindful-break | mindful-break, silent-canvas | 06-ideate.json | 09/09 06:17 | 09/09 06:28 | complete | 5/0/0 | TOP-3 RANKED |
+| r2-backend-ideate | ai-project-orchestrator, community-knowledge-network | 07-backend-ideate.json | 09/09 06:44 | 09/09 07:01 | complete | 5/0/0 | 2 CONCEPTS FUNDED |
+| r3-ambient-lock-widget | ambient-lock-widget | 01-discovery.json | 09/09 07:01 | 09/09 07:05 | partial | 4/1/0 | GO-WITH-CONDITIONS |
+| r4-mindful-break | mindful-break | 01-discovery.json | 09/09 07:22 | 09/09 07:28 | complete | 5/0/0 | GO-WITH-CONDITIONS |
+| r5-ai-project-orchestrator | ai-project-orchestrator | 01-discovery.json | 09/09 07:41 | 09/09 07:41 | failed | 0/1/0 | NO-GO (premature) |
+| r6-ai-project-orchestrator | ai-project-orchestrator | 01-discovery.json | 09/09 07:59 | 09/09 07:59 | failed | 0/1/0 | Discovery retry r6: market-scan failed again (RPC). |
+| r7-ai-project-orchestrator | ai-project-orchestrator | 01-discovery.json | 09/09 08:22 | 09/09 08:22 | failed | 0/1/0 | Discovery retry r7: market-scan failed 3rd time — project blocked. |
+| r8-mindful-break | mindful-break | 02-build.json | 09/09 08:52 | 09/09 09:01 | partial | 2/1/1 | Build r8: engineer applied 5 fixes, QA proof green (lint 0, manifest O… |
+| r9-mindful-break | mindful-break | 03-release.json | 09/09 09:34 | 09/09 09:47 | partial | 2/1/1 | INVALID (wrong-product memo) |
+
+## Timeline (start → terminal per run)
 
 ```
-2026-09-09 06:17  06-ideate (trend-scan start)
-2026-09-09 06:20  06-ideate (ideate done)
-2026-09-09 06:20  06-ideate (game-design-check done)
-2026-09-09 06:26  06-ideate (evaluate done)
-2026-09-09 06:28  06-ideate (synthesis done — r1 terminal)
-
-2026-09-09 06:44  07-backend-ideate (trend-scan start — r2)
-2026-09-09 06:47  07-backend-ideate (market-scan failed)
-2026-09-09 06:52  07-backend-ideate (ideate done)
-2026-09-09 06:54  07-backend-ideate (game-design-check done)
-2026-09-09 07:00  07-backend-ideate (evaluate done — r2 terminal)
-2026-09-09 07:01  07-backend-ideate (synthesis done — r2 terminal)
-
-2026-09-09 07:01  01-discovery / ambient-lock-widget (r3 market-scan)
-2026-09-09 07:05  r3 market-scan done
-2026-09-09 07:05  r3 PRD done
-2026-09-09 07:05  r3 ux-sketch done
-2026-09-09 07:05  r3 financials done
-2026-09-09 07:05  r3 synthesis failed (RPC) — partial
-
-2026-09-09 07:22  01-discovery / mindful-break (r4 market-scan)
-2026-09-09 07:26  r4 PRD done
-2026-09-09 07:26  r4 ux-sketch done
-2026-09-09 07:26  r4 financials failed
-2026-09-09 07:28  r4 synthesis done (GO-WITH-CONDITIONS)
-
-2026-09-09 07:41  01-discovery / AI Project Orchestrator (r5 market-scan — failed)
-2026-09-09 07:59  r6 retry — market-scan failed
-2026-09-09 08:22  r7 retry — market-scan failed (3rd failure)
-
-2026-09-09 08:52  02-build / mindful-break (r8 engineer)
-2026-09-09 08:56  r8 engineer done (5 fixes applied)
-2026-09-09 08:58  r8 qa-proof done (lint 0, manifest OK)
-2026-09-09 08:58  r8 review failed (RPC)
-2026-09-09 09:01  r8 release-gate blocked (review dependency)
-
-2026-09-09 09:34  03-release / mindful-break (r9 privacy-audit ✅, storefront-check ❌, qa-validate running)
-2026-09-09 09:47  r9 synthesis done (for wrong product — WikiThriving memo produced)
+09/09 06:17  r1-mindful-break [06-ideate.json] (mindful-break) — complete · Ideation r1: mindful-break ranked TOP with 4.20/5.0 (3 concepts); silent-canvas also ideated (3.70/5.0). Kill list produced.
+09/09 06:44  r2-backend-ideate [07-backend-ideate.json] (community-knowledge-network) — complete · Backend ideation r2: Community Knowledge Network scored 8.4, AI Project Orchestrator 8.0.
+09/09 07:01  r3-ambient-lock-widget [01-discovery.json] (ambient-lock-widget) — partial · Discovery r3: Conditional GO — 6 competitors scanned, 4 open verification items.
+09/09 07:22  r4-mindful-break [01-discovery.json] (mindful-break) — complete · Discovery r4: market-scan + PRD + ux-sketch + synthesis; financials failed once at 07:26 then retried ok.
+09/09 07:41  r5-ai-project-orchestrator [01-discovery.json] (ai-project-orchestrator) — failed · Discovery attempt r5: market-scan failed (RPC stopReason length).
+09/09 07:59  r6-ai-project-orchestrator [01-discovery.json] (ai-project-orchestrator) — failed · Discovery retry r6: market-scan failed again (RPC).
+09/09 08:22  r7-ai-project-orchestrator [01-discovery.json] (ai-project-orchestrator) — failed · Discovery retry r7: market-scan failed 3rd time — project blocked.
+09/09 08:52  r8-mindful-break [02-build.json] (mindful-break) — partial · Build r8: engineer applied 5 fixes, QA proof green (lint 0, manifest OK); review failed (RPC) → release-gate blocked.
+09/09 09:34  r9-mindful-break [03-release.json] (mindful-break) — partial · Release r9: privacy-audit ok, qa-validate stuck, storefront-check failed, final synthesis produced for WikiThriving — evidence incomplete for mindful-break.
 ```
 
+## Per-step events
+
+### r1-mindful-break — mindful-break
+- ▶ start 09/09 06:17
+- `trend-scan` [complete] via package:scout · artifact trend-scan-final.md — trend evidence collected 09/09 06:20
+- `ideate` [complete] via package:planner · artifact ideate-final.md — 3 concepts ranked 09/09 06:20
+- `game-design-check` [complete] via package:critic · artifact game-design-check-final.md — NOT-A-GAME confirmed 09/09 06:20
+- `evaluate` [complete] via package:reviewer · artifact evaluate-final.md — Score 4.20 / 5.0 09/09 06:26
+- `ideation-synthesis` [complete] via package:synthesizer · artifact ideation-synthesis-final.md — Top 3 + kill list 09/09 06:28
+### r2-backend-ideate — community-knowledge-network
+- ▶ start 09/09 06:44
+- `trend-scan` [complete] via package:scout · artifact trend-scan-final.md — first attempt failed (RPC 06:47), retry ok 09/09 06:52
+- `ideate` [complete] via package:planner · artifact ideate-final.md — concepts incl. CKN + orchestrator 09/09 06:54
+- `game-design-check` [complete] via package:critic · artifact game-design-check-final.md — engagement loop check 09/09 07:00
+- `evaluate` [complete] via package:reviewer · artifact evaluate-final.md — 8.4 / 8.0 scores 09/09 07:00
+- `ideation-synthesis` [complete] via package:synthesizer · artifact ideation-synthesis-final.md — funding memo 09/09 07:01
+### r3-ambient-lock-widget — ambient-lock-widget
+- ▶ start 09/09 07:01
+- `market-scan` [complete] via package:scout · artifact market-scan-final.md — 6 competitors called out 09/09 07:05
+- `prd` [complete] via package:planner · artifact prd-final.md — Conditional GO 09/09 07:05
+- `ux-sketch` [complete] via package:planner · artifact ux-sketch-final.md — first-run journey 09/09 07:05
+- `financials` [complete] via package:reviewer · artifact financials-final.md — score 4.10 09/09 07:05
+- `gated-synthesis` [failed] via package:synthesizer — RPC stopReason length — synthesis missing 09/09 07:05
+### r4-mindful-break — mindful-break
+- ▶ start 09/09 07:22
+- `market-scan` [complete] via package:scout · artifact market-scan-final.md — market evidence 09/09 07:26
+- `prd` [complete] via package:planner · artifact prd-final.md — PRD produced 09/09 07:26
+- `ux-sketch` [complete] via package:planner · artifact ux-sketch-final.md — wireframes 09/09 07:26
+- `financials` [complete] via package:reviewer · artifact financials-final.md — first attempt failed 07:26, retry ok 09/09 07:27
+- `gated-synthesis` [complete] via package:synthesizer · artifact synthesis-final.md — GO-WITH-CONDITIONS memo 09/09 07:28
+### r5-ai-project-orchestrator — ai-project-orchestrator
+- ▶ start 09/09 07:41
+- `market-scan` [failed] via package:scout — RPC — 3 retries inside lane, unreadable output 09/09 07:41
+### r6-ai-project-orchestrator — ai-project-orchestrator
+- ▶ start 09/09 07:59
+- `market-scan` [failed] via package:scout — RPC — retry 2 of 3 09/09 07:59
+### r7-ai-project-orchestrator — ai-project-orchestrator
+- ▶ start 09/09 08:22
+- `market-scan` [failed] via package:scout — RPC — 3rd failure, market-scan unreadable 09/09 08:22
+### r8-mindful-break — mindful-break
+- ▶ start 09/09 08:52
+- `engineer` [complete] via package:worker · artifact engineer-final.md — 5 fixes applied 09/09 08:56
+- `qa-proof` [complete] via package:validator · artifact qa-proof-final.md — lint 0, manifest OK, store-ready 09/09 08:58
+- `review` [failed] via package:reviewer · artifact review-final.md — RPC stopReason length 09/09 08:58
+- `release-gate` [blocked] via package:validator · artifact release-gate-final.md — dependency: review failed 09/09 09:01
+### r9-mindful-break — mindful-break
+- ▶ start 09/09 09:34
+- `qa-validate` [running] via package:validator — stuck — no terminal output 09/09 09:34
+- `privacy-audit` [complete] via package:scout · artifact privacy-audit-final.md — Play Data Safety + Apple labels 09/09 09:47
+- `storefront-check` [failed] via package:docs-auditor — store assets audit failed 09/09 09:47
+- `release-verdict` [blocked] via package:validator — needs qa-validate + storefront-check 09/09 09:47
+- `final-synthesis` [complete] via package:synthesizer — WRONG PRODUCT — WikiThriving memo 09/09 09:47
+
 ---
 
-## Per-Project Artifact Index (paths relative to `/workspaces/portfolio`)
-
-### mindful-break
-- **Brief:** `pi-agents/products/mindful-break/BRIEF.md`
-- **Discovery (r4)**: `pi-agents/graphs/01-discovery.json` outputs at `/tmp/pi-multiagent-run-4nCwFv/`
-- **Build (r8)**: `pi-agents/graphs/02-build.json` outputs at `/tmp/pi-multiagent-run-fdvjOb/`
-- **Deploy**: `pi-agents/deploy/mindful-break/` (all 7 owned files implemented)
-- **Next**: `graphs/03-release.json` (needs review/release-verdict complete; privacy-audit ✅)
-
-### ambient-lock-widget
-- **Brief:** `pi-agents/products/ambient-reader/BRIEF.md`
-- **Discovery (r3)**: `/tmp/pi-multiagent-run-V8p4IA/`
-- **Status**: Conditional GO — 4 open verification items (Apple TWA/widget docs, icon format, competitor, mic UX)
-- **Next**: Resolve verification → `graphs/02-build.json`
-
-### silent-canvas
-- **Brief:** `pi-agents/products/ideas/concepts/silent-canvas.md`
-- **Status**: Concept only (no brief, no discovery)
-- **Next**: Write brief → `graphs/01-discovery.json`
-
-### ai-project-orchestrator
-- **Brief**: `pi-agents/products/ai-project-orchestrator/BRIEF.md` ✅ (created for r5/r6/r7)
-- **Discovery**: Failed 3× on `market-scan` (RPC) — synthesis produced NO-GO
-- **Status**: Blocked — needs working `market-scan` or manual competitor table
-- **Next**: Retry `market-scan` or write manual market-scan → `graphs/01-discovery.json`
-
-### community-knowledge-network
-- **Brief**: `pi-agents/products/community-knowledge-network/BRIEF.md` (created)
-- **Status**: No discovery run — brief exists, pipeline not started
-- **Next**: `graphs/01-discovery.json`
-
----
-
-## Key Pattern Observed Across All Runs
-
-> **Transistant `Subagent RPC ended with stopReason length.`** affects `market-scan` (scout), `evaluate` (reviewer), `review` (reviewer), and `storefront-check` (docs-auditor) steps inconsistently. It does not always correlate with a specific product — `market-scan` succeeded for `ambient-lock-widget` (`r3`) and `mindful-break` (`r4`), but failed 3× for `AI Project Orchestrator` (`r5/r6/r7`). The build steps (`engineer`, `qa-proof`) pass reliably when granted `package:worker` / `package:validator`.
-
----
-
-*Last updated: 2026-09-09, after r9 (release readiness) synthesis.*
-*Traceability feature added per user request.*
+*Regenerated by `bin/tracker.py build` — data source under `tracker/`.*
