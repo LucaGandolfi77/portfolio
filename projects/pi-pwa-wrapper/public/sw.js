@@ -2,13 +2,14 @@
    The chat itself needs the server, but the UI should load from cache. */
 "use strict";
 
-const VERSION = "v1";
+const VERSION = "v2";
 const CORE = [
   "./",
   "./index.html",
   "./css/style.css",
   "./js/ws-client.js",
   "./js/render.js",
+  "./js/debug.js",
   "./js/app.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",

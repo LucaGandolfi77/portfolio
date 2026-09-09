@@ -9,7 +9,9 @@ you a chat UI in the browser — and as an installable app — over Pi's RPC mod
 - **Images**: attach screenshots/photos with your message (sent to the model)
 - **Extension UI**: `select` / `confirm` / `input` / `editor` dialogs plus
   `notify` / `setStatus` / `setWidget` / `setTitle` from Pi extensions
+- **Slash commands**: type `/` for a palette of local commands (`/help /compact /stats /new /clear /logs /server /reconnect`) plus every command the agent registers (extensions/skills); `Tab`/arrows to pick
 - **Queue controls**: steer (interrupt after the current tool batch), follow-up, abort
+- **Diagnostics**: `Logs` button and `/server` dialog with health checks; the bridge exposes `GET /healthz` and `GET /api/logs` (ring buffer)
 - **Session tools**: new session, token/cost stats, context-compaction notices
 - **PWA**: manifest + service worker + icons — install it as a standalone app
 
@@ -51,6 +53,48 @@ PI_ARGS="--extension $(pwd)/examples-extension/pwa-demo.js" npm start
 On the site, use the browser menu **Install app / Add to Home screen**, or trigger the
 install prompt if the browser offers it. The service worker caches the UI shell so it
 loads offline (chatting still needs the server).
+
+### Slash commands
+
+Type `/` in the composer to see a palette:
+
+- **Local** (handled by the wrapper itself): `/help`, `/compact`, `/stats`, `/new`,
+  `/clear`, `/logs`, `/server`, `/reconnect`
+- **Agent-registered** (extensions, skills, prompt templates — fetched via Pi's
+  `get_commands`): e.g. `/pwa-ping`, `/pwa-select`, … when the demo extension is loaded
+- Anything else starting with `/` is forwarded to the agent as a normal prompt
+  (Pi RPC treats unknown slash text as a plain user message)
+
+`Tab` completes the highlighted suggestion, arrows move, Enter sends.
+
+### When the page is hosted statically (e.g. on the portfolio)
+
+The PWA UI can be served from any static host, but the agent bridge is a Node server.
+Point the app at a running bridge with the **Server** toolbar button (or `/server`,
+or `?server=http://host:8787` in the URL). The dialog can verify the target via
+`GET /healthz`. When no bridge is reachable the status pill shows offline and clicking
+it retries.
+
+### Diagnostics & logging
+
+- **`Logs` button** — client log ring (connection, commands, errors, unhandled
+  exceptions/promise rejections) with copy/clear; “+ server log” pulls the server ring.
+- **`GET /healthz`** — pi resolution, client count, root, uptime.
+- **`GET /api/logs`** — last ~500 log lines from the server ring buffer.
+- The server prints timestamped logs per connection: spawn state, every RPC command,
+  response outcomes, extension-UI dialogs, per-connection event/counter summary on close.
+
+### Security notes
+
+- The agent runs **real shell commands as your user** inside the chosen workspace.
+  It can read and modify files there. That is the point — treat it like running `pi`.
+- Sessions are ephemeral: when the browser tab closes, the per-tab agent process is
+  terminated. The on-screen transcript is persisted locally (localStorage) so history
+  survives reloads, but the agent itself starts fresh on the next visit.
+- Attachment images are sent to the model provider, base64 inline, exactly like Pi's
+  own prompt-image support.
+- Log lines may contain prompt text and tool results. Don't expose `/api/logs` or the
+  WebSocket to untrusted users; set `PI_PWA_TOKEN` when sharing on a network.
 
 ## Configuration (environment)
 
@@ -107,19 +151,21 @@ pi-pwa-wrapper/
 ├── package.json
 ├── README.md
 ├── server/
-│   ├── index.js         # static server + WebSocket bridge
+│   ├── index.js         # static server + WebSocket bridge + /healthz + /api/logs
 │   ├── agent-bridge.js  # one pi RPC subprocess per connection
 │   ├── pi.js            # pi discovery / spawn + JSONL framing
-│   └── workspaces.js    # safe workspace listing under a root
+│   ├── workspaces.js    # safe workspace listing under a root
+│   └── log.js           # ring-buffer logger backing /api/logs
 ├── public/
 │   ├── index.html
 │   ├── manifest.webmanifest
 │   ├── sw.js            # offline app shell
 │   ├── css/style.css
 │   ├── js/
-│   │   ├── ws-client.js # resilient WebSocket client
+│   │   ├── ws-client.js # resilient WebSocket client (server override + logging)
 │   │   ├── render.js    # bubbles + small safe markdown renderer
-│   │   └── app.js       # state machine, streaming, dialogs
+│   │   ├── debug.js     # client log ring + global error capture
+│   │   └── app.js       # state machine, streaming, dialogs, slash palette
 │   └── icons/           # generated icons (scripts/make-icons.mjs)
 ├── examples-extension/
 │   └── pwa-demo.js       # extension exercising all wrapper UI surfaces
@@ -129,20 +175,18 @@ pi-pwa-wrapper/
     └── smoke-ext.mjs    # extension-UI dialog round-trip check
 ```
 
-## Security notes
-
-- The agent runs **real shell commands as your user** inside the chosen workspace.
-  It can read and modify files there. That is the point — treat it like running `pi`.
-- Sessions are ephemeral: when the browser tab closes, the per-tab agent process is
-  terminated. The on-screen transcript is persisted locally (localStorage) so history
-  survives reloads, but the agent itself starts fresh on the next visit.
-- Attachment images are sent to the model provider, base64 inline, exactly like Pi's
-  own prompt-image support.
-
 ## Development
 
 Regenerate icons after changing `scripts/make-icons.mjs`:
 
 ```bash
 npm run icons
+```
+
+Run the automated checks (both need the pi CLI and, for `test:bridge`, a working
+model credential):
+
+```bash
+npm run test:ext      # extension-UI dialog round trip
+npm run test:bridge   # bridge + workspace switch + streaming prompt
 ```

@@ -27,6 +27,8 @@
     deferredInstall: null,
     tokenPromptOpen: false,
     connectFailHandled: false,
+    commands: [],           // commands registered with the agent (get_commands)
+    cmdSel: -1,             // highlighted suggestion index
   };
 
   const transcript = loadTranscript();
@@ -37,14 +39,32 @@
     phasePill: $("phase-pill"), phaseDot: $("phase-dot"), phaseLabel: $("phase-label"),
     modelChip: $("model-chip"),
     wsSelect: $("ws-select"), modelSelect: $("model-select"), thinkSelect: $("think-select"),
-    btnStats: $("btn-stats"), btnNew: $("btn-new"), btnClear: $("btn-clear"), btnHelp: $("btn-help"),
+    btnStats: $("btn-stats"), btnNew: $("btn-new"), btnClear: $("btn-clear"),
+    btnLogs: $("btn-logs"), btnSettings: $("btn-settings"), btnHelp: $("btn-help"),
     transcript: $("transcript"),
     composerText: $("composer-text"), attachBtn: $("attach-btn"), sendBtn: $("send-btn"),
     steerBtn: $("steer-btn"), stopBtn: $("stop-btn"), liveActions: $("live-actions"),
-    attachments: $("attachments"), fileInput: $("file-input"),
+    attachments: $("attachments"), fileInput: $("file-input"), cmdSuggest: $("cmd-suggest"),
     queueInfo: $("queue-info"), usageInfo: $("usage-info"), cwdLabel: $("cwd-label"),
     toasts: $("toasts"), dlgHost: $("dlg-host"),
   };
+
+  const D = window.Dbg || { log(){}, warn(){}, error(){}, info(){}, all(){ return []; }, clear(){} };
+
+  /* local commands that run in the wrapper itself (the pi RPC agent only knows
+     extension/skill/template commands; built-in TUI ones like /compact are
+     separate RPC commands, so we surface them here) */
+  const LOCAL_COMMANDS = {
+    help:     { desc: "About this wrapper, shortcuts, security", run: () => openHelp() },
+    compact:  { desc: "Compact the agent conversation context", run: () => { piWS.rpc({ type: "compact" }); } },
+    stats:    { desc: "Session token / cost statistics", run: () => fetchStats() },
+    new:      { desc: "Start a fresh agent session", run: () => confirmDialog("New session", "Restart the agent with a fresh session in this workspace? (The on-screen history is kept.)", () => { piWS.send({ kind: "restart" }); addSys("Starting a fresh agent session…", "warn"); }) },
+    clear:    { desc: "Clear the on-screen transcript (local only)", run: () => confirmDialog("Clear chat", "Remove the on-screen transcript (local history only — does not affect the agent session).", () => { transcript.length = 0; saveTranscript(); rerenderAll(); els.usageInfo.textContent = ""; }) },
+    logs:     { desc: "Open the diagnostic log", run: () => openLogsDialog() },
+    server:   { desc: "Server / token / reconnect settings", run: () => openSettingsDialog() },
+    reconnect:{ desc: "Reconnect to the bridge server", run: () => { state.connectFailHandled = false; piWS.retry(); } },
+  };
+  const LOCAL_HELP = Object.entries(LOCAL_COMMANDS).map(([n, c]) => ({ name: n, description: c.desc, source: "local" }));
 
   /* ============================================================ transcript persistence */
   function loadTranscript() {
@@ -358,6 +378,7 @@
     switch (ev.type) {
       case "agent_start":
         setBusy(true);
+        D.log("agent", "turn start");
         startLiveBubble();
         break;
 
@@ -381,11 +402,20 @@
       case "agent_settled":
         finalizeLiveTurn();
         setBusy(false);
+        D.log("agent", "turn settled (idle)");
         piWS.rpc({ type: "get_session_stats" });
         break;
 
       case "turn_start":
       case "turn_end":
+      case "message_start":
+      case "message_end":
+      case "thinking_level_changed":
+      case "bash_execution_update":
+      case "tool_execution_update":
+      case "summarization_retry_scheduled":
+      case "summarization_retry_attempt_start":
+      case "summarization_retry_finished":
         break;
 
       case "compaction_start":
@@ -424,6 +454,8 @@
         handleRpcResponse(ev);
         break;
       default:
+        // keep an eye out for event types this UI does not yet handle
+        D.log(`ev:${ev.type}`, "(unhandled event type)");
         break;
     }
   }
@@ -446,6 +478,10 @@
     if (res.command === "get_available_thinking_levels") {
       state.thinkingLevels = (res.data && res.data.levels) || [];
       populateThinking();
+    }
+    if (res.command === "get_commands") {
+      state.commands = (res.data && res.data.commands) || [];
+      D.log("cmd", `agent exposes ${state.commands.length} slash commands: ${state.commands.map((c) => c.name).slice(0, 20).join(", ")}`);
     }
     if (res.command === "set_model") {
       state.activeModel = res.data || state.activeModel;
@@ -672,6 +708,29 @@
   function submitComposer() {
     const text = els.composerText.value.trim();
     if (!text && !attachments.length) return;
+
+    // ---- local slash commands run in the wrapper, even when busy/offline ----
+    if (text.startsWith("/")) {
+      const m = text.slice(1).trim().split(/\s+/);
+      const name = (m[0] || "").toLowerCase();
+      const local = LOCAL_COMMANDS[name];
+      if (local) {
+        echoUserCommand(text);
+        els.composerText.value = "";
+        attachments.length = 0;
+        renderAttachments();
+        autosize();
+        hideSuggestions();
+        D.log("cmd", `local /${name}`);
+        try { local.run(); } catch (err) { D.error("cmd", `/${name} failed: ${err}`); toast("Command", String(err), "error"); }
+        return;
+      }
+      if (!state.connected) {
+        toast("Not connected", "The agent is not reachable. Use /server to configure the bridge, or click the status pill to retry.", "warn");
+        return;
+      }
+    }
+
     if (state.busy) {
       // queue as a steer so it interrupts after the current tool batch
       if (text) {
@@ -679,6 +738,7 @@
         autosize();
         addQueued("steer", text);
         addSys(`Steer queued: “${text.length > 140 ? text.slice(0, 140) + "…" : text}”`, "warn");
+        D.log("cmd", `steer → ${text.slice(0, 80)}`);
         piWS.rpc({ type: "steer", message: text });
       } else {
         toast("Busy", "The agent is working — type text to steer it.", "warn");
@@ -691,16 +751,25 @@
     attachments.length = 0;
     renderAttachments();
     autosize();
+    hideSuggestions();
 
     const msg = text || (imagesForHistory.length ? `Analyze the attached image${imagesForHistory.length > 1 ? "s" : ""}.` : "");
     pushEntry({ kind: "user", text: msg, images: imagesForHistory, ts: Date.now() });
     els.transcript.append(Render.userBubble(msg, imagesForHistory));
     document.body.classList.add("has-transcript");
     scrollToBottom();
+    D.log("cmd", `prompt → ${msg.slice(0, 80)}${images.length ? ` (+${images.length} image)` : ""}`);
 
     if (!piWS.rpc({ type: "prompt", message: msg, images: images.length ? images : undefined })) {
       addSys("Cannot reach the agent process — is it running?", "error");
     }
+  }
+
+  function echoUserCommand(text) {
+    pushEntry({ kind: "user", text, ts: Date.now() });
+    els.transcript.append(Render.userBubble(text, []));
+    document.body.classList.add("has-transcript");
+    scrollToBottom();
   }
 
   els.sendBtn.addEventListener("click", submitComposer);
@@ -709,12 +778,89 @@
     els.composerText.style.height = "auto";
     els.composerText.style.height = Math.min(els.composerText.scrollHeight, 180) + "px";
   }
-  els.composerText.addEventListener("input", autosize);
+  els.composerText.addEventListener("input", () => { autosize(); updateSuggestions(); });
+
+  function commandItems() {
+    // union: local commands first, then commands the agent registered
+    const seen = new Set();
+    const items = [];
+    for (const c of LOCAL_HELP) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      items.push(c);
+    }
+    for (const c of state.commands) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      items.push(c);
+    }
+    return items;
+  }
+
+  function updateSuggestions() {
+    const raw = els.composerText.value;
+    if (!raw.startsWith("/") || raw.includes("\n")) { hideSuggestions(); return; }
+    const q = raw.slice(1).toLowerCase();
+    const list = commandItems()
+      .filter((c) => !q || c.name.toLowerCase().includes(q))
+      .slice(0, 8);
+    if (!list.length) { hideSuggestions(); return; }
+    state.cmdSel = 0;
+    state.suggestList = list;
+    els.cmdSuggest.classList.remove("hidden");
+    els.cmdSuggest.innerHTML = "";
+    list.forEach((c, i) => {
+      const row = Render.el("div", { class: "sugg-row" + (i === state.cmdSel ? " sel" : ""), dataset: { i } }, [
+        Render.el("span", { class: "sugg-name" }, "/" + c.name),
+        Render.el("span", { class: "sugg-desc" }, `${c.description || ""}`),
+        Render.el("span", { class: "sugg-src" }, c.source || ""),
+      ]);
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // keep focus in the textarea
+        setComposerCommand(c.name);
+      });
+      els.cmdSuggest.append(row);
+    });
+  }
+
+  function setComposerCommand(name) {
+    els.composerText.value = `/${name} `;
+    els.composerText.focus();
+    autosize();
+    updateSuggestions();
+  }
+
+  function hideSuggestions() {
+    els.cmdSuggest.classList.add("hidden");
+    els.cmdSuggest.innerHTML = "";
+    state.cmdSel = -1;
+    state.suggestList = [];
+  }
 
   els.composerText.addEventListener("keydown", (e) => {
+    const suggOpen = !els.cmdSuggest.classList.contains("hidden");
+    if (suggOpen && e.key === "Tab") {
+      e.preventDefault();
+      const top = state.suggestList && state.suggestList[Math.max(0, state.cmdSel)];
+      if (top) setComposerCommand(top.name);
+      return;
+    }
+    if (suggOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      const n = state.suggestList.length;
+      state.cmdSel = e.key === "ArrowDown" ? (state.cmdSel + 1) % n : (state.cmdSel - 1 + n) % n;
+      [...els.cmdSuggest.children].forEach((el, i) => el.classList.toggle("sel", i === state.cmdSel));
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
+      hideSuggestions();
       submitComposer();
+    }
+    if (e.key === "Escape" && suggOpen) {
+      e.preventDefault();
+      e.stopPropagation(); // don't let the global Esc handler stop the agent
+      hideSuggestions();
     }
   });
 
@@ -796,6 +942,99 @@
   });
 
   els.btnHelp.addEventListener("click", openHelp);
+  els.btnLogs.addEventListener("click", openLogsDialog);
+  els.btnSettings.addEventListener("click", openSettingsDialog);
+
+  /* ============================================================ Logs dialog */
+  function openLogsDialog() {
+    const pre = Render.el("pre", { class: "logs-pre" });
+    const refresh = () => {
+      const client = D.all();
+      pre.textContent = client.map((e) => `[${e.ts}] [${e.level}/${e.tag}] ${e.msg}`).join("\n") || "(no client log entries yet)";
+    };
+    refresh();
+
+    const copy = Render.el("button", { class: "btn", textContent: "Copy" });
+    const fetchSrv = Render.el("button", { class: "btn", textContent: "+ server log" });
+    const clear = Render.el("button", { class: "btn", textContent: "Clear" });
+    const close = Render.el("button", { class: "btn primary", textContent: "Close" });
+
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pre.textContent);
+        toast("Logs", "Copied to clipboard", "success", 2000);
+      } catch (e) {
+        D.warn("logs", `clipboard: ${e}`);
+      }
+    });
+    clear.addEventListener("click", () => { D.clear(); refresh(); });
+    fetchSrv.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`${piWS.httpBase()}/api/logs`, { cache: "no-store" });
+        const data = await res.json();
+        const srv = (data.entries || []).map((e) => `[${e.ts}] [srv/${e.tag}] ${e.msg}`).join("\n");
+        pre.textContent = (pre.textContent ? pre.textContent + "\n\n——— server ———\n" : "") + (srv || "(server returned no entries)");
+        toast("Logs", "Server log appended", "success", 2000);
+      } catch (err) {
+        toast("Logs", `Cannot fetch server log: ${err}. Server is on another origin?`, "warn", 5000);
+      }
+    });
+    close.addEventListener("click", () => dlg.close());
+
+    const body = Render.el("div", {}, [
+      Render.el("p", { class: "small muted" }, "Client events (connection, commands, errors) — click “+ server log” to also pull the bridge server’s ring buffer from /api/logs."),
+      pre,
+    ]);
+    const dlg = openDialog(dialogShell("Diagnostic log", body, [copy, fetchSrv, clear, close]));
+    dlg.onCancel = () => {};
+  }
+
+  /* ============================================================ Server settings dialog */
+  function openSettingsDialog() {
+    const srvInput = Render.el("input", { type: "text", class: "txt", placeholder: "e.g. http://localhost:8787  (empty = this page)", value: piWS.getServerBase() });
+    const tokInput = Render.el("input", { type: "password", class: "txt", placeholder: "access token (PI_PWA_TOKEN), if required", value: piWS.getToken() });
+    const health = Render.el("div", { class: "small muted" });
+
+    const save = Render.el("button", { class: "btn primary", textContent: "Save & reconnect" });
+    const cancel = Render.el("button", { class: "btn", textContent: "Cancel" });
+    const dlg = openDialog(dialogShell("Server connection", [
+      Render.el("p", { class: "small muted" }, "Where is the pi-pwa-wrapper bridge server running? Useful when this page is hosted statically (e.g. on the portfolio) while the agent server runs elsewhere. Leave empty to use this page’s origin."),
+      Render.el("label", { class: "lbl" }, ["Bridge server URL", srvInput]),
+      Render.el("label", { class: "lbl" }, ["Token", tokInput]),
+      Render.el("div", { class: "row-actions" }, [
+        Render.el("button", { class: "btn ghost", textContent: "Check health" }),
+        health,
+      ]),
+    ], [save, cancel]));
+
+    const checkBtn = els.dlgHost.querySelector(".row-actions .btn");
+    const check = async () => {
+      const base = srvInput.value.trim();
+      const target = (base ? base.replace(/^ws/i, "http") : location.origin).replace(/\/+$/, "");
+      health.textContent = "checking " + target + "/healthz …";
+      health.style.color = "";
+      try {
+        const res = await fetch(`${target}/healthz`, { cache: "no-store" });
+        const j = await res.json();
+        const piInfo = j.pi && (j.pi.command || "?");
+        health.textContent = `✓ server ok — ${j.clients} client(s), pi=${piInfo}, root=${j.root}`;
+        health.style.color = "var(--ok)";
+      } catch (err) {
+        health.textContent = `✗ no healthz reply from ${target} (${err}). Is the pi-pwa-wrapper server running there?`;
+        health.style.color = "var(--err)";
+      }
+    };
+    checkBtn.addEventListener("click", check);
+
+    save.addEventListener("click", () => {
+      piWS.setServerBase(srvInput.value.trim());
+      piWS.setToken(tokInput.value.trim());
+      dlg.close();
+      state.connectFailHandled = false;
+      piWS.retry();
+    });
+    cancel.addEventListener("click", () => dlg.close());
+  }
 
   function openHelp() {
     const body = Render.el("div", {}, [
@@ -852,15 +1091,17 @@
   /* ============================================================ wire server messages */
   function wireServer() {
     piWS.on("state", (s) => {
-      if (s === "open") setConn(true);
-      if (s === "closed") setConn(false);
+      if (s === "open") { setConn(true); D.log("conn", "ws open"); }
+      if (s === "closed") { setConn(false); D.log("conn", "ws closed"); }
     });
 
     piWS.on("kind:hello", () => {
       setConn(true);
+      D.log("conn", "hello from bridge server");
       piWS.rpc({ type: "get_state" });
       piWS.rpc({ type: "get_available_models" });
       piWS.rpc({ type: "get_available_thinking_levels" });
+      piWS.rpc({ type: "get_commands" });
     });
 
     piWS.on("kind:agent_event", (m) => handleAgentEvent(m.event));
@@ -873,12 +1114,14 @@
       const p = m.payload || {};
       if (p.phase === "running") {
         setPhase("running");
+        D.log("agent", `ready (cwd ${p.cwd})`);
         // refresh session state after any restart
         piWS.rpc({ type: "get_state" });
         piWS.rpc({ type: "get_available_models" });
         piWS.rpc({ type: "get_available_thinking_levels" });
+        piWS.rpc({ type: "get_commands" });
         els.usageInfo.textContent = "";
-      } else if (p.phase === "starting") setPhase("starting");
+      } else if (p.phase === "starting") { setPhase("starting"); D.log("agent", "starting…"); }
       else if (p.phase === "exited") setPhase("exited", p.code != null ? `exited (${p.code})` : "exited");
       else if (p.phase === "failed") { setPhase("failed", "start failed"); addSys(`Agent failed to start: ${p.error || ""}`, "error"); }
     });
@@ -895,12 +1138,13 @@
       }
     });
 
-    piWS.on("connect_failed", () => {
+    piWS.on("connect_failed", (info) => {
       if (state.connectFailHandled) return;
       state.connectFailHandled = true;
       setConn(false);
-      toast("No bridge server", "This UI is the Pi Agent PWA shell — start the Node server in the pi-pwa-wrapper folder (npm install && npm start) to chat.", "info", 12000);
-      addSys("Could not connect to the bridge server (ws://…/ws). Click the status pill to retry. If the server requires an access token, open the app with ?token=…", "error");
+      D.error("conn", `connect failed after retries code=${info && info.code}`);
+      toast("Not connected", "No pi-pwa bridge server reachable at this address.", "error", 9000);
+      addSys("Could not connect to the bridge server. If this page is hosted statically, point the wrapper at the running server with the “Server” button or /server (e.g. http://localhost:8787). Start it with npm install && npm start in the pi-pwa-wrapper folder. Logs: /logs.", "error");
     });
 
     // clicking the connection pill retries the WebSocket
@@ -908,6 +1152,7 @@
     els.connPill.title = "Reconnect to the bridge server";
     els.connPill.addEventListener("click", () => {
       state.connectFailHandled = false;
+      D.log("conn", "manual reconnect (pill click)");
       piWS.retry();
     });
   }
