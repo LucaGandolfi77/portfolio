@@ -41,7 +41,16 @@ var G = {
   npcLineT: 0,
   rentT: 0,
   bench: { x: 0, y: 0 },
-  ring: []             // punti del parco per l'anello
+  ring: [],
+  traffic: [],          // auto NPC in movimento
+  trafficT: 0,          // timer per spawn traffico
+  collectibles: [],     // oggetti da trovare (side quest)
+  eventT: 0,            // timer per eventi dinamici
+  eventCd: 0,           // cooldown evento attivo
+  phone: null,          // sistema telefono (missioni)
+  missionLog: [],       // log missioni completate
+  interior: null,       // edificio corrente {id, data, playerX, playerY}
+  interiorItems: []     // stato oggetti interni
 };
 
 // ══════════ CANVAS ══════════
@@ -93,19 +102,29 @@ function buildCity() {
     return { x: p.x, y: p.y, angle: Math.random() * 6.28, model: model, color: color, stolen: false, speed: 0 };
   });
   G.npcs = [];
-  for (var n = 0; n < 26; n++) {
+  for (var n = 0; n < 40; n++) {
+    var npcType = null;
+    var roll = Math.random();
+    var cumPct = 0;
+    for (var t = 0; t < DATA.NPC_TYPES.length; t++) {
+      cumPct += DATA.NPC_TYPES[t].pct;
+      if (roll < cumPct) { npcType = DATA.NPC_TYPES[t]; break; }
+    }
+    if (!npcType) npcType = { type: 'normal', emoji: '🧑', speed: 20 + Math.random() * 20, color: '#64748b', pct: 0 };
     G.npcs.push({
       x: Math.random() * DATA.WORLD - DATA.WORLD / 2,
       y: Math.random() * DATA.WORLD - DATA.WORLD / 2,
-      a: Math.random() * 6.28, v: 20 + Math.random() * 20, knock: 0, kdir: 0
+      a: Math.random() * 6.28, v: npcType.speed, knock: 0, kdir: 0,
+      npcType: npcType.type, npcColor: npcType.color, npcEmoji: npcType.emoji,
+      reaction: 0
     });
   }
   G.police = [];
-  // personaggi con nome (ben distanziati dal centro edificio)
   G.chars = DATA.CHARS.map(function (c) {
     var b = buildingById(c.home);
-    var dx = c.home === 'parco' ? 150 : 90;
-    var px = b.cx + dx, py = b.cy + 110;
+    var dx = c.home === 'parco' ? 150 : (c.home === 'discoteca' ? -100 : 90);
+    var dy = c.home === 'discoteca' ? -60 : 110;
+    var px = b.cx + dx, py = b.cy + dy;
     return { id: c.id, name: c.name, emoji: c.emoji, color: c.color, home: c.home, x: px, y: py, quest: c.quest, talked: false };
   });
   // panchina del parco
@@ -121,6 +140,12 @@ function buildCity() {
       has: r === ringIdx, found: false
     });
   }
+  // traffico iniziale
+  G.traffic = [];
+  G.trafficT = 0;
+  // oggetti da trovare (collezionabili)
+  G.collectibles = [];
+  initCollectibles();
 }
 function buildingById(id) {
   for (var i = 0; i < buildings.length; i++) if (buildings[i].id === id) return buildings[i];
@@ -141,16 +166,309 @@ function collidesRect(x, y, r) {
   return false;
 }
 
-// ══════════ INPUT ══════════
+// ══════════ COLLEZIONABILI ══════════
+function initCollectibles() {
+  G.collectibles = [];
+  Object.keys(DATA.COLLECTIBLE_SPAWNS).forEach(function (key) {
+    var spawns = DATA.COLLECTIBLE_SPAWNS[key];
+    spawns.forEach(function (sp, i) {
+      G.collectibles.push({ type: key, x: sp.x, y: sp.y, id: key + '_' + i, found: false });
+    });
+  });
+}
+
+// ══════════ INTERNI ══════════
+function enterBuilding(buildingId) {
+  var data = DATA.INTERIORS[buildingId];
+  if (!data) return;
+  // salva posizione esterna del giocatore
+  G.interior = {
+    id: buildingId,
+    data: data,
+    exitX: G.player.x,
+    exitY: G.player.y,
+    playerX: data.spawn.x,
+    playerY: data.spawn.y
+  };
+  G.player.x = data.spawn.x;
+  G.player.y = data.spawn.y;
+  G.player.angle = -Math.PI / 2; // guarda verso l'alto
+  G.player.inCar = null;
+  toast('📍 Sei dentro: ' + data.label);
+  hud();
+}
+
+function exitBuilding() {
+  if (!G.interior) return;
+  G.player.x = G.interior.exitX;
+  G.player.y = G.interior.exitY;
+  G.player.angle = 0;
+  G.interior = null;
+  toast('📍 Sei uscito.');
+  hud();
+}
+
+function interiorCollides(x, y, r) {
+  if (!G.interior) return false;
+  var d = G.interior.data;
+  // muri perimetrali
+  if (x - r < 0 || x + r > d.w || y - r < 0 || y + r > d.h) return true;
+  // muri interni
+  for (var i = 0; i < d.walls.length; i++) {
+    var w = d.walls[i];
+    if (x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h) return true;
+  }
+  // ostacoli (items con collisione)
+  for (var j = 0; j < d.items.length; j++) {
+    var it = d.items[j];
+    if (x + r > it.x && x - r < it.x + it.w && y + r > it.y && y - r < it.y + it.h) return true;
+  }
+  return false;
+}
+
+function interiorNearestInteractable() {
+  if (!G.interior) return null;
+  var p = G.player;
+  var d = G.interior.data;
+  var best = null, bd = 60;
+  for (var i = 0; i < d.items.length; i++) {
+    var it = d.items[i];
+    var cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+    var dist = Math.hypot(p.x - cx, p.y - cy);
+    if (dist < bd && it.act) { bd = dist; best = it; }
+  }
+  // porta di uscita
+  var doorDist = Math.hypot(p.x - d.exit.x, p.y - d.exit.y);
+  if (doorDist < 50 && doorDist < bd) { best = { act: '__exit', label: '🚪 Esci' }; }
+  return best;
+}
+
+function interiorInteract() {
+  if (!G.interior) return;
+  var a = interiorNearestInteractable();
+  if (!a) return;
+  if (a.act === '__exit') { exitBuilding(); return; }
+  var action = DATA.INTERIOR_ACTIONS[a.act];
+  if (!action) return;
+  // mostra testo
+  if (action.text) toast(action.text, 3500);
+  if (action.anxiety) addAnxiety(action.anxiety);
+  if (action.money) { G.money += action.money; hud(); }
+  if (action.action === 'startCashier') {
+    if (G.stage === 1) { showDialogue(DATA.STORY[1].dialogo, function () { startCashier(); }); }
+    else if (G.stage > 1) { startCashier(); }
+    else toast('Prima leggi il diario (capitolo 1).');
+  } else if (action.action === 'startBoxing') {
+    if (G.money >= 5) { G.money -= 5; startBoxing(); }
+    else toast('L\'ingresso all\'arena costa €5.');
+  }
+}
+
+function updateInterior(dt) {
+  if (!G.interior) return;
+  var mv = moveVector();
+  if (mv.m > 0.1) {
+    var sp = 150 * dt;
+    var nx = G.player.x + mv.x * sp;
+    var ny = G.player.y + mv.y * sp;
+    if (!interiorCollides(nx, G.player.y, 10)) G.player.x = nx;
+    if (!interiorCollides(G.player.x, ny, 10)) G.player.y = ny;
+    G.player.angle = Math.atan2(mv.x, mv.y);
+  }
+}
+
+function renderInterior() {
+  if (!G.interior) return false;
+  var d = G.interior.data;
+  var p = G.player;
+
+  // sfondo
+  ctx.fillStyle = d.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  // centra la vista sull'interno
+  var scale = Math.min(W / d.w, H / d.h) * 0.85;
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(scale, scale);
+  ctx.translate(-d.w / 2, -d.h / 2);
+
+  // muri perimetrali
+  ctx.fillStyle = '#4a5568';
+  ctx.fillRect(0, 0, d.w, 12);
+  ctx.fillRect(0, d.h - 12, d.w, 12);
+  ctx.fillRect(0, 0, 12, d.h);
+  ctx.fillRect(d.w - 12, 0, 12, d.h);
+
+  // muri interni
+  ctx.fillStyle = '#5a6577';
+  d.walls.forEach(function (w) {
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+  });
+
+  // pavimento (schema a scacchi)
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  for (var gx = 12; gx < d.w - 12; gx += 30) {
+    for (var gy = 12; gy < d.h - 12; gy += 30) {
+      if ((Math.floor(gx / 30) + Math.floor(gy / 30)) % 2 === 0) {
+        ctx.fillRect(gx, gy, 30, 30);
+      }
+    }
+  }
+
+  // oggetti
+  d.items.forEach(function (it) {
+    ctx.fillStyle = it.color;
+    roundRect(ctx, it.x, it.y, it.w, it.h, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // etichetta
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(it.label, it.x + it.w / 2, it.y + it.h / 2);
+  });
+
+  // porta di uscita (pulsante)
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath(); ctx.arc(d.exit.x, d.exit.y, 14, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 14px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🚪', d.exit.x, d.exit.y);
+
+  // giocatore
+  ctx.fillStyle = '#3b82f6';
+  ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#fcd9b8';
+  ctx.beginPath(); ctx.arc(p.x, p.y - 3, 5, 0, 6.28); ctx.fill();
+  // indicatore direzione
+  ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(p.x + Math.sin(p.angle) * 10, p.y + Math.cos(p.angle) * 10);
+  ctx.stroke();
+
+  // etichetta interazione
+  var a = interiorNearestInteractable();
+  if (a && !G.dialogue && !G.minigame && !G.paused) {
+    var lbl = a.label || a.act;
+    ctx.font = 'bold 12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    roundRect(ctx, p.x - 80, p.y - 38, 160, 20, 6); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(lbl, p.x, p.y - 25);
+  }
+
+  // nome edificio in alto
+  ctx.font = 'bold 16px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('📍 ' + d.label, d.w / 2, d.h - 30);
+
+  ctx.restore();
+  return true;
+}
+
+// ══════════ TRAFFICO NPC ══════════
+function spawnTrafficCar() {
+  if (G.traffic.length >= DATA.TRAFFIC.maxCars) return;
+  var horizontal = Math.random() < 0.5;
+  var roadIdx = Math.floor(Math.random() * (DATA.GRID + 1));
+  var roadCenter = -DATA.WORLD / 2 + roadIdx * DATA.CELL + DATA.ROAD / 2;
+  var startEdge = -DATA.WORLD / 2 - 100;
+  var endEdge = DATA.WORLD / 2 + 100;
+  var model = DATA.TRAFFIC.models[(Math.random() * DATA.TRAFFIC.models.length) | 0];
+  var color = DATA.CAR_COLORS[(Math.random() * DATA.CAR_COLORS.length) | 0];
+  var speed = DATA.TRAFFIC.speedRange[0] + Math.random() * (DATA.TRAFFIC.speedRange[1] - DATA.TRAFFIC.speedRange[0]);
+  var goingForward = Math.random() < 0.5;
+  var car;
+  if (horizontal) {
+    car = { x: goingForward ? startEdge : endEdge, y: roadCenter, angle: goingForward ? 0 : Math.PI, model: model, color: color, speed: speed, horizontal: true, forward: goingForward };
+  } else {
+    car = { x: roadCenter, y: goingForward ? startEdge : endEdge, angle: goingForward ? Math.PI / 2 : -Math.PI / 2, model: model, color: color, speed: speed, horizontal: false, forward: goingForward };
+  }
+  G.traffic.push(car);
+}
+
+function updateTraffic(dt) {
+  G.trafficT -= dt;
+  if (G.trafficT <= 0) {
+    G.trafficT = DATA.TRAFFIC.spawnInterval + Math.random() * 2;
+    spawnTrafficCar();
+  }
+  for (var i = G.traffic.length - 1; i >= 0; i--) {
+    var c = G.traffic[i];
+    var dir = c.forward ? 1 : -1;
+    if (c.horizontal) c.x += c.speed * dir * dt;
+    else c.y += c.speed * dir * dt;
+    // rimuovi auto fuori dai bordi
+    if (c.x < -DATA.WORLD / 2 - 200 || c.x > DATA.WORLD / 2 + 200 ||
+        c.y < -DATA.WORLD / 2 - 200 || c.y > DATA.WORLD / 2 + 200) {
+      G.traffic.splice(i, 1);
+      continue;
+    }
+    // evita collisioni con il giocatore
+    var d = Math.hypot(G.player.x - c.x, G.player.y - c.y);
+    if (d < 30 && !G.player.inCar) {
+      // il giocatore viene investito!
+      addAnxiety(8);
+      G.shake = 0.5;
+      toast('🚗 Auto in movimento! Stai attento!');
+    }
+    // collisioni con passanti
+    for (var n = 0; n < G.npcs.length; n++) {
+      var np = G.npcs[n];
+      if (Math.hypot(np.x - c.x, np.y - c.y) < 20) {
+        np.knock = 0.5;
+        np.kdir = Math.atan2(np.y - c.y, np.x - c.x);
+      }
+    }
+  }
+}
+
+// ══════════ REAZIONI NPC ══════════
+function updateNPCReactions(dt) {
+  G.npcs.forEach(function (n) {
+    if (n.reaction > 0) { n.reaction -= dt; return; }
+    var d = Math.hypot(n.x - G.player.x, n.y - G.player.y);
+    if (d < 50 && Math.random() < 0.008) {
+      var lines = DATA.NPC_REACTIONS[0].lines;
+      if (d < 30) lines = DATA.NPC_REACTIONS[2].lines;
+      else if (d < 40) lines = DATA.NPC_REACTIONS[1].lines;
+      toast('💬 ' + lines[(Math.random() * lines.length) | 0], 2500);
+      n.reaction = 8;
+    }
+  });
+}
+
+// ══════════ EVENTI DINAMICI ══════════
+function triggerDynamicEvent() {
+  var ev = DATA.DYNAMIC_EVENTS[(Math.random() * DATA.DYNAMIC_EVENTS.length) | 0];
+  toast(ev.text, 3500);
+  if (ev.anxiety) addAnxiety(ev.anxiety);
+  if (ev.money) { G.money += ev.money; hud(); }
+}
 function bindInput() {
   window.addEventListener('keydown', function (e) {
     G.keys[e.key.toLowerCase()] = true;
     if (e.key === ' ') { e.preventDefault(); fireWeapon(); }
-    if (e.key.toLowerCase() === 'e') tryInteract();
+    if (e.key.toLowerCase() === 'e') {
+      if (G.interior) interiorInteract();
+      else tryInteract();
+    }
     if (e.key.toLowerCase() === 'm') toggleMusic();
     if (e.key.toLowerCase() === 'v') tryPhoto();
     if (e.key.toLowerCase() === 'q') cycleWeapon();
-    if (e.key === 'Escape') toggleMenu();
+    if (e.key === 'Escape') {
+      if (G.interior) exitBuilding();
+      else toggleMenu();
+    }
   });
   window.addEventListener('keyup', function (e) { G.keys[e.key.toLowerCase()] = false; });
 
@@ -175,8 +493,8 @@ function bindInput() {
     for (var i = 0; i < e.touches.length; i++) if (joyEl.contains(e.touches[i].target)) still = true;
     if (!still) { G.joy.active = false; G.joy.x = 0; G.joy.y = 0; knob.style.transform = 'translate(0,0)'; }
   });
-  $('actBtn').addEventListener('touchstart', function (e) { e.preventDefault(); tryInteract(); }, { passive: false });
-  $('actBtn').addEventListener('mousedown', tryInteract);
+  $('actBtn').addEventListener('touchstart', function (e) { e.preventDefault(); if (G.interior) interiorInteract(); else tryInteract(); }, { passive: false });
+  $('actBtn').addEventListener('mousedown', function () { if (G.interior) interiorInteract(); else tryInteract(); });
   $('attackBtn').addEventListener('touchstart', function (e) { e.preventDefault(); fireWeapon(); }, { passive: false });
   $('attackBtn').addEventListener('mousedown', fireWeapon);
   $('carBtn').addEventListener('touchstart', function (e) { e.preventDefault(); toggleCarAction(); }, { passive: false });
@@ -246,14 +564,24 @@ function hud() {
   if (G.job) $('jobTag').textContent = G.job.kind === 'pizza' ? '🍕 ' + G.job.left + ' consegne' : G.job.kind === 'taxi' ? '🚕 ' + G.job.left + ' corse' : '';
   var w = weaponCurrent();
   $('weapon').textContent = (w ? w.emoji + ' ' + w.name : '🔧') + ' · Q';
+  // cooldown bar
+  var cdBar = $('cdBar');
+  if (cdBar) {
+    var cdPct = w ? Math.max(0, G.weapon.cd / w.cd) : 0;
+    cdBar.style.width = (cdPct * 100) + '%';
+    cdBar.style.background = cdPct > 0 ? '#f59e0b' : '#38a169';
+  }
   // pulsante auto contestuale
   var cb = $('carBtn');
   cb.textContent = G.player.inCar ? '🚪' : '🚗';
   cb.title = G.player.inCar ? 'Esci dall\'auto' : 'Entra in auto';
-  // sblocco urlo per capitolo
+  // sblocco armi per capitolo
   for (var ui = 0; ui < G.weapon.items.length; ui++) {
     if (G.weapon.items[ui].id === 'urlo') {
       G.weapon.items[ui].owned = G.stage >= (DATA.WEAPON_UNLOCK.urlo + 1);
+    }
+    if (G.weapon.items[ui].id === 'fischio') {
+      G.weapon.items[ui].owned = G.stage >= (DATA.WEAPON_UNLOCK.fischio + 1);
     }
   }
   if (!weaponCurrent().owned) G.weapon.slot = 0;
@@ -276,6 +604,9 @@ function sideProgress() {
   if (G.side.id === 'caffe') return G.side.count + '/' + q.count + ' caffè';
   if (G.side.id === 'anello') return 'cerca il luccichio...';
   if (G.side.id === 'pacchi') return G.side.count + '/' + q.count + ' pacchi';
+  if (G.side.id === 'utensili') return G.side.count + '/' + q.count + ' utensili';
+  if (G.side.id === 'libri') return G.side.count + '/' + q.count + ' libri';
+  if (G.side.id === 'djset') return G.side.count + '/' + q.count + ' dischi';
   return '';
 }
 
@@ -332,16 +663,63 @@ function fireWeapon() {
   var a = p.inCar ? p.inCar.angle : p.angle;
   if (w.id === 'fionda') {
     G.shots.push({ x: p.x + Math.sin(a) * 16, y: p.y + Math.cos(a) * 16, a: a, sp: 380, type: 'fionda', life: 0.9 });
+    addAttackFx(p.x + Math.sin(a) * 20, p.y + Math.cos(a) * 20, 'muzzle', '#f59e0b');
     toast('🪀 FIONDA! (satira inclusa)');
   } else if (w.id === 'acqua') {
     G.shots.push({ x: p.x + Math.sin(a) * 16, y: p.y + Math.cos(a) * 16, a: a, sp: 420, type: 'acqua', life: 0.6 });
+    addAttackFx(p.x + Math.sin(a) * 20, p.y + Math.cos(a) * 20, 'muzzle', '#38bdf8');
     addAnxiety(-3);
   } else if (w.id === 'urlo') {
     addAnxiety(-15);
     G.shake = 0.6;
+    addAttackFx(p.x, p.y, 'slash', '#ef4444');
     G.npcs.forEach(function (n) { var d = Math.hypot(n.x - p.x, n.y - p.y); if (d < 140) { n.knock = 0.8; n.kdir = Math.atan2(n.y - p.y, n.x - p.x); } });
     toast('😤 URLO LIBERATORIO! L\'ansia scende di 15.');
+  } else if (w.id === 'fischio') {
+    G.npcs.forEach(function (n) {
+      var d = Math.hypot(n.x - p.x, n.y - p.y);
+      if (d < 200) { n.a = Math.atan2(p.y - n.y, p.x - n.x); n.v = 10; setTimeout(function () { n.v = n.npcType === 'runner' ? 80 : 20 + Math.random() * 20; }, 3000); }
+    });
+    addAnxiety(-2);
+    toast('📣 FISCHIO! I passanti si fermano a guardarti. Utile per le consegne.');
   }
+}
+// effetti visivi attacco
+var attackFx = [];
+function addAttackFx(x, y, type, color) {
+  attackFx.push({ x: x, y: y, type: type, color: color || '#fff', timer: 12 });
+}
+function autoFireWeapon(dt) {
+  if (G.paused || G.over || G.dialogue || G.minigame || G.interior) return;
+  var w = weaponCurrent();
+  if (!w || !w.owned) return;
+  if (G.weapon.cd > 0) return;
+  var p = G.player;
+  // trova nemico piu vicino (polizia > NPC)
+  var target = null;
+  var bestD = 220;
+  for (var c = 0; c < G.police.length; c++) {
+    var cop = G.police[c];
+    var d = Math.hypot(cop.x - p.x, cop.y - p.y);
+    if (d < bestD) { bestD = d; target = cop; }
+  }
+  if (!target) {
+    for (var n = 0; n < G.npcs.length; n++) {
+      var np = G.npcs[n];
+      var dn = Math.hypot(np.x - p.x, np.y - p.y);
+      if (dn < 150) { target = np; bestD = dn; break; }
+    }
+  }
+  if (!target) return;
+  // orienta il giocatore verso il nemico
+  p.angle = Math.atan2(target.x - p.x, target.y - p.y);
+  // controlla se il nemico e nella direzione corretta (conico)
+  var aToTarget = Math.atan2(target.y - p.y, target.x - p.x);
+  var angleDiff = Math.abs(p.angle - aToTarget);
+  if (angleDiff > Math.PI) angleDiff = 6.28 - angleDiff;
+  if (angleDiff > 1.2) return;
+  // spara automaticamente
+  fireWeapon();
 }
 function updateShots(dt) {
   var p = G.player;
@@ -382,7 +760,15 @@ function nearestInteractable() {
     { b: buildingById('taxi'), act: 'taxi' },
     { b: buildingById('bar'), act: 'bar' },
     { b: buildingById('posta'), act: 'posta' },
-    { b: buildingById('ufficio'), act: 'ufficio' }
+    { b: buildingById('ufficio'), act: 'ufficio' },
+    { b: buildingById('edicola'), act: 'edicola' },
+    { b: buildingById('ristorante'), act: 'ristorante' },
+    { b: buildingById('arena'), act: 'arena' },
+    { b: buildingById('meccanico'), act: 'meccanico' },
+    { b: buildingById('biblioteca'), act: 'biblioteca' },
+    { b: buildingById('discoteca'), act: 'discoteca' },
+    { b: buildingById('cinema'), act: 'cinema' },
+    { b: buildingById('palestra'), act: 'palestra' }
   ];
   var i, d;
   for (i = 0; i < spots.length; i++) {
@@ -418,45 +804,69 @@ function nearestInteractable() {
       if (d < 45) { best = { act: 'deliverCoffee' }; }
     }
   }
+  // collezionabili (utensili, libri, dischi)
+  if (G.side && DATA.COLLECTIBLE_SPAWNS[G.side.id]) {
+    for (i = 0; i < G.collectibles.length; i++) {
+      var col = G.collectibles[i];
+      if (col.type === G.side.id && !col.found) {
+        d = Math.hypot(p.x - col.x, p.y - col.y);
+        if (d < 45 && d < bd) { bd = d; best = { act: 'collect', collectible: col }; }
+      }
+    }
+  }
   return best;
 }
 function interactLabel(a) {
   if (!a) return '';
-  if (a.act === 'door') return '🏠 Casa';
-  if (a.act === 'market') return '🏪 Lavoro (cassa)';
-  if (a.act === 'pizza') return '🍕 Consegne';
-  if (a.act === 'taxi') return '🚕 Taxi';
+  if (a.act === 'door') return '📍 Entra in Casa';
+  if (a.act === 'market') return '📍 Entra in Minimarket';
+  if (a.act === 'pizza') return '📍 Entra in Pizzeria';
+  if (a.act === 'taxi') return '📍 Entra in Taxi';
   if (a.act === 'bar') return '☕ Caffè (€' + DATA.COSTS.caffe + ')';
-  if (a.act === 'posta') return '✉️ Posta';
-  if (a.act === 'ufficio') return '🏢 Sede Merloni';
+  if (a.act === 'posta') return '📍 Entra in Posta';
+  if (a.act === 'ufficio') return '📍 Entra in Sede Merloni';
   if (a.act === 'park') return '🌳 Panchina (rilassa)';
   if (a.act === 'moto') return '🏍️ La moto';
   if (a.act === 'car') return '🚗 Salta in auto';
   if (a.act === 'char') return a.ch.emoji + ' ' + a.ch.name;
   if (a.act === 'ring') return '✨ Luccichio... prova a raccogliere';
   if (a.act === 'deliverCoffee') return '☕ Consegna il caffè';
+  if (a.act === 'edicola') return '📍 Entra in Edicola';
+  if (a.act === 'ristorante') return '📍 Entra in Trattoria';
+  if (a.act === 'arena') return '📍 Entra in Arena';
+  if (a.act === 'meccanico') return '📍 Entra in Autofficina';
+  if (a.act === 'biblioteca') return '📍 Entra in Biblioteca';
+  if (a.act === 'discoteca') return '📍 Entra in Discoteca';
+  if (a.act === 'cinema') return '📍 Entra in Cinema';
+  if (a.act === 'palestra') return '📍 Entra in Palestra';
+  if (a.act === 'collect') {
+    var info = DATA.COLLECTIBLES[a.collectible.type];
+    return info.emoji + ' Raccogli ' + info.name;
+  }
   return '';
 }
 function tryInteract() {
   if (G.paused || G.over || G.dialogue || G.minigame) return;
+  // se dentro un edificio, gestisci interazione interna
+  if (G.interior) { interiorInteract(); return; }
   var a = nearestInteractable();
   if (!a) return;
   var act = a.act;
   if (act === 'door') {
     if (G.stage === 0) showDialogue(DATA.STORY[0].dialogo, function () { nextStage(); });
-    else toast('La casa di Marco. Un rifugio, a modo suo.');
+    else enterBuilding('casa');
   } else if (act === 'market') {
     if (G.stage === 1) { showDialogue(DATA.STORY[1].dialogo, function () { startCashier(); }); }
     else if (G.stage < 1) toast('Prima leggi il diario (capitolo 1).');
-    else toast('Il minimarket. Merloni non c\'è. Meglio così.');
+    else enterBuilding('market');
   } else if (act === 'pizza') {
     if (G.stage === 3) { showDialogue(DATA.STORY[3].dialogo, function () { startPizzaJob(3); }); }
     else if (G.stage === 8) { buyPizzeria(); }
     else if (G.stage === 9 && G.ownsPizza) { startPizzaJob(1, true); }
-    else toast('La pizzeria. Il panettiere guarda le pizze come figli.');
+    else enterBuilding('pizza');
   } else if (act === 'taxi') {
     if (G.stage === 4) { showDialogue(DATA.STORY[4].dialogo, function () { startTaxiJob(2); }); }
-    else toast('Stazione taxi. Nessuna corsa in corso.');
+    else enterBuilding('taxi');
   } else if (act === 'bar') {
     var acq = null;
     for (var wi = 0; wi < G.weapon.items.length; wi++) if (G.weapon.items[wi].id === 'acqua') acq = G.weapon.items[wi];
@@ -474,9 +884,9 @@ function tryInteract() {
     } else toast('Non hai i €' + DATA.COSTS.caffe + ' per il caffè. Satira inclusa.');
   } else if (act === 'posta') {
     if (G.stage === 7) { showDialogue(DATA.STORY[7].dialogo, function () { nextStage(); }); }
-    else toast('La fila della posta. Portati un libro.');
+    else enterBuilding('posta');
   } else if (act === 'ufficio') {
-    if (G.stage === 6) toast('Entra e fotografa la frode con V (fotocamera).');
+    if (G.stage === 6) enterBuilding('ufficio');
     else toast('La sede Merloni. Meglio non entrare senza motivo.');
   } else if (act === 'park') {
     if (G.stage === 5) {
@@ -510,6 +920,65 @@ function tryInteract() {
       hud();
       if (G.side.count >= DATA.SIDE_QUESTS.caffe.count) completeSide('caffe');
     }
+  } else if (act === 'collect') {
+    if (G.side && G.side.id === a.collectible.type) {
+      a.collectible.found = true;
+      G.side.count++;
+      var ci = DATA.COLLECTIBLES[a.collectible.type];
+      toast(ci.emoji + ' ' + ci.name + ' trovato! (' + G.side.count + '/' + DATA.SIDE_QUESTS[G.side.id].count + ')');
+      hud();
+      if (G.side.count >= DATA.SIDE_QUESTS[G.side.id].count) completeSide(G.side.id);
+    }
+  } else if (act === 'edicola') {
+    if (G.money >= 2) {
+      G.money -= 2;
+      addAnxiety(-5);
+      toast('📰 Giornale letto. Le notizie sono tristi, ma almeno sai cosa succede. -5 ansia.');
+      hud();
+    } else toast('Il giornale costa €2. Anche la conoscenza ha un prezzo.');
+  } else if (act === 'ristorante') {
+    if (G.money >= 8) {
+      G.money -= 8;
+      addAnxiety(-20);
+      toast('🍝 Pasto alla trattoria. La Nonna cuoce bene. -20 ansia. +€0 (ma +vita).');
+      hud();
+    } else toast('Il piatto della casa costa €8. La fame, invece, è gratis.');
+  } else if (act === 'arena') {
+    if (G.money >= 5) {
+      G.money -= 5;
+      startBoxing();
+    } else toast('L\'ingresso all\'arena costa €5. La violenza, come sempre, ha un prezzo.');
+  } else if (act === 'meccanico') {
+    if (G.player.inCar) {
+      if (G.money >= DATA.COSTS.riparazione) {
+        G.money -= DATA.COSTS.riparazione;
+        G.player.inCar.speed = 0;
+        toast('🛠️ Auto riparata! -€' + DATA.COSTS.riparazione);
+        hud();
+      } else toast('La riparazione costa €' + DATA.COSTS.riparazione + '. Gino è gentile ma non gratis.');
+    } else enterBuilding('meccanico');
+  } else if (act === 'biblioteca') {
+    addAnxiety(-10);
+    toast('📚 Ti sei perso tra i libri. L\'ansia scende di 10. Consigliato.');
+    hud();
+  } else if (act === 'discoteca') {
+    if (G.money >= 7) {
+      G.money -= 7;
+      addAnxiety(-18);
+      toast('🪩 Musica forte! L\'ansia scende di 18. Per un\'ora, il mondo tace.');
+      hud();
+    } else toast('L\'ingresso alla discoteca costa €7. La musica, invece, è ovunque.');
+  } else if (act === 'cinema') {
+    if (G.money >= 6) {
+      G.money -= 6;
+      addAnxiety(-15);
+      toast('🎬 Film vista! Due ore di escape. L\'ansia scende di 15.');
+      hud();
+    } else toast('Il biglietto costa €6. La realtà è gratis (e pure brutta).');
+  } else if (act === 'palestra') {
+    addAnxiety(-8);
+    toast('🏋️ Allenamento fatto! L\'ansia scende di 8. I muscoli ringraziano.');
+    hud();
   }
   hud();
 }
@@ -519,7 +988,14 @@ function talkToChar(ch) {
   var lines = [{ n: ch.name, t: q.text }];
   if (!ch.talked) {
     ch.talked = true;
-    lines.unshift({ n: ch.name, t: ch.id === 'senzanome' ? 'Sei il primo che si ferma ad ascoltarmi. Ho perso l\'anello di mia moglie...' : (ch.id === 'rosa' ? 'Marco! Ho un favore da chiederti. Un giro di caffè per la città.' : 'Agente Conti: aiuto! I pacchi della posta mi seppelliscono.') });
+    var intro = 'Ciao Marco!';
+    if (ch.id === 'senzanome') intro = 'Sei il primo che si ferma ad ascoltarmi. Ho perso l\'anello di mia moglie...';
+    else if (ch.id === 'rosa') intro = 'Marco! Ho un favore da chiederti. Un giro di caffè per la città.';
+    else if (ch.id === 'conti') intro = 'Agente Conti: aiuto! I pacchi della posta mi seppelliscono.';
+    else if (ch.id === 'gino') intro = 'Ehi Marco! Ho perso tutti i miei utensili nell\'officina. Li trovi nel parcheggio?';
+    else if (ch.id === 'luca') intro = 'Marco! I libri sono spariti dalla biblioteca. Li hanno sparsi per la città...';
+    else if (ch.id === 'dj_nina') intro = 'Marco! Ho bisogno dei miei dischi per il set di stasera. Li trovi in giro?';
+    lines.unshift({ n: ch.name, t: intro });
   }
   showDialogue(lines, function () {
     G.side = { id: ch.quest, count: 0, state: {} };
@@ -741,6 +1217,11 @@ function restartGame() {
   var h = homeSpawn();
   G.player.x = h.x; G.player.y = h.y; G.player.inCar = null; G.player.anxiety = 40;
   G.chillT = 0;
+  G.traffic = []; G.trafficT = 0;
+  G.eventT = 30; G.eventCd = 0;
+  G.collectibles = [];
+  G.interior = null;
+  initCollectibles();
   $('finaleBox').classList.add('hidden');
   $('menuOverlay').classList.remove('open');
   hud();
@@ -987,6 +1468,79 @@ function endRace() {
   $('raceBox').classList.add('hidden');
 }
 
+// --- boxe (arena) ---
+var boxing = null;
+function startBoxing() {
+  G.minigame = 'boxing';
+  boxing = { hp: 100, enemyHp: 80, round: 1, maxRounds: 3, score: 0, combo: 0, t: 0, enemyCd: 0, playerCd: 0 };
+  $('boxingBox').classList.remove('hidden');
+  renderBoxing();
+  toast('🥊 Round 1! Colpisci con SPAZIO o clicca!');
+}
+function renderBoxing() {
+  if (!boxing) return;
+  $('boxingHP').textContent = '❤️ ' + boxing.hp + '%';
+  $('boxingEnemyHP').textContent = '💀 Avversario: ' + boxing.enemyHp + '%';
+  $('boxingScore').textContent = 'Punti: ' + boxing.score + ' · Combo: x' + boxing.combo + ' · Round: ' + boxing.round + '/' + boxing.maxRounds;
+  $('boxingBarHP').style.width = boxing.hp + '%';
+  $('boxingBarHP').style.background = boxing.hp > 60 ? '#38a169' : boxing.hp > 30 ? '#ed8936' : '#e53e3e';
+  $('boxingBarEnemy').style.width = boxing.enemyHp + '%';
+}
+function updateBoxing(dt) {
+  if (G.minigame !== 'boxing' || !boxing) return;
+  boxing.t += dt;
+  boxing.playerCd = Math.max(0, boxing.playerCd - dt);
+  boxing.enemyCd = Math.max(0, boxing.enemyCd - dt);
+  // avversario colpisce
+  if (boxing.enemyCd <= 0) {
+    var dmg = 8 + Math.random() * 7;
+    boxing.hp = Math.max(0, boxing.hp - dmg);
+    boxing.enemyCd = 0.8 + Math.random() * 0.6;
+    boxing.combo = 0;
+    G.shake = 0.3;
+    renderBoxing();
+    if (boxing.hp <= 0) { endBoxing(false); return; }
+  }
+  // round successivo
+  if (boxing.enemyHp <= 0) {
+    if (boxing.round >= boxing.maxRounds) { endBoxing(true); return; }
+    boxing.round++;
+    boxing.enemyHp = 60 + boxing.round * 15;
+    boxing.score += 50;
+    toast('🥊 Round ' + boxing.round + '! Avversario più forte!');
+    renderBoxing();
+  }
+}
+function boxingPunch() {
+  if (!boxing || boxing.playerCd > 0) return;
+  var dmg = 10 + Math.random() * 10;
+  boxing.combo++;
+  if (boxing.combo > 2) dmg += boxing.combo * 2;
+  boxing.enemyHp = Math.max(0, boxing.enemyHp - dmg);
+  boxing.score += 10 + boxing.combo * 2;
+  boxing.playerCd = 0.35;
+  G.shake = 0.2;
+  renderBoxing();
+}
+function endBoxing(win) {
+  G.minigame = null;
+  $('boxingBox').classList.add('hidden');
+  if (win) {
+    var prize = 20 + boxing.score;
+    G.money += prize;
+    addAnxiety(-10);
+    toast('🏆 Vittoria! +€' + prize + ' (+ ' + boxing.score + ' punti)');
+  } else {
+    addAnxiety(10);
+    toast('🥊 Sconfitta! Ma hai guadagnato rispetto. L\'ansia sale di 10.');
+  }
+  boxing = null;
+  hud();
+}
+window.addEventListener('keydown', function (e) {
+  if (G.minigame === 'boxing' && e.key === ' ') { e.preventDefault(); boxingPunch(); }
+});
+
 // ══════════ EVENTI RANDOM ══════════
 function randomEvents(dt) {
   G.npcLineT -= dt;
@@ -1022,6 +1576,15 @@ function updateChill(dt) {
 
 // ══════════ RENDER ══════════
 function render() {
+  // se dentro un edificio, renderizza l'interno
+  if (renderInterior()) {
+    if (G.photoFlash > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + G.photoFlash + ')';
+      ctx.fillRect(0, 0, W, H);
+      G.photoFlash = Math.max(0, G.photoFlash - 0.08);
+    }
+    return;
+  }
   ctx.fillStyle = '#dfe7ef';
   ctx.fillRect(0, 0, W, H);
   ctx.save();
@@ -1125,6 +1688,27 @@ function render() {
   // polizia
   G.police.forEach(function (cop) { drawCar(cop.x, cop.y, cop.a, 'police', '#1d4ed8'); });
 
+  // traffico in movimento
+  G.traffic.forEach(function (c) {
+    drawCar(c.x, c.y, c.angle, c.model, c.color);
+  });
+
+  // collezionabili (oggetti da trovare)
+  G.collectibles.forEach(function (col) {
+    if (col.found) return;
+    if (G.side && G.side.id === col.type) {
+      var info = DATA.COLLECTIBLES[col.type];
+      var puls = 0.5 + 0.5 * Math.sin(performance.now() / 300 + col.x * 0.1);
+      ctx.globalAlpha = 0.6 + puls * 0.4;
+      ctx.fillStyle = info.color;
+      ctx.beginPath(); ctx.arc(col.x, col.y, 10, 0, 6.28); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.font = '14px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(info.emoji, col.x, col.y - 14);
+      ctx.globalAlpha = 1;
+    }
+  });
+
   // personaggi con nome
   G.chars.forEach(function (ch) {
     ctx.fillStyle = ch.color;
@@ -1136,15 +1720,63 @@ function render() {
 
   // passanti
   G.npcs.forEach(function (n) {
-    ctx.fillStyle = n.knock > 0 ? '#fbbf24' : '#64748b';
+    var baseColor = n.npcColor || '#64748b';
+    ctx.fillStyle = n.knock > 0 ? '#fbbf24' : baseColor;
     ctx.beginPath(); ctx.arc(n.x, n.y, 6, 0, 6.28); ctx.fill();
+    // tipo NPC (piccolo indicatore)
+    if (n.npcType && n.npcType !== 'normal' && n.npcType !== 'worker') {
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.npcEmoji, n.x, n.y - 10);
+    }
   });
 
-  // proiettili
+  // proiettili con scia
   G.shots.forEach(function (s) {
-    ctx.fillStyle = s.type === 'acqua' ? '#38bdf8' : '#f59e0b';
-    ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 6.28); ctx.fill();
+    var col = s.type === 'acqua' ? '#38bdf8' : '#f59e0b';
+    // scia
+    ctx.globalAlpha = 0.3;
+    for (var t = 1; t <= 3; t++) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(s.x - Math.cos(s.a) * t * 4, s.y - Math.sin(s.a) * t * 4, 3 - t * 0.5, 0, 6.28);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // nucleo
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 5, 0, 6.28);
+    ctx.fill();
+    // alone luminoso
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 9, 0, 6.28);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   });
+
+  // effetti attacco (flash, slash)
+  attackFx.forEach(function (fx) {
+    var alpha = fx.timer / 12;
+    ctx.globalAlpha = alpha;
+    if (fx.type === 'muzzle') {
+      ctx.fillStyle = fx.color;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, 8 * (1 - alpha) + 4, 0, 6.28);
+      ctx.fill();
+    } else if (fx.type === 'slash') {
+      ctx.strokeStyle = fx.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, 20 * (1 - alpha) + 5, 0, Math.PI * 0.8);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  });
+  attackFx.forEach(function (fx) { fx.timer--; });
+  attackFx = attackFx.filter(function (fx) { return fx.timer > 0; });
 
   // destinazione lavoro
   if (G.job) {
@@ -1241,6 +1873,27 @@ function drawCar(x, y, a, model, color) {
     ctx.fillStyle = blink ? '#ef4444' : '#3b82f6';
     roundRect(ctx, 1, -h / 2 - 4, 5, 4, 2); ctx.fill();
   }
+  // pickup: cassone posteriore
+  if (m.truck) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    roundRect(ctx, -w / 2 + 2, -h / 2 + 2, w * 0.4, h - 4, 3); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w * 0.4 - 2, h - 6);
+  }
+  // moto/bici: cmdline centrale
+  if (m.bike) {
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(-w / 2 + 2, -1, w - 4, 2);
+    // ruote
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.beginPath(); ctx.arc(-w / 2 + 4, 0, 3, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(w / 2 - 4, 0, 3, 0, 6.28); ctx.fill();
+    // manubrio
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(w / 2 - 6, -4); ctx.lineTo(w / 2 - 2, -4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w / 2 - 6, 4); ctx.lineTo(w / 2 - 2, 4); ctx.stroke();
+  }
   // ruote
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   [[-w / 2 + 6, -h / 2 + 3], [-w / 2 + 6, h / 2 - 3], [w / 2 - 6, -h / 2 + 3], [w / 2 - 6, h / 2 - 3]].forEach(function (wh) {
@@ -1297,13 +1950,26 @@ function update(dt) {
   G.camera.x += (G.player.x - G.camera.x) * Math.min(1, 6 * dt);
   G.camera.y += (G.player.y - G.camera.y) * Math.min(1, 6 * dt);
 
+  if (G.interior) {
+    updateInterior(dt);
+    return;
+  }
   if (G.minigame === 'arcade') { updateArcade(dt); return; }
   if (G.minigame === 'race') { updateRace(dt); updateCars(dt); return; }
+  if (G.minigame === 'boxing') { updateBoxing(dt); return; }
 
   updateCars(dt);
+  autoFireWeapon(dt);
   updateJob(dt);
   updateChill(dt);
   randomEvents(dt);
+  updateTraffic(dt);
+  updateNPCReactions(dt);
+  G.eventT -= dt;
+  if (G.eventT <= 0) {
+    G.eventT = 45 + Math.random() * 60;
+    triggerDynamicEvent();
+  }
   hud();
 }
 function loop(t) {
@@ -1326,26 +1992,53 @@ function renderMinimap() {
   if (mm.width !== Math.round(MM * dpr)) { mm.width = Math.round(MM * dpr); mm.height = Math.round(MM * dpr); }
   mmCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   mmCtx.clearRect(0, 0, MM, MM);
-  var f = MM / DATA.WORLD;
-  var tx = function (wx) { return (wx + DATA.WORLD / 2) * f; };
-  var ty = function (wy) { return (wy + DATA.WORLD / 2) * f; };
+
+  // se dentro un edificio, mostra la minimappa dell'interno
+  if (G.interior) {
+    var d = G.interior.data;
+    var f = MM / Math.max(d.w, d.h);
+    mmCtx.fillStyle = d.bg;
+    mmCtx.fillRect(0, 0, MM, MM);
+    // muri
+    mmCtx.fillStyle = '#4a5568';
+    mmCtx.fillRect(0, 0, MM, 2);
+    mmCtx.fillRect(0, MM - 2, MM, 2);
+    mmCtx.fillRect(0, 0, 2, MM);
+    mmCtx.fillRect(MM - 2, 0, 2, MM);
+    // items
+    d.items.forEach(function (it) {
+      mmCtx.fillStyle = it.color;
+      mmCtx.fillRect(it.x * f, it.y * f, Math.max(2, it.w * f), Math.max(2, it.h * f));
+    });
+    // porta
+    mmCtx.fillStyle = '#e74c3c';
+    mmCtx.beginPath(); mmCtx.arc(d.exit.x * f, d.exit.y * f, 3, 0, 6.28); mmCtx.fill();
+    // giocatore
+    mmCtx.fillStyle = '#3b82f6';
+    mmCtx.beginPath(); mmCtx.arc(G.player.x * f, G.player.y * f, 3, 0, 6.28); mmCtx.fill();
+    return;
+  }
+
+  var f2 = MM / DATA.WORLD;
+  var tx = function (wx) { return (wx + DATA.WORLD / 2) * f2; };
+  var ty = function (wy) { return (wy + DATA.WORLD / 2) * f2; };
   // prato
   mmCtx.fillStyle = '#a7c896';
   mmCtx.fillRect(0, 0, MM, MM);
   // strade
-  var rw = Math.max(2, DATA.ROAD * f);
+  var rw = Math.max(2, DATA.ROAD * f2);
   mmCtx.fillStyle = '#e8ecf1';
   var i;
   for (i = 0; i <= DATA.GRID; i++) {
-    var cx = (i * DATA.CELL + DATA.ROAD / 2) * f;
+    var cx = (i * DATA.CELL + DATA.ROAD / 2) * f2;
     mmCtx.fillRect(cx - rw / 2, 0, rw, MM);
-    var cy = (i * DATA.CELL + DATA.ROAD / 2) * f;
+    var cy = (i * DATA.CELL + DATA.ROAD / 2) * f2;
     mmCtx.fillRect(0, cy - rw / 2, MM, rw);
   }
   // edifici e parco
   buildings.forEach(function (b) {
     mmCtx.fillStyle = b.kind === 'park' ? '#9ae6b4' : b.color;
-    mmCtx.fillRect(tx(b.x), ty(b.y), Math.max(2, b.w * f), Math.max(2, b.h * f));
+    mmCtx.fillRect(tx(b.x), ty(b.y), Math.max(2, b.w * f2), Math.max(2, b.h * f2));
   });
   // destinazione lavoro
   if (G.job) {
@@ -1366,6 +2059,11 @@ function renderMinimap() {
     mmCtx.fillStyle = c.color;
     mmCtx.fillRect(tx(c.x) - 2, ty(c.y) - 2, 4, 4);
   });
+  // traffico in movimento
+  G.traffic.forEach(function (c) {
+    mmCtx.fillStyle = 'rgba(255,255,255,0.4)';
+    mmCtx.fillRect(tx(c.x) - 1, ty(c.y) - 1, 3, 3);
+  });
   G.police.forEach(function (cop) {
     mmCtx.fillStyle = '#1d4ed8';
     mmCtx.fillRect(tx(cop.x) - 2, ty(cop.y) - 2, 4, 4);
@@ -1380,6 +2078,16 @@ function renderMinimap() {
       if (r.has && !r.found) {
         mmCtx.fillStyle = '#f59e0b';
         mmCtx.beginPath(); mmCtx.arc(tx(r.x), ty(r.y), 3, 0, 6.28); mmCtx.fill();
+      }
+    });
+  }
+  // collezionabili attivi
+  if (G.side && DATA.COLLECTIBLE_SPAWNS[G.side.id]) {
+    G.collectibles.forEach(function (col) {
+      if (col.type === G.side.id && !col.found) {
+        var info = DATA.COLLECTIBLES[col.type];
+        mmCtx.fillStyle = info.color;
+        mmCtx.beginPath(); mmCtx.arc(tx(col.x), ty(col.y), 3, 0, 6.28); mmCtx.fill();
       }
     });
   }
@@ -1420,11 +2128,13 @@ function init() {
   });
   $('btnPhoto').addEventListener('click', tryPhoto);
   $('btnCycle').addEventListener('click', cycleWeapon);
+  $('boxingPunch').addEventListener('click', boxingPunch);
+  $('boxingPunch').addEventListener('touchstart', function (e) { e.preventDefault(); boxingPunch(); }, { passive: false });
   hud();
   showDialogue(DATA.STORY[0].dialogo, function () { G.stage = 1; hud(); });
   requestAnimationFrame(loop);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { G: G, DATA: DATA, init: init, update: update, render: render, tryInteract: tryInteract, advanceDialogue: advanceDialogue, fireWeapon: fireWeapon, startCashier: startCashier, confirmOrder: confirmOrder, startPizzaJob: startPizzaJob, startTaxiJob: startTaxiJob, startArcade: startArcade, startRace: startRace, nextStage: nextStage, completeSide: completeSide, cycleWeapon: cycleWeapon, buildingById: buildingById };
+  module.exports = { G: G, DATA: DATA, init: init, update: update, render: render, tryInteract: tryInteract, advanceDialogue: advanceDialogue, fireWeapon: fireWeapon, startCashier: startCashier, confirmOrder: confirmOrder, startPizzaJob: startPizzaJob, startTaxiJob: startTaxiJob, startArcade: startArcade, startRace: startRace, startBoxing: startBoxing, nextStage: nextStage, completeSide: completeSide, cycleWeapon: cycleWeapon, buildingById: buildingById, spawnTrafficCar: spawnTrafficCar, triggerDynamicEvent: triggerDynamicEvent, enterBuilding: enterBuilding, exitBuilding: exitBuilding };
 }
