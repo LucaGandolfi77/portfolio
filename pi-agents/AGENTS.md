@@ -53,6 +53,29 @@ Launch with `agent_team` → `{ "action": "start", "graphFile": "graphs/NN-name.
 
 **Web research note:** `project:trend-hunter` and `project:marta` support optional web research. To use it, run `agent_team catalog` first to get live extension-tool provenance (`exa_search`, `exa_fetch`), then copy the `from` object into graph steps. Without provenance, these agents work on local evidence only. See SKILL.md section "Extension tools" for the `from` format.
 
+## Progress & model tracking
+
+Every run is recorded, not narrated. The tracker under `tracker/` is the single
+source of truth; `TRACEABILITY.md`, `tracker/index.json` and the dashboard
+(`dashboard/`) are all **generated** from it.
+
+| File | What it is | Maintained by |
+|---|---|---|
+| `tracker/runs/<runId>.json` | One record per `agent_team start` run: graph, project, timestamps, per-step agent/status/model/artifact | Director, after every run |
+| `tracker/projects/<slug>.json` | Pipeline stage/status/blocker/next-step per product | Director, when a product moves |
+| `tracker/agents.json` | Static identity catalog (roles, tools) | Curated |
+| `tracker/index.json` · `TRACEABILITY.md` · `dashboard/data/snapshot.js` | Aggregates & human views | **Generated** by `bin/tracker.py build` — never edit |
+
+Mandatory loop after any graph run that reaches a terminal state:
+
+1. `python3 bin/tracker.py template --run-id r10-<slug> --graph graphs/NN-….json --project <slug>` → copy the skeleton.
+2. Fill `tracker/runs/<runId>.json` with the observed steps: `status` per step
+   (`complete|failed|blocked|running|skipped`) and the LLM `model` per step when
+   visible — that is what powers the **Models** view and RPC-failure-rate signals.
+3. Refresh `tracker/projects/<slug>.json` (`stage`, `status`, `blocker`, `nextStep`).
+4. `python3 bin/tracker.py build` → regenerates index, TRACEABILITY.md, snapshot.
+5. `python3 bin/tracker.py check` anytime to validate all records.
+
 ## Iron rules
 
 1. **Never create `.pi/settings.json` in this workspace.** Bash-capable children are hard-refused anywhere under a tree containing one (this is a pi-multiagent security feature). pi-multiagent is installed *globally* (`~/.pi`) for exactly this reason.
@@ -63,6 +86,8 @@ Launch with `agent_team` → `{ "action": "start", "graphFile": "graphs/NN-name.
 6. Products live in `products/<slug>/` with `BRIEF.md` as the entry point. Source code may live elsewhere in the portfolio — briefs link to it.
 7. **Every agent maintains an activity log** at `.pi/agents/logs/<name>.md`. After every graph run, append an entry: date, action taken, evidence produced, and next step. The log is the agent's resume — it proves what was done, not what was intended.
 8. **Every project maintains a changelog** at `products/<slug>/CHANGELOG.md`. After every release, feature addition, or fix, append an entry: date, version/event, what changed, and decision context. The changelog is the project's timeline — it shows growth over time.
+9. **Every run gets a tracker record** at `tracker/runs/<runId>.json` plus a `tracker/projects/<slug>.json` refresh, then `bin/tracker.py build`. Never hand-edit `TRACEABILITY.md` / `tracker/index.json` — the builder overwrites them.
+10. **Attribute models when you can.** Record the LLM `model` per step in the run record when observable (run metadata or child report); otherwise leave it `null` and, if known, set the run-level `model`. Do not invent model names — `null` is honest and aggregates under `unrecorded`.
 
 ## Products under management
 

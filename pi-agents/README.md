@@ -23,6 +23,18 @@ agent_team catalog
 # trend-hunter, plus packaged: scout, planner, critic, reviewer, validator, worker, synthesizer, docs-auditor, web-researcher
 ```
 
+Progress & models are tracked in machine-readable records:
+
+```bash
+python3 bin/tracker.py check      # validate tracker/ records
+python3 bin/tracker.py build      # regenerate index.json + TRACEABILITY.md + dashboard snapshot
+python3 bin/tracker.py template   # skeleton for a new run record
+```
+
+Open the visual dashboard (`pi-agents/dashboard/index.html`) in a browser —
+either served (recommended, live data) or straight from `file://` (bundled
+snapshot). See [📈 Progress & Model Tracking](#-progress--model-tracking).
+
 ---
 
 ## 🎯 Three Ways to Start a Project
@@ -288,8 +300,21 @@ The `graphs/06-ideate.json` playbook is designed for autonomous idea generation.
 ```
 /workspaces/portfolio/pi-agents/
 ├── AGENTS.md                    # Studio operating manual (auto-loaded by pi)
+├── TRACEABILITY.md              # GENERATED project/run trace (bin/tracker.py)
 ├── bin/
-│   └── studio.sh                # Studio launcher
+│   ├── studio.sh                # Studio launcher
+│   └── tracker.py               # Tracker builder (check | build | template)
+├── dashboard/                   # Hermes-desktop-style visual GUI
+│   ├── index.html               #   open in a browser (serve for live data)
+│   ├── styles.css
+│   ├── app.js
+│   └── data/snapshot.js         #   GENERATED file:// fallback dataset
+├── tracker/                     # Progress & model registry (single source)
+│   ├── README.md                # Data model + workflow spec
+│   ├── agents.json              # Agent identity catalog (24 refs)
+│   ├── index.json               # GENERATED aggregate consumed by dashboard
+│   ├── projects/<slug>.json     # Pipeline stage/status per product
+│   └── runs/<runId>.json        # One record per graph run (+ _template.json)
 ├── .pi/
 │   └── agents/
 │       ├── aurelio.md           # Agent definitions (18 total)
@@ -345,6 +370,43 @@ The `graphs/06-ideate.json` playbook is designed for autonomous idea generation.
 
 ---
 
+## 📈 Progress & Model Tracking
+
+Every graph run is recorded once, in `tracker/runs/<runId>.json` — graph,
+project, timestamps, and per-step **agent**, **status** and **LLM model**.
+Products carry a living status in `tracker/projects/<slug>.json`. All
+human-facing views are generated, never hand-edited:
+
+| Source (edit me) | Generated (never edit) |
+|---|---|
+| `tracker/runs/*.json` | `tracker/index.json` (dashboard data) |
+| `tracker/projects/*.json` | `TRACEABILITY.md` |
+| `tracker/agents.json` | `dashboard/data/snapshot.js` |
+
+**Mandatory loop after every terminal run** (also in `AGENTS.md`):
+
+```bash
+python3 bin/tracker.py template --run-id r10-<slug> --graph graphs/NN-….json --project <slug>
+# fill tracker/runs/r10-<slug>.json with observed steps (status + model per step)
+# refresh tracker/projects/<slug>.json (stage / status / blocker / nextStep)
+python3 bin/tracker.py build
+```
+
+The **dashboard** (`dashboard/`) is a Hermes-desktop-style visual GUI with six
+views — **Overview**, **Projects** (pipeline board), **Runs** (activity log),
+**Models** (LLM telemetry: steps, success rates, failure per step type),
+**Agents** (roster with live stats) and **Timeline** (GANTT of runs). It reads
+`tracker/index.json` when served over HTTP and falls back to the bundled
+snapshot when opened from `file://`. Full schema and workflow: `tracker/README.md`.
+
+> Model telemetry is the new signal: recording which LLM executed `market-scan`
+> turns TRACEABILITY's anecdotal *"Subagent RPC ended with stopReason length"*
+> notes into a queryable failure-rate per model and step type. Historical runs
+> predating the tracker are bucketed as `unrecorded` — attribution starts with
+> the next run.
+
+---
+
 ## 🛡️ Iron Rules
 
 1. **Never create `.pi/settings.json`** in this workspace — bash-capable children are refused in trees containing one. pi-multiagent is installed globally for this reason.
@@ -354,6 +416,8 @@ The `graphs/06-ideate.json` playbook is designed for autonomous idea generation.
 5. **Discovery before Build**. Build before Release. No shortcuts.
 6. **Agents return evidence, not instructions.** The Director decides.
 7. **Web research** (trend-hunter, marta) requires extension tools with live catalog provenance. Without them, agents work on local evidence only.
+8. **Every run gets a tracker record** (`tracker/runs/`) + a project status refresh, then `bin/tracker.py build`. Never hand-edit generated views (`TRACEABILITY.md`, `tracker/index.json`).
+9. **Attribute the LLM model per step** when observable (`null` if unknown — aggregates as `unrecorded`). Never invent model names.
 
 ---
 

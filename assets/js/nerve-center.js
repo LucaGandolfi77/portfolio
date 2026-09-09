@@ -176,7 +176,8 @@
         // Color the language bars
         wrap.querySelectorAll('.nerve-lang-fill').forEach(el => {
             const name = el.dataset.lang;
-            const c = LANG_COLORS[name] || '#00d4ff';
+            const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b3e836';
+            const c = LANG_COLORS[name] || accent;
             el.style.background = c;
         });
 
