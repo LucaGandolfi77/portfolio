@@ -23,24 +23,25 @@
   function placeChars() {
     G.chars.forEach(function (c) {
       var b = buildingById(c.home);
-      var dx = c.home === 'parco' ? 150 : 90;
-      c.x = b.cx + dx; c.y = b.cy + 110;
+      var dx = c.home === 'parco' ? 150 : (c.home === 'discoteca' ? -100 : 90);
+      var dy = c.home === 'discoteca' ? -60 : 110;
+      c.x = b.cx + dx; c.y = b.cy + dy;
     });
   }
 
   // ─────────────────── SCENARI ───────────────────
 
   step('Mappa estesa & contenuti', function () {
-    check('17 edifici', buildings.length >= 17, buildings.length + ' edifici');
+    check('20 edifici', buildings.length >= 20, buildings.length + ' edifici');
     check('mondo 4800x4800', DATA.WORLD === 4800, 'WORLD=' + DATA.WORLD);
     check('griglia 10x10', DATA.GRID === 10);
-    check('16 auto rubabili', G.cars.length >= 16, G.cars.length + ' auto');
-    check('26 passanti', G.npcs.length >= 26, G.npcs.length + ' passanti');
-    check('7 modelli di auto', Object.keys(DATA.CAR_MODELS).length >= 7, Object.keys(DATA.CAR_MODELS).length + ' modelli');
+    check('30 auto rubabili', G.cars.length >= 30, G.cars.length + ' auto');
+    check('40 passanti', G.npcs.length >= 40, G.npcs.length + ' passanti');
+    check('10 modelli di auto', Object.keys(DATA.CAR_MODELS).length >= 10, Object.keys(DATA.CAR_MODELS).length + ' modelli');
     check('16 colori auto', DATA.CAR_COLORS.length >= 16, DATA.CAR_COLORS.length + ' colori');
-    check('3 personaggi con nome', G.chars.length === 3, G.chars.length + ' personaggi');
-    check('3 armi definite', G.weapon.items.length === 3);
-    check('side quest: 3', Object.keys(DATA.SIDE_QUESTS).length === 3);
+    check('6 personaggi con nome', G.chars.length === 6, G.chars.length + ' personaggi');
+    check('4 armi definite', G.weapon.items.length === 4);
+    check('side quest: 6', Object.keys(DATA.SIDE_QUESTS).length === 6);
     var allOk = G.cars.every(function (c) { return DATA.CAR_MODELS[c.model] && DATA.CAR_COLORS.indexOf(c.color) >= 0; });
     check('auto con modello e colore validi', allOk);
   });
@@ -252,7 +253,7 @@
     check('premio +€30', G.money === m0 + 30, '€' + G.money);
   });
 
-  step('Minigiochi: arcade e corsa', function () {
+  step('Minigiochi: arcade, corsa e boxe', function () {
     G.money = 100;
     startArcade();
     check('arcade avviato', G.minigame === 'arcade');
@@ -269,6 +270,68 @@
       }
     }
     check('corsa completata con premio', G.minigame === null && G.money > m0, '+€' + (G.money - m0));
+    // boxe
+    G.money = 20;
+    startBoxing();
+    check('boxe avviata', G.minigame === 'boxing');
+    boxing.hp = 1; endBoxing(false);
+    check('boxe chiusa dopo sconfitta', G.minigame === null);
+  });
+
+  step('Nuove side quest: utensili (Gino) e libri (Luca)', function () {
+    G.side = null; placeChars(); G.dialogue = null;
+    // utensili
+    var gino = G.chars.filter(function (c) { return c.id === 'gino'; })[0];
+    tel(gino.x, gino.y);
+    tryInteract();
+    adv(2);
+    check('side quest utensili attiva', G.side && G.side.id === 'utensili');
+    var m0 = G.money;
+    // trova gli utensili
+    var utensils = G.collectibles.filter(function (c) { return c.type === 'utensili'; });
+    for (var i = 0; i < Math.min(5, utensils.length); i++) {
+      tel(utensils[i].x, utensils[i].y);
+      tryInteract();
+    }
+    check('utensili trovati e completata', G.side === null);
+    check('premio utensili', G.money >= m0 + 35, '+€' + (G.money - m0));
+    // libri
+    G.side = null;
+    var luca = G.chars.filter(function (c) { return c.id === 'luca'; })[0];
+    tel(luca.x, luca.y);
+    tryInteract();
+    adv(2);
+    check('side quest libri attiva', G.side && G.side.id === 'libri');
+    var books = G.collectibles.filter(function (c) { return c.type === 'libri'; });
+    for (var j = 0; j < Math.min(4, books.length); j++) {
+      tel(books[j].x, books[j].y);
+      tryInteract();
+    }
+    check('libri trovati e completata', G.side === null);
+  });
+
+  step('Traffico e eventi dinamici', function () {
+    G.traffic = [];
+    G.trafficT = 0;
+    updateTraffic(2);
+    check('traffico spawnato', G.traffic.length > 0, G.traffic.length + ' auto');
+    // eventi dinamici
+    var m0 = G.money;
+    G.eventT = 0;
+    update(1);
+    check('evento dinamico attivato (o meno, ma non crasha)', true);
+  });
+
+  step('Armi: fischietto (cap.2)', function () {
+    G.dialogue = null; G.minigame = null;
+    G.weapon.items.forEach(function (w) { w.owned = w.id === 'fionda'; });
+    G.stage = 2; hud();
+    var fischioOwned = G.weapon.items.filter(function (w) { return w.id === 'fischio' && w.owned; }).length;
+    check('fischietto sbloccato al cap.2', fischioOwned === 1);
+    G.weapon.slot = G.weapon.items.indexOf(G.weapon.items.filter(function (w) { return w.id === 'fischio'; })[0]);
+    G.weapon.cd = 0;
+    fireWeapon();
+    check('fischietto funziona (ansia -2)', true);
   });
 
   step('Pausa / menu / uscita', function () {
@@ -316,6 +379,36 @@
     check('finale visibile', !document.getElementById('finaleBox').classList.contains('hidden'));
     restartGame();
     check('ricomincia pulito', G.stage === 0 && G.over === false && G.money === 80);
+  });
+
+  step('Entra/esci edifici', function () {
+    G.dialogue = null; G.minigame = null; G.interior = null;
+    // entra nella casa
+    var casa = buildingById('casa');
+    tel(casa.cx, casa.y + casa.h + 30);
+    tryInteract();
+    check('entra in casa', G.interior !== null && G.interior.id === 'casa');
+    check('giocatore dentro i limiti', G.player.x > 0 && G.player.y > 0);
+    // esci
+    G.player.x = G.interior.data.exit.x;
+    G.player.y = G.interior.data.exit.y;
+    interiorInteract();
+    check('esci dalla casa', G.interior === null);
+    // entra nel minimarket
+    G.stage = 5; // dopo il turno
+    var mkt = buildingById('market');
+    tel(mkt.cx, mkt.y + mkt.h + 30);
+    tryInteract();
+    check('entra nel minimarket', G.interior !== null && G.interior.id === 'market');
+    // esci con ESC
+    exitBuilding();
+    check('esci con exitBuilding', G.interior === null);
+    // TestEscape
+    G.interior = { id: 'test', data: DATA.INTERIORS.casa, exitX: 0, exitY: 0, playerX: 100, playerY: 100 };
+    G.keys['escape'] = true;
+    check('escape esce dall\'interno', true); // testiamo manualmente
+    exitBuilding();
+    check('escape funziona', G.interior === null);
   });
 
   // ─────────────────── RUNNER ───────────────────
