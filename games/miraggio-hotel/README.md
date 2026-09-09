@@ -59,5 +59,38 @@ interazioni, emote, chat, acquisti, save, paint su tutte le stanze e tutti i loo
 - 🧭 **Caccia al tesoro**: quarto minigioco (trova il forziere di Tino in 4 tentativi).
 - 📡 **Chat tra schede**: i messaggi appaiono anche in altre schede aperte (BroadcastChannel).
 - 🌙 **Atmosfera notte/giorno** sul pavimento delle stanze.
+- ⭐ **Hall of Fame — Star Rating**: rating 0.00-5.00 per ogni ospite, media globale, tier Bronze→Diamond, aura stellata visuale, Hall of Fame in-app. Persistente in localStorage.
+- 🐾 **Pet Companion**: animali esotici e unicorni (12 specie), max 3 per volta, adozione dal Nido, truelli pre-definiti (wave/dance/spin/jump/fly), follow l'avatar, fame/felicità persistenti.
 - 📸 **Salva il tuo look** come PNG · 🔊 **Mute** · haptic su iPhone · suoni extra.
 - 📱 **PWA installabile**: manifest + service worker (funziona offline).
+
+## TODO — Prossimi sviluppi
+
+### Gameplay
+- 🎭 **Fashion Show Events**: eventi temporizzati con fase pose + votazione bot, premi per top 3
+- 🔮 **Fortune Wheel**: ruota giornaliera per ricompense casuali (monete, oggetti, titoli)
+- 👻 **Ghost NPCs**: personaggi spettrali che appaiono di notte con missioni speciali
+
+### Minigiochi
+- 🎪 **Carnival Minigame**: stile "Whack-a-Mole" e "catch-the-coin"
+- 💃 **Dance Battle**: minigioco ritmico con frecce da premere in tempo
+- 🧭 **Caccia al tesoro migliorata**: perfezionamento del minigioco esistente
+
+### Sistema
+- 📊 **Leaderboard**: classifiche globali/room-specific per monete, like, livello
+- 🌧️ **Weather System**: pioggia/neve/fulmini che cambiano l'atmosfera delle stanze
+- 📸 **Photo Mode**: scatta screenshot con filtri e salva come PNG
+- 🏨 **Secret Rooms**: stanze nascoste (tetto, cantina, dungeon) sbloccabili con easter egg
+
+### Tecnico
+- 🎵 **Room Music**: musica ambientale per stanza che suona automaticamente
+- 🔊 **Sound engine migliorato**: Web Audio API per effetti sonori spaziali
+- 🧪 **Test suite**: smoke test headless per tutte le interazioni
+- 🌧️ **Weather System**: pioggia/neve/fulmini che cambiano l'atmosfera delle stanze
+- 📸 **Photo Mode**: scatta screenshot con filtri e salva come PNG
+- 🏨 **Secret Rooms**: stanze nascoste (tetto, cantina, dungeon) sbloccabili con easter egg
+
+### Tecnico
+- 🎵 **Room Music**: musica ambientale per stanza che suona automaticamente
+- 🔊 **Sound engine migliorato**: Web Audio API per effetti sonori spaziali
+- 🧪 **Test suite**: smoke test headless per tutte le interazioni
