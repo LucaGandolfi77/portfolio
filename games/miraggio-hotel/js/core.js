@@ -24,7 +24,14 @@
       ownedColors: [D.skins[0], D.skins[1], D.hairColors[0], D.tops[0], D.pants[0]],
       styleIdx: { hairStyle: 0, acc: 0 },
       px: 350, py: 360,
-      eqStyle: { hairStyle: 'short', acc: 'none' }
+      eqStyle: { hairStyle: 'short', acc: 'none' },
+      ach: {},
+      stats: { talks: 0 },
+      visitedRooms: [],
+      emotesUsed: [],
+      stars: {},
+      pets: [],
+      fashionShow: { active: false, startTime: 0, duration: 45000, participants: [], winners: [], phase: 'idle' }
     };
   }
   let st = freshState();
@@ -32,12 +39,417 @@
   function load() { try { const r = localStorage.getItem(SAVE_KEY); if (r) { st = Object.assign(freshState(), JSON.parse(r)); return true; } } catch (e) {} return false; }
   function wipe() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 
-  /* ---------- runtime ---------- */
-  const canvas = $('view');
-  const ctx = canvas.getContext('2d');
-  let CW = 0, CH = 0, DPR = 1;
-  const cam = { s: 1, ox: 0, oy: 0 };
-  const TOP_RES = 84, DOCK_RES = 92;
+/* ---------- runtime ---------- */
+const canvas = $('view');
+const ctx = canvas.getContext('2d');
+let CW = 0, CH = 0, DPR = 1;
+const cam = { s: 1, ox: 0, oy: 0 };
+const TOP_RES = 84, DOCK_RES = 92;
+
+/* ---------- day/night ---------- */
+let dayTime = 0;
+let daySpeed = 0.00005;
+
+/* ---------- achievements ---------- */
+let achievements = {};
+const ACHIVE_DEFS = [
+  { id: 'first_chat', title: 'Primo contatto', desc: 'Parla con un ospite per la prima volta', icon: '💬' },
+  { id: '5_chats', title: 'Chiacchierone', desc: '5 chiacchierate in una stanza', icon: '💬' },
+  { id: 'all_rooms', title: 'Esploratore', desc: 'Visita tutte le stanze', icon: '🗺️' },
+  { id: 'first_coin', title: 'Prima moneta', desc: 'Guadagna la tua prima moneta', icon: '🪙' },
+  { id: '100_coins', title: 'Borsellino', desc: 'Raggiungi 100 monete', icon: '💰' },
+  { id: 'first_emote', title: 'Espressivo', desc: 'Usa la tua prima emote', icon: '😄' },
+  { id: 'all_emotes', title: 'Versatile', desc: 'Usa tutte le emote', icon: '🎭' },
+  { id: 'first_mission', title: 'Missione', desc: 'Completa la prima missione', icon: '✅' },
+  { id: 'first_lvl', title: 'Livello 2', desc: 'Raggiungi il livello 2 con un ospite', icon: '❤️' },
+  { id: 'first_trophy', title: 'Trofeo', desc: 'Ottieni il tuo primo trofeo', icon: '🏆' },
+  { id: 'collect_5', title: 'Collezionista', desc: 'Raccogli 5 oggetti volanti', icon: '⭐' },
+  { id: 'night_visit', title: 'Notte al Miraggio', desc: 'Visita una stanza di notte', icon: '🌙' },
+];
+
+function checkAchievements() {
+  achievements = st.ach || {};
+  const chats = st.stats ? (st.stats.talks || 0) : 0;
+  const earned = st.earned || 0;
+  if (chats >= 1 && !achievements.first_chat) unlockAch('first_chat');
+  if (chats >= 5 && !achievements['5_chats']) unlockAch('5_chats');
+  if (earned >= 1 && !achievements.first_coin) unlockAch('first_coin');
+  if (earned >= 100 && !achievements['100_coins']) unlockAch('100_coins');
+  if (earned >= 1 && !achievements.first_emote) unlockAch('first_emote');
+}
+function unlockAch(id) {
+  st.ach = st.ach || {};
+  st.ach[id] = true;
+  achievements[id] = true;
+  const def = ACHIVE_DEFS.find(a => a.id === id);
+  if (def) toast(`${def.icon} Achievement sbloccato: ${def.title}!`);
+  save();
+}
+function checkRoomVisit() {
+  // track visited rooms
+  st.visitedRooms = st.visitedRooms || [];
+  if (!st.visitedRooms.includes(st.room)) {
+    st.visitedRooms.push(st.room);
+    if (st.visitedRooms.length >= Object.keys(D.rooms).length && !achievements.all_rooms) {
+      unlockAch('all_rooms');
+    }
+    if (dayTime < 0.3 || dayTime > 0.85 && !achievements.night_visit) {
+      unlockAch('night_visit');
+    }
+  }
+}
+function checkEmoteAchievement() {
+  st.emotesUsed = st.emotesUsed || [];
+  const used = new Set(st.emotesUsed);
+  if (used.size >= D.emotes.length && !achievements.all_emotes) unlockAch('all_emotes');
+}
+function computeStarRating(botId, baseGain) {
+  st.stars = st.stars || {};
+  const s = st.stars[botId] || { received: 0, total: 0 };
+  const mult = s.total < 50 ? 1 : Math.pow(0.5, Math.floor((s.total - 50) / 50));
+  s.received = Math.round((s.received + baseGain * mult) * 100) / 100;
+  s.total += 1;
+  const rating = s.total > 0 ? Math.min(5, s.received / s.total * 5) : 0;
+  s.rating = Math.round(rating * 100) / 100;
+  st.stars[botId] = s;
+  // ricalcola media globale
+  const allRatings = Object.keys(st.stars).map(id => st.stars[id].rating || 0).filter(r => r > 0);
+  st.globalAvg = allRatings.length > 0 ? Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 100) / 100 : 0;
+  save();
+  return s.rating;
+}
+function getStarTier(rating) {
+  if (rating >= 4.5) return { tier: 'diamond', icon: '💎', label: 'Diamond' };
+  if (rating >= 3.5) return { tier: 'platinum', icon: '🏆', label: 'Platinum' };
+  if (rating >= 2.5) return { tier: 'gold', icon: '🥇', label: 'Gold' };
+  if (rating >= 1.5) return { tier: 'silver', icon: '🥈', label: 'Silver' };
+  return { tier: 'bronze', icon: '🥉', label: 'Bronze' };
+}
+
+/* ============ PET COMPANION ============ */
+const PET_TRICKS = {
+  wave: { id: 'wave', emoji: '👋', label: 'Ciao', unlock: 1 },
+  dance: { id: 'dance', emoji: '🕺', label: 'Ballo', unlock: 2 },
+  spin: { id: 'spin', emoji: '🔄', label: 'Giro', unlock: 3 },
+  jump: { id: 'jump', emoji: '🤸', label: 'Salto', unlock: 4 },
+  fly: { id: 'fly', emoji: '🕊️', label: 'Volo', unlock: 6 }
+};
+const MAX_PETS = 3;
+const PET_HUNGER_RATE = 0.3;
+const PET_HAPPINESS_RATE = -0.2;
+
+function adoptPet(speciesId) {
+  if (st.pets.length >= MAX_PETS) { toast('🐾 Hai già 3 animali! Rilasciane uno per adottarne un altro.'); return; }
+  const sp = D.species.find(s => s.id === speciesId);
+  if (!sp) return;
+  const names = { unicorn: ['Arcidrago', 'Stellino', 'Luminoso'], pegasus: ['Cielo', 'Vento', 'Alato'], dragon: ['Fiamma', 'Drago', 'Furioso'], fire_snake: ['Serpente', 'Fuoco', 'Luminoso'], crocodile: ['Tropicale', 'Acqua', 'Verde'], snow_tiger: ['Neve', 'Bianco', 'Freddo'], iguana: ['Isla', 'Verde', 'Veloce'], macaw: ['Rosso', 'Ara', 'Piume'], parrot: ['Colorato', 'Canta', 'Pappagallo'], rhino: ['Corna', 'Forte', 'Ruggine'], elephant: ['Saggio', 'Gigante', 'Portatore'], flamingo: ['Rosa', 'Gentile', 'Neon'] };
+  const nameList = names[speciesId] || ['Amico'];
+  const name = nameList[Math.floor(Math.random() * nameList.length)];
+  st.pets.push({ species: speciesId, name, level: 1, happiness: 80, hunger: 20, tricks: ['wave'], color: sp.color, born: Date.now() });
+  toast('🐾 Adottato ' + sp.emoji + ' ' + name + '! Visita il Nido per curarlo.');
+  renderPets(); save();
+}
+function getPet(i) { return st.pets[i]; }
+function getSpecies(pet) { return D.species.find(s => s.id === pet.species) || D.species[0]; }
+function petFeed(i) {
+  const pet = st.pets[i]; if (!pet) return;
+  pet.hunger = Math.max(0, pet.hunger - 30);
+  pet.happiness = Math.min(100, pet.happiness + 10);
+  pet.level = Math.min(6, Math.floor(pet.happiness / 20) + 1);
+  if (pet.happiness >= 80 && !pet.tricks.includes('dance')) { pet.tricks.push('dance'); toast('🕺 Trucco sbloccato: Ballo!'); }
+  toast('🍖 ' + pet.name + ' è sazio! Felicità: ' + Math.round(pet.happiness));
+  renderPets(); save();
+}
+function petPlay(i) {
+  const pet = st.pets[i]; if (!pet) return;
+  pet.happiness = Math.min(100, pet.happiness + 20);
+  pet.hunger = Math.min(100, pet.hunger + 5);
+  if (pet.happiness >= 60 && !pet.tricks.includes('spin')) { pet.tricks.push('spin'); toast('🔄 Trucco sbloccato: Giro!'); }
+  spawnFx(player.x + 20, player.y - 20, '✨', 15);
+  toast('🎾 ' + pet.name + ' si diverte! Felicità: ' + Math.round(pet.happiness));
+  renderPets(); save();
+}
+function petPet(i) {
+  const pet = st.pets[i]; if (!pet) return;
+  pet.happiness = Math.min(100, pet.happiness + 5);
+  if (Math.random() < 0.3) { const sp = getSpecies(pet); toast('🐾 ' + pet.name + ' ti fa le smorfie! ' + sp.emoji); }
+  save(); renderPets();
+}
+function petTrick(i, trickId) {
+  const pet = st.pets[i]; if (!pet) return;
+  const trick = PET_TRICKS[trickId]; if (!trick || !pet.tricks.includes(trickId)) return;
+  pet.happiness = Math.min(100, pet.happiness + 15);
+  spawnFx(pet.x || player.x + 15, pet.y || player.y - 30, trick.emoji, 15);
+  if (trickId === 'dance') { toast('🕺 ' + pet.name + ' balla!'); }
+  if (trickId === 'spin') { toast('🔄 ' + pet.name + ' gira!'); }
+  if (trickId === 'fly') { toast('🕊️ ' + pet.name + ' vola!'); }
+  if (trickId === 'wave') { toast('👋 ' + pet.name + ' saluta!'); }
+  if (trickId === 'jump') { toast('🤸 ' + pet.name + ' salta!'); }
+  save(); renderPets();
+}
+function updatePets(dt) {
+  st.pets.forEach(pet => {
+    pet.hunger = Math.min(100, pet.hunger + PET_HUNGER_RATE * dt);
+    pet.happiness = Math.max(0, Math.min(100, pet.happiness + PET_HAPPINESS_RATE * dt));
+    pet.level = Math.min(6, Math.floor(pet.happiness / 20) + 1);
+  });
+}
+function renderPets() {
+  const pc = $('petChip');
+  if (!pc) return;
+  let html = '';
+  for (let i = 0; i < Math.min(MAX_PETS, st.pets.length); i++) {
+    const pet = st.pets[i];
+    const sp = getSpecies(pet);
+    html += '<span class="petc" title="' + pet.name + ' (' + sp.tier + ')">' + sp.emoji + ' ' + pet.name + ' ❤' + Math.round(pet.happiness) + ' 🍖' + Math.round(pet.hunger) + '</span>';
+  }
+  pc.innerHTML = html || '<span style="opacity:.5">🐾 Nessun animale</span>';
+}
+function openNest() {
+  const el = $('sNest');
+  closeAllSheets();
+  el.classList.add('on');
+  renderNest();
+}
+function openFsOverlay() {
+  const el = $('fsOverlay');
+  closeAllSheets();
+  el.classList.add('on');
+  renderFashionShow();
+}
+function renderNest() {
+  const nb = $('nestBody');
+  if (!nb) return;
+  let html = '';
+  D.species.forEach(sp => {
+    const owned = st.pets.filter(p => p.species === sp.id).length;
+    html += '<div class="nspecies" data-species="' + sp.id + '" title="' + sp.hint + '">' +
+      '<span class="ns-emoji">' + sp.emoji + '</span>' +
+      '<span class="ns-name">' + sp.name + '</span>' +
+      '<span class="ns-tier" style="color:' + (sp.tier === 'comune' ? '#3ddc97' : sp.tier === 'raro' ? '#ffd166' : sp.tier === 'epico' ? '#ff5d9e' : '#ffd166') + '">' + sp.tier + '</span>' +
+      '<span class="ns-owned">' + (owned > 0 ? '✅ x' + owned : 'Adotta') + '</span>' +
+    '</div>';
+  });
+  nb.innerHTML = html;
+  nb.querySelectorAll('.nspecies').forEach(el => {
+    el.onclick = () => {
+      const sid = el.dataset.species;
+      if (st.pets.length >= MAX_PETS) { toast('🐾 Hai già 3 animali!'); return; }
+      adoptPet(sid);
+    };
+  });
+}
+function renderPetMenu(i) {
+  const pet = st.pets[i]; if (!pet) return;
+  const sp = getSpecies(pet);
+  const tricksHtml = pet.tricks ? pet.tricks.map(t => { const tr = PET_TRICKS[t]; return tr ? '<button class="mini" data-trick="' + t + '">' + tr.emoji + ' ' + tr.label + '</button>' : ''; }).join('') : '';
+  const menu = document.createElement('div');
+  menu.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.97);border:2px solid #e7e0ff;border-radius:16px;padding:14px;z-index:50;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;box-shadow:0 10px 30px rgba(60,20,120,.4);min-width:300px';
+  menu.innerHTML =
+    '<div style="font-size:28px;margin-right:8px">' + sp.emoji + '</div>' +
+    '<div style="flex:1;min-width:120px"><b>' + pet.name + '</b><br><span style="font-size:.72rem">Livello ' + pet.level + ' · ❤️ ' + Math.round(pet.happiness) + ' · 🍖 ' + Math.round(pet.hunger) + '</span></div>' +
+    '<button class="mini" data-pet="pet" data-idx="' + i + '">🐾 Petta</button>' +
+    '<button class="mini" data-pet="feed" data-idx="' + i + '">🍖 Nutrisci</button>' +
+    '<button class="mini" data-pet="play" data-idx="' + i + '">🎾 Gioca</button>' +
+    '<button class="mini" data-pet="rename" data-idx="' + i + '">✏️ Ribat.</button>' +
+    '<div style="width:100%;text-align:center;font-size:.72rem;color:#8a7fb8;margin-top:4px">Trucco: ' + pet.tricks.map(t => { const tr = PET_TRICKS[t]; return tr ? tr.emoji : ''; }).join(' ') + '</div>';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('[data-pet]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.idx);
+      const action = btn.dataset.pet;
+      if (action === 'pet') petPet(idx);
+      else if (action === 'feed') petFeed(idx);
+      else if (action === 'play') petPlay(idx);
+      else if (action === 'rename') { const n = prompt('Nuovo nome per ' + pet.name + ':'); if (n) { st.pets[idx].name = n; toast('✏️ Rinominato in ' + n); save(); } }
+      menu.remove();
+    };
+  });
+  setTimeout(() => menu.remove(), 8000);
+}
+function petFollow(pet, dt) {
+  const px = player.x, py = player.y;
+  const idx = st.pets.indexOf(pet);
+  const offsetX = idx * 25;
+  pet.x = pet.x !== undefined ? pet.x + (px + 15 + offsetX - pet.x) * 0.1 : px + 15 + offsetX;
+  pet.y = pet.y !== undefined ? pet.y + (py - 25 - pet.y) * 0.1 : py - 25;
+  pet._ph = (pet._ph || 0) + dt * 8;
+}
+
+/* ============ FASHION SHOW ============ */
+const FS_INTERVAL = 7200000;
+const FS_POSE_TIME = 30000;
+const FS_VOTE_TIME = 15000;
+const FS_REWARDS = [20, 15, 10];
+const FS_XP = 5;
+
+function getFsState() { return st.fashionShow; }
+
+function startFashionShow() {
+  const fs = st.fashionShow;
+  fs.active = true;
+  fs.startTime = Date.now();
+  fs.duration = FS_POSE_TIME + FS_VOTE_TIME;
+  fs.phase = 'pose';
+  fs.participants = [];
+  fs.winners = [];
+  fs.votes = {};
+  toast('🎭✨ Fashion Show in corso! Scegli il tuo outfit e la tua emote!');
+  updateFSChip();
+  save();
+}
+function endFashionShow() {
+  const fs = st.fashionShow;
+  fs.phase = 'vote';
+  // calcola punteggi
+  const allScores = [];
+  D.bots.forEach((botId, idx) => {
+    const bp = roomBots.find(b => b.id === botId);
+    if (!bp) return;
+    const bot = D.bots[botId];
+    const ci = D.charInfo[botId];
+    const score = calculateFashionScore(botId);
+    allScores.push({ id: botId, name: bot.name, score, emoji: bot.emoji, outfit: bot.outfit || {}, emote: 'dance' });
+  });
+  // aggiungi player
+  allScores.push({ id: 'player', name: st.nick || 'Ospite', score: calculateFashionScore('player'), emoji: '👤', outfit: st.outfit, emote: 'dance' });
+  allScores.sort((a, b) => b.score - a.score);
+  fs.winners = allScores.slice(0, 3);
+  fs.phase = 'done';
+  fs.active = false;
+  // premia
+  fs.winners.forEach((w, i) => {
+    if (i < FS_REWARDS.length) {
+      addCoins(FS_REWARDS[i]);
+      if (i === 0) { st.fashionShow.trophy = (st.fashionShow.trophy || 0) + 1; }
+    }
+  });
+  toast('🎭🏆 Fashion Show finito! 1°: ' + fs.winners[0].name + ' (' + fs.winners[0].score + 'pt)');
+  updateFSChip();
+  renderFashionShowResults();
+  save();
+}
+function calculateFashionScore(entityId) {
+  let score = 0;
+  let outfit = {};
+  if (entityId === 'player') {
+    outfit = st.outfit;
+  } else {
+    const bot = D.bots[entityId];
+    if (!bot) return 0;
+    outfit = { skin: bot.skin, hairColor: bot.hair, top: bot.top, pants: bot.pants, acc: bot.acc || 'none' };
+  }
+  // coordinamento colori
+  if (outfit.top && outfit.pants) {
+    if (outfit.top === outfit.pants) score += 15;
+  }
+  // accessori
+  if (outfit.acc && outfit.acc !== 'none') score += 10;
+  // emote gradita
+  const ci = D.charInfo[entityId];
+  if (ci && ci.likes && ci.likes.indexOf('dance') >= 0) score += 20;
+  // random
+  score += Math.random() * 10;
+  return Math.round(score);
+}
+function voteFor(voterId, targetId, vote) {
+  const fs = st.fashionShow;
+  if (!fs.votes[voterId]) fs.votes[voterId] = {};
+  fs.votes[voterId][targetId] = vote;
+  save();
+}
+function renderFashionShowResults() {
+  const fb = $('fsResults');
+  if (!fb) return;
+  const fs = st.fashionShow;
+  if (!fs.winners.length) { fb.innerHTML = '<div style="color:#8a7fb8">Nessun risultato ancora</div>'; return; }
+  let html = '';
+  fs.winners.forEach((w, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+    const reward = i < FS_REWARDS.length ? FS_REWARDS[i] + ' 🪙' : '';
+    html += '<div class="fsr" style="border-color:' + (i === 0 ? '#ffd166' : i === 1 ? '#c0c0c0' : '#cd7f32') + '">' +
+      '<span class="fsr-medal">' + medal + '</span>' +
+      '<span class="fsr-name">' + w.name + '</span>' +
+      '<span class="fsr-score">' + w.score + 'pt</span>' +
+      '<span class="fsr-reward">' + reward + '</span>' +
+    '</div>';
+  });
+  fb.innerHTML = html;
+}
+function updateFSChip() {
+  const fs = st.fashionShow;
+  const fc = $('fsChip');
+  if (!fc) return;
+  if (!fs.active) { fc.style.display = 'none'; return; }
+  fc.style.display = '';
+  const elapsed = Date.now() - fs.startTime;
+  const remaining = Math.max(0, fs.duration - elapsed);
+  const s = Math.floor(remaining / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  fc.textContent = '⏰ ' + m + ':' + String(sec).padStart(2, '0');
+}
+function renderFashionShow() {
+  const fb = $('fsBody');
+  if (!fb) return;
+  const fs = st.fashionShow;
+  const poseLeft = Math.max(0, fs.duration - (Date.now() - fs.startTime));
+  const s = Math.floor(poseLeft / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  let html = '<div class="fspose" style="margin-bottom:12px">';
+  html += '<span class="fs-emoji">🎭</span>';
+  html += '<span>Fase: ' + (fs.phase === 'pose' ? '🕐 Pose' : fs.phase === 'vote' ? '🗳️ Votazione' : '🏆 Risultati') + '</span>';
+  html += '<span>⏰ ' + m + ':' + String(sec).padStart(2, '0') + '</span>';
+  html += '</div>';
+  if (fs.phase === 'pose' || fs.phase === 'vote') {
+    html += '<div class="gtitle">Il tuo outfit</div>';
+    html += '<div style="background:#faf8ff;border:1.5px solid #e7e0ff;border-radius:14px;padding:12px;margin-bottom:12px">';
+    html += '<span style="font-size:24px">' + (st.outfit.acc && st.outfit.acc !== 'none' ? '👒' : '') + '</span> ';
+    html += '<b>' + (D.wardrobe.top.find(t => t.id === st.outfit.top) ? D.wardrobe.top.find(t => t.id === st.outfit.top).id : st.outfit.top) + '</b> ';
+    html += '<b>' + (D.wardrobe.pants.find(p => p.id === st.outfit.pants) ? D.wardrobe.pants.find(p => p.id === st.outfit.pants).id : st.outfit.pants) + '</b> ';
+    html += '<span>' + (st.outfit.acc ? st.outfit.acc : 'none') + '</span>';
+    html += '</div>';
+    html += '<div class="gtitle">La tua emote</div>';
+    html += '<div class="emotes" style="grid-template-columns:repeat(4,1fr)">';
+    D.emotes.forEach(em => {
+      html += '<div class="emo" data-fs-emote="' + em.id + '"><span class="e">' + em.e + '</span><span>' + em.label + '</span></div>';
+    });
+    html += '</div>';
+    html += '<button class="mini" id="fsConfirm" style="width:100%;margin-top:12px;padding:12px">🎭 Conferma e attendi il verdetto!</button>';
+  }
+  fb.innerHTML = html;
+  if (fs.phase === 'pose') {
+    fb.querySelectorAll('.emo').forEach(el => {
+      el.onclick = () => {
+        const emoteId = el.dataset.fsEmote;
+        const e = D.emotes.find(x => x.id === emoteId);
+        if (e) doEmote(e);
+        fb.querySelectorAll('.emo').forEach(x => x.style.borderColor = '#e7e0ff');
+        el.style.borderColor = '#ffd166';
+        el.style.background = '#ffe9f2';
+      };
+    });
+    const confirmBtn = $('fsConfirm');
+    if (confirmBtn) confirmBtn.onclick = () => {
+      fs.participants.push({ name: st.nick || 'Ospite', outfit: st.outfit, emote: 'dance', score: 0 });
+      toast('✅ Pronto! Attendi il verdetto...');
+      fs.phase = 'voting';
+      setTimeout(() => endFashionShow(), 3000);
+      renderFashionShow();
+    };
+  }
+}
+function checkFashionShow() {
+  const fs = st.fashionShow;
+  if (!fs.active) {
+    const now = Date.now();
+    const lastShow = fs.lastShow || 0;
+    if (now - lastShow > FS_INTERVAL) {
+      startFashionShow();
+    }
+  }
+}
 
   const player = { x: 350, y: 360, tx: null, ty: null, moving: false, face: 1, ph: 0, anim: null, animT: 0, talked: false };
   let bubbles = [];      // {x,y,lines,t,dur,color,bg,align}
@@ -46,9 +458,13 @@
   let roomBots = [];
   let lastBotTalk = {};  // id -> ts
   let lastFurnTalk = {}; // key -> ts
-  let lastChatCoin = 0;
-  let lastAmbient = 0;
-  let lastEvent = 0;
+let lastChatCoin = 0;
+let lastAmbient = 0;
+let lastEvent = 0;
+let lastParticles = 0;
+let ambientParticles = []; // {x,y,type,life,t,vy}
+let flyingCollectibles = []; // {x,y,e,life,t}
+let roomTransition = null; // {from,to,progress,t}
 
   function room() { return D.rooms[st.room]; }
 
@@ -84,6 +500,7 @@
     st.coins += n; st.earned += n;
     if (!silent) coinSound();
     try { if (st.sound !== false && navigator.vibrate) navigator.vibrate(8); } catch (e) {}
+    checkAchievements();
     updateHUD();
     save();
   }
@@ -118,6 +535,68 @@
         evEl.style.color = '#fff';
       } else evEl.style.display = 'none';
     } catch (e) {}
+    // indicatore chat cross-scheda
+    try {
+      let bcEl = $('bcChip');
+      if (!bcEl) {
+        bcEl = document.createElement('span');
+        bcEl.id = 'bcChip';
+        bcEl.className = 'chip';
+        bcEl.style.cssText = 'font-size:11px;background:rgba(61,220,151,.2);border-color:rgba(61,220,151,.4);color:#3ddc97';
+        bcEl.textContent = '📡 Live';
+        const hud = $('hud');
+        if (hud) hud.appendChild(bcEl);
+      }
+    } catch(e) {}
+    // indicatore stelle globale
+    try {
+      let scEl = $('scChip');
+      if (!scEl) {
+        scEl = document.createElement('span');
+        scEl.id = 'scChip';
+        scEl.className = 'chip';
+        scEl.style.cssText = 'font-size:11px;background:rgba(255,209,102,.2);border-color:rgba(255,209,102,.4);color:#ffd166';
+        scEl.textContent = '⭐ 0.00';
+        const hud = $('hud');
+        if (hud) hud.appendChild(scEl);
+      } else {
+        const avg = st.globalAvg || 0;
+        scEl.textContent = '⭐ ' + avg.toFixed(2);
+      }
+    } catch(e) {}
+    // chip pet
+    try {
+      let pcEl = $('pcChip');
+      if (!pcEl) {
+        pcEl = document.createElement('span');
+        pcEl.id = 'pcChip';
+        pcEl.className = 'chip';
+        pcEl.style.cssText = 'font-size:11px;background:rgba(61,220,151,.2);border-color:rgba(61,220,151,.4);color:#3ddc97';
+        pcEl.textContent = '🐾 Nessun animale';
+        const hud = $('hud');
+        if (hud) hud.appendChild(pcEl);
+      } else {
+        renderPets();
+      }
+    } catch(e) {}
+    // chip fashion show
+    try {
+      let fsEl = $('fsChip');
+      if (!fsEl) {
+        fsEl = document.createElement('span');
+        fsEl.id = 'fsChip';
+        fsEl.className = 'chip';
+        fsEl.style.cssText = 'font-size:11px;background:rgba(255,93,158,.2);border-color:rgba(255,93,158,.4);color:#ff5d9e';
+        fsEl.textContent = '🎭 Nessun evento';
+        fsEl.style.display = 'none';
+        const hud = $('hud');
+        if (hud) hud.appendChild(fsEl);
+      } else {
+        const fs = st.fashionShow;
+        fsEl.style.display = fs.active ? '' : 'none';
+        if (fs.active) updateFSChip();
+      }
+    } catch(e) {}
   }
 
   /* ---------- dimensioni / camera ---------- */
@@ -151,6 +630,7 @@
     // aggiorna selezione nella lista
     document.querySelectorAll('.room').forEach(el => el.classList.toggle('here', el.dataset.room === id));
     missionHit('room', null);
+    checkRoomVisit();
     toast(room().emoji + ' Benvenuto in: ' + room().name);
     updateHUD(); save();
   }
@@ -335,7 +815,13 @@
     if (canCoin) { addCoins(2); spawnFx(bp.x, bp.y - 46, '🪙'); }
     if (canCoin && bp.id === guestId()) { addCoins(2); spawnFx(bp.x, bp.y - 60, '⭐'); }
     if (Math.random() < 0.25) playerWave(bp);
+    const isFirstTalk = prevTalk === undefined;
     affTalk(bp.id);
+    if (isFirstTalk) {
+      const prevRating = (st.stars[bp.id] && st.stars[bp.id].rating) || 0;
+      const newRating = computeStarRating(bp.id, 0.3);
+      if (newRating >= 2.5 && prevRating < 2.5) toast('🥇 Prima visita a ' + b.name + ' — è diventato Gold!');
+    }
   }
   function playerWave(who) {
     setAnim('wave', 1400);
@@ -362,6 +848,9 @@
 
   /* ---------- emotes ---------- */
   function doEmote(e) {
+    st.emotesUsed = st.emotesUsed || [];
+    if (!st.emotesUsed.includes(e.id)) st.emotesUsed.push(e.id);
+    checkEmoteAchievement();
     setAnim(e.anim, e.dur);
     say({ id: 'player', x: player.x, y: player.y }, e.txt, e.dur);
     const nearBot = roomBots.find(bp => Math.hypot(bp.x - player.x, bp.y - player.y) < 230) || null;
@@ -384,6 +873,7 @@
     txt = String(txt || '').trim();
     if (!txt) return;
     say({ id: 'player' }, txt, 3600, { color: '#fffbe6', ink: '#5a3a00', border: '#ffd166' });
+    broadcast(txt); // chat cross-tab
     const now = performance.now();
     const prevChat = lastChatCoin;
     if (prevChat === 0 || now - prevChat > 9000) { addCoins(1); spawnFx(player.x, player.y - 46, '🪙'); lastChatCoin = now; }
@@ -408,22 +898,47 @@
   function drawFloor() {
     const r = room();
     const ts = 46;
+    // day/night tint
+    const dayR = Math.round(255 * (1 - dayTime * 0.6));
+    const dayG = Math.round(220 * (1 - dayTime * 0.5));
+    const dayB = Math.round(180 * (1 - dayTime * 0.4));
+    const nightFactor = dayTime < 0.3 || dayTime > 0.85 ? 0.3 : 0;
+    const floor1T = r.floor1;
+    const floor2T = r.floor2;
     for (let gy = 0; gy < Math.ceil(r.h / ts); gy++) {
       for (let gx = 0; gx < Math.ceil(r.w / ts); gx++) {
-        ctx.fillStyle = (gx + gy) % 2 ? r.floor2 : r.floor1;
+        const base = (gx + gy) % 2 ? r.floor2 : r.floor1;
+        // parse hex
+        const cr = parseInt(base.slice(1,3),16), cg = parseInt(base.slice(3,5),16), cb = parseInt(base.slice(5,7),16);
+        const nr = Math.round(cr * (1 - nightFactor) + dayR * nightFactor * 0.3);
+        const ng = Math.round(cg * (1 - nightFactor) + dayG * nightFactor * 0.3);
+        const nb = Math.round(cb * (1 - nightFactor) + dayB * nightFactor * 0.3);
+        ctx.fillStyle = `rgb(${nr},${ng},${nb})`;
         ctx.fillRect(gx * ts, gy * ts, ts, ts);
       }
     }
     // muro: strisce allegre
-    ctx.fillStyle = r.wall;
+    const wallNight = nightFactor > 0.2;
+    ctx.fillStyle = wallNight ? '#1a1a3e' : r.wall;
     ctx.fillRect(0, 0, r.w, 18);
-    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fillStyle = wallNight ? 'rgba(255,200,100,.15)' : 'rgba(255,255,255,.25)';
     for (let x = 0; x < r.w; x += 40) ctx.fillRect(x, 4, 18, 10);
     ctx.fillStyle = 'rgba(0,0,0,.10)';
     ctx.fillRect(0, 18, r.w, 7);
     // battiscopa
-    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.fillStyle = wallNight ? 'rgba(255,200,100,.1)' : 'rgba(255,255,255,.18)';
     ctx.fillRect(0, r.h - 8, r.w, 8);
+    // lanterne notturne
+    if (wallNight) {
+      const lanterns = [{x:100},{x:300},{x:500},{x:650}];
+      lanterns.forEach(l => {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 500 + l.x);
+        ctx.fillStyle = `rgba(255,180,50,${0.1 + pulse * 0.15})`;
+        ctx.beginPath(); ctx.arc(l.x, 15, 12, 0, TAU); ctx.fill();
+        ctx.fillStyle = `rgba(255,220,100,${0.3 + pulse * 0.3})`;
+        ctx.beginPath(); ctx.arc(l.x, 15, 5, 0, TAU); ctx.fill();
+      });
+    }
   }
 
   function EMOJI(size) { return size + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; }
@@ -456,15 +971,115 @@
     });
     if (r.id === 'camera') drawCameraExtras();
 
+    // particelle ambientali
+    const now = performance.now();
+    ambientParticles.forEach(p => {
+      const pct = 1 - (now - p.t) / p.life;
+      const alpha = Math.max(0, pct);
+      if (p.type === 'firefly') {
+        ctx.fillStyle = `rgba(200,255,50,${alpha * 0.7})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, TAU); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,100,${alpha * 0.3})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, TAU); ctx.fill();
+      } else if (p.type === 'sparkle') {
+        ctx.fillStyle = `rgba(255,200,255,${alpha * 0.6})`;
+        const s = 2 + Math.sin(now / 200 + p.x) * 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+      } else if (p.type === 'star') {
+        ctx.fillStyle = `rgba(255,255,200,${alpha * 0.5})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, TAU); ctx.fill();
+      } else {
+        ctx.fillStyle = `rgba(200,200,200,${alpha * 0.3})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, TAU); ctx.fill();
+      }
+    });
+    // collezionabili volanti
+    flyingCollectibles.forEach(c => {
+      const pct = 1 - (now - c.t) / c.life;
+      const alpha = Math.max(0, pct * pct);
+      const bob = Math.sin(now / 400 + c.x) * 3;
+      ctx.globalAlpha = alpha;
+      ctx.font = '22px "Apple Color Emoji","Segoe UI Emoji",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(c.e, c.x, c.y + bob);
+      // glow
+      ctx.fillStyle = c.e === '🪙' ? 'rgba(255,209,102,0.15)' : 'rgba(255,215,0,0.15)';
+      ctx.beginPath(); ctx.arc(c.x, c.y + bob, 10, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
     // bot
     roomBots.forEach(bp => {
       const b = D.bots[bp.id];
       if (!b) return;
       drawAv(bp.x, bp.y, bp.moving ? Math.floor(bp.ph) % 2 : 0, bp.dir, b, 1, false);
+      // stella aura
+      const sr = (st.stars && st.stars[bp.id] && st.stars[bp.id].rating) || 0;
+      if (sr >= 2.0) {
+        const now = performance.now();
+        const glow = sr >= 4.5 ? 20 : sr >= 3.5 ? 16 : 12;
+        const hue = sr >= 4.5 ? 45 : sr >= 3.5 ? 40 : 45;
+        const alpha = 0.15 + Math.sin(now / 500 + bp.x) * 0.05;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        const grad = ctx.createRadialGradient(bp.x, bp.y, 5, bp.x, bp.y, glow);
+        grad.addColorStop(0, 'hsla(' + hue + ', 100%, 70%, ' + alpha + ')');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(bp.x, bp.y, glow, 0, TAU); ctx.fill();
+        if (sr >= 4.5) {
+          for (let i = 0; i < 6; i++) {
+            const a = now / 300 + i * Math.PI / 3;
+            const sx = bp.x + Math.cos(a) * (glow + 5 + Math.sin(now / 200 + i) * 3);
+            const sy = bp.y + Math.sin(a) * (glow + 5 + Math.cos(now / 200 + i) * 3);
+            ctx.fillStyle = 'rgba(255,215,0,' + (0.6 + Math.sin(now / 150 + i) * 0.3) + ')';
+            ctx.beginPath(); ctx.arc(sx, sy, 2, 0, TAU); ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
     });
     // giocatore
     const pwalk = player.moving ? Math.floor(player.ph) % 2 : 0;
     drawAv(player.x, player.y, pwalk, player.face, st.outfit, 1, true);
+    // pet companioni
+    st.pets.forEach((pet, idx) => {
+      const sp = getSpecies(pet);
+      const px = pet.x, py = pet.y;
+      if (px === undefined || py === undefined) return;
+      const now = performance.now();
+      const bob = Math.sin(now / 400 + idx * 1.5) * 3;
+      // shadow
+      ctx.fillStyle = 'rgba(0,0,0,.15)';
+      ctx.beginPath(); ctx.ellipse(px, py + 2, 10, 4, 0, 0, TAU); ctx.fill();
+      // emoji
+      ctx.font = '22px "Apple Color Emoji","Segoe UI Emoji",sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(sp.emoji, px, py + bob);
+      // glow se tier raro+
+      if (sp.tier === 'raro' || sp.tier === 'epico' || sp.tier === 'leggendario') {
+        ctx.save();
+        ctx.globalAlpha = 0.3 + Math.sin(now / 300 + idx) * 0.15;
+        const grad = ctx.createRadialGradient(px, py + bob, 5, px, py + bob, 20);
+        grad.addColorStop(0, sp.glow);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(px, py + bob, 20, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      // sparkles se felice
+      if (pet.happiness > 80 && Math.random() < 0.02) {
+        spawnFx(px + (Math.random() - 0.5) * 15, py + bob - 5, '✨', 10);
+      }
+      // hunger indicator
+      if (pet.hunger > 70) {
+        ctx.font = '10px system-ui';
+        ctx.fillStyle = '#ff4444';
+        ctx.textAlign = 'center';
+        ctx.fillText('🍖', px, py + bob - 16);
+      }
+    });
 
     ctx.restore();
   }
@@ -675,6 +1290,55 @@
     ctx.clearRect(0, 0, CW, CH);
     drawWorld();
     drawScreen();
+    // overlay giorno/notte
+    const nightAlpha = dayTime < 0.3 || dayTime > 0.85 ? Math.min(0.35, (dayTime < 0.3 ? 0.3 - dayTime : dayTime - 0.85) * 1.5) : 0;
+    if (nightAlpha > 0.01) {
+      ctx.fillStyle = `rgba(5,5,30,${nightAlpha})`;
+      ctx.fillRect(0, 0, CW, CH);
+    }
+    // indicatorlo ora
+    const h = Math.floor(dayTime * 24);
+    const m = Math.floor((dayTime * 24 - h) * 60);
+    const isNight = dayTime < 0.3 || dayTime > 0.85;
+    ctx.fillStyle = isNight ? 'rgba(255,200,50,0.6)' : 'rgba(255,255,255,0.4)';
+    ctx.font = '12px system-ui,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(isNight ? '🌙 ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') : '☀️ ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'), 8, CH - 12);
+    // minimap
+    const r = room();
+    if (r && r.w && r.h) {
+      const mmSize = 90;
+      const mmX = CW - mmSize - 12;
+      const mmY = CH - mmSize - 12;
+      const scale = mmSize / Math.max(r.w, r.h);
+      ctx.fillStyle = 'rgba(0,0,0,.45)';
+      ctx.beginPath(); ctx.roundRect(mmX, mmY, mmSize, mmSize, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.15)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mmX, mmY, mmSize, mmSize);
+      // stanze
+      (D.rooms ? Object.keys(D.rooms) : []).forEach(rid => {
+        const rm = D.rooms[rid];
+        if (!rm) return;
+        const rx = mmX + (rm.x || 0) * scale;
+        const ry = mmY + (rm.y || 0) * scale;
+        const rw = Math.max(4, (rm.w || 80) * scale);
+        const rh = Math.max(4, (rm.h || 60) * scale);
+        ctx.fillStyle = rid === st.room ? 'rgba(61,220,151,.5)' : 'rgba(255,255,255,.1)';
+        ctx.fillRect(rx, ry, rw, rh);
+      });
+      // player
+      const px = mmX + player.x * scale;
+      const py = mmY + player.y * scale;
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+      // bots
+      roomBots.forEach(bp => {
+        ctx.fillStyle = '#3ddc97';
+        ctx.beginPath(); ctx.arc(mmX + bp.x * scale, mmY + bp.y * scale, 2, 0, TAU); ctx.fill();
+      });
+    }
   }
 
   /* ============================ INPUT ============================ */
@@ -722,6 +1386,29 @@
     if (fur && D.furnitureReplies[fur.e]) {
       walkTo(fur.x + (fur.x < w.x ? -14 : 14), fur.y + 16, () => interactFurniture(fur));
       return;
+    }
+    // collezionabili volanti
+    const now = performance.now();
+    for (let i = flyingCollectibles.length - 1; i >= 0; i--) {
+      const c = flyingCollectibles[i];
+      if (Math.hypot(c.x - w.x, c.y - w.y) < 25) {
+        const earned = c.e === '🪙' ? 2 : 5;
+        addCoins(earned);
+        spawnFx(c.x, c.y, c.e, 20);
+        flyingCollectibles.splice(i, 1);
+        toast('🪙 +' + earned + ' raccolto!');
+        blip(880, .08, 'triangle');
+        return;
+      }
+    }
+    // click su pet
+    for (let i = 0; i < st.pets.length; i++) {
+      const pet = st.pets[i];
+      if (pet.x !== undefined && Math.hypot(pet.x - w.x, pet.y - w.y) < 25) {
+        renderPetMenu(i);
+        blip(660, .1, 'square');
+        return;
+      }
     }
     walkTo(w.x, w.y);
   });
@@ -966,7 +1653,7 @@
     }
     $('dbRooms').onclick = () => { const el = $('sRooms'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderRooms(); $('dbRooms').classList.add('on'); } };
     $('dbChat').onclick = () => { const was = composer.classList.contains('on'); closeAllSheets(); if (!was) { openComposer(); $('dbChat').classList.add('on'); } };
-    $('dbEmotes').onclick = () => { const el = $('sEmotes'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderEmotes(); $('dbEmotes').classList.add('on'); } };
+    $('dbEmotes').onclick = () => { const el = $('sEmotes'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderEmotes(); $('dbEmotes').classList.add('on'); } openFsOverlay(); };
     $('dbWardrobe').onclick = () => { const el = $('sWardrobe'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderWardrobe(); $('dbWardrobe').classList.add('on'); } };
     document.querySelectorAll('.sheetwrap').forEach(sw => sw.addEventListener('click', e => { if (e.target === sw) { sw.classList.remove('on'); closeAllSheets(); } }));
     document.querySelectorAll('[data-close]').forEach(x => x.onclick = () => { $(x.dataset.close).classList.remove('on'); document.querySelectorAll('.db').forEach(b => b.classList.remove('on')); });
@@ -1035,9 +1722,17 @@
     st.friends[botId].x++;
     const lv = lvlOf(botId);
     st.stats.talks = (st.stats.talks || 0) + 1;
+    checkAchievements();
+    const prevRating = (st.stars[botId] && st.stars[botId].rating) || 0;
+    const newRating = computeStarRating(botId, 0.5);
+    const ci = D.charInfo[botId];
     xpAdd(2);
     if (lv > old) onLevelUp(botId, lv);
     else missionHit('talk', botId);
+    if (newRating >= 4.5 && prevRating < 4.5) toast('💎 ' + (D.bots[botId] ? D.bots[botId].name : botId) + ' ha raggiunto il Diamond!');
+    if (newRating >= 2.5 && prevRating < 2.5) toast('🥇 ' + (D.bots[botId] ? D.bots[botId].name : botId) + ' è diventato Gold!');
+    if (ci && ci.starLines && newRating >= 2.5 && prevRating < 2.5) { say({ id: 'player' }, ci.starLines.gold, 3500, { color: '#ffe08a', ink: '#5a3a00', border: '#ffd166' }); }
+    if (ci && ci.starLines && newRating >= 4.5 && prevRating < 4.5) { say({ id: 'player' }, ci.starLines.diamond, 4000, { color: '#ffd166', ink: '#4a2c00', border: '#ff9f43' }); }
     save();
   }
   function onLevelUp(botId, lv) {
@@ -1054,6 +1749,7 @@
       st.items.push({ e: ci.trophy, name: 'Trofeo di ' + bname });
       addCoins(8);
       xpAdd(25);
+      computeStarRating(botId, 2.0);
       toast('🏆 Trofeo sbloccato: ' + ci.trophy + ' (+8 🪙)');
       spawnFx(player.x, player.y - 50, '🏆', 22);
       logDiary('🏆 Trofeo conquistato: ' + ci.trophy + ' (' + bname + ')');
@@ -1075,7 +1771,11 @@
     missionHit('emote', botId);
     const ci = D.charInfo[botId];
     if (!ci) return;
-    if (ci.likes.indexOf(emoteId) >= 0) {
+    const isLike = ci.likes.indexOf(emoteId) >= 0;
+    const gain = isLike ? 1.0 : 0.2;
+    const prevRating = (st.stars[botId] && st.stars[botId].rating) || 0;
+    const newRating = computeStarRating(botId, gain);
+    if (isLike) {
       st.friends[botId] = st.friends[botId] || { x: 0 };
       const old = lvlOf(botId);
       st.friends[botId].x += 2;
@@ -1095,6 +1795,10 @@
         setTimeout(() => say(bp, lines[Math.floor(Math.random() * lines.length)], 3000), 500);
       }
     }
+    if (newRating >= 4.5 && prevRating < 4.5) toast('💎 ' + (D.bots[botId] ? D.bots[botId].name : botId) + ' ha raggiunto il Diamond!');
+    if (newRating >= 2.5 && prevRating < 2.5) toast('🥇 ' + (D.bots[botId] ? D.bots[botId].name : botId) + ' è diventato Gold!');
+    if (ci && ci.starLines && newRating >= 2.5 && prevRating < 2.5) { say({ id: 'player' }, ci.starLines.gold, 3500, { color: '#ffe08a', ink: '#5a3a00', border: '#ffd166' }); }
+    if (ci && ci.starLines && newRating >= 4.5 && prevRating < 4.5) { say({ id: 'player' }, ci.starLines.diamond, 4000, { color: '#ffd166', ink: '#4a2c00', border: '#ff9f43' }); }
     save();
   }
 
@@ -1183,9 +1887,18 @@
     fb.innerHTML = fh;
     // trofei
     const tb = $('trophyBody');
-    tb.innerHTML = st.items.length
+tb.innerHTML = st.items.length
       ? st.items.map(it => '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff6df;border:1px solid #ffd166;border-radius:99px;padding:5px 11px;font-size:.78rem;font-weight:800;color:#6b4a00;margin:0 5px 6px 0">' + it.e + ' ' + it.name + '</span>').join('')
       : '<div style="color:#8a7fb8;font-size:.8rem">Nessun trofeo ancora: porta un ospite a livello 5 parlandogli e con le emote che ama!</div>';
+    // achievements
+    const achb = $('achieveBody');
+    if (achb) {
+      const unlocked = st.ach || {};
+      achb.innerHTML = ACHIVE_DEFS.map(a => {
+        const isUn = unlocked[a.id];
+        return '<div class="ach ' + (isUn ? 'unlocked' : 'locked') + '"><span class="ai">' + (isUn ? a.icon : '🔒') + '</span><div class="at"><div>' + a.title + '</div><div class="ab">' + a.desc + '</div></div></div>';
+      }).join('');
+    }
     // album degli amici (figurine)
     const ab = $('albumBody');
     if (ab) {
@@ -1206,6 +1919,29 @@
         ? '<div style="font-family:ui-monospace,monospace;font-size:.74rem;line-height:1.8;color:#5a4a9f;max-height:200px;overflow-y:auto">' + st.log.map(l => '<div>' + l + '</div>').join('') + '</div>'
         : '<div style="color:#8a7fb8;font-size:.8rem">Nessuna voce… il Miraggio aspetta la tua storia!</div>';
     }
+    // star board
+    renderStarBoard();
+  }
+
+  function renderStarBoard() {
+    const sb = $('starBoard');
+    if (!sb) return;
+    const allRatings = Object.keys(st.stars || {}).map(id => ({ id, rating: (st.stars[id] && st.stars[id].rating) || 0, total: (st.stars[id] && st.stars[id].total) || 0 }));
+    allRatings.sort((a, b) => b.rating - a.rating);
+    const allIds = Object.keys(D.bots);
+    let html = '';
+    allIds.forEach(id => {
+      const r = allRatings.find(x => x.id === id) || { rating: 0, total: 0 };
+      const t = getStarTier(r.rating);
+      const pct = Math.min(100, r.rating / 5 * 100);
+      html += '<div class="sb" title="' + D.bots[id].name + ' (' + r.total + ' interazioni)">' +
+        '<span class="sb-tier">' + t.icon + '</span>' +
+        '<span class="sb-name">' + D.bots[id].name + '</span>' +
+        '<span class="sb-bar"><span class="sb-bar-fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="sb-rating">' + r.rating.toFixed(2) + '</span>' +
+      '</div>';
+    });
+    sb.innerHTML = html;
   }
 
   /* ============ MINIGIOCHI ============ */
@@ -1428,8 +2164,10 @@
 
   /* ============ WIRING EXTRA ============ */
   function wireExtras() {
-    $('dbMissions').onclick = () => { const el = $('sMissions'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderMissionsUI(); $('dbMissions').classList.add('on'); } };
-    $('dbGames').onclick = () => { const el = $('sGames'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderGamesUI(); $('dbGames').classList.add('on'); } };
+    $('dbMissions').onclick = () => { const el = $('sMissions'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderMissionsUI(); renderStarBoard(); } };
+    $('dbStars').onclick = () => { const el = $('sMissions'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderMissionsUI(); renderStarBoard(); } };
+    $('dbNest').onclick = () => openNest();
+    $('dbGames').onclick = () => { const el = $('sGames'); const was = el.classList.contains('on'); closeAllSheets(); if (!was) { el.classList.add('on'); renderGamesUI(); } };
     $('gameClose').onclick = () => closeGame();
     $('gameWrap').addEventListener('click', e => { if (e.target === $('gameWrap')) closeGame(); });
   }
@@ -1499,6 +2237,43 @@
     } else if (!ev.active) evActiveNow = false;
     // produzione mobili della camera
     productionTick();
+    // ciclo giorno/notte
+    dayTime = (dayTime + daySpeed * dt * 60) % 1;
+    // particelle ambientali
+    if (now - lastParticles > 1500) {
+      lastParticles = now;
+      const r = room();
+      const count = r.id === 'giardino' ? 3 : r.id === 'discoteca' ? 4 : r.id === 'terrazza' ? 2 : 1;
+      for (let i = 0; i < count; i++) {
+        ambientParticles.push({
+          x: 30 + Math.random() * (r.w - 60),
+          y: r.walkTop + 20 + Math.random() * (r.h - r.walkTop - 80),
+          type: r.id === 'giardino' ? 'firefly' : r.id === 'discoteca' ? 'sparkle' : r.id === 'terrazza' ? 'star' : 'dust',
+          life: 3000 + Math.random() * 2000,
+          t: now,
+          vy: -(0.1 + Math.random() * 0.3),
+          vx: (Math.random() - 0.5) * 0.3
+        });
+      }
+    }
+    // collezionabili volanti
+    if (flyingCollectibles.length < 3 && Math.random() < 0.003) {
+      const r = room();
+      flyingCollectibles.push({
+        x: 50 + Math.random() * (r.w - 100),
+        y: r.walkTop + 30 + Math.random() * (r.h - r.walkTop - 100),
+        e: Math.random() < 0.7 ? '🪙' : '⭐',
+        life: 6000 + Math.random() * 4000,
+        t: now,
+        vy: -0.05 - Math.random() * 0.1,
+        vx: (Math.random() - 0.5) * 0.2
+      });
+    }
+    // aggiorna particelle
+    ambientParticles = ambientParticles.filter(p => now - p.t < p.life);
+    flyingCollectibles = flyingCollectibles.filter(c => now - c.t < c.life);
+    updatePets(dt);
+    checkFashionShow();
   }
   function productionTick() {
     const now = Date.now();

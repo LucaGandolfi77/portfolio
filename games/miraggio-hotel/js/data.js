@@ -382,19 +382,19 @@
       "🥖": "La baguette è così fresca che fa “gnam” da sola."
     },
 
-    charInfo: {
-      lola: { likes: ["heart", "wave"], trophy: "🗝️ Chiave del sorriso", s1: "Lola custodisce il registro degli arrivi dal 2012: c’è scritto anche il tuo nome… di nascosto.", s2: "Il suo sogno è aprire un albergo per emoji stanche. “Le emoji non dormono mai, serve una struttura adatta.”" },
-      pino: { likes: ["laugh", "wave"], trophy: "🧳 Trolley nostalgico", s1: "Pino non ha mai viaggiato: la sua valigia sì. Lui la guarda partire da sola, ogni tanto.", s2: "Ha scritto 3.000 messaggi di attesa alla valigia. Il capitolo 4 si intitola “Lei non risponde ma mi manca”." },
-      leo: { likes: ["clap", "laugh"], trophy: "🕹️ Joystick d’oro", s1: "Leo sta sviluppando un gioco sul Miraggio. Il boss finale è… la sveglia del mattino.", s2: "Il suo record di 9.999 punti a Space Blaster lo ha fatto con gli occhi chiusi. Letteralmente: dormiva." },
-      guest2: { likes: ["heart", "dance"], trophy: "🦄 Coriandoli magici", s1: "Bibi dice di avere un costume da unicorno. In realtà il corno è una lampada da scrivania: non chiedere.", s2: "Ha collezionato 47 “sguardi confusi”. È il suo Guinness personale e non ha intenzione di fermarsi." },
-      rigo: { likes: ["wave", "laugh"], trophy: "🛟 Fenicottero galleggiante", s1: "Rigo una volta ha salvato un fenicottero gonfiabile dal bordo della piscina. Dice che fu “il giorno più eroico della mia vita”.", s2: "Sa nuotare solo a rana e a stile “galleggio e fingo”. Ha una medaglia di partecipazione alla vita." },
-      max: { likes: ["dance", "clap"], trophy: "🎧 Mixer arcobaleno", s1: "Max ha composto la suoneria dell’hotel. È il jingle che ti entra in testa e non esce più (colpa sua).", s2: "Il suo tasto segreto dei confetti esiste davvero: lo preme ogni volta che qualcuno si iscrive alla vita." },
-      nina: { likes: ["heart", "wave"], trophy: "🌻 Mario il fiore", s1: "Nina parla con le piante da 9 anni. Le piante non hanno mai risposto, ma lei dice che “ascoltano benissimo”.", s2: "Mario il fiore è in realtà un albero di pomodoro travestito. Nina lo sa. Mario no." },
-      guest1: { likes: ["laugh"], trophy: "😴 Cuscino di nuvola", s1: "Ugo sogna di dormire in ogni stanza del Miraggio. Gli mancano solo 4 stanze e il tetto.", s2: "Una volta ha dormito 12 ore e ha sognato di dormire. Al risveglio era riposatissimo. Scienza." },
-      gigi: { likes: ["clap", "heart"], trophy: "🍹 Shaker del sorriso", s1: "Gigi ha un cocktail chiamato “Hotel Colazione”: segreto assoluto, lo serve solo a chi sorride prima delle 9.", s2: "Una volta un ospite ha chiesto “lo Spritz più buono del mondo”. Gigi ha chiuso il bar e ha preparato la ricetta per 3 giorni." },
-      stella: { likes: ["heart", "wave"], trophy: "🔭 Telescopio dei desideri", s1: "Stella ha chiamato una stella “Caffè”. Così, quando la vede, si sente meno in colpa a prenderne un altro.", s2: "Sostiene che l’universo sia una palla di gomma che rimbalza. “La prova? Il tempo vola.”" },
-      tino: { likes: ["clap", "laugh"], trophy: "🕊️ Piuma di Tino", s1: "Tino una volta ha volato 40 km per una patatina. Dice che ne valeva la pena. La patatina conferma.", s2: "Il suo canto ufficiale è “Squaw-squaw, che bella la vita”. È in radio ogni mattina alle 6." },
-      sergio: { likes: ["clap", "heart"], trophy: "🍳 Padella della felicità", s1: "Sergio ha una ricetta che non scrive da nessuna parte: “Paura in padella”. Il trucco è non averne.", s2: "Il suo assistente in cucina è una pentola che lui chiama “Vice Chef”. La pentola non si è ancora dimessa." }
+charInfo: {
+      lola: { likes: ["heart", "wave"], trophy: "🗝️ Chiave del sorriso", s1: "Lola custodisce il registro degli arrivi dal 2012: c'è scritto anche il tuo nome… di nascosto.", s2: "Il suo sogno è aprire un albergo per emoji stanche. \"Le emoji non dormono mai, serve una struttura adatta.\"", starLines: { gold: "Sei diventato parte della famiglia del Miraggio, 🏨💖", diamond: "Ora lavoriamo insieme: il registro segreto ti aspetta in fondo al corridoio." } },
+      pino: { likes: ["laugh", "wave"], trophy: "🧳 Trolley nostalgico", s1: "Pino non ha mai viaggiato: la sua valigia sì. Lui la guarda partire da sola, ogni tanto.", s2: "Ha scritto 3.000 messaggi di attesa alla valigia. Il capitolo 4 si intitola \"Lei non risponde ma mi manca\".", starLines: { gold: "La valigia sa che ti apprezza. Viaggia per te, senza destinazione.", diamond: "Ha trovato una destinazione: sei tu. Il viaggio finisce qui, con te." } },
+      leo: { likes: ["clap", "laugh"], trophy: "🕹️ Joystick d'oro", s1: "Leo sta sviluppando un gioco sul Miraggio. Il boss finale è… la sveglia del mattino.", s2: "Il suo record di 9.999 punti a Space Blaster lo ha fatto con gli occhi chiusi. Letteralmente: dormiva.", starLines: { gold: "Il prossimo boss sei tu. Sei pronto per la sfida?", diamond: "Il gioco è quasi finito. L'ultimo livello? Solo tu puoi completarlo." } },
+      guest2: { likes: ["heart", "dance"], trophy: "🦄 Coriandoli magici", s1: "Bibi dice di avere un costume da unicorno. In realtà il corno è una lampada da scrivania: non chiedere.", s2: "Ha collezionato 47 \"sguardi confusi\". È il suo Guinness personale e non ha intenzione di fermarsi.", starLines: { gold: "48° sguardo confuso? Quello è per te, ora sei leggenda.", diamond: "Il corno brilla di luce propria. Sei la ragione del suo splendore." } },
+      rigo: { likes: ["wave", "laugh"], trophy: "🛟 Fenicottero galleggiante", s1: "Rigo una volta ha salvato un fenicottero gonfiabile dal bordo della piscina. Dice che fu \"il giorno più eroico della mia vita\".", s2: "Sa nuotare solo a rana e a stile \"galleggio e fingo\". Ha una medaglia di partecipazione alla vita.", starLines: { gold: "Il fenicottero galleggiante ti ha scelto come capitano.", diamond: "L'eroe della piscina? Non uno qualunque. Solo tu." } },
+      max: { likes: ["dance", "clap"], trophy: "🎧 Mixer arcobaleno", s1: "Max ha composto la suoneria dell'hotel. È il jingle che ti entra in testa e non esce più (colpa sua).", s2: "Il suo tasto segreto dei confetti esiste davvero: lo preme ogni volta che qualcuno si iscrive alla vita.", starLines: { gold: "Il prossimo singolo è tutto tuo. Il beat è già in testa!", diamond: "Mixer arcobaleno completo. Sei il producer finale del Miraggio." } },
+      nina: { likes: ["heart", "wave"], trophy: "🌻 Mario il fiore", s1: "Nina parla con le piante da 9 anni. Le piante non hanno mai risposto, ma lei dice che \"ascoltano benissimo\".", s2: "Mario il fiore è in realtà un albero di pomodoro travestito. Nina lo sa. Mario no.", starLines: { gold: "Mario ha parlato! Ha detto che sei il suo giardiniere preferito.", diamond: "Mario è fiorito. Tutto il giardino ti ringrazia, guardati intorno." } },
+      guest1: { likes: ["laugh"], trophy: "😴 Cuscino di nuvola", s1: "Ugo sogna di dormire in ogni stanza del Miraggio. Gli mancano solo 4 stanze e il tetto.", s2: "Una volta ha dormito 12 ore e ha sognato di dormire. Al risveglio era riposatissimo. Scienza.", starLines: { gold: "Ugo ha sognato te tra le nuvole. Sei il suo miglior compagno di letto.", diamond: "Il sogno più bello? Che tu sia sveglio e accanto a lui." } },
+      gigi: { likes: ["clap", "heart"], trophy: "🍹 Shaker del sorriso", s1: "Gigi ha un cocktail chiamato \"Hotel Colazione\": segreto assoluto, lo serve solo a chi sorride prima delle 9.", s2: "Una volta un ospite ha chiesto \"lo Spritz più buono del mondo\". Gigi ha chiuso il bar e ha preparato la ricetta per 3 giorni.", starLines: { gold: "Lo Spritz del sorriso è pronto. Il tuo nome è sul menu.", diamond: "La ricetta segreta? Il tuo sorriso. Senza di te il bar chiude." } },
+      stella: { likes: ["heart", "wave"], trophy: "🔭 Telescopio dei desideri", s1: "Stella ha chiamato una stella \"Caffè\". Così, quando la vede, si sente meno in colpa a prenderne un altro.", s2: "Sostiene che l'universo sia una palla di gomma che rimbalza. \"La prova? Il tempo vola.\"", starLines: { gold: "La stella \"Caffè\" ha fatto la spremuta per te. Bevila!", diamond: "L'universo ti ha scelto. Sei la stella che tutti osservano." } },
+      tino: { likes: ["clap", "laugh"], trophy: "🕊️ Piuma di Tino", s1: "Tino una volta ha volato 40 km per una patatina. Dice che ne valeva la pena. La patatina conferma.", s2: "Il suo canto ufficiale è \"Squaw-squaw, che bella la vita\". È in radio ogni mattina alle 6.", starLines: { gold: "Tino ha scritto una canzone per te. La suona ogni mattina.", diamond: "Il gabbiano capo ti ha incoronato. Il volo più bello è quello verso di te." } },
+      sergio: { likes: ["clap", "heart"], trophy: "🍳 Padella della felicità", s1: "Sergio ha una ricetta che non scrive da nessuna parte: \"Paura in padella\". Il trucco è non averne.", s2: "Il suo assistente in cucina è una pentola che lui chiama \"Vice Chef\". La pentola non si è ancora dimessa.", starLines: { gold: "Sergio ha cucinato per te. Il sapore? Paura zero, allegria massima.", diamond: "La Padella della Felicità ha brilliato. Sei il cuoco finale." } }
     },
 
     missionPool: [
@@ -490,16 +490,31 @@
       pants: ["#3a2a8f", "#1f3b73", "#7b2d8b", "#c2185b", "#0b7285", "#37474f"]
     },
 
-    badges: [
-      { min: 0, title: "Neo-arrivato", icon: "🌱" },
-      { min: 80, title: "Ospite allegro", icon: "😄" },
-      { min: 160, title: "Chiacchierone", icon: "💬" },
-      { min: 260, title: "Stella dell’hotel", icon: "⭐" },
-      { min: 420, title: "Vip del Miraggio", icon: "👑" },
-      { min: 700, title: "Leggenda vivente", icon: "🌟" }
-    ],
+badges: [
+       { min: 0, title: "Neo-arrivato", icon: "🌱" },
+       { min: 80, title: "Ospite allegro", icon: "😄" },
+       { min: 160, title: "Chiacchierone", icon: "💬" },
+       { min: 260, title: "Stella dell'hotel", icon: "⭐" },
+       { min: 420, title: "Vip del Miraggio", icon: "👑" },
+       { min: 700, title: "Leggenda vivente", icon: "🌟" }
+     ],
 
-    ambientInterval: 7000
+     species: [
+       { id: "unicorn", name: "Unicorno", emoji: "🦄", color: "#ffd166", tier: "comune", glow: "rgba(255,209,102,0.4)", hint: "magico e luminoso" },
+       { id: "pegasus", name: "Pegaso", emoji: "🦄", color: "#87ceeb", tier: "raro", glow: "rgba(135,206,235,0.4)", hint: "alato e volante" },
+       { id: "dragon", name: "Drago", emoji: "🐉", color: "#ff4500", tier: "epico", glow: "rgba(255,69,0,0.4)", hint: "soffia fiamme" },
+       { id: "fire_snake", name: "Serpente di fuoco", emoji: "🐍", color: "#ff6347", tier: "raro", glow: "rgba(255,99,71,0.4)", hint: "luminoso e caldo" },
+       { id: "crocodile", name: "Coccodrillo esotico", emoji: "🐊", color: "#228b22", tier: "comune", glow: "rgba(34,139,34,0.4)", hint: "tropicale e acquatico" },
+       { id: "snow_tiger", name: "Tigre delle nevi", emoji: "🐯", color: "#b0e0e6", tier: "raro", glow: "rgba(176,224,230,0.4)", hint: "bianco e freddo" },
+       { id: "iguana", name: "Lucertola delle isole", emoji: "🦎", color: "#32cd32", tier: "comune", glow: "rgba(50,205,50,0.4)", hint: "tropicale e veloce" },
+       { id: "macaw", name: "Ara scarlatto", emoji: "🦜", color: "#ff2400", tier: "comune", glow: "rgba(255,36,0,0.4)", hint: "piume rosse intense" },
+       { id: "parrot", name: "Pappagallo tropicale", emoji: "🦜", color: "#ffa500", tier: "comune", glow: "rgba(255,165,0,0.4)", hint: "colorato e canta" },
+       { id: "rhino", name: "Rinoceronte", emoji: "🦏", color: "#8b4513", tier: "raro", glow: "rgba(139,69,19,0.4)", hint: "forte e coriaceo" },
+       { id: "elephant", name: "Elefante", emoji: "🐘", color: "#808080", tier: "leggendario", glow: "rgba(128,128,128,0.4)", hint: "saggio e portatore" },
+       { id: "flamingo", name: "Flamingo", emoji: "🦩", color: "#ff69b4", tier: "comune", glow: "rgba(255,105,180,0.4)", hint: "rosa neon e gentile" }
+     ],
+
+     ambientInterval: 7000
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = G;
