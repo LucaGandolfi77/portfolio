@@ -1,6 +1,6 @@
 const START_TIME = 60000;
 let startTime, timer;
-document.getElementById('welcome')?.addEventListener('click', startBreak);
+document.getElementById('start-btn')?.addEventListener('click', startBreak);
 function startBreak() {
   const welcome = document.getElementById('welcome'), breakScreen = document.getElementById('break'), stats = document.getElementById('stats');
   if (welcome) welcome.hidden = true;
