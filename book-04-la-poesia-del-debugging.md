@@ -318,7 +318,6 @@ Ogni risorsa aperta deve essere chiusa. Ogni oggetto creato deve essere distrutt
 
 ### Limerick
 > C'era un puntatore null  
->
 > che non sapeva dove andare  
 > provo a dereferenziare  
 > e il crash è arrivato  
@@ -359,17 +358,6 @@ La migliore pratica per prevenire i puntatori nulli è sempre controllare se un 
 ### Esempio di Codice
 
 **Il bug:**
-```python
-def get_user_name(user):
-    # L'errore: non si controlla se user è None
-    return user.nome
-
-# Chiamata senza controllare
-utente = None
-nome = get_user_name(utente)  # AttributeError: 'NoneType' object has no attribute 'nome'
-```
-
-**La correzione:**
 ```python
 def get_user_name(user):
     # Correzione: si controlla se user è None
@@ -423,7 +411,7 @@ La ricorsione infinita si verifica quando una funzione ricorsiva non raggiunge m
 Per prevenire questo errore, assicurarsi sempre che:
 1. Esista un caso base chiaro e raggiungibile.
 2. Ogni chiamata ricorsiva avvicini i parametri al caso base (es. decrementare un valore).
-3. Non si usi ricorsione per problemi che possono essere risolti iterativamente.
+3. Non si usi ricursione per problemi che possono essere risolti iterativamente.
 
 ### Esempio di Codice
 
@@ -456,8 +444,8 @@ Se stai usando la ricorsione, chiediti sempre: *"Quando mi fermo?"* Se non hai u
 
 ## Capitolo 6 — Il Silenzio del Crash: Quando il Codice Non Parla
 
-### Limerick
-> Il programma morì  
+### Villanella
+> *Il programma morì  
 > senza dire una parola  
 > nessun errore, nessun grido  
 > solo il silenzio del server  
@@ -505,10 +493,10 @@ attendi_forever()
 
 **La correzione:**
 ```python
+import signal
+
 def attendi_sicuro(timeout=5):
     # Aggiungiamo un timeout per evitare il blocco infinito
-    import signal
-
     def handler(signum, frame):
         raise TimeoutError("Timeout raggiunto")
 
@@ -581,7 +569,7 @@ risultato = somma_sicura(5, 10)  # Funziona
 ```
 
 ### Il Consigli dello Chef
-Non assumere mai il tipo di un dato che arriva da un utente, un file o una rete. Verifica con `isinstance`, usa `typing` per documentare, e ricorda: un numero in veste di stringa è una bug in agguato.
+Non assumere mai il tipo di un dato che arriva da un utente, un file o una rete. Verifica con `isinstance`, usa `typing` per documentare, e ricorda: un numero in veste di stringa è un bug in agguato.
 
 ---
 
@@ -638,8 +626,8 @@ Se fai una chiamata esterna, guarda sempre il clock. Un timeout non è una debol
 
 ## Capitolo 9 — Lo Stato Globale: Il Sogno Condiviso
 
-### Limerick
-> Una variabile globale era felice  
+### Villanella
+> *Una variabile globale era felice  
 > ma poi un altro thread la cambiò  
 > il mondo cadde nel caos  
 > e il codice non sapeva chi era il padrone  
@@ -667,17 +655,13 @@ Soluzione: incapsulare lo stato in classi, usare pattern come Dependency Injecti
 
 **Il bug:**
 ```python
-counter = 0
+global_counter = 0
 
 def incrementa():
-    global counter
-    counter += 1
+    global global_counter
+    global_counter += 1
 
-def decrementa():
-    global counter
-    counter -= 1
-
-# Due thread modificano counter senza sincronizzazione
+# Due thread chiamano incrementa senza sincronizzazione
 # Risultato imprevedibile
 ```
 
@@ -691,10 +675,6 @@ class Counter:
     def incrementa(self):
         with self.lock:
             self.value += 1
-
-    def decrementa(self):
-        with self.lock:
-            self.value -= 1
 
 counter = Counter()
 ```
