@@ -12,7 +12,15 @@ G.INSTRUMENTS = {
   defib:     { id:'defib',     name:'Defibrillator', icon:'⚡', color:'#e74c3c', desc:'Electric shock to restore rhythm',   chapter:3 },
   clamps:    { id:'clamps',    name:'Clamps',        icon:'🔧', color:'#e67e22', desc:'Pinch to stop bleeding vessels',     chapter:3 },
   laser:     { id:'laser',     name:'Laser',         icon:'🔴', color:'#e74c3c', desc:'Focused beam for precise cutting',   chapter:4 },
-  retractor: { id:'retractor', name:'Retractor',     icon:'🪝', color:'#3498db', desc:'Hold tissue open for visibility',    chapter:4 }
+  retractor: { id:'retractor', name:'Retractor',     icon:'🪝', color:'#3498db', desc:'Hold tissue open for visibility',    chapter:4 },
+  bonesaw:   { id:'bonesaw',   name:'Bone Saw',      icon:'🦴', color:'#bdc3c7', desc:'Precision saw for bone and cast',    chapter:6 },
+  castapp:   { id:'castapp',   name:'Cast Applicator',icon:'🩹', color:'#ecf0f1', desc:'Wrap and set fractures properly',    chapter:6 },
+  epiinject: { id:'epiinject', name:'Epinephrine',   icon:'💉', color:'#e74c3c', desc:'Emergency injection for anaphylaxis',chapter:7 },
+  antihist:  { id:'antihist',  name:'Antihistamine', icon:'💊', color:'#2ecc71', desc:'Block histamine allergic response',  chapter:7 },
+  ultrasound:{ id:'ultrasound',name:'Ultrasound',    icon:'📡', color:'#3498db', desc:'Sound waves to see inside',          chapter:8 },
+  hyperbaric:{ id:'hyperbaric',name:'Hyperbaric',    icon:'🫁', color:'#1abc9c', desc:'Pressurized oxygen therapy',         chapter:8 },
+  fetalmon:  { id:'fetalmon',  name:'Fetal Monitor', icon:'👶', color:'#f39c12', desc:'Track baby heartbeat in womb',       chapter:9 },
+  csection:  { id:'csection',  name:'C-Section Kit', icon:'🏥', color:'#ecf0f1', desc:'Emergency cesarean delivery',        chapter:9 }
 };
 
 /* ───────────── PATIENTS ───────────── */
@@ -46,6 +54,36 @@ G.PATIENTS = {
     condition:'Mass casualty event',
     desc:'A multi-vehicle accident has produced several casualties arriving simultaneously. You must triage and operate on the most critical patients in order of priority. Use every instrument at your disposal. The clock is ticking.',
     vitals:{ hr:0, bp:'—', temp:0, o2:0 }
+  },
+  luca: {
+    id:'luca', name:'Luca', age:6, emoji:'🧒',
+    condition:'Fractured radius (broken arm)',
+    desc:'Luca is a 6-year-old aspiring artist who fell from a treehouse while building a fort. His left radius is fractured and displaced. He needs the bone set, a cast applied, and lots of reassurance. He keeps asking if he can still draw.',
+    vitals:{ hr:105, bp:'95/55', temp:36.8, o2:98 }
+  },
+  giorgio: {
+    id:'giorgio', name:'Giorgio', age:35, emoji:'👨‍🍳',
+    condition:'Anaphylactic shock (shellfish allergy)',
+    desc:'Giorgio is a celebrity chef who accidentally tasted a dish containing shrimp during a live cooking competition. His throat is swelling, blood pressure is plummeting, and he\'s breaking out in hives. Immediate epinephrine and airway management required.',
+    vitals:{ hr:150, bp:'70/40', temp:37.2, o2:88 }
+  },
+  yuki: {
+    id:'yuki', name:'Yuki', age:28, emoji:'🤿',
+    condition:'Decompression sickness (the bends)',
+    desc:'Yuki is a professional deep-sea diver who explored a WWII shipwreck at 40 meters. She ascended too quickly and now has severe joint pain, dizziness, and tingling in her limbs. Nitrogen bubbles are forming in her blood. She needs hyperbaric oxygen therapy.',
+    vitals:{ hr:115, bp:'125/80', temp:37.0, o2:94 }
+  },
+  anna: {
+    id:'anna', name:'Anna', age:30, emoji:'🤰',
+    condition:'Placental abruption — emergency C-section',
+    desc:'Anna is a 30-year-old pregnant teacher at 38 weeks. She arrived with severe abdominal pain and vaginal bleeding. Ultrasound confirms placental abruption — the placenta is separating from the uterine wall. Both mother and baby are in danger. Emergency C-section now.',
+    vitals:{ hr:125, bp:'85/50', temp:37.1, o2:96 }
+  },
+  reynolds: {
+    id:'reynolds', name:'Dr. Marcus Reynolds', age:52, emoji:'👨‍⚕️',
+    condition:'Penetrating chest trauma (stabbing)',
+    desc:'Your mentor, Dr. Reynolds, was attacked in the parking garage. He has a knife wound to the chest with active bleeding into the pericardial sac, causing cardiac tamponade. He taught you everything you know — now you must save his life. Everything, every instrument, every skill. Now.',
+    vitals:{ hr:135, bp:'80/50', temp:36.4, o2:92 }
   }
 };
 
@@ -85,6 +123,43 @@ G.PROCEDURES = {
     { id:'stop_bleed',type:'tap',     tool:'clamps',    name:'Stop Bleeding',      points:5,           accuracy:80, time:10, desc:'Clamp all actively bleeding vessels' },
     { id:'cardio',    type:'timing',  tool:'defib',     name:'Cardiac Rescue',     target_bpm:160,    accuracy:85, time:8,  desc:'Patient is in V-fib — shock immediately' },
     { id:'close',     type:'stitch',  tool:'sutures',    name:'Final Sutures',      points:10,          accuracy:75, time:20, desc:'Close all incisions and stabilize patients' }
+  ],
+  chapter6: [
+    { id:'xray',      type:'tap',     tool:'ultrasound', name:'X-Ray Fracture',    points:2,            accuracy:70, time:8,  desc:'Image the fracture to see the break clearly' },
+    { id:'saw_cast',  type:'swipe',   tool:'bonesaw',    name:'Cut Old Cast',      path:'arm_cast',     accuracy:75, time:10, desc:'Saw through the temporary splint carefully' },
+    { id:'set_bone',  type:'tap',     tool:'forceps',    name:'Set the Bone',      points:4,            accuracy:85, time:12, desc:'Align the fractured bone fragments perfectly' },
+    { id:'apply_cast',type:'draw',    tool:'castapp',    name:'Apply Cast',        path:'arm_wrap',     accuracy:70, time:14, desc:'Wrap the cast around the arm in a spiral pattern' },
+    { id:'stitch_c',  type:'stitch',  tool:'sutures',    name:'Close Incision',    points:6,            accuracy:75, time:12, desc:'Suture the small surgical opening closed' }
+  ],
+  chapter7: [
+    { id:'epi_shot',  type:'tap',     tool:'epiinject',  name:'Epinephrine Shot',  points:1,            accuracy:90, time:5,  desc:'Inject epinephrine into the thigh immediately' },
+    { id:'airway',    type:'swipe',   tool:'scalpel',    name:'Secure Airway',     path:'throat',       accuracy:85, time:10, desc:'Emergency cricothyrotomy if airway closes' },
+    { id:'iv_line',   type:'tap',     tool:'clamps',     name:'Start IV Line',     points:3,            accuracy:80, time:8,  desc:'Establish IV access for fluids and meds' },
+    { id:'antihist',  type:'spray',   tool:'antihist',   name:'Antihistamine',     points:6,            accuracy:70, time:10, desc:'Spray antihistamine to block further reaction' },
+    { id:'monitor_e', type:'timing',  tool:'fetalmon',   name:'Monitor Vitals',    target_bpm:90,       accuracy:85, time:10, desc:'Watch vitals — ensure stable recovery' }
+  ],
+  chapter8: [
+    { id:'scan',      type:'navigate',tool:'ultrasound', name:'Scan for Bubbles',  path:'vessels',      accuracy:60, time:14, desc:'Navigate ultrasound to find nitrogen bubbles' },
+    { id:'map',       type:'tap',     tool:'ultrasound', name:'Map Affected Areas',points:4,            accuracy:75, time:10, desc:'Mark all affected joints and tissues' },
+    { id:'pressurize',type:'timing',  tool:'hyperbaric', name:'Pressurize Chamber',target_bpm:60,       accuracy:80, time:12, desc:'Gradually increase pressure to dissolve bubbles' },
+    { id:'oxygen',    type:'spray',   tool:'hyperbaric', name:'Oxygen Therapy',    points:8,            accuracy:70, time:15, desc:'Flood tissues with pure oxygen at pressure' },
+    { id:'depress',   type:'timing',  tool:'hyperbaric', name:'Depressurize',      target_bpm:50,       accuracy:85, time:10, desc:'Slowly return to normal pressure safely' }
+  ],
+  chapter9: [
+    { id:'scan_baby', type:'navigate',tool:'ultrasound', name:'Scan Baby Position',path:'womb',         accuracy:65, time:10, desc:'Locate the baby and check placenta position' },
+    { id:'monitor_f', type:'timing',  tool:'fetalmon',   name:'Monitor Fetal HR',  target_bpm:140,      accuracy:85, time:8,  desc:'Track the baby\'s heart rate — keep it stable' },
+    { id:'incision_c',type:'swipe',   tool:'scalpel',    name:'C-Section Incision',path:'abdomen_c',    accuracy:80, time:12, desc:'Make the low transverse abdominal incision' },
+    { id:'deliver',   type:'tap',     tool:'forceps',    name:'Deliver Baby',      points:1,            accuracy:95, time:8,  desc:'Carefully extract the baby from the uterus' },
+    { id:'clamp_umb', type:'tap',     tool:'clamps',     name:'Clamp Umbilical',   points:2,            accuracy:85, time:6,  desc:'Clamp and cut the umbilical cord' },
+    { id:'close_u',   type:'stitch',  tool:'sutures',    name:'Close Uterus',      points:8,            accuracy:80, time:15, desc:'Suture the uterine wall layer by layer' }
+  ],
+  chapter10: [
+    { id:'tamponade', type:'tap',     tool:'clamps',     name:'Relieve Tamponade', points:3,            accuracy:90, time:8,  desc:'Open pericardium to relieve pressure on heart' },
+    { id:'clamp_m',   type:'tap',     tool:'clamps',     name:'Clamp Wound Vessel',points:4,            accuracy:85, time:10, desc:'Identify and clamp the bleeding artery' },
+    { id:'defib_m',   type:'timing',  tool:'defib',      name:'Defibrillate',      target_bpm:150,      accuracy:85, time:8,  desc:'Heart is in V-fib — shock now!' },
+    { id:'repair_h',  type:'stitch',  tool:'sutures',    name:'Repair Heart Wall', points:8,            accuracy:90, time:18, desc:'Suture the cardiac muscle carefully' },
+    { id:'laser_m',   type:'draw',    tool:'laser',      name:'Cauterize Bleeding',path:'heart_vessel', accuracy:85, time:12, desc:'Use laser to seal the damaged vessels' },
+    { id:'close_m',   type:'stitch',  tool:'sutures',    name:'Close Chest',       points:12,           accuracy:80, time:20, desc:'Close the chest — layer by layer. He must live.' }
   ]
 };
 
@@ -165,6 +240,93 @@ G.CHAPTERS = [
       { speaker:'Dr. Reynolds', text:'You\'ve earned the title of Chief Surgeon at Ospedale Miraggio. This hospital — and these patients — are alive because of you.' },
       { speaker:'SYSTEM', text:'🎓 CONGRATULATIONS — You\'ve completed all chapters! You are now a Master Surgeon at Ospedale Miraggio.' }
     ]
+  },
+  {
+    id:6, title:'The Toy Maker', icon:'🧒', unlocked:false,
+    patient:'luca',
+    briefing:[
+      { speaker:'Nurse Ada', text:'Doctor, we have a little one in OR 3. Luca, age 6, fell from a treehouse. His left arm is broken in two places.' },
+      { speaker:'Nurse Ada', text:'He\'s scared but trying to be brave. He keeps asking if he can still draw with his right hand. Adorable.' },
+      { speaker:'You', text:'Let me see the X-ray. We need to set the bone properly and get a cast on him.' },
+      { speaker:'Nurse Ada', text:'I\'m prepping the Bone Saw and Cast Applicator. Also — he asked if you could draw a superhero on his cast. Maybe after surgery?' },
+      { speaker:'Dr. Reynolds', text:'Orthopedics is about precision and patience, Doctor. The bone must align perfectly or he\'ll have lifelong issues. Let\'s make sure Luca keeps drawing for years to come.' }
+    ],
+    debriefing:[
+      { speaker:'Nurse Ada', text:'The cast is on, and Luca is already drawing a dinosaur on it with markers. He says you\'re his new hero.' },
+      { speaker:'Dr. Reynolds', text:'Well done. Children heal fast when you set things right. Luca will be climbing trees again in 6 weeks — maybe with better judgment this time.' },
+      { speaker:'Luca', text:'Thank you, Doctor! Look — I drew you on my cast! You\'re fighting a dragon! 🦕' }
+    ]
+  },
+  {
+    id:7, title:'Seafood Surprise', icon:'🍤', unlocked:false,
+    patient:'giorgio',
+    briefing:[
+      { speaker:'ER Nurse', text:'Code Red! Celebrity chef Giorgio Moretti, 35, in anaphylactic shock! He accidentally ate shrimp during a live TV cooking competition!' },
+      { speaker:'ER Nurse', text:'Throat swelling, BP 70/40, hives everywhere. He can barely breathe. We need epinephrine NOW.' },
+      { speaker:'You', text:'Get me the Epinephrine Injector and set up an IV. We need to secure his airway before it closes completely.' },
+      { speaker:'Dr. Reynolds', text:'Anaphylaxis kills in minutes, Doctor. The immune system goes haywire — histamine floods every tissue. You must act fast.' },
+      { speaker:'Dr. Reynolds', text:'Epinephrine and Antihistamine are unlocked. Epinephrine first — it\'s the only thing that can reverse this. Go!' }
+    ],
+    debriefing:[
+      { speaker:'ER Nurse', text:'Giorgio is stabilized! His airway is open, BP recovering. He\'s asking about his soufflé in the oven backstage.' },
+      { speaker:'Dr. Reynolds', text:'Anaphylaxis is terrifying because it attacks everything at once — airway, circulation, skin. You handled it perfectly.' },
+      { speaker:'Giorgio', text:'Doctor... you saved my life. When I get out of here, I\'m cooking you the best meal of your life. No shellfish, I promise. 🍝' }
+    ]
+  },
+  {
+    id:8, title:'The Diver\'s Secret', icon:'🤿', unlocked:false,
+    patient:'yuki',
+    briefing:[
+      { speaker:'Dive Team', text:'Mayday, mayday! Yuki Tanaka, 28, deep-sea diver, decompression sickness! She surfaced from a 40-meter wreck dive in under 2 minutes!' },
+      { speaker:'Yuki', text:'My joints... it feels like fire in my knees. Everything is tingling. I can\'t feel my fingers...' },
+      { speaker:'You', text:'Classic bends. Nitrogen bubbles are forming in her blood and joints. We need ultrasound to map the damage and the hyperbaric chamber.' },
+      { speaker:'Dr. Reynolds', text:'At 40 meters, nitrogen dissolves into tissues under pressure. Surfacing too fast is like opening a shaken soda can — bubbles everywhere.' },
+      { speaker:'Dr. Reynolds', text:'The Ultrasound and Hyperbaric chamber are ready. Scan her, find the bubbles, then pressurize slowly. Reverse the physics.' }
+    ],
+    debriefing:[
+      { speaker:'Yuki', text:'The pain is fading... I can feel my fingers again. Thank you, Doctor. That wreck held a 200-year-old ship\'s bell. I heard it ring once before I surfaced.' },
+      { speaker:'Dr. Reynolds', text:'Decompression sickness teaches respect for physics. The ocean doesn\'t forgive shortcuts. Yuki will dive again — but she\'ll ascend slowly next time.' },
+      { speaker:'Yuki', text:'Next dive, I\'m bringing you along. You\'d love the coral reefs. Just... take the stairs back up. 🐠' }
+    ]
+  },
+  {
+    id:9, title:'Midnight ER', icon:'👶', unlocked:false,
+    patient:'anna',
+    briefing:[
+      { speaker:'OB Nurse', text:'Emergency! Anna Ferretti, 30, 38 weeks pregnant! Severe abdominal pain and bleeding — we think placental abruption!' },
+      { speaker:'Anna', text:'Please... save my baby. I\'m a teacher — my students are waiting for me to come back. Please...' },
+      { speaker:'You', text:'The placenta is separating from the uterine wall. The baby is losing oxygen. We need a C-section immediately.' },
+      { speaker:'Dr. Reynolds', text:'This is a race against time, Doctor. Every minute the baby stays in, the risk of hypoxia increases. But you must also protect Anna.' },
+      { speaker:'Dr. Reynolds', text:'Fetal Monitor and C-Section Kit are ready. Monitor the baby\'s heart, make the incision, and deliver safely. Two lives depend on you.' }
+    ],
+    debriefing:[
+      { speaker:'Anna', text:'Is... is my baby okay? I heard crying... I heard crying!' },
+      { speaker:'Nurse Ada', text:'She\'s perfect. 3.2 kilograms, strong lungs. Welcome to the world, little one.' },
+      { speaker:'Anna', text:'Thank you, Doctor. I\'m naming her Miraggio. After the hospital that saved us both. 🌟' },
+      { speaker:'Dr. Reynolds', text:'Bringing new life into the world — there\'s no greater reward in medicine. You did beautifully, Doctor.' }
+    ]
+  },
+  {
+    id:10, title:'The Final Puzzle', icon:'💉', unlocked:false,
+    patient:'reynolds',
+    briefing:[
+      { speaker:'Nurse Ada', text:'Doctor... it\'s Dr. Reynolds. He was attacked in the parking garage. Knife wound to the chest. He\'s losing blood fast.' },
+      { speaker:'You', text:'Dr. Reynolds?! No... get him to OR 1 NOW. Page every surgeon in the building.' },
+      { speaker:'Dr. Reynolds', text:'Hey... don\'t look so scared, Doc. I taught you everything you know, remember? Now... it\'s your turn to teach me.' },
+      { speaker:'You', text:'You\'re going to be fine, Doctor. I\'m not losing you. Not today.' },
+      { speaker:'Dr. Reynolds', text:'Cardiac tamponade... the pericardial sac is filling with blood. My heart can\'t pump. You need to open it... relieve the pressure... then repair the damage.' },
+      { speaker:'You', text:'All instruments ready. Every skill you taught me — I\'m using them all. Stay with me, Doctor. I\'m not done learning from you.' },
+      { speaker:'Nurse Ada', text:'He\'s in V-fib! Heart stopped!' },
+      { speaker:'You', text:'No! DEFIBRILLATOR! Clear! ... Come on, Doctor... COME BACK!' }
+    ],
+    debriefing:[
+      { speaker:'Dr. Reynolds', text:'...You did it. I knew you would. From your first day at Miraggio, I knew you\'d be the one to save me someday.' },
+      { speaker:'You', text:'Don\'t talk. Save your strength. You\'re not retiring on my watch.' },
+      { speaker:'Dr. Reynolds', text:'I\'ve been doing this for 30 years. I\'ve seen hundreds of surgeons come and go. But you... you have something special. Compassion and skill, together. That\'s rare.' },
+      { speaker:'Dr. Reynolds', text:'The Chief Surgeon position is yours. Not because I\'m your mentor — because you earned it. Every patient, every surgery, every life you touched.' },
+      { speaker:'Nurse Ada', text:'Dr. Reynolds is stable and recovering well. And the hospital board just approved your promotion. Congratulations, Chief Surgeon.' },
+      { speaker:'SYSTEM', text:'🎓 MASTERY ACHIEVED — You are now Chief Surgeon of Ospedale Miraggio. Your journey from first incision to saving your mentor is complete. The hospital is in your hands. 🏥✨' }
+    ]
   }
 ];
 
@@ -219,6 +381,56 @@ G.JOURNAL = {
       'Hemorrhagic shock kills 40% of trauma patients. The body can compensate for up to 15% blood loss, but beyond 30%, organ failure begins.',
       'Damage control surgery prioritizes stopping bleeding and contamination over definitive repair. The patient is stabilized first, then returned to the OR for final repairs.'
     ]
+  },
+  chapter6: {
+    title:'Pediatric Orthopedics',
+    facts:[
+      'Children\'s bones are softer and more flexible than adults\', but they fracture just as easily. A "greenstick fracture" is when the bone bends and cracks but doesn\'t break all the way through.',
+      'The radius and ulna are the two bones in the forearm. A "both-bones" forearm fracture requires precise alignment to restore full rotation of the wrist.',
+      'Casts are made from fiberglass or plaster. Fiberglass is lighter, stronger, and water-resistant — perfect for active kids who will inevitably get their cast dirty.',
+      'Bone healing in children takes 4-6 weeks vs. 6-12 weeks in adults. Kids are biological healing machines — their growth plates allow remarkable regeneration.',
+      'Pediatric orthopedic surgeons must consider growth plates when setting fractures. Damaging a growth plate can cause the bone to grow crooked or stop growing entirely.'
+    ]
+  },
+  chapter7: {
+    title:'Anaphylaxis & Immunology',
+    facts:[
+      'Anaphylaxis is a severe, life-threatening allergic reaction. It can occur within seconds of exposure to an allergen — peanuts, shellfish, bee stings, or medications.',
+      'Epinephrine (adrenaline) is the ONLY first-line treatment for anaphylaxis. It constricts blood vessels, opens airways, and raises blood pressure within minutes.',
+      'The "biphasic reaction" can occur 4-12 hours after the initial anaphylaxis. Even after treatment, patients must be monitored for delayed recurrence.',
+      'Histamine is released by mast cells during allergic reactions. It causes vasodilation, increased permeability, bronchoconstriction — the classic allergy symptoms.',
+      'Anaphylaxis kills 200 people annually in the US alone. Most deaths occur outside hospitals because epinephrine wasn\'t available or wasn\'t used in time.'
+    ]
+  },
+  chapter8: {
+    title:'Hyperbaric Medicine & Diving Physiology',
+    facts:[
+      'At sea level, nitrogen makes up 78% of the air we breathe. Under pressure (diving), nitrogen dissolves into tissues. Surfacing too fast causes it to form bubbles — like opening a shaken soda.',
+      'Decompression sickness (DCS) affects joints, lungs, and the nervous system. "The bends" gets its name from the bent posture sufferers adopt due to joint pain.',
+      'Hyperbaric oxygen therapy (HBOT) works by pressurizing pure oxygen to 2-3 ATM, forcing dissolved oxygen into tissues and shrinking nitrogen bubbles.',
+      'The US Navy Diving Manual tables calculate safe ascent rates based on depth and time. Most recreational dives stay above 30 meters to avoid nitrogen narcosis.',
+      'Nitrogen narcosis — "rapture of the deep" — causes impaired judgment, euphoria, and hallucinations at depths below 30 meters. It\'s like underwater drunkenness.'
+    ]
+  },
+  chapter9: {
+    title:'Obstetrics & Emergency C-Section',
+    facts:[
+      'Placental abruption affects 1% of pregnancies. The placenta detaches prematurely, cutting off oxygen to the baby. It\'s the leading cause of emergency C-sections.',
+      'A C-section (cesarean delivery) is performed through a low transverse incision (Pfannenstiel) — the same incision used for appendectomies, but lower.',
+      'Normal fetal heart rate is 110-160 bpm. Below 100 (bradycardia) indicates fetal distress. The fetal monitor (CTG) tracks heart rate and contractions simultaneously.',
+      'The Apgar score (Appearance, Pulse, Grimace, Activity, Respiration) is assessed at 1 and 5 minutes after birth. A score of 7+ is normal; below 4 is critical.',
+      'Cesarean sections account for 32% of all US births. The procedure takes 45-60 minutes; emergency C-sections can be completed in under 10 minutes when necessary.'
+    ]
+  },
+  chapter10: {
+    title:'Cardiac Surgery & Tamponade',
+    facts:[
+      'Cardiac tamponade occurs when fluid (usually blood) fills the pericardial sac, compressing the heart. The heart can\'t fill — stroke volume drops — cardiac arrest follows.',
+      'Beck\'s Triad diagnoses tamponade: low blood pressure, distended neck veins, and muffled heart sounds. All three together = emergency thoracotomy.',
+      'Pericardial window is a surgical procedure to drain fluid from the pericardial sac. A small opening allows blood to drain, relieving pressure on the heart.',
+      'Cardiac suturing requires extraordinary precision — the heart wall is only 3-5mm thick in the ventricles. A suture too deep perforates; too shallow dehisces.',
+      'Open-heart surgery survival rates have improved from 50% in the 1960s to over 97% today. Technological advances in cardiopulmonary bypass made this possible.'
+    ]
   }
 };
 
@@ -258,5 +470,51 @@ G.COLORS = {
 
 /* ───────────── HELPER ───────────── */
 G.clamp = function(v,min,max){ return Math.max(min,Math.min(max,v)); };
+
+/* ───────────── ACHIEVEMENTS ───────────── */
+G.ACHIEVEMENTS = [
+  { id:'first_save',    name:'First Save',        icon:'🏅', desc:'Complete Chapter 1', condition:function(s){ return s.chapter > 1; } },
+  { id:'perfect_step',  name:'Steady Hands',      icon:'🎯', desc:'Get 100% accuracy on any step', condition:function(s){ return s.perfectSteps >= 1; } },
+  { id:'combo_master',  name:'Combo Master',      icon:'🔥', desc:'Reach x10 combo', condition:function(s){ return s.maxCombo >= 10; } },
+  { id:'speed_demon',   name:'Speed Demon',       icon:'⚡', desc:'Complete a chapter with >50% time remaining', condition:function(s){ return s.speedClears >= 1; } },
+  { id:'no_complications', name:'No Complications', icon:'🛡️', desc:'Complete 3 chapters without any complications', condition:function(s){ return s.noCompChapters >= 3; } },
+  { id:'full_journal',  name:'Scholar',           icon:'📖', desc:'Unlock all journal entries', condition:function(s){ return s.journalUnlocked >= 10; } },
+  { id:'ortho_pro',     name:'Bone Doctor',       icon:'🦴', desc:'Complete Chapter 6 with S rank', condition:function(s){ return s.scores && s.scores[6] && s.scores[6].grade === 'S'; } },
+  { id:'allergy_hero',  name:'Allergy Hero',      icon:'💉', desc:'Complete Chapter 7', condition:function(s){ return s.chapter > 7; } },
+  { id:'deep_diver',    name:'Deep Diver',        icon:'🤿', desc:'Complete Chapter 8', condition:function(s){ return s.chapter > 8; } },
+  { id:'baby_whisperer',name:'Baby Whisperer',    icon:'👶', desc:'Complete Chapter 9', condition:function(s){ return s.chapter > 9; } },
+  { id:'chief_surgeon', name:'Chief Surgeon',     icon:'👨‍⚕️', desc:'Complete Chapter 10 — save Dr. Reynolds', condition:function(s){ return s.chapter > 10; } },
+  { id:'master_surgeon',name:'Master Surgeon',    icon:'🏆', desc:'S rank on ALL chapters', condition:function(s){ return s.allSRank; } }
+];
+
+/* ───────────── POWERUPS ───────────── */
+G.POWERUPS = {
+  speed:    { id:'speed',    name:'Speed Boost',     icon:'⚡', desc:'+50% time for next step', duration:1, color:'#f39c12' },
+  shield:   { id:'shield',   name:'Accuracy Shield', icon:'🛡️', desc:'1 free mistake per level', duration:1, color:'#3498db' },
+  second:   { id:'second',   name:'Second Chance',   icon:'❤️', desc:'Repeat last failed step', duration:1, color:'#e74c3c' },
+  precision:{ id:'precision',name:'Precision Bonus', icon:'🎯', desc:'x2 score for 10 seconds', duration:10, color:'#2ecc71' }
+};
+
+/* ───────────── COMPLICATIONS ───────────── */
+G.COMPLICATIONS = [
+  { id:'bleed',     name:'Unexpected Bleeding!',  icon:'🩸', desc:'Rapid bleeding — tap quickly to clamp!', type:'tap', points:4, time:5, penalty:15 },
+  { id:'move',      name:'Patient is Moving!',    icon:'🫨', desc:'Patient moved — recalibrate quickly!', type:'swipe', path:'recalibrate', time:6, penalty:20 },
+  { id:'equipment', name:'Equipment Malfunction!', icon:'⚠️', desc:'Machine failure — switch to backup tool!', type:'tap', points:2, time:4, penalty:10 },
+  { id:'spike',     name:'Vitals Spiking!',       icon:'📈', desc:'Heart rate spiking — stabilize now!', type:'timing', target_bpm:160, time:6, penalty:25 }
+];
+
+/* ───────────── DIFFICULTY SCALING ───────────── */
+G.DIFFICULTY = {
+  1:  { timeMod:1.0,   compChance:0,    compMax:0 },
+  2:  { timeMod:1.0,   compChance:0,    compMax:0 },
+  3:  { timeMod:1.0,   compChance:0.08, compMax:1 },
+  4:  { timeMod:0.9,   compChance:0.12, compMax:1 },
+  5:  { timeMod:0.9,   compChance:0.15, compMax:2 },
+  6:  { timeMod:0.85,  compChance:0.15, compMax:2 },
+  7:  { timeMod:0.85,  compChance:0.18, compMax:2 },
+  8:  { timeMod:0.8,   compChance:0.20, compMax:3 },
+  9:  { timeMod:0.8,   compChance:0.22, compMax:3 },
+  10: { timeMod:0.75,  compChance:0.25, compMax:4 }
+};
 
 })();
