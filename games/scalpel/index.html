@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="theme-color" content="#0d2137"/>
+<meta name="color-scheme" content="dark"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Scalpel"/>
+<meta name="description" content="Scalpel — Surgical Stories. A Trauma Center-inspired PWA surgery game. Perform operations, save patients, unlock instruments. Optimized for iPhone."/>
+<title>Scalpel — Surgical Stories</title>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="icon" href="icon.svg"/>
+<link rel="apple-touch-icon" href="icon.svg"/>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a1628;font-family:'Courier New',monospace;color:#ecf0f1;user-select:none;-webkit-user-select:none}
+#app{width:100%;height:100%;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%;position:absolute;top:0;left:0}
+#hud{position:absolute;top:0;left:0;right:0;padding:env(safe-area-inset-top,12px) 12px 0;display:flex;justify-content:space-between;align-items:center;height:56px;pointer-events:none;z-index:10}
+.hud-item{background:rgba(10,22,40,.85);border:1px solid rgba(52,152,219,.3);border-radius:12px;padding:4px 12px;font-size:.75rem;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hud-item.warn{border-color:#e74c3c;color:#e74c3c}
+.hud-item.ok{border-color:#27ae60;color:#27ae60}
+#ecg-mini{position:absolute;top:env(safe-area-inset-top,12px);right:12px;width:100px;height:40px;z-index:10;pointer-events:none}
+#timer-bar{position:absolute;top:calc(env(safe-area-inset-top,12px) + 48px);left:12px;right:12px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;z-index:10;pointer-events:none;overflow:hidden}
+#timer-fill{height:100%;background:linear-gradient(90deg,#27ae60,#f39c12,#e74c3c);border-radius:2px;transition:width .3s}
+#instrument-bar{position:absolute;bottom:0;left:0;right:0;padding:0 8px calc(env(safe-area-inset-bottom,8px) + 8px);display:flex;gap:8px;justify-content:center;z-index:20;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.inst-btn{flex-shrink:0;width:56px;height:56px;border-radius:16px;border:2px solid rgba(52,152,219,.3);background:rgba(10,22,40,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.4rem;transition:all .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);position:relative}
+.inst-btn.active{border-color:#3498db;background:rgba(52,152,219,.25);box-shadow:0 0 20px rgba(52,152,219,.3);transform:scale(1.1)}
+.inst-btn.locked{opacity:.3;pointer-events:none}
+.inst-btn .inst-label{font-size:.5rem;color:#8a9bb5;margin-top:2px;letter-spacing:.5px}
+#dialogue{position:absolute;bottom:calc(env(safe-area-inset-bottom,8px) + 76px);left:12px;right:12px;background:rgba(10,22,40,.95);border:1px solid rgba(52,152,219,.3);border-radius:16px;padding:16px;z-index:30;display:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#dialogue.show{display:block;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+#dialogue .speaker{font-size:.7rem;color:#3498db;font-weight:700;letter-spacing:1px;margin-bottom:6px;text-transform:uppercase}
+#dialogue .text{font-size:.85rem;line-height:1.5;color:#ecf0f1}
+#dialogue .tap-hint{font-size:.6rem;color:#5a6a80;margin-top:8px;text-align:right}
+#overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(10,22,40,.92);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#overlay.hidden{display:none}
+#overlay h1{font-size:1.8rem;color:#ecf0f1;margin-bottom:8px;letter-spacing:2px}
+#overlay h2{font-size:1rem;color:#3498db;margin-bottom:20px;font-weight:400}
+#overlay .subtitle{font-size:.75rem;color:#5a6a80;margin-bottom:24px;max-width:320px;text-align:center;line-height:1.6}
+#overlay .menu-btn{width:260px;padding:14px;border:2px solid rgba(52,152,219,.4);background:rgba(52,152,219,.1);color:#ecf0f1;border-radius:14px;font-size:.9rem;font-weight:700;letter-spacing:1px;cursor:pointer;margin-bottom:12px;text-align:center;transition:all .2s;font-family:inherit}
+#overlay .menu-btn:active{background:rgba(52,152,219,.3);transform:scale(.97)}
+#overlay .menu-btn.primary{border-color:#3498db;background:rgba(52,152,219,.2)}
+#overlay .menu-btn.green{border-color:#27ae60;background:rgba(39,174,96,.15);color:#27ae60}
+#overlay .menu-btn:disabled{opacity:.3;pointer-events:none}
+#results-card{background:rgba(10,22,40,.95);border:1px solid rgba(52,152,219,.3);border-radius:20px;padding:24px;max-width:340px;width:100%;text-align:center;margin-bottom:20px}
+#results-card .grade{font-size:3rem;margin-bottom:8px}
+#results-card .score{font-size:1.4rem;color:#3498db;font-weight:700;margin-bottom:4px}
+#results-card .detail{font-size:.75rem;color:#8a9bb5;margin-bottom:12px;line-height:1.6}
+#results-card .journal{background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3);border-radius:12px;padding:12px;margin-top:12px;text-align:left}
+#results-card .journal h3{font-size:.7rem;color:#27ae60;letter-spacing:1px;margin-bottom:6px;text-transform:uppercase}
+#results-card .journal p{font-size:.72rem;color:#bdc3c7;line-height:1.6}
+#chapter-select{max-width:380px;width:100%}
+#chapter-select .ch{background:rgba(10,22,40,.8);border:1px solid rgba(52,152,219,.2);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;transition:all .2s;cursor:pointer}
+#chapter-select .ch:active{transform:scale(.98)}
+#chapter-select .ch.locked{opacity:.35;pointer-events:none}
+#chapter-select .ch .ch-icon{font-size:1.6rem;width:44px;text-align:center}
+#chapter-select .ch .ch-info{flex:1}
+#chapter-select .ch .ch-title{font-size:.85rem;font-weight:700;color:#ecf0f1}
+#chapter-select .ch .ch-sub{font-size:.65rem;color:#8a9bb5;margin-top:2px}
+#chapter-select .ch .ch-status{font-size:.7rem}
+#patient-info{background:rgba(10,22,40,.95);border:1px solid rgba(52,152,219,.3);border-radius:20px;padding:20px;max-width:340px;width:100%;margin-bottom:20px}
+#patient-info .pi-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+#patient-info .pi-avatar{width:48px;height:48px;border-radius:50%;background:rgba(52,152,219,.2);display:flex;align-items:center;justify-content:center;font-size:1.6rem;border:2px solid rgba(52,152,219,.3)}
+#patient-info .pi-name{font-size:1rem;font-weight:700}
+#patient-info .pi-meta{font-size:.65rem;color:#8a9bb5}
+#patient-info .pi-desc{font-size:.78rem;color:#bdc3c7;line-height:1.6;margin-bottom:12px}
+#patient-info .pi-procedure{font-size:.65rem;color:#3498db;letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+#patient-info .pi-instruments{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+#patient-info .pi-inst{background:rgba(52,152,219,.15);border:1px solid rgba(52,152,219,.25);border-radius:8px;padding:4px 8px;font-size:.65rem;color:#8ab4f8}
+#accuracy-indicator{position:absolute;top:calc(env(safe-area-inset-top,12px) + 56px);left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;color:#27ae60;z-index:15;pointer-events:none;opacity:0;transition:opacity .3s}
+#accuracy-indicator.show{opacity:1}
+#accuracy-indicator.miss{color:#e74c3c}
+#level-label{position:absolute;top:calc(env(safe-area-inset-top,12px) + 56px);left:12px;font-size:.6rem;color:#5a6a80;letter-spacing:1px;text-transform:uppercase;z-index:15;pointer-events:none}
+.particles-container{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:5}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gameCanvas"></canvas>
+  <canvas id="ecg-mini"></canvas>
+  <div id="hud">
+    <div class="hud-item" id="hud-score">0 pts</div>
+    <div class="hud-item" id="hud-combo">x1</div>
+    <div class="hud-item" id="hud-accuracy">100%</div>
+  </div>
+  <div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
+  <div id="accuracy-indicator"></div>
+  <div id="level-label"></div>
+  <div id="instrument-bar"></div>
+  <div id="dialogue">
+    <div class="speaker"></div>
+    <div class="text"></div>
+    <div class="tap-hint">tap to continue</div>
+  </div>
+  <div id="overlay"></div>
+  <div class="particles-container" id="particles"></div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+</body>
+</html>

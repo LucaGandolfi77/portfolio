@@ -1,5 +1,5 @@
 /* Miraggio Hotel — service worker (cache-first per il gioco) */
-var CACHE = 'miraggio-v1';
+var CACHE = 'miraggio-v2';
 var CORE = [
   './',
   './index.html',

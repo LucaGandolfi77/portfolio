@@ -561,129 +561,128 @@
           "Il profumo di pane arriva fino all’Atrio. È il mio biglietto da visita.",
           "La salsa segreta è finita. Prepara il piano B: la salsa molto segreta."
         ]
+      },
+      /* ==================== BOT DIMENSIONALI ==================== */
+      lola_dark: {
+        name: "Lola Oscura", role: "receptionist ombra", emoji: "🕯️", skin: "#8a6a5a", hair: "#2a1a4e", hairStyle: 2, top: "#3a2a5e", pants: "#1a1030", acc: "mask",
+        greet: ["Benvenuta nell'oscurità… dove i sorrisi sono bugie 🕯️","Le chiavi qui aprono porte che non esistono più.","La tua stanza è la numero… nessuna. Qui non esiste il numero.","Il check-in è permanente: una volta entrata, non puoi più uscire."],
+        ambient: ["📞 *squillo* … \"Miraggio Oscuro, dove le ombre rispondono.\"","Sto lucidando la targa \"Hotel dei Desideri Oscuri\".","Mi raccomando: niente risate, le ombre ascoltano."]
+      },
+      pino_dark: {
+        name: "Pino Ombra", role: "ospite eterno", emoji: "🪦", skin: "#6a5a4a", hair: "#2a2a3e", hairStyle: 1, top: "#2a2a3e", pants: "#1a1a2e", acc: "mask",
+        greet: ["Aspetto il mio trolley dal 2003… è ancora in viaggio. O forse no. 🪦","Qui le piante parlano… ma solo per dirti addio.","Io sono solo di passaggio. Come la vita stessa.","Il wifi qui è ancora più lento… e non c'è nemmeno."],
+        ambient: ["🪦 *apre la valigia* … c'è solo polvere e ombre.","Dicono che al terzo giorno trovi la stanza segreta… io cerco dal 2003.","Nota a me stesso: la valigia è vuota. Come me."]
+      },
+      lola_neon: {
+        name: "Lola Cyber", role: "receptionist digitale", emoji: "💻", skin: "#4a4a6a", hair: "#ff00ff", hairStyle: 2, top: "#00ffff", pants: "#1a0030", acc: "glasses",
+        greet: ["Benvenuto nel datacenter! Carica il tuo profilo 📡","I dati sono il nuovo benvenuto. Tutto è connesso qui.","La tua stanza è il server #404. Trovala!","Check-in digitalizzato: biometria obbligatoria."],
+        ambient: ["💻 *buzz* … il server ronza di gioia.","Sto aggiornando il firmware dell'hotel.","Mi raccomando: niente analogici, tutto digitale."]
+      },
+      pino_neon: {
+        name: "Pino Hack", role: "ospite hacker", emoji: "🔌", skin: "#5a5a3a", hair: "#00ff00", hairStyle: 1, top: "#003300", pants: "#0a0a20", acc: "glasses",
+        greet: ["Aspetto il mio pacchetto dati dal 2003… è ancora in upload. 📡","Qui le piante hanno root access. Ne parlo solo quando serve.","Io sono solo di passaggio nella rete. Come un pacchetto di dati.","Il wifi qui è così veloce che i dati arrivano prima di essere inviati."],
+        ambient: ["🔌 *beep* … new packet incoming!","Sto scansionando la rete per vulnerabilità.","Nota a me stesso: backup completato."]
+      },
+      lola_steam: {
+        name: "Lola Vittoriana", role: "receptionist aristocratica", emoji: "🫖", skin: "#c68b59", hair: "#4a2a14", hairStyle: 2, top: "#8b4513", pants: "#3a2a1f", acc: "hat",
+        greet: ["Benvenuta, cara! Il tè è servito nel salone principale 🫖","Le chiavi qui sono d'oro e di rame, come la nostra educazione.","La tua stanza è la numero… beh, la trovi, tesoro.","Il check-in è un rituale: si saluta, si offre il tè, si entra."],
+        ambient: ["🫖 *bolle* … il tè è pronto per il prossimo ospite.","Sto lucidando l'argenteria per la cena delle otto.","Mi raccomando: niente volgarità, siamo in casa."]
+      },
+      pino_steam: {
+        name: "Pino Ingegnere", role: "ospite inventore", emoji: "🔧", skin: "#c68b59", hair: "#7f8c8d", hairStyle: 1, top: "#4a4a3a", pants: "#3a3a2a", acc: "tools",
+        greet: ["Aspetto il mio trolley di attrezzi dal 2003… è ancora in fabbrica! 🔧","Le piante qui crescono con la mia invenzione: il fertilizzante a vapore.","Io sono solo di passaggio. Come un ingranaggio che si sposta.","Il telegrafo dell'hotel funziona… con i miei miglioramenti."],
+        ambient: ["🔧 *clic* … pezzo aggiunto al meccanismo.","Sto costruendo un congegno che nessuno ha mai visto.","Nota a me stesso: il prossimo progetto è il volo."]
+      },
+      leo_dark: {
+        name: "Leo Reaper", role: "game master ombra", emoji: "🗡️", skin: "#3a2a5a", hair: "#1a0a30", hairStyle: 0, top: "#2a1a4a", pants: "#0a0a1a", acc: "mask",
+        greet: ["Il record dell'oscurità è 999 punti di paura. A te la sfida 🗡️","Qui il livello più difficile è… non morire di paura.","Ho nascosto un'ombra nella sala. No, non è quella che pensi.","Gamer da 20 anni: l'unico lag è il brivido lungo la schiena."],
+        ambient: ["🗡️ *ticchettio* … i secondi scorrono nell'ombra.","Il joystick è freddo: segno che il terrore arriva.","Se senti un sussurro, è il game over che ti chiama."]
+      },
+      leo_neon: {
+        name: "Leo Byte", role: "game master cyber", emoji: "🕹️", skin: "#2a4a6a", hair: "#00ccff", hairStyle: 0, top: "#004466", pants: "#001133", acc: "headphones",
+        greet: ["Il record del neon è 9999 punti digitali. A te la sfida 💻","Qui il livello più duro è l'hack: il gioco è programmato.","Ho nascosto un virus nella sala. Trovalo!","Gamer da 20 anni: l'unico bug è la tua percezione."],
+        ambient: ["🕹️ *beep boop* … nuovo record di cicli!","Il joystick è luminoso: segno che la corrente scorre.","Se senti 8-bit, sono io che compilo il codice."]
+      },
+      leo_steam: {
+        name: "Leo Meccanico", role: "game master vittoriano", emoji: "🎲", skin: "#6a5a4a", hair: "#4a3a2a", hairStyle: 0, top: "#3a3020", pants: "#2a2010", acc: "gear",
+        greet: ["Il record del vapore è 9999 punti meccanici. A te la sfida 🎲","Qui il livello più duro è la precisione: ogni ingranaggio conta.","Ho nascosto un congegno nella sala. Trovalo!","Gamer da 20 anni: l'unico ritardo è la leva del tempo."],
+        ambient: ["🎲 *tocco* … il dado è truccato dalla meccanica!","La leva è calda: segno che la macchina funziona.","Se senti un clic, è il meccanismo che gira."]
+      },
+      max_dark: {
+        name: "Max Cimitero", role: "dj ombra", emoji: "🎭", skin: "#3a2a5a", hair: "#2a1a4e", hairStyle: 1, top: "#1a0a30", pants: "#2a1040", acc: "mask",
+        greet: ["Ciao! Preparati: qui il volume è al 100% di terrore 🎭","Stasera la playlist è \"Balli nel buio\" — tutto esaurito.","Il mio mixer ha un pulsante che invia anime. Non lo premere.","Balla come se non ci fosse un domani… perché non c'è."],
+        ambient: ["🎭 *wobble* … bassi di terrore in arrivo.","Mixaggio… 50% ombra, 50% silenzio.","Questa canzone l'ho composta con le urla dei fantasmi."]
+      },
+      max_neon: {
+        name: "Max Byte", role: "dj cyber", emoji: "🎤", skin: "#0a2a4a", hair: "#ff00ff", hairStyle: 1, top: "#00ccff", pants: "#003366", acc: "glasses",
+        greet: ["Ciao! Preparati: qui il volume è al 100% di pixel 📡","Stasera la playlist è \"Synthwave Dreams\" — tutto esaurito.","Il mio mixer ha un tasto che sovrascrive la realtà.","Balla come se fossi in un glitch. Con la neon del 2099."],
+        ambient: ["🎤 *sintetizzatore* … dati musicali in arrivo.","Mixaggio… 50% codice, 50% ritmo.","Questa canzone la carico dalla cloud. O forse no."]
+      },
+      max_steam: {
+        name: "Max Vittoriano", role: "dj aristocratico", emoji: "🎻", skin: "#6a5a4a", hair: "#d9a441", hairStyle: 1, top: "#8b4513", pants: "#3a2a1f", acc: "bowtie",
+        greet: ["Ciao! Preparati: qui il volume è al 100% di eleganza 🎻","Stasera la playlist è \"Valzer della Nobiltà\" — tutto esaurito.","Il mio organo ha un pedale che suona come il vapore.","Balla come se fossi in un salotto vittoriano. Con stile."],
+        ambient: ["🎻 *archetto* … la musica è una scienza!","Mixaggio… 50% accordi, 50% vapore.","Questa sinfonia la compongo io stesso."]
+      },
+      guest2_dark: {
+        name: "Bibi Spettrale", role: "ospite da record", emoji: "👻", skin: "#5a4a3a", hair: "#1a0a00", hairStyle: 3, top: "#3a2a1a", pants: "#1a0a00", acc: "ghost",
+        greet: ["Io sono entrata qui con 0 monete e ora sono un fantasma. La storia non lo conferma, ma vabbè 👻","Il mio record? 47 spettri in un minuto. I polsi ne parlano ancora.","Il segreto del Miraggio Oscuro: ballare con le ombre. Tutti vedono. Balli.","Ho finito i cristalli del costume da spettro. Questa è la versione spirito."],
+        ambient: ["👻 *fluttuo* … oggi brillo anche senza luce.","Sto collezionando sguardi da polvere. Già 12.","Fantasmi veri non esistono… eccetto il venerdì."]
+      },
+      guest2_neon: {
+        name: "Bibi Cyber", role: "ospite da record", emoji: "🤖", skin: "#4a4a6a", hair: "#00ff00", hairStyle: 3, top: "#003300", pants: "#001a00", acc: "visor",
+        greet: ["Io sono entrata qui con 0 dati e ora sono una leggenda digitale. La storia non lo conferma, ma vabbè 🤖","Il mio record? 47 download in un minuto. I circuiti ne parlano ancora.","Il segreto del Miraggio Neon: ballare con i dati. Tutti vedono. Balli.","Ho finito la RAM del costume cyber. Questa è la versione ottimizzata."],
+        ambient: ["🤖 *boot* … oggi brillo anche senza server.","Sto collezionando pacchetti confusi. Già 12.","Cyberpunk veri non esistono… eccetto il codice."]
+      },
+      guest2_steam: {
+        name: "Bibi Meccanica", role: "ospite da record", emoji: "⚙️", skin: "#8a7a6a", hair: "#d9a441", hairStyle: 3, top: "#8b6508", pants: "#5a4a20", acc: "cog",
+        greet: ["Io sono entrata qui con 0 ingranaggi e ora sono una leggenda meccanica. La storia non lo conferma, ma vabbè ⚙️","Il mio record? 47 pezzi assemblati in un minuto. Le viti ne parlano ancora.","Il segreto del Miraggio Steampunk: ballare con le macchine. Tutti vedono. Balli.","Ho finito i bulloni del costume meccanico. Questa è la versione rustica."],
+        ambient: ["⚙️ *clang* … oggi brillo anche senza elettricità.","Sto collezionando ingranaggi usati. Già 12.","Macchine vere non esistono… eccetto le mie."]
+      },
+      stella_dark: {
+        name: "Stella Ombra", role: "astronoma delle tenebre", emoji: "🔮", skin: "#8a6a5a", hair: "#1a0a30", hairStyle: 2, top: "#2a1a4e", pants: "#0a0a1a", acc: "crystal",
+        greet: ["Stasera il cielo è pieno di porte oscure… e di wormhole 🔮","Quella costellazione si chiama \"Buio Assoluto\". L'ho chiamata io.","Da qui si vede la Via Lattea e le stelle che si spengono.","Le stelle cadenti? Sono portali che si chiudono."],
+        ambient: ["🔮 *luccichio* … una stella ha appena fatto l'occhiolino… nell'oscurità.","Sto mappando la costellazione \"Nessuna Luce\". Promettente.","Se vedi una cometa, corri: ha il veleno."]
+      },
+      tino_dark: {
+        name: "Tino Corvo", role: "gabbiano spia", emoji: "🕊️", skin: "#4a4a4a", hair: "#2a2a2a", hairStyle: 1, top: "#1a1a1a", pants: "#2a2a2a", acc: "monocle",
+        greet: ["Squaw! Sono Tino, il gabbiano ombra. Ho una laurea in spionaggio 🕊️","Volo sopra le 6 stanze oscure ogni mattina per il controllo sicurezza!","Non sono un gabbiano qualunque: sono il gabbiano che sente tutto.","Se vedi qualcosa di strano, segui la mia ombra."],
+        ambient: ["🕊️ *volo ombre* … punto strategico avvistato: la porta segreta.","Squaw! Qualcuno ha lasciato qualcosa. Era mio? Ora lo è.","Oggi niente gabbiani: sono in missione segreta."]
+      },
+      stella_neon: {
+        name: "Stella Byte", role: "astronoma digitale", emoji: "📡", skin: "#4a6a8a", hair: "#00ccff", hairStyle: 2, top: "#002244", pants: "#001122", acc: "visor",
+        greet: ["Stasera il cielo è pieno di dati… e di segnali 📡","Quella costellazione si chiama \"Data Stream\". L'ho mappata io.","Da qui si vede la rete e il server che lampeggia.","Le stelle cadenti? Sono pacchetti di dati in caduta libera."],
+        ambient: ["📡 *ping* … un dato ha appena catturato un segnale.","Sto mappando la costellazione \"Rete Globale\". Promettente.","Se vedi un satellite, corri: ha il mio IP."]
+      },
+      tino_neon: {
+        name: "Tino Bot", role: "drone-capo", emoji: "🤖", skin: "#6a6a8a", hair: "#00ff88", hairStyle: 1, top: "#004422", pants: "#002211", acc: "antenna",
+        greet: ["BEEP! Sono Tino, il dron-capo. Ho una laurea in rete 🤖","Volo sopra le 6 stanze neon ogni mattina per il controllo connettività!","Non sono un gabbiano qualunque: sono il dron che connette tutto.","Se il segnale è debole, segui il mio LED."],
+        ambient: ["🤖 *volo* … punto di accesso avvistato: il router.","BEEP! Qualcuno ha lasciato un dispositivo. Era mio? Ora lo è.","Oggi niente droni: sono in modalità stand-by."]
+      },
+      stella_steam: {
+        name: "Stella Vittoriana", role: "astronoma aristocratica", emoji: "🔭", skin: "#c68b59", hair: "#d9a441", hairStyle: 2, top: "#5c3d2e", pants: "#3a2a1f", acc: "telescope",
+        greet: ["Stasera il cielo è pieno di costellazioni… e di vapore 🔭","Quella stella si chiama \"Vapore Dorato\". L'ho nominata io.","Da lì si vede l'orizzonte e le fabbriche che fumano.","Le stelle cadenti? Sono coccinelle che cadono dal cielo."],
+        ambient: ["🔭 *clic* … un ingranaggio ha appena catturato una stella.","Sto mappando la costellazione \"Grande Fabbrica\". Promettente.","Se vedi una cometa, corri: ha il tuo nome inciso."]
+      },
+      tino_steam: {
+        name: "Tino Vapore", role: "gabbiano meccanico", emoji: "🕊️", skin: "#8a7a6a", hair: "#4a3a2a", hairStyle: 1, top: "#6a5a4a", pants: "#4a3a2a", acc: "propeller",
+        greet: ["Squaw! Sono Tino, il gabbiano a vapore. Ho una laurea in ingegneria 🕊️","Volo sopra le 6 stanze vittoriane ogni mattina per il controllo qualità!","Non sono un gabbiano qualunque: sono il gabbiano che vola a vapore.","Se butti una mollica, ti segue fino al bar. È il protocollo vittoriano."],
+        ambient: ["🕊️ *vapore* … punto strategico avvistato: il caminetto.","Squaw! Qualcuno ha lasciato un ingranaggio. Era mio? Ora lo è.","Oggi niente gabbiani meccanici: sono in riposo."]
+      },
+      ombra: {
+        name: "Ombra Profonda", role: "guardiano ombra", emoji: "🌑", skin: "#1a1a2e", hair: "#0a0a15", hairStyle: 0, top: "#0f0f2a", pants: "#050510", acc: "void",
+        greet: ["Sei arrivato nell'oscurità profonda… ora non c'è più ritorno 🌑","Le ombre ti parlano? Io le ascolto da sempre.","Il portale si chiude dietro di te. Sei dentro.","Benvenuto nel nucleo dell'oscurità."],
+        ambient: ["🌑 *sussurro* … l'oscurità si addensa.","Sto proteggendo il confine tra luce e buio.","Non guardare troppo a lungo: le ombre vedono."]
+      },
+      veil: {
+        name: "Veil Neon", role: "mercante ciber", emoji: "💾", skin: "#0a2a4a", hair: "#00ffff", hairStyle: 1, top: "#003344", pants: "#001122", acc: "chip",
+        greet: ["Il mercato dati non dorme mai 💾","Ogni informazione ha un prezzo. Anche la tua memoria.","Ho comprato il mio nome in un auction di codice.","Il mercato ombra del ciber-spazio ti aspetta."],
+        ambient: ["💾 *download* … nuovi arrivi nel mercato.","Sto negoziando con un algoritmo.","Il prezzo sale. Il mercato non perdona."]
+      },
+      erica: {
+        name: "Erica Ghost", role: "agente spettrale", emoji: "👻", skin: "#5a3a5a", hair: "#ff00aa", hairStyle: 2, top: "#3a1030", pants: "#1a0020", acc: "void",
+        greet: ["Ho trovato l'ultimo indizio nell'oscurità 👻","La missione segreta è cambiata. Il tempo stringe.","Ogni portale che apro rivela un nuovo mistero.","Sei pronto a seguirmi nell'abisso?"],
+        ambient: ["👻 *passo* … nessun suono nell'oscurità.","Sto inseguendo un portale che non si chiude mai.","La missione continua… nel nero totale."]
       }
-    },
-
-    /* ==================== BOT DIMENSIONALI ==================== */
-    lola_dark: {
-      name: "Lola Oscura", role: "receptionist ombra", emoji: "🕯️", skin: "#8a6a5a", hair: "#2a1a4e", hairStyle: 2, top: "#3a2a5e", pants: "#1a1030", acc: "mask",
-      greet: ["Benvenuta nell'oscurità… dove i sorrisi sono bugie 🕯️","Le chiavi qui aprono porte che non esistono più.","La tua stanza è la numero… nessuna. Qui non esiste il numero.","Il check-in è permanente: una volta entrata, non puoi più uscire."],
-      ambient: ["📞 *squillo* … \"Miraggio Oscuro, dove le ombre rispondono.\"","Sto lucidando la targa \"Hotel dei Desideri Oscuri\".","Mi raccomando: niente risate, le ombre ascoltano."]
-    },
-    pino_dark: {
-      name: "Pino Ombra", role: "ospite eterno", emoji: "🪦", skin: "#6a5a4a", hair: "#2a2a3e", hairStyle: 1, top: "#2a2a3e", pants: "#1a1a2e", acc: "mask",
-      greet: ["Aspetto il mio trolley dal 2003… è ancora in viaggio. O forse no. 🪦","Qui le piante parlano… ma solo per dirti addio.","Io sono solo di passaggio. Come la vita stessa.","Il wifi qui è ancora più lento… e non c'è nemmeno."],
-      ambient: ["🪦 *apre la valigia* … c'è solo polvere e ombre.","Dicono che al terzo giorno trovi la stanza segreta… io cerco dal 2003.","Nota a me stesso: la valigia è vuota. Come me."]
-    },
-    lola_neon: {
-      name: "Lola Cyber", role: "receptionist digitale", emoji: "💻", skin: "#4a4a6a", hair: "#ff00ff", hairStyle: 2, top: "#00ffff", pants: "#1a0030", acc: "glasses",
-      greet: ["Benvenuto nel datacenter! Carica il tuo profilo 📡","I dati sono il nuovo benvenuto. Tutto è connesso qui.","La tua stanza è il server #404. Trovala!","Check-in digitalizzato: biometria obbligatoria."],
-      ambient: ["💻 *buzz* … il server ronza di gioia.","Sto aggiornando il firmware dell'hotel.","Mi raccomando: niente analogici, tutto digitale."]
-    },
-    pino_neon: {
-      name: "Pino Hack", role: "ospite hacker", emoji: "🔌", skin: "#5a5a3a", hair: "#00ff00", hairStyle: 1, top: "#003300", pants: "#0a0a20", acc: "glasses",
-      greet: ["Aspetto il mio pacchetto dati dal 2003… è ancora in upload. 📡","Qui le piante hanno root access. Ne parlo solo quando serve.","Io sono solo di passaggio nella rete. Come un pacchetto di dati.","Il wifi qui è così veloce che i dati arrivano prima di essere inviati."],
-      ambient: ["🔌 *beep* … new packet incoming!","Sto scansionando la rete per vulnerabilità.","Nota a me stesso: backup completato."]
-    },
-    lola_steam: {
-      name: "Lola Vittoriana", role: "receptionist aristocratica", emoji: "🫖", skin: "#c68b59", hair: "#4a2a14", hairStyle: 2, top: "#8b4513", pants: "#3a2a1f", acc: "hat",
-      greet: ["Benvenuta, cara! Il tè è servito nel salone principale 🫖","Le chiavi qui sono d'oro e di rame, come la nostra educazione.","La tua stanza è la numero… beh, la trovi, tesoro.","Il check-in è un rituale: si saluta, si offre il tè, si entra."],
-      ambient: ["🫖 *bolle* … il tè è pronto per il prossimo ospite.","Sto lucidando l'argenteria per la cena delle otto.","Mi raccomando: niente volgarità, siamo in casa."]
-    },
-    pino_steam: {
-      name: "Pino Ingegnere", role: "ospite inventore", emoji: "🔧", skin: "#c68b59", hair: "#7f8c8d", hairStyle: 1, top: "#4a4a3a", pants: "#3a3a2a", acc: "tools",
-      greet: ["Aspetto il mio trolley di attrezzi dal 2003… è ancora in fabbrica! 🔧","Le piante qui crescono con la mia invenzione: il fertilizzante a vapore.","Io sono solo di passaggio. Come un ingranaggio che si sposta.","Il telegrafo dell'hotel funziona… con i miei miglioramenti."],
-      ambient: ["🔧 *clic* … pezzo aggiunto al meccanismo.","Sto costruendo un congegno che nessuno ha mai visto.","Nota a me stesso: il prossimo progetto è il volo."]
-    },
-    leo_dark: {
-      name: "Leo Reaper", role: "game master ombra", emoji: "🗡️", skin: "#3a2a5a", hair: "#1a0a30", hairStyle: 0, top: "#2a1a4a", pants: "#0a0a1a", acc: "mask",
-      greet: ["Il record dell'oscurità è 999 punti di paura. A te la sfida 🗡️","Qui il livello più difficile è… non morire di paura.","Ho nascosto un\'ombra nella sala. No, non è quella che pensi.","Gamer da 20 anni: l'unico lag è il brivido lungo la schiena."],
-      ambient: ["🗡️ *ticchettio* … i secondi scorrono nell'ombra.","Il joystick è freddo: segno che il terrore arriva.","Se senti un sussurro, è il game over che ti chiama."]
-    },
-    leo_neon: {
-      name: "Leo Byte", role: "game master cyber", emoji: "🕹️", skin: "#2a4a6a", hair: "#00ccff", hairStyle: 0, top: "#004466", pants: "#001133", acc: "headphones",
-      greet: ["Il record del neon è 9999 punti digitali. A te la sfida 💻","Qui il livello più duro è l'hack: il gioco è programmato.","Ho nascosto un virus nella sala. Trovalo!","Gamer da 20 anni: l'unico bug è la tua percezione."],
-      ambient: ["🕹️ *beep boop* … nuovo record di cicli!","Il joystick è luminoso: segno che la corrente scorre.","Se senti 8-bit, sono io che compilo il codice."]
-    },
-    leo_steam: {
-      name: "Leo Meccanico", role: "game master vittoriano", emoji: "🎲", skin: "#6a5a4a", hair: "#4a3a2a", hairStyle: 0, top: "#3a3020", pants: "#2a2010", acc: "gear",
-      greet: ["Il record del vapore è 9999 punti meccanici. A te la sfida 🎲","Qui il livello più duro è la precisione: ogni ingranaggio conta.","Ho nascosto un congegno nella sala. Trovalo!","Gamer da 20 anni: l'unico ritardo è la leva del tempo."],
-      ambient: ["🎲 *tocco* … il dado è truccato dalla meccanica!","La leva è calda: segno che la macchina funziona.","Se senti un clic, è il meccanismo che gira."]
-    },
-    max_dark: {
-      name: "Max Cimitero", role: "dj ombra", emoji: "🎭", skin: "#3a2a5a", hair: "#2a1a4e", hairStyle: 1, top: "#1a0a30", pants: "#2a1040", acc: "mask",
-      greet: ["Ciao! Preparati: qui il volume è al 100% di terrore 🎭","Stasera la playlist è \"Balli nel buio\" — tutto esaurito.","Il mio mixer ha un pulsante che invia anime. Non lo premere.","Balla come se non ci fosse un domani… perché non c'è."],
-      ambient: ["🎭 *wobble* … bassi di terrore in arrivo.","Mixaggio… 50% ombra, 50% silenzio.","Questa canzone l'ho composta con le urla dei fantasmi."]
-    },
-    max_neon: {
-      name: "Max Byte", role: "dj cyber", emoji: "🎤", skin: "#0a2a4a", hair: "#ff00ff", hairStyle: 1, top: "#00ccff", pants: "#003366", acc: "glasses",
-      greet: ["Ciao! Preparati: qui il volume è al 100% di pixel 📡","Stasera la playlist è \"Synthwave Dreams\" — tutto esaurito.","Il mio mixer ha un tasto che sovrascrive la realtà.","Balla come se fossi in un glitch. Con la neon del 2099."],
-      ambient: ["🎤 *sintetizzatore* … dati musicali in arrivo.","Mixaggio… 50% codice, 50% ritmo.","Questa canzone la carico dalla cloud. O forse no."]
-    },
-    max_steam: {
-      name: "Max Vittoriano", role: "dj aristocratico", emoji: "🎻", skin: "#6a5a4a", hair: "#d9a441", hairStyle: 1, top: "#8b4513", pants: "#3a2a1f", acc: "bowtie",
-      greet: ["Ciao! Preparati: qui il volume è al 100% di eleganza 🎻","Stasera la playlist è \"Valzer della Nobiltà\" — tutto esaurito.","Il mio organo ha un pedale che suona come il vapore.","Balla come se fossi in un salotto vittoriano. Con stile."],
-      ambient: ["🎻 *archetto* … la musica è una scienza!","Mixaggio… 50% accordi, 50% vapore.","Questa sinfonia la compongo io stesso."]
-    },
-    guest2_dark: {
-      name: "Bibi Spettrale", role: "ospite da record", emoji: "👻", skin: "#5a4a3a", hair: "#1a0a00", hairStyle: 3, top: "#3a2a1a", pants: "#1a0a00", acc: "ghost",
-      greet: ["Io sono entrata qui con 0 monete e ora sono un fantasma. La storia non lo conferma, ma vabbè 👻","Il mio record? 47 spettri in un minuto. I polsi ne parlano ancora.","Il segreto del Miraggio Oscuro: ballare con le ombre. Tutti vedono. Balli.","Ho finito i cristalli del costume da spettro. Questa è la versione spirito."],
-      ambient: ["👻 *fluttuo* … oggi brillo anche senza luce.","Sto collezionando sguardi da polvere. Già 12.","Fantasmi veri non esistono… eccetto il venerdì."]
-    },
-    guest2_neon: {
-      name: "Bibi Cyber", role: "ospite da record", emoji: "🤖", skin: "#4a4a6a", hair: "#00ff00", hairStyle: 3, top: "#003300", pants: "#001a00", acc: "visor",
-      greet: ["Io sono entrata qui con 0 dati e ora sono una leggenda digitale. La storia non lo conferma, ma vabbè 🤖","Il mio record? 47 download in un minuto. I circuiti ne parlano ancora.","Il segreto del Miraggio Neon: ballare con i dati. Tutti vedono. Balli.","Ho finito la RAM del costume cyber. Questa è la versione ottimizzata."],
-      ambient: ["🤖 *boot* … oggi brillo anche senza server.","Sto collezionando pacchetti confusi. Già 12.","Cyberpunk veri non esistono… eccetto il codice."]
-    },
-    guest2_steam: {
-      name: "Bibi Meccanica", role: "ospite da record", emoji: "⚙️", skin: "#8a7a6a", hair: "#d9a441", hairStyle: 3, top: "#8b6508", pants: "#5a4a20", acc: "cog",
-      greet: ["Io sono entrata qui con 0 ingranaggi e ora sono una leggenda meccanica. La storia non lo conferma, ma vabbè ⚙️","Il mio record? 47 pezzi assemblati in un minuto. Le viti ne parlano ancora.","Il segreto del Miraggio Steampunk: ballare con le macchine. Tutti vedono. Balli.","Ho finito i bulloni del costume meccanico. Questa è la versione rustica."],
-      ambient: ["⚙️ *clang* … oggi brillo anche senza elettricità.","Sto collezionando ingranaggi usati. Già 12.","Macchine vere non esistono… eccetto le mie."]
-    },
-    stella_dark: {
-      name: "Stella Ombra", role: "astronoma delle tenebre", emoji: "🔮", skin: "#8a6a5a", hair: "#1a0a30", hairStyle: 2, top: "#2a1a4e", pants: "#0a0a1a", acc: "crystal",
-      greet: ["Stasera il cielo è pieno di porte oscuri… e di wormhole 🔮","Quella costellazione si chiama \"Buio Assoluto\". L'ho chiamata io.","Da qui si vede la Via Lattea e le stelle che si spengono.","Le stelle cadenti? Sono portali che si chiudono."],
-      ambient: ["🔮 *luccichio* … una stella ha appena fatto l'occhiolino… nell'oscurità.","Sto mappando la costellazione \"Nessuna Luce\". Promettente.","Se vedi una cometa, corri: ha il veleno."]
-    },
-    tino_dark: {
-      name: "Tino Corvo", role: "gabbiano spia", emoji: "🕊️", skin: "#4a4a4a", hair: "#2a2a2a", hairStyle: 1, top: "#1a1a1a", pants: "#2a2a2a", acc: "monocle",
-      greet: ["Squaw! Sono Tino, il gabbiano ombra. Ho una laurea in spionaggio 🕊️","Volo sopra le 6 stanze oscure ogni mattina per il controllo sicurezza!","Non sono un gabbiano qualunque: sono il gabbiano che sente tutto.","Se vedi qualcosa di strano, segui la mia ombra."],
-      ambient: ["🕊️ *volo ombre* … punto strategico avvistato: la porta segreta.","Squaw! Qualcuno ha lasciato qualcosa. Era mio? Ora lo è.","Oggi niente gabbiani: sono in missione segreta."]
-    },
-    stella_neon: {
-      name: "Stella Byte", role: "astronoma digitale", emoji: "📡", skin: "#4a6a8a", hair: "#00ccff", hairStyle: 2, top: "#002244", pants: "#001122", acc: "visor",
-      greet: ["Stasera il cielo è pieno di dati… e di segnali 📡","Quella costellazione si chiama \"Data Stream\". L'ho mappata io.","Da qui si vede la rete e il server che lampeggia.","Le stelle cadenti? Sono pacchetti di dati in caduta libera."],
-      ambient: ["📡 *ping* … un dato ha appena catturato un segnale.","Sto mappando la costellazione \"Rete Globale\". Promettente.","Se vedi un satellite, corri: ha il mio IP."]
-    },
-    tino_neon: {
-      name: "Tino Bot", role: "drone-capo", emoji: "🤖", skin: "#6a6a8a", hair: "#00ff88", hairStyle: 1, top: "#004422", pants: "#002211", acc: "antenna",
-      greet: ["BEEP! Sono Tino, il dron-capo. Ho una laurea in rete 🤖","Volo sopra le 6 stanze neon ogni mattina per il controllo connettività!","Non sono un gabbiano qualunque: sono il dron che connette tutto.","Se il segnale è debole, segui il mio LED."],
-      ambient: ["🤖 *volaro* … punto di accesso avvistato: il router.","BEEP! Qualcuno ha lasciato un dispositivo. Era mio? Ora lo è.","Oggi niente droni: sono in modalità stand-by."]
-    },
-    stella_steam: {
-      name: "Stella Vittoriana", role: "astronoma aristocratica", emoji: "🔭", skin: "#c68b59", hair: "#d9a441", hairStyle: 2, top: "#5c3d2e", pants: "#3a2a1f", acc: "telescope",
-      greet: ["Stasera il cielo è pieno di costellazioni… e di vapore 🔭","Quella stella si chiama \"Vapore Dorato\". L'ho nominata io.","Da lì si vede l'orizzonte e le fabbriche che fumano.","Le stelle cadenti? Sono coccinelle che cadono dal cielo."],
-      ambient: ["🔭 *clic* … un ingranaggio ha appena catturato una stella.","Sto mappando la costellazione \"Grande Fabbrica\". Promettente.","Se vedi una cometa, corri: ha il tuo nome inciso."]
-    },
-    tino_steam: {
-      name: "Tino Vapore", role: "gabbiano meccanico", emoji: "🕊️", skin: "#8a7a6a", hair: "#4a3a2a", hairStyle: 1, top: "#6a5a4a", pants: "#4a3a2a", acc: "propeller",
-      greet: ["Squaw! Sono Tino, il gabbiano a vapore. Ho una laurea in ingegneria 🕊️","Volo sopra le 6 stanze vittoriane ogni mattina per il controllo qualità!","Non sono un gabbiano qualunque: sono il gabbiano che vola a vapore.","Se butti una mollica, ti segue fino al bar. È il protocollo vittoriano."],
-      ambient: ["🕊️ *vapore* … punto strategico avvistato: il caminetto.","Squaw! Qualcuno ha lasciato un ingranaggio. Era mio? Ora lo è.","Oggi niente gabbiani meccanici: sono in riposo."]
-    },
-    ombra_dim: {
-      name: "Ombra Profonda", role: "guardiano ombra", emoji: "🌑", skin: "#1a1a2e", hair: "#0a0a15", hairStyle: 0, top: "#0f0f2a", pants: "#050510", acc: "void",
-      greet: ["Sei arrivato nell'oscurità profonda… ora non c'è più ritorno 🌑","Le ombre ti parlano? Io le ascolto da sempre.","Il portale si chiude dietro di te. Sei dentro.","Benvenuto nel nucleo dell'oscurità."],
-      ambient: ["🌑 *sussurro* … l'oscurità si addensa.","Sto proteggendo il confine tra luce e buio.","Non guardare troppo a lungo: le ombre vedono."]
-    },
-    veil_dim: {
-      name: "Veil Neon", role: "mercante ciber", emoji: "💾", skin: "#0a2a4a", hair: "#00ffff", hairStyle: 1, top: "#003344", pants: "#001122", acc: "chip",
-      greet: ["Il mercato dati non dorme mai 💾","Ogni informazione ha un prezzo. Anche la tua memoria.","Ho comprato il mio nome in un auction di codice.","Il mercato ombra del ciber-spazio ti aspetta."],
-      ambient: ["💾 *download* … nuovi arrivi nel mercato.","Sto negoziando con un algoritmo.","Il prezzo sale. Il mercato non perdona."]
-    },
-    erica_dim: {
-      name: "Erica Ghost", role: "agente spettrale", emoji: "👻", skin: "#5a3a5a", hair: "#ff00aa", hairStyle: 2, top: "#3a1030", pants: "#1a0020", acc: "void",
-      greet: ["Ho trovato l'ultimo indizio nell'oscurità 👻","La missione segreta è cambiata. Il tempo stringe.","Ogni portale che apro rivela un nuovo mistero.","Sei pronto a seguirmi nell'abisso?"],
-      ambient: ["👻 *passo* … nessun suono nell'oscurità.","Sto inseguendo un portale che non si chiude mai.","La missione continua… nel nero totale."]
     },
 
     /* ==================== MANAGER (HOTEL TYCOON) ==================== */
@@ -768,37 +767,49 @@
       "🍝": "Spaghetti al sugo della felicità. La ricetta esiste solo qui.",
       "🧑‍🍳": "Il cuoco di legno approva. Il suo pollice è sempre alzato.",
       "🔪": "Un coltello che affila… le battute di Sergio. Pericolosissimo.",
-      "🥖": "La baguette è così fresca che fa “gnam” da sola."
+      "🥖": "La baguette è così fresca che fa “gnam” da sola.",
+      "🕯️": "Una candela dell'oscurità. Brilla solo di notte.",
+      "📜": "Un rotolo ombroso. I segreti sono scritti al contrario.",
+      "👁️": "Un occhio che osserva tutto. Guardalo, ma non troppo a lungo.",
+      "🪦": "Una lapide temporanea. Rimbalza se ci cammini sopra.",
+      "🌑": "Il vuoto stesso. Non è buio, è assenza di luce.",
+      "⛓️": "Catene dell'oscurità. Si sciolgono con le parole giuste.",
+      "📡": "Un trasmettitore neon. Invia dati a velocità impensabile.",
+      "💾": "Un chip di memoria. Contiene segreti del passato.",
+      "🔌": "Una porta di rete. Collegala a qualcosa… o qualcuno.",
+      "⚡": "Un fulmine artificiale. Non toccarlo mai.",
+      "💻": "Un computer ombroso. Funziona solo di notte.",
+      "⚙️": "Un ingranaggio steampunk. La precisione è tutto.",
+      "🔧": "Un attrezzo ombroso. Serve per tutto… o per niente.",
+      "🏭": "Una fabbrica in miniatura. Produce fumo e meraviglia.",
+      "🔩": "Un bullone dorato. Dalla parte giusta, apre porte.",
+      "🕰️": "Un orologio steampunk. Va avanti, indietro, ovunque.",
+      "🎭": "Una maschera ombra. Nasconde chi la indossa.",
+      "🦇": "Un pipistrello di cristallo. Porta sfortuna… o fortuna.",
+      "💡": "Una lampada neon. Illumina solo la verità.",
+      "🌈": "Un prisma neon. I colori sono dati criptati.",
+      "🎨": "Un pennello ciber. I colori dipingono il futuro.",
+      "🎆": "Fuochi artificiali. Esplodono in dati, non in luce.",
+      "🎛️": "Un mixer digitale. La musica è codice.",
+      "📺": "Un monitor ombroso. Mostra cosa non vuoi vedere.",
+      "🗺️": "Una mappa vittoriana. Le rotte cambiano con il vapore.",
+      "🪗": "Un organo steampunk. Suona con il vapore puro.",
+      "🫖": "Un teiera aristocratica. Il tè rivela il futuro.",
+      "🕊️": "Un gabbiano di metallo. Vola solo quando lo comandi.",
+      "🔮": "Una sfera di cristallo. Mostra futuri che non esistono ancora.",
+      "💀": "Un teschio parlante. Racconta storie dell'altro mondo.",
+      "🕸️": "Una ragnatela lucente. Cattura sogni, non insetti.",
+      "💎": "Un diamante scintillante. Brilla più di una stella.",
+      "📖": "Un libro antico. Le pagine raccontano storie dimenticate.",
+      "🔍": "Una lente d'ingrandimento. Rivela segreti nascosti.",
+      "🗡️": "Una spada ombrosa. Taglia il velo tra i mondi.",
+      "🚪": "Una porta misteriosa. Da che porta davvero?",
+      "⚰️": "Una bara decorativa. Contiene solo polvere di stelle.",
+      "🎮": "Un controller Arcade. I bottoni brillano di neon.",
+      "🎹": "Una tastiera meccanica. Ogni tasto suona una nota diversa.",
+      "🎻": "Un violino vittoriano. Suona melodie che nessuno ricorda.",
+      "🧟": "Un zombie meccanico. Brilla solo quando piove."
     },
-
-    "🕯️": "Una candela dell'oscurità. Brilla solo di notte.",
-    "📜": "Un rotolo ombroso. I segreti sono scritti al contrario.",
-    "👁️": "Un occhio che osserva tutto. Guardalo, ma non troppo a lungo.",
-    "🪦": "Una lapide temporanea. Rimbalza se ci cammini sopra.",
-    "🌑": "Il vuoto stesso. Non è buio, è assenza di luce.",
-    "⛓️": "Catene dell'oscurità. Si sciolgono con le parole giuste.",
-    "📡": "Un trasmettitore neon. Invia dati a velocità impensabile.",
-    "💾": "Un chip di memoria. Contiene segreti del passato.",
-    "🔌": "Una porta di rete. Collegala a qualcosa… o qualcuno.",
-    "⚡": "Un fulmine artificiale. Non toccarlo mai.",
-    "💻": "Un computer ombroso. Funziona solo di notte.",
-    "⚙️": "Un ingranaggio steampunk. La precisione è tutto.",
-    "🔧": "Un attrezzo ombroso. Serve per tutto… o per niente.",
-    "🏭": "Una fabbrica in miniatura. Produce fumo e meraviglia.",
-    "🔩": "Un bullone dorato. Dalla parte giusta, apre porte.",
-    "🕰️": "Un orologio steampunk. Va avanti, indietro, ovunque.",
-    "🎭": "Una maschera ombra. Nasconde chi la indossa.",
-    "🦇": "Un pipistrello di cristallo. Porta sfortuna… o fortuna.",
-    "💡": "Una lampada neon. Illumina solo la verità.",
-    "🌈": "Un prisma neon. I colori sono dati criptati.",
-    "🎨": "Un pennello ciber. I colori dipingono il futuro.",
-    "🎆": "Fuochi artificiali. Esplodono in dati, non in luce.",
-    "🎛️": "Un mixer digitale. La musica è codice.",
-    "📺": "Un monitor ombroso. Mostra cosa non vuoi vedere.",
-    "🗺️": "Una mappa vittoriana. Le rotte cambiano con il vapore.",
-    "🪗": "Un organo steampunk. Suona con il vapore puro.",
-    "🫖": "Un teiera aristocratica. Il tè rivela il futuro.",
-    "🕊️": "Un gabbiano di metallo. Vola solo quando lo comandi.",
 
 charInfo: {
       lola: { likes: ["heart", "wave"], trophy: "🗝️ Chiave del sorriso", s1: "Lola custodisce il registro degli arrivi dal 2012: c'è scritto anche il tuo nome… di nascosto.", s2: "Il suo sogno è aprire un albergo per emoji stanche. \"Le emoji non dormono mai, serve una struttura adatta.\"", starLines: { gold: "Sei diventato parte della famiglia del Miraggio, 🏨💖", diamond: "Ora lavoriamo insieme: il registro segreto ti aspetta in fondo al corridoio." } },
@@ -815,7 +826,28 @@ charInfo: {
 sergio: { likes: ["clap", "heart"], trophy: "🍳 Padella della felicità", s1: "Sergio ha una ricetta che non scrive da nessuna parte: \"Paura in padella\". Il trucco è non averne.", s2: "Il suo assistente in cucina è una pentola che lui chiama \"Vice Chef\". La pentola non si è ancora dimessa.", starLines: { gold: "Sergio ha cucinato per te. Il sapore? Paura zero, allegria massima.", diamond: "La Padella della Felicità ha brilliato. Sei il cuoco finale." } },
       ombra: { likes: ["heart", "wave"], trophy: "🗿 Sigillo della Società", s1: "Ombra ha visto tutto. Tutto. Anche quello che non dovrebbe. Il Sotterraneo è solo l'inizio.", s2: "La chiave oscura non si trova nel mondo. Si trova nella mente di chi ha il coraggio di cercarla.", starLines: { gold: "Ombra ti ha rivelato il segreto più grande. Ora sei uno di loro.", diamond: "Il Sigillo della Società brilla. Sei il leader ombra." } },
       veil: { likes: ["clap", "heart"], trophy: "🧙 Mantello Ombra", s1: "Veil scambia segreti come altri scambiano fiori. Ogni oggetto ha un prezzo.", s2: "Il mercato ombra non ha regole, solo accordi. E Veil tiene sempre la sua parte.", starLines: { gold: "Veil ti ha mostrato il mercato segreto. Il prezzo? Solo la fiducia.", diamond: "Il Mantello Ombra brilla. Sei il mercante finale." } },
-      erica: { likes: ["wave", "laugh"], trophy: "🗺️ Mappa Segreta", s1: "Erica ha trovato un indizio che nessuno ha mai visto. La mappa porta al Sotterraneo.", s2: "La missione segreta è cambiata. Erica dice che \"il tempo stringe\". Ma il tempo non è mai stato il suo amico.", starLines: { gold: "Erica ti ha dato la mappa completa. Il Sotterraneo ti aspetta.", diamond: "La Mappa Segreta è completa. Sei il cacciatore finale." } }
+      erica: { likes: ["wave", "laugh"], trophy: "🗺️ Mappa Segreta", s1: "Erica ha trovato un indizio che nessuno ha mai visto. La mappa porta al Sotterraneo.", s2: "La missione segreta è cambiata. Erica dice che \"il tempo stringe\". Ma il tempo non è mai stato il suo amico.", starLines: { gold: "Erica ti ha dato la mappa completa. Il Sotterraneo ti aspetta.", diamond: "La Mappa Segreta è completa. Sei il cacciatore finale." } },
+      lola_dark: { likes: ["heart", "wave"], trophy: "🕯️ Candela Oscura", s1: "Lola Oscura custodisce le chiavi delle porte che non esistono più.", s2: "Il suo sorriso nasconde un segreto: l'hotel è vivo, e lei ne è la voce.", starLines: { gold: "Le ombre ti riconoscono. Sei uno di loro.", diamond: "La Candela Oscura brilla per te. L'oscurità è casa." } },
+      pino_dark: { likes: ["laugh", "wave"], trophy: "🪦 Valigia Vuota", s1: "Pino Ombra aspetta dal 2003. La valigia è vuota, ma i ricordi no.", s2: "Dice che il wifi qui è ancora più lento. Non c'è nemmeno.", starLines: { gold: "La valigia ti riconosce. Il viaggio continua.", diamond: "Pino ha trovato una destinazione: sei tu." } },
+      lola_neon: { likes: ["heart", "dance"], trophy: "💻 Chip Digitale", s1: "Lola Cyber gestisce il datacenter dell'hotel. Il server #404 è sempre online.", s2: "La biometria è obbligatoria, ma il sorriso è facoltativo.", starLines: { gold: "I dati ti riconoscono. Sei connesso.", diamond: "Il Chip Digitale è tuo. Il futuro è digitale." } },
+      pino_neon: { likes: ["laugh", "wave"], trophy: "🔌 Packet Dati", s1: "Pino Hack aspetta il suo pacchetto dati dal 2003. È ancora in upload.", s2: "Le piante qui hanno root access. Ne parla solo quando serve.", starLines: { gold: "La rete ti riconosconi. Sei un nodo.", diamond: "Il Packet Dati è tuo. La rete è tua." } },
+      lola_steam: { likes: ["heart", "wave"], trophy: "🫖 Tè Vittoriano", s1: "Lola Vittoriana serve il tè nel salone principale. Le chiavi sono d'oro e di rame.", s2: "Il check-in è un rituale: si saluta, si offre il tè, si entra.", starLines: { gold: "L'argenteria brilla per te. Sei aristocratico.", diamond: "Il Tè Vittoriano è pronto. L'eleganza è tutto." } },
+      pino_steam: { likes: ["laugh", "wave"], trophy: "🔧 Attrezzo Meccanico", s1: "Pino Ingegnere costruisce congegno che nessuno ha mai visto.", s2: "Il telegrafo funziona con i suoi miglioramenti.", starLines: { gold: "Il meccanismo gira per te. Sei un inventore.", diamond: "L'Attrezzo Meccanico è tuo. La precisione è tutto." } },
+      leo_dark: { likes: ["clap", "laugh"], trophy: "🗡️ Joystick Ombra", s1: "Leo Reaper tiene il record dell'oscurità: 999 punti di paura.", s2: "L'unico lag è il brivido lungo la schiena.", starLines: { gold: "Il game over ti aspetta. Sei pronto?", diamond: "Il Joystick Ombra è tuo. L'oscurità gioca con te." } },
+      leo_neon: { likes: ["clap", "laugh"], trophy: "🕹️ Controller Cyber", s1: "Leo Byte tiene il record del neon: 9999 punti digitali.", s2: "L'unico bug è la tua percezione.", starLines: { gold: "Il codice ti riconosce. Sei un programma.", diamond: "Il Controller Cyber è tuo. Il digitale è vita." } },
+      leo_steam: { likes: ["clap", "laugh"], trophy: "🎲 Dado Meccanico", s1: "Leo Meccanico tiene il record del vapore: 9999 punti meccanici.", s2: "L'unico ritardo è la leva del tempo.", starLines: { gold: "L'ingranaggio gira per te. Sei un meccanico.", diamond: "Il Dado Meccanico è tuo. La meccanica è arte." } },
+      max_dark: { likes: ["dance", "clap"], trophy: "🎭 Maschera Ombra", s1: "Max Cimitero mixa con le urla dei fantasmi. La playlist è \"Balli nel buio\".", s2: "Il mixer ha un pulsante che invia anime. Non lo premere.", starLines: { gold: "I bassi di terrore vibrano per te.", diamond: "La Maschera Ombra è tua. La notte balla con te." } },
+      max_neon: { likes: ["dance", "clap"], trophy: "🎤 Microfono Digitale", s1: "Max Byte mixa con dati musicali. La playlist è \"Synthwave Dreams\".", s2: "Il mixer ha un tasto che sovrascrive la realtà.", starLines: { gold: "Il ritmo digitale vibra per te.", diamond: "Il Microfono Digitale è tuo. Il codice balla." } },
+      max_steam: { likes: ["dance", "clap"], trophy: "🎻 Archetto Vittoriano", s1: "Max Vittoriano mixa con eleganza. La playlist è \"Valzer della Nobiltà\".", s2: "L'organo ha un pedale che suona come il vapore.", starLines: { gold: "La sinfonia vibra per te.", diamond: "L'Archetto Vittoriano è tuo. L'eleganza balla." } },
+      guest2_dark: { likes: ["heart", "dance"], trophy: "👻 Fantasma Lucido", s1: "Bibi Spettrale ha 47 spettri in un minuto. I polsi ne parlano ancora.", s2: "Il segreto: ballare con le ombre. Tutti vedono. Balli.", starLines: { gold: "Il 48° sguardo confuso è per te.", diamond: "Il Fantasma Lucido brilla. Sei una leggenda." } },
+      guest2_neon: { likes: ["heart", "dance"], trophy: "🤖 Chip Cyber", s1: "Bibi Cyber ha 47 download in un minuto. I circuiti ne parlano ancora.", s2: "Il segreto: ballare con i dati. Tutti vedono. Balli.", starLines: { gold: "Il 48° download è per te.", diamond: "Il Chip Cyber è tuo. Il digitale brilla." } },
+      guest2_steam: { likes: ["heart", "dance"], trophy: "⚙️ Ingranaggio Meccanico", s1: "Bibi Meccanica ha 47 pezzi assemblati in un minuto. Le viti ne parlano ancora.", s2: "Il segreto: ballare con le macchine. Tutti vedono. Balli.", starLines: { gold: "Il 48° pezzo è per te.", diamond: "L'Ingranaggio Meccanico è tuo. La meccanica brilla." } },
+      stella_dark: { likes: ["heart", "wave"], trophy: "🔮 Cristallo Ombra", s1: "Stella Ombra mappa la costellazione \"Nessuna Luce\". Promettente.", s2: "Le stelle cadenti sono portali che si chiudono.", starLines: { gold: "L'oscurità ti riconosce. Sei una stella.", diamond: "Il Cristallo Ombra brilla. Le tenebre ti accarezzano." } },
+      stella_neon: { likes: ["heart", "wave"], trophy: "📡 Antenna Digitale", s1: "Stella Byte mappa la costellazione \"Rete Globale\". Promettente.", s2: "Le stelle cadenti sono pacchetti di dati in caduta libera.", starLines: { gold: "La rete ti riconosce. Sei un segnale.", diamond: "L'Antenna Digitale è tua. I dati brillano per te." } },
+      stella_steam: { likes: ["heart", "wave"], trophy: "🔭 Telescopio Vittoriano", s1: "Stella Vittoriana mappa la costellazione \"Grande Fabbrica\". Promettente.", s2: "Le stelle cadenti sono coccinelle che cadono dal cielo.", starLines: { gold: "Il vapore ti riconosce. Sei una stella.", diamond: "Il Telescopio Vittoriano è tuo. Il cielo è vittoriano." } },
+      tino_dark: { likes: ["clap", "laugh"], trophy: "🕊️ Piuma Ombra", s1: "Tino Corvo ha una laurea in spionaggio. Vola sopra le stanze oscure.", s2: "Non è un gabbiano qualunque: sente tutto.", starLines: { gold: "L'ombra ti riconosce. Sei un spia.", diamond: "La Piuma Ombra è tua. Il silenzio è tuo." } },
+      tino_neon: { likes: ["clap", "laugh"], trophy: "🤖 Antenna Robot", s1: "Tino Bot ha una laurea in rete. Vola sopra le stanze neon.", s2: "Non è un dron qualunque: connette tutto.", starLines: { gold: "La rete ti riconosce. Sei un dron.", diamond: "L'Antenna Robot è tua. La connessione è tua." } },
+      tino_steam: { likes: ["clap", "laugh"], trophy: "🕊️ Elica Vapore", s1: "Tino Vapore ha una laurea in ingegneria. Vola sopra le stanze vittoriane.", s2: "Non è un gabbiano qualunque: vola a vapore.", starLines: { gold: "Il vapore ti riconosce. Sei un meccanico.", diamond: "L'Elica Vapore è tua. Il vapore è vita." } }
      },
 
      missionPool: [
@@ -1187,7 +1219,28 @@ sergio: { likes: ["clap", "heart"], trophy: "🍳 Padella della felicità", s1: 
         { id: "surf_board", label: "Tavola Surf", cost: 0 },
         { id: "hammer", label: "Martello", cost: 0 },
         { id: "paintbrush", label: "Pennello", cost: 0 },
-        { id: "stamps", label: "Bollini", cost: 0 }
+        { id: "stamps", label: "Bollini", cost: 0 },
+        { id: "mask", label: "Maschera", cost: 0 },
+        { id: "hat", label: "Cappello", cost: 0 },
+        { id: "tools", label: "Attrezzi", cost: 0 },
+        { id: "gear", label: "Ingranaggio", cost: 0 },
+        { id: "bowtie", label: "Farciolette", cost: 0 },
+        { id: "ghost", label: "Fantasma", cost: 0 },
+        { id: "visor", label: "Visore", cost: 0 },
+        { id: "cog", label: "Ingranaggio", cost: 0 },
+        { id: "crystal", label: "Cristallo", cost: 0 },
+        { id: "monocle", label: "Monocolo", cost: 0 },
+        { id: "antenna", label: "Antenna", cost: 0 },
+        { id: "telescope", label: "Telescopio", cost: 0 },
+        { id: "propeller", label: "Elica", cost: 0 },
+        { id: "void", label: "Vuoto", cost: 0 },
+        { id: "chip", label: "Chip", cost: 0 },
+        { id: "void_crystal", label: "Cristallo Vuoto", cost: 0 },
+        { id: "neon_chip", label: "Chip Neon", cost: 0 },
+        { id: "steam_wrench", label: "Chiave inglese", cost: 0 },
+        { id: "shadow_amulet", label: "Amuleto Ombra", cost: 0 },
+        { id: "anti_virus", label: "Antivirus", cost: 0 },
+        { id: "time_machine", label: "Macchina del Tempo", cost: 0 }
       ],
       skin: ["#ffe0bd", "#f2c9a0", "#eab98a", "#c68b59", "#8d5a2b"],
       hairColor: ["#4a2a14", "#2b1b0e", "#d9a441", "#c0392b", "#8e44ad", "#2c3e50", "#7f8c8d", "#ecf0f1"],
@@ -1271,7 +1324,6 @@ badges: [
           ["unicorn","dragon","moon_phoenix"],
           ["pegasus","flamingo","storm_eagle"],
           ["dragon","flamingo","fire_flamingo"],
-          ["dragon","snow_tiger","ice_dragon"],
           ["pegasus","unicorn","thunder_pegasus"],
           ["dragon","pegasus","shadow_cat"],
           ["unicorn","fire_snake","golden_lizard"],
@@ -1300,16 +1352,45 @@ badges: [
           ["pegasus","crocodile","ocean_whale"],
           ["flamingo","iguana","moon_iguana"],
           ["unicorn","rhino","diamond_rhino"],
-          ["dragon","flamingo","fire_flamingo"],
           ["snow_tiger","macaw","storm_macaw"],
-          ["crocodile","pegasus","river_gryphon"],
           ["iguana","unicorn","moon_iguana"],
           ["macaw","flamingo","wind_flamingo"],
           ["elephant","dragon","celestial_titan"],
           ["flamingo","pegasus","wind_flamingo"],
           ["unicorn","snow_tiger","frost_drake"]
         ],
-        hybridNamesFor: {}
+        hybridNamesFor: {
+          fire_unicorn: ["unicorn", "dragon"],
+          shadow_wyvern: ["pegasus", "dragon"],
+          celestial_stallion: ["unicorn", "pegasus"],
+          infernal_dragon: ["fire_snake", "dragon"],
+          frost_drake: ["snow_tiger", "dragon"],
+          river_gryphon: ["crocodile", "pegasus"],
+          tropical_parrot_dragon: ["iguana", "flamingo"],
+          woolly_mammoth: ["macaw", "elephant"],
+          rose_rhinoceros: ["rhino", "flamingo"],
+          celestial_titan: ["unicorn", "elephant"],
+          wind_flamingo: ["pegasus", "flamingo"],
+          moon_phoenix: ["unicorn", "dragon"],
+          storm_eagle: ["pegasus", "flamingo"],
+          fire_flamingo: ["dragon", "flamingo"],
+          thunder_pegasus: ["pegasus", "unicorn"],
+          shadow_cat: ["dragon", "pegasus"],
+          golden_lizard: ["unicorn", "fire_snake"],
+          star_parrot: ["pegasus", "macaw"],
+          flame_tiger: ["dragon", "snow_tiger"],
+          moon_iguana: ["iguana", "pegasus"],
+          storm_macaw: ["macaw", "pegasus"],
+          diamond_rhino: ["rhino", "elephant"],
+          ghost_unicorn: ["unicorn", "flamingo"],
+          desert_cobra: ["fire_snake", "pegasus"],
+          ocean_whale: ["crocodile", "dragon"],
+          forest_owl: ["snow_tiger", "pegasus"],
+          lava_lizard: ["iguana", "dragon"],
+          crystal_parrot: ["unicorn", "macaw"],
+          mountain_bear: ["rhino", "dragon"],
+          ice_dragon: ["dragon", "snow_tiger"]
+        }
       },
 
       ambientInterval: 7000,
@@ -1407,8 +1488,8 @@ badges: [
           { id: 'coins_50', emoji: '💰', label: '+50 🪙', weight: 12, action: (st) => { st.coins += 50; return 'Hai vinto 50 monete!'; } },
           { id: 'xp_20', emoji: '⭐', label: '+20 XP', weight: 18, action: (st) => { st.earned += 20; return 'Hai guadagnato 20 XP!'; } },
           { id: 'xp_50', emoji: '⭐', label: '+50 XP', weight: 8, action: (st) => { st.earned += 50; return 'Hai guadagnato 50 XP!'; } },
-         { id: 'title', emoji: '👑', label: 'Titolo', weight: 5, action: (st) => { const bonusTitles = ['principe', 're_hotel', 'stella_notte', 'maestro_ballo', 'leggenda', 'guardiano']; const available = bonusTitles.filter(t => !(st.titles || []).includes(t)); if (available.length > 0) { const tid = available[Math.floor(Math.random() * available.length)]; st.titles = st.titles || []; st.titles.push(tid); const t = D.titles.find(x => x.id === tid); return 'Hai vinto il titolo: ' + (t ? t.emoji + ' ' + t.name : tid) + '!'; } st.coins += 50; return 'Hai tutti i titoli bonus! +50 🪙'; } },
-         { id: 'pet_egg', emoji: '🥚', label: 'Uovo raro', weight: 3, action: (st) => { const sp = D.species[Math.floor(Math.random() * D.species.length)]; if (st.pets.length < 3) { st.pets.push({ species: sp.id, name: 'Uovo', level: 1, happiness: 80, hunger: 20, tricks: ['wave'], color: sp.color, born: Date.now(), care: { feedCount: 0, playCount: 0, petCount: 0, totalTime: 0 }, evolutionStage: 'normal', parent1: null, parent2: null }); st.breeding.totalHatchings++; return '🥚 Uovo schiuso! ' + sp.emoji + ' ' + sp.name + ' è nato!'; } return 'Hai già 3 pet!'; } },
+         { id: 'title', emoji: '👑', label: 'Titolo', weight: 5, action: (st) => { const bonusTitles = ['principe', 're_hotel', 'stella_notte', 'maestro_ballo', 'leggenda', 'guardiano']; const available = bonusTitles.filter(t => !(st.titles || []).includes(t)); if (available.length > 0) { const tid = available[Math.floor(Math.random() * available.length)]; st.titles = st.titles || []; st.titles.push(tid); const t = G.titles.find(x => x.id === tid); return 'Hai vinto il titolo: ' + (t ? t.emoji + ' ' + t.name : tid) + '!'; } st.coins += 50; return 'Hai tutti i titoli bonus! +50 🪙'; } },
+         { id: 'pet_egg', emoji: '🥚', label: 'Uovo raro', weight: 3, action: (st) => { const sp = G.species[Math.floor(Math.random() * G.species.length)]; if (st.pets.length < 3) { st.pets.push({ species: sp.id, name: 'Uovo', level: 1, happiness: 80, hunger: 20, tricks: ['wave'], color: sp.color, born: Date.now(), care: { feedCount: 0, playCount: 0, petCount: 0, totalTime: 0 }, evolutionStage: 'normal', parent1: null, parent2: null }); st.breeding.totalHatchings++; return '🥚 Uovo schiuso! ' + sp.emoji + ' ' + sp.name + ' è nato!'; } return 'Hai già 3 pet!'; } },
           { id: 'mega_coins', emoji: '💎', label: '+100 🪙', weight: 2, action: (st) => { st.coins += 100; return 'JACKPOT! 100 monete dorate!'; } },
           { id: 'jackpot', emoji: '🏆', label: 'JACKPOT', weight: 1, action: (st) => { st.coins += 250; st.earned += 100; return 'JACKPOT! 250 monete + 100 XP! Sei una leggenda!'; } }
         ]
@@ -1550,7 +1631,7 @@ badges: [
           segreto: { text: "Il Miraggio è un portale. Le stanze si collegano a vite diverse. Ogni ospite che parte... non torna mai nello stesso modo.", emoji: "🌑", diary: "Stella ha rivelato il Segreto dell'Hotel: il Miraggio è un portale." }
         },
         tino: {
-          sogno: { text: "Voglio che la terrazza sia il luogo dove il cielo e la terra si abbracciano, e ogni tramonto è un nuovo capitolo.", emoji: "🌟", diary: "Tino ha svelato il suo Sogno: una terrazza tra cielo e terra." },
+          sogno: { text: "Voglio che ogni volo di Tino lasci una scia di vapore dorato nel cielo della terrazza, come un segno che il cielo e il mare si abbracciano.", emoji: "🌟", diary: "Tino ha svelato il suo Sogno: un volo di vapore dorato tra cielo e mare." },
           paura: { text: "Ho paura di essere solo sulla terrazza. Il vento è freddo, e le stelle non rispondono.", emoji: "🌙", diary: "Tino ha rivelato la sua Paura: essere solo sulla terrazza." },
           talento: { text: "So prevedere il tempo guardando le nuvole. Il cielo è la mia bussola, e il vento è il mio messaggio.", emoji: "⭐", diary: "Tino ha rivelato il suo Talento: prevedere il tempo dalle nuvole." },
           relazioni: { text: "Stella è la mia compagna sulla terrazza. Max conosce i segreti della discoteca.", emoji: "💕", diary: "Tino ha rivelato le sue Relazioni: Stella e Max." },
@@ -1559,7 +1640,7 @@ badges: [
         sergio: {
           sogno: { text: "Voglio che la cucina sia il cuore dell'hotel, dove ogni piatto è un abbraccio e ogni aroma è un ricordo.", emoji: "🌟", diary: "Sergio ha svelato il suo Sogno: una cucina come cuore." },
           paura: { text: "Ho paura di perdere la mia ricetta segreta. È l'unica cosa che mi definisce. Senza di essa, sono nulla.", emoji: "🌙", diary: "Sergio ha rivelato la sua Paura: perdere la ricetta segreta." },
-          talento: { text: "Posso assaggiare un piatto e ricostruire la ricola completa. Il gusto è linguaggio, e io ne sono fluentemente parlante.", emoji: "⭐", diary: "Sergio ha rivelato il suo Talento: ricostruire ricette dal gusto." },
+          talento: { text: "Posso assaggiare un piatto e ricostruire la ricetta completa. Il gusto è linguaggio, e io ne sono fluentemente parlante.", emoji: "⭐", diary: "Sergio ha rivelato il suo Talento: ricostruire ricette dal gusto." },
           relazioni: { text: "Pino è il mio ragazzo al desk. Lola conosce i volti di tutti. La cucina è il nostro regno.", emoji: "💕", diary: "Sergio ha rivelato le sue Relazioni: Pino e Lola." },
           segreto: { text: "Il Miraggio è un portale. Le stanze si collegano a vite diverse. Ogni ospite che parte... non torna mai nello stesso modo.", emoji: "🌑", diary: "Sergio ha rivelato il Segreto dell'Hotel: il Miraggio è un portale." }
         },
@@ -1595,7 +1676,7 @@ badges: [
         rigo:  { connectedTo: ['stella', 'nina'], hint: "Rigo nuota all'alba con Stella. Nina conosce i segreti del giardino." },
         max:   { connectedTo: ['lola', 'guest2'], hint: "Max conosce i segreti di tutti. Lola e Guest2 sono i suoi informatori." },
         nina:  { connectedTo: ['rigo', 'guest1'], hint: "Nina e Rigo crescono insieme nel giardino. Guest1 è il suo compagno segreto." },
-        guest1:{ connectedTo: ['nina', 'ugo'], hint: "Guest1 e Nina custodiscono il giardino. Ugo è il silenzioso compagno." },
+        guest1:{ connectedTo: ['nina', 'guest1'], hint: "Guest1 e Nina custodiscono il giardino. Ugo è il silenzioso compagno." },
         gigi:  { connectedTo: ['max', 'stella'], hint: "Gigi serve il Bar, Max conosce la discoteca. Stella è la voce della terrazza." },
         stella:{ connectedTo: ['rigo', 'tino'], hint: "Stella e Tino sono la coppia della terrazza. Rigo le ha insegnato a nuotare." },
         tino:  { connectedTo: ['stella', 'max'], hint: "Tino prevede il tempo per Stella. Max conosce i segreti del locale." },

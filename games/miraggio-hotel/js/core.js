@@ -340,7 +340,8 @@ function showHint(targetId, text, pos) {
   const hint = document.createElement('div');
   hint.id = 'tutorialHint';
   hint.className = 'tutorial-hint';
-  hint.innerHTML = '<span>' + text + '</span><button onclick="hideHint()">✕</button>';
+  hint.innerHTML = '<span>' + text + '</span><button id="hintCloseBtn">✕</button>';
+  setTimeout(() => { const hb = document.getElementById('hintCloseBtn'); if (hb) hb.onclick = hideHint; }, 0);
   document.body.appendChild(hint);
   const rect = target.getBoundingClientRect();
   const hintH = 50;
@@ -459,7 +460,7 @@ function updatePets(dt) {
   });
 }
 function renderPets() {
-     const pc = $('petChip');
+     const pc = $('pcChip');
      if (!pc) return;
      let html = '';
      for (let i = 0; i < Math.min(MAX_PETS, st.pets.length); i++) {
@@ -555,7 +556,7 @@ function evolvePet(i) {
 function updatePetCare(i, action) {
     const pet = st.pets[i]; if (!pet) return;
     if (!pet.care) pet.care = { feedCount: 0, playCount: 0, petCount: 0, totalTime: 0 };
-    pet.care.totalTime += Date.now();
+    pet.care.totalTime += 1;
     if (action === 'feed') pet.care.feedCount++;
     if (action === 'play') pet.care.playCount++;
     if (action === 'pet') pet.care.petCount++;
@@ -690,10 +691,6 @@ let selectedBreedPet = -1;
 function selectBreedPet(idx) {
   selectedBreedPet = idx;
   toast('🐾 Pet selezionato: ' + st.pets[idx].name + '. Seleziona il secondo pet.');
-  if (st.pets.length > 1 && selectedBreedPet >= 0) {
-    const otherIdx = st.pets.findIndex((p, i) => i !== selectedBreedPet);
-    breedPets(selectedBreedPet, otherIdx);
-  }
 }
 function breedTwoPets() {
   if (st.pets.length < 2) { toast('🐾 Hai bisogno di almeno 2 pet!'); return; }
@@ -1034,6 +1031,45 @@ function updateSeasonalChip() {
     chip.style.display = 'none';
   }
 }
+/* Controllo stagionale: gira a ogni tick (1s).
+   Avvia l'evento attivo, avvisa quando un evento sta per arrivare e
+   chiude (con ricompense) quello a cui il giocatore ha partecipato. */
+function checkSeasonal() {
+  if (!st) return;
+  if (!st.seasonal) st.seasonal = { active: null, progress: {}, completed: [], adventCalendar: {}, candyCollected: 0, eggsFound: 0, surfBest: 0 };
+  const s = st.seasonal;
+  if (!s.progress) s.progress = {};
+  if (!Array.isArray(s.completed)) s.completed = [];
+  if (!s.adventCalendar) s.adventCalendar = {};
+  const ev = getSeasonalEvent();
+  // l'evento attivo non è più quello corrente: se era finito, chiudilo
+  if (s.active && (!ev || ev.id !== s.active)) {
+    const prev = D.seasonalEvents ? D.seasonalEvents.find(e => e.id === s.active) : null;
+    if (prev && !isEventActive(prev.id) && !s.completed.includes(prev.id) && s.progress[prev.id]) {
+      completeSeasonal(prev.id);
+    } else if (prev) {
+      s.active = null;
+      save();
+    }
+  }
+  if (!ev) return;
+  const today = new Date();
+  const todayStr = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const phase = todayStr >= ev.startDate ? 'active' : 'soon';
+  const key = ev.id + ':' + phase + ':' + today.getFullYear();
+  if (s.notice === key) return;   // già notificato (una volta per fase/anno)
+  s.notice = key;
+  save();
+  if (phase === 'active') {
+    if (!s.completed.includes(ev.id)) startSeasonal(ev.id);
+  } else {
+    const [sm, sd] = ev.startDate.split('-').map(Number);
+    const start = new Date(today.getFullYear(), sm - 1, sd);
+    const days = Math.max(1, Math.round((start - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000));
+    toast(ev.emoji + ' ' + ev.name + ' sta arrivando! Inizia tra ' + days + (days === 1 ? ' giorno' : ' giorni') + '.');
+  }
+  updateSeasonalChip();
+}
 function startSeasonal(eventId) {
   const ev = D.seasonalEvents ? D.seasonalEvents.find(e => e.id === eventId) : null;
   if (!ev || st.seasonal.completed.includes(eventId)) return;
@@ -1316,8 +1352,7 @@ function visitSotterraneo() {
   st.room = 'sotterraneo';
   st.px = st.py = -1;
   setupRoom(); computeCam();
-  $('roomChip').textContent = room().emoji + ' ' + room().name;
-  document.querySelectorAll('.room').forEach(el => el.classList.toggle('here', el.dataset.room === 'sotterraneo'));
+  if ($('roomChip')) $('roomChip').textContent = room().emoji + ' ' + room().name;
   checkRoomVisit(); updateHUD(); save();
 }
 
@@ -2051,7 +2086,7 @@ function voteFor(voterId, targetId, vote) {
   save();
 }
 function renderFashionShowResults() {
-  const fb = $('fsResults');
+  const fb = $('fsResultsBody');
   if (!fb) return;
   const fs = st.fashionShow;
   if (!fs.winners.length) { fb.innerHTML = '<div style="color:#8a7fb8">Nessun risultato ancora</div>'; return; }
@@ -2724,7 +2759,7 @@ function updateWeather(dt) {
   // spawn particles
   const wData = D.weather.types.find(t => t.id === w.type);
   if (wData && wData.particles > 0) {
-    const spawnRate = Math.floor(1000 / (wData.particles * w.intensity));
+    const spawnRate = Math.min(10, Math.floor(1000 / (wData.particles * w.intensity)));
     for (let i = 0; i < spawnRate; i++) {
       if (Math.random() < 0.3) {
         weatherParticles.push({
@@ -2832,10 +2867,10 @@ function drawWeather() {
 
   /* ---------- toast ---------- */
   let toastT = null;
-  function toast(msg) {
+  function toast(msg, dur) {
     const t = $('toast');
     t.textContent = msg; t.classList.add('on');
-    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2800);
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), dur || 2800);
   }
 
   /* ---------- monete & badge ---------- */
@@ -3285,6 +3320,14 @@ function enterRoom(id) {
       border: o.border || (botDef && botDef.top ? botDef.top : '#ffd166'),
       align: isBot ? -1 : 1
     });
+  }
+  // Battuta di storia di un NPC: fumetto dedicato sopra il personaggio
+  function storySay(botId, text, emoji) {
+    if (!text) return;
+    const bp = roomBots ? roomBots.find(b => b.id === botId) : null;
+    const who = bp || { id: botId, x: player.x + 34, y: player.y - 12 };
+    const msg = (emoji ? emoji + ' ' : '') + text;
+    say(who, msg, Math.max(4000, Math.min(9000, 1600 + msg.length * 45)), { color: '#f3e8ff', ink: '#38206b', border: '#5b3bd6' });
   }
 
   /* ---------- interazioni ---------- */
@@ -4602,7 +4645,7 @@ const gain = isLike ? 1.0 : 0.2;
         '<div style="height:6px;background:#efe9ff;border-radius:99px;margin-top:7px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + (m.done ? '#3ddc97' : 'linear-gradient(90deg,#5b3bd6,#ff5d9e)') + ';border-radius:99px"></div></div></div>';
     });
     b.innerHTML = guestBanner + (html || '<div style="color:#8a7fb8">Nessuna missione.</div>');
-    $('missionsDone').textContent = done + '/' + st.missions.list.length + ' completate';
+    if ($('missionsDone')) $('missionsDone').textContent = done + '/' + st.missions.list.length + ' completate';
     // amici
     const fb = $('friendsBody');
     let fh = '';
@@ -4623,7 +4666,7 @@ const gain = isLike ? 1.0 : 0.2;
     fb.innerHTML = fh;
     // trofei
     const tb = $('trophyBody');
-tb.innerHTML = st.items.length
+if (tb) tb.innerHTML = st.items.length
       ? st.items.map(it => '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff6df;border:1px solid #ffd166;border-radius:99px;padding:5px 11px;font-size:.78rem;font-weight:800;color:#6b4a00;margin:0 5px 6px 0">' + it.e + ' ' + it.name + '</span>').join('')
       : '<div style="color:#8a7fb8;font-size:.8rem">Nessun trofeo ancora: porta un ospite a livello 5 parlandogli e con le emote che ama!</div>';
     // achievements
@@ -5382,8 +5425,8 @@ if ($('societyChip')) $('societyChip').onclick = () => { const el = $('sSociety'
       }
     } else if (!ev.active) evActiveNow = false;
     // stagione
-    checkSeasonal();
-    updateSeasonalChip();
+    if (typeof checkSeasonal === 'function') checkSeasonal();
+    if (typeof updateSeasonalChip === 'function') updateSeasonalChip();
     // produzione mobili della camera
     productionTick();
     // ciclo giorno/notte
