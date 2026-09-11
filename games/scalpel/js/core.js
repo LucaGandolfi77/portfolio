@@ -574,7 +574,11 @@ function checkTapHit(x, y){
       }
 
       if(completedTaps >= tapTargets.length){
-        setTimeout(onStepComplete, 500);
+        if(complicationActive){
+          setTimeout(function(){ onComplicationComplete(true); }, 500);
+        } else {
+          setTimeout(onStepComplete, 500);
+        }
       }
       updateHUD();
       break;
@@ -601,7 +605,11 @@ function completeSwipe(){
   showAccuracy(acc + '%', acc >= 60);
   spawnParticles(touchData.x, touchData.y, acc >= 70 ? C.heal : C.bloodLight, 10);
   if(prog >= 0.6){
-    setTimeout(onStepComplete, 400);
+    if(complicationActive){
+      setTimeout(function(){ onComplicationComplete(true); }, 400);
+    } else {
+      setTimeout(onStepComplete, 400);
+    }
   } else {
     showAccuracy('Too short!', false);
     combo = 1;
@@ -614,7 +622,11 @@ function completeNavigate(){
   var acc = Math.min(100, Math.round((touchData.pathProgress || 0) * 100));
   addAccuracy(acc);
   showAccuracy('Located: ' + acc + '%', acc >= 50);
-  setTimeout(onStepComplete, 400);
+  if(complicationActive){
+    setTimeout(function(){ onComplicationComplete(true); }, 400);
+  } else {
+    setTimeout(onStepComplete, 400);
+  }
 }
 
 function completeDraw(){
@@ -623,7 +635,11 @@ function completeDraw(){
   addAccuracy(acc);
   showAccuracy('Precision: ' + acc + '%', acc >= 70);
   spawnParticles(touchData.x, touchData.y, C.bloodLight, 15);
-  setTimeout(onStepComplete, 500);
+  if(complicationActive){
+    setTimeout(function(){ onComplicationComplete(true); }, 500);
+  } else {
+    setTimeout(onStepComplete, 500);
+  }
 }
 
 function updateSpray(x, y){
@@ -637,7 +653,13 @@ function completeSpray(){
   spawnParticles(touchData ? touchData.x : W/2, touchData ? touchData.y : H/2, C.healLight, 12);
   sprayCoverage = 0;
   sprayActive = false;
-  if(acc >= 50) setTimeout(onStepComplete, 400);
+  if(acc >= 50){
+    if(complicationActive){
+      setTimeout(function(){ onComplicationComplete(true); }, 400);
+    } else {
+      setTimeout(onStepComplete, 400);
+    }
+  }
 }
 
 function checkTimingHit(){
@@ -647,11 +669,19 @@ function checkTimingHit(){
   addAccuracy(acc);
   showAccuracy(inZone ? 'PERFECT!' : 'Miss...', inZone);
   spawnParticles(W/2, H/2, inZone ? C.heal : C.bloodLight, inZone ? 20 : 5);
-  if(inZone) setTimeout(onStepComplete, 500);
+  if(inZone){
+    if(complicationActive){
+      setTimeout(function(){ onComplicationComplete(true); }, 500);
+    } else {
+      setTimeout(onStepComplete, 500);
+    }
+  }
 }
 
 function addAccuracy(val){
-  totalAccuracy += val;
+  var finalVal = val;
+  if(hasPowerup('precision')) finalVal = Math.min(100, val * 1.2);
+  totalAccuracy += finalVal;
   accuracyCount++;
 }
 
@@ -660,6 +690,13 @@ function onStepComplete(){
   if(currentStepIdx >= D.PROCEDURES['chapter'+currentChapter.id].length){
     onSurgeryComplete();
   } else {
+    /* try to spawn complication before next step */
+    if(!complicationActive && maybeSpawnComplication()){
+      /* complication spawned — don't advance step yet */
+      return;
+    }
+    /* try random powerup on step completion */
+    tryRandomPowerup();
     setupStep(currentStepIdx);
   }
 }
@@ -668,9 +705,13 @@ function onTimeUp(){
   showAccuracy('TIME\'S UP!', false);
   combo = 1;
   updateHUD();
-  setTimeout(function(){
-    onSurgeryComplete();
-  }, 1000);
+  if(complicationActive){
+    setTimeout(function(){ onComplicationComplete(false); }, 1000);
+  } else {
+    setTimeout(function(){
+      onSurgeryComplete();
+    }, 1000);
+  }
 }
 
 /* ═══════════════ STEP SETUP ═══════════════ */
@@ -717,6 +758,12 @@ function setupStep(idx){
 
   timerMax = step.time;
   timerLeft = step.time;
+  /* apply difficulty scaling */
+  var diff = D.DIFFICULTY[currentChapter.id];
+  if(diff && diff.timeMod < 1){
+    timerMax = Math.round(step.time * diff.timeMod);
+    timerLeft = timerMax;
+  }
   timerRunning = true;
 
   setTimeout(function(){ surgeryActive = true; }, 300);
@@ -752,6 +799,43 @@ function generatePath(type, cx, cy){
       var t = i/(steps-1);
       pts.push({ x: cx+Math.sin(t*Math.PI*2)*10, y: cy-10-t*60 });
     }
+  } else if(type === 'arm_cast'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      pts.push({ x: cx-60+t*120, y: cy+10+Math.sin(t*Math.PI*3)*8 });
+    }
+  } else if(type === 'arm_wrap'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      var angle = t * Math.PI * 4;
+      pts.push({ x: cx+Math.cos(angle)*(30+t*20), y: cy-40+t*80+Math.sin(angle)*10 });
+    }
+  } else if(type === 'abdomen_c'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      pts.push({ x: cx-40+t*80, y: cy+10+Math.sin(t*Math.PI)*15 });
+    }
+  } else if(type === 'vessels'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      pts.push({ x: cx+Math.sin(t*8)*25, y: cy-80+t*160 });
+    }
+  } else if(type === 'womb'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      pts.push({ x: cx+Math.sin(t*4)*20, y: cy-60+t*120 });
+    }
+  } else if(type === 'heart_vessel'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      var angle = -Math.PI/3 + t*Math.PI*0.8;
+      pts.push({ x: cx+Math.cos(angle)*40, y: cy-10+Math.sin(angle)*35 });
+    }
+  } else if(type === 'recalibrate'){
+    for(var i=0;i<steps;i++){
+      var t = i/(steps-1);
+      pts.push({ x: cx+Math.cos(t*Math.PI*2)*50, y: cy+Math.sin(t*Math.PI*2)*50 });
+    }
   }
   return pts;
 }
@@ -767,6 +851,187 @@ function generateNavPath(type, cx, cy){
     });
   }
   return pts;
+}
+
+/* ═══════════════ COMPLICATIONS ═══════════════ */
+var complicationActive = false;
+var complicationData = null;
+var complicationStepsDone = 0;
+
+function maybeSpawnComplication(){
+  if(!currentChapter) return false;
+  var diff = D.DIFFICULTY[currentChapter.id];
+  if(!diff || Math.random() > diff.compChance) return false;
+  if(complicationStepsDone >= diff.compMax) return false;
+
+  var comp = D.COMPLICATIONS[Math.floor(Math.random()*D.COMPLICATIONS.length)];
+  complicationActive = true;
+  complicationData = comp;
+  complicationStepsDone++;
+
+  showComplicationOverlay(comp);
+  return true;
+}
+
+function showComplicationOverlay(comp){
+  var html = '<div id="results-card" style="border-color:#e74c3c">' +
+    '<div style="font-size:3rem;margin-bottom:8px">' + comp.icon + '</div>' +
+    '<div style="font-size:1.1rem;color:#e74c3c;font-weight:700;margin-bottom:8px">' + comp.name + '</div>' +
+    '<div style="font-size:.8rem;color:#bdc3c7;margin-bottom:16px">' + comp.desc + '</div>' +
+    '<div style="font-size:.65rem;color:#f39c12">Penalty: -' + comp.penalty + ' pts if failed</div>' +
+    '</div>';
+  showOverlay(html);
+  setTimeout(function(){ hideOverlay(); startComplication(comp); }, 1500);
+}
+
+function startComplication(comp){
+  var cx = W/2, cy = H/2 - 30;
+  surgeryActive = false;
+  touchData = { type:comp.type, x:0, y:0, active:false, pathProgress:0 };
+  tapTargets = [];
+  completedTaps = 0;
+  pathPoints = [];
+
+  if(comp.type === 'tap'){
+    for(var i=0;i<comp.points;i++){
+      var angle = (i/comp.points)*Math.PI*2 - Math.PI/2;
+      var r = 50 + Math.random()*30;
+      tapTargets.push({ x:cx+Math.cos(angle)*r, y:cy+Math.sin(angle)*r, done:false });
+    }
+  } else if(comp.type === 'swipe'){
+    pathPoints = generatePath(comp.path, cx, cy);
+  } else if(comp.type === 'timing'){
+    timingActive = true;
+    targetBpm = comp.target_bpm;
+  }
+
+  timerMax = comp.time;
+  timerLeft = comp.time;
+  timerRunning = true;
+  $levelLabel.textContent = '⚠️ COMPLICATION — ' + comp.name;
+  $levelLabel.style.color = '#e74c3c';
+
+  setTimeout(function(){ surgeryActive = true; }, 300);
+}
+
+function onComplicationComplete(success){
+  var pen = complicationData ? complicationData.penalty : 15;
+  complicationActive = false;
+  complicationData = null;
+  $levelLabel.style.color = '';
+  if(!success){
+    score = Math.max(0, score - pen);
+    showAccuracy('-Penalty', false);
+  } else {
+    showAccuracy('Resolved!', true);
+    spawnParticles(W/2, H/2, C.heal, 15);
+  }
+  updateHUD();
+  /* after complication, continue to next step */
+  setupStep(currentStepIdx);
+}
+
+/* ═══════════════ POWERUPS ═══════════════ */
+var activePowerups = {};
+var powerupTimers = {};
+
+function activatePowerup(id){
+  if(!D.POWERUPS[id]) return;
+  activePowerups[id] = true;
+  showPowerupToast(D.POWERUPS[id]);
+  updatePowerupBar();
+  if(id === 'precision'){
+    powerupTimers[id] = setTimeout(function(){ deactivatePowerup(id); }, 10000);
+  }
+}
+
+function deactivatePowerup(id){
+  activePowerups[id] = false;
+  clearTimeout(powerupTimers[id]);
+  delete powerupTimers[id];
+  updatePowerupBar();
+}
+
+function hasPowerup(id){ return !!activePowerups[id]; }
+
+function updatePowerupBar(){
+  var bar = document.getElementById('powerup-bar');
+  if(!bar) return;
+  var html = '';
+  var keys = Object.keys(activePowerups);
+  for(var i=0;i<keys.length;i++){
+    if(!activePowerups[keys[i]]) continue;
+    var pu = D.POWERUPS[keys[i]];
+    html += '<div class="pu-chip" style="border-color:'+pu.color+'">'+pu.icon+' '+pu.name+'</div>';
+  }
+  bar.innerHTML = html;
+}
+
+function showPowerupToast(pu){
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(10,22,40,.95);border:2px solid '+pu.color+';border-radius:12px;padding:8px 16px;z-index:100;font-size:.75rem;color:'+pu.color+';font-weight:700;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:slideUp .3s ease';
+  toast.textContent = pu.icon + ' ' + pu.name + ' — ' + pu.desc;
+  document.body.appendChild(toast);
+  setTimeout(function(){ toast.remove(); }, 2500);
+}
+
+function tryRandomPowerup(){
+  if(Math.random() < 0.12){
+    var keys = Object.keys(D.POWERUPS);
+    var id = keys[Math.floor(Math.random()*keys.length)];
+    activatePowerup(id);
+  }
+}
+
+/* ═══════════════ ACHIEVEMENTS ═══════════════ */
+function checkAchievements(){
+  if(!save) return;
+  var newAchievements = [];
+  for(var i=0;i<D.ACHIEVEMENTS.length;i++){
+    var ach = D.ACHIEVEMENTS[i];
+    if(save.achievements && save.achievements.indexOf(ach.id) !== -1) continue;
+    if(ach.condition(save)){
+      if(!save.achievements) save.achievements = [];
+      save.achievements.push(ach.id);
+      newAchievements.push(ach);
+    }
+  }
+  for(var i=0;i<newAchievements.length;i++){
+    showAchievementToast(newAchievements[i]);
+  }
+  saveGame();
+}
+
+function showAchievementToast(ach){
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);background:rgba(10,22,40,.95);border:2px solid #f39c12;border-radius:14px;padding:10px 18px;z-index:100;font-size:.75rem;color:#f39c12;font-weight:700;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:slideUp .3s ease;text-align:center;max-width:300px';
+  toast.innerHTML = '<div style="font-size:1.2rem;margin-bottom:4px">' + ach.icon + '</div>' +
+    '<div style="color:#ecf0f1;margin-bottom:2px">Achievement Unlocked!</div>' +
+    '<div>' + ach.name + '</div>';
+  document.body.appendChild(toast);
+  setTimeout(function(){ toast.remove(); }, 3500);
+}
+
+/* ═══════════════ SAVE STATS ═══════════════ */
+function updateSaveStats(){
+  if(!save) return;
+  if(!save.perfectSteps) save.perfectSteps = 0;
+  if(!save.maxCombo) save.maxCombo = 0;
+  if(!save.speedClears) save.speedClears = 0;
+  if(!save.noCompChapters) save.noCompChapters = 0;
+  if(combo > save.maxCombo) save.maxCombo = combo;
+  var acc = accuracyCount > 0 ? Math.round(totalAccuracy/accuracyCount) : 0;
+  if(acc === 100) save.perfectSteps++;
+  var grade = D.getGrade(acc);
+  if(!save.scores) save.scores = {};
+  save.scores[currentChapter.id] = { score:Math.round(acc*10+combo*50), grade:grade.grade };
+
+  /* check all S rank */
+  var allS = true;
+  for(var i=1;i<=10;i++){
+    if(!save.scores[i] || save.scores[i].grade !== 'S') allS = false;
+  }
+  save.allSRank = allS;
 }
 
 /* ═══════════════ INSTRUMENT BAR ═══════════════ */
@@ -878,13 +1143,21 @@ function showChapterSelect(){
     var ch = D.CHAPTERS[i];
     var unlocked = save && (i === 0 || save.chapter > i);
     var scoreVal = save && save.scores && save.scores[ch.id] ? save.scores[ch.id] : null;
+    var scoreDisplay = '';
+    if(scoreVal !== null){
+      if(typeof scoreVal === 'object'){
+        scoreDisplay = scoreVal.grade + ' ' + (scoreVal.score || 0) + 'pts';
+      } else {
+        scoreDisplay = '⭐ ' + scoreVal;
+      }
+    }
     html += '<div class="ch' + (unlocked ? '' : ' locked') + '" data-ch="' + ch.id + '">' +
       '<div class="ch-icon">' + (unlocked ? ch.icon : '🔒') + '</div>' +
       '<div class="ch-info">' +
         '<div class="ch-title">Chapter ' + ch.id + ': ' + ch.title + '</div>' +
         '<div class="ch-sub">' + (unlocked ? D.PATIENTS[ch.patient].condition : 'Complete previous chapter to unlock') + '</div>' +
       '</div>' +
-      '<div class="ch-status">' + (scoreVal !== null ? '⭐ ' + scoreVal : (unlocked ? '→' : '')) + '</div>' +
+      '<div class="ch-status">' + (scoreDisplay || (unlocked ? '→' : '')) + '</div>' +
     '</div>';
   }
   html += '</div>';
@@ -948,8 +1221,14 @@ function beginSurgery(){
   totalAccuracy = 0;
   accuracyCount = 0;
   currentStepIdx = 0;
+  complicationStepsDone = 0;
+  complicationActive = false;
+  complicationData = null;
+  activePowerups = {};
   hideOverlay();
   $instrBar.style.display = 'flex';
+  $levelLabel.style.color = '';
+  updatePowerupBar();
   updateHUD();
   setupStep(0);
 }
@@ -958,8 +1237,10 @@ function onSurgeryComplete(){
   surgeryActive = false;
   timerRunning = false;
   timingActive = false;
+  complicationActive = false;
   $instrBar.style.display = 'none';
   $levelLabel.textContent = '';
+  $levelLabel.style.color = '';
 
   var acc = accuracyCount > 0 ? Math.round(totalAccuracy / accuracyCount) : 0;
   var grade = D.getGrade(acc);
@@ -970,6 +1251,29 @@ function onSurgeryComplete(){
   if(chScore > prev) save.scores[currentChapter.id] = chScore;
 
   if(currentChapter.id >= save.chapter) save.chapter = currentChapter.id + 1;
+
+  /* check for speed clear */
+  if(timerLeft > timerMax * 0.5){
+    if(!save.speedClears) save.speedClears = 0;
+    save.speedClears++;
+  }
+
+  /* unlock journal */
+  if(!save.journal) save.journal = {};
+  save.journal['chapter'+currentChapter.id] = true;
+
+  /* count journal entries */
+  var jCount = 0;
+  var jKeys = Object.keys(save.journal);
+  for(var i=0;i<jKeys.length;i++) if(save.journal[jKeys[i]]) jCount++;
+  save.journalUnlocked = jCount;
+
+  /* update stats */
+  updateSaveStats();
+
+  /* check achievements */
+  checkAchievements();
+
   saveGame();
 
   showResults(chScore, acc, grade);
