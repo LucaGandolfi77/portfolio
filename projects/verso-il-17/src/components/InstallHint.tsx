@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from 'framer-motion';
 import { Download, Share, SquarePlus, X } from 'lucide-react';
 import { useEffect } from 'react';
 import { EXIT_MS, useAnimatedExit } from '../hooks/useAnimatedExit';
@@ -15,11 +14,13 @@ interface InstallHintProps {
  * Banner di installazione. Su iOS mostra i passaggi reali di Safari
  * (Condividi -> Aggiungi a Home), su Chromium usa il prompt nativo.
  *
+ * Come il toast, l'entrata è un'animazione CSS di sola trasformazione: il banner
+ * è leggibile di default e non dipende da un'animazione che deve completare.
+ *
  * Nota: viene renderizzato solo quando sta entrando o è a schermo, e si smonta
  * dopo la propria uscita — la decisione di mostrarlo resta al genitore.
  */
 export function InstallHint({ visible, platform, onDismiss, onInstall }: InstallHintProps) {
-  const prefersReducedMotion = useReducedMotion();
   const { leaving, requestExit, reset } = useAnimatedExit(onDismiss, EXIT_MS);
 
   useEffect(() => {
@@ -35,19 +36,8 @@ export function InstallHint({ visible, platform, onDismiss, onInstall }: Install
   if (!visible && !leaving) return null;
 
   return (
-    <motion.aside
-      className="installhint"
-      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 30, scale: 0.97 }}
-      animate={
-        leaving
-          ? { opacity: 0, y: prefersReducedMotion ? 0 : 18, scale: 0.98 }
-          : { opacity: 1, y: 0, scale: 1 }
-      }
-      transition={
-        leaving
-          ? { duration: EXIT_MS / 1000, ease: 'easeIn' }
-          : { type: 'spring', stiffness: 260, damping: 26 }
-      }
+    <aside
+      className={`installhint ${leaving ? 'installhint--leaving' : ''}`}
       aria-label="Installa l'app sulla schermata Home"
     >
       <button
@@ -78,6 +68,6 @@ export function InstallHint({ visible, platform, onDismiss, onInstall }: Install
           </button>
         </>
       )}
-    </motion.aside>
+    </aside>
   );
 }

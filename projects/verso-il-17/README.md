@@ -1,10 +1,18 @@
 # Verso il 17 ottobre ✨
 
-Una **PWA mobile-first per iPhone**: un calendario d'attesa in stile diario segreto, dedicato al
-pattinaggio artistico a rotelle sincronizzato. Si apre ogni giorno per una frase, un pensiero, una
-mini poesia o una piccola dose di motivazione — e per il countdown che accompagna fino al **17 ottobre**.
+**Il diario segreto del Monza Precision Team**, in cammino verso i **Campionati del Mondo di
+pattinaggio artistico a rotelle sincronizzato in Paraguay**, dove la squadra rappresenterà l'**Italia**
+il **17 ottobre**.
+
+Una **PWA mobile-first per iPhone**: un calendario d'attesa in stile diario segreto. Si apre ogni
+giorno per una frase, un pensiero, una mini poesia o una piccola dose di motivazione — e per il
+countdown che accompagna fino al giorno della gara.
 
 > «Apri la tua casella di oggi. C'è qualcosa che ti aspetta.»
+
+Squadra, nazione e competizione non sono decorazione: compaiono nell'intestazione (con il tricolore),
+nel countdown, nella casella del 17 ottobre e nella celebrazione finale. Tutto è centralizzato in
+`src/data/event.ts`, così i dettagli si aggiornano in un punto solo.
 
 ---
 
@@ -12,14 +20,16 @@ mini poesia o una piccola dose di motivazione — e per il countdown che accompa
 
 1. [Cosa c'è dentro](#cosa-cè-dentro)
 2. [Avviare il progetto](#1-avviare-il-progetto)
+   - [Se la schermata resta su «Sto allacciando le ruote…»](#se-la-schermata-resta-su-sto-allacciando-le-ruote)
 3. [Build di produzione](#2-build-di-produzione)
 4. [Installare la PWA su iPhone](#3-installare-la-pwa-su-iphone)
 5. [Struttura dei file](#4-struttura-dei-file)
 6. [Scelte architetturali](#5-scelte-architetturali)
 7. [Come cambiare i contenuti](#6-come-cambiare-i-contenuti)
-8. [Come cambiare la data finale](#7-come-cambiare-la-data-finale)
-9. [Test](#8-test)
-10. [Accessibilità e prestazioni](#9-accessibilità-e-prestazioni)
+8. [Squadra, nazione ed evento](#7-squadra-nazione-ed-evento)
+9. [Come cambiare la data finale](#8-come-cambiare-la-data-finale)
+10. [Test](#9-test)
+11. [Accessibilità e prestazioni](#10-accessibilità-e-prestazioni)
 
 ---
 
@@ -36,8 +46,19 @@ mini poesia o una piccola dose di motivazione — e per il countdown che accompa
 - **Stato persistente**: le caselle aperte restano tali tra una sessione e l'altra (`localStorage`).
 - **Micro-rituale**: alla prima apertura di ogni casella appare per pochi secondi una frase lenta
   («Respira. Metti giù le spalle. Ricorda perché hai iniziato.»), poi arriva il messaggio.
-- **Gran finale**: il 17 ottobre la home cambia atmosfera, parte una celebrazione a schermo intero
-  con coriandoli, stelle e cuori, e il countdown lascia il posto a «È arrivato il giorno».
+- **Gran finale**: il 17 ottobre la home cambia atmosfera, l'intestazione si accende di un filo
+  tricolore, parte una celebrazione a schermo intero con coriandoli, stelle e cuori, e il countdown
+  lascia il posto a «È arrivato il giorno», al nome dei Campionati del Mondo, al Paraguay e alla
+  squadra che rappresenta l'Italia.
+
+**L'identità della squadra**
+
+- Stemma con bandierina tricolore e nome **Monza Precision Team · Italia** in testata.
+- Etichetta dell'evento sotto il countdown: **Campionati del Mondo · Paraguay**.
+- La casella del 17 ottobre porta il chip **mondiale** e la firma dell'evento.
+- Il 17 ottobre l'intestazione si accende con un filo tricolore.
+- La celebrazione finale nomina evento, luogo, squadra e nazione, con coriandoli e striscia tricolore.
+- Footer e icone dell'app (anello tricolore + sigla MPT) chiudono il cerchio.
 
 **Dettagli che rendono l'app "viva"**
 
@@ -66,7 +87,9 @@ recuperabile dal DOM — le caselle bloccate non contengono il testo del messagg
 
 ## 1. Avviare il progetto
 
-Serve **Node 20+** (testato con Node 26).
+Serve **Node 22.6 o superiore** (testato con Node 26). È il minimo perché Vite 8 richiede
+`^20.19 || >=22.12` e i test usano `node --experimental-strip-types`, disponibile da Node 22.6.
+Il requisito è dichiarato in `engines` dentro `package.json`.
 
 ```bash
 cd projects/verso-il-17
@@ -76,11 +99,53 @@ npm run dev
 
 Apri l'indirizzo che stampa Vite (di default `http://localhost:5178`).
 
+> ⚠️ **Non aprire questo progetto con Live Server o un server statico**: vedi
+> [la sezione qui sotto](#se-la-schermata-resta-su-sto-allacciando-le-ruote).
+
 Per provarla dal telefono sulla stessa rete Wi-Fi, il server è già configurato con `host: true`:
 usa l'indirizzo `http://<ip-del-computer>:5178` che compare nel terminale.
 
 > **Nota**: in sviluppo il service worker è disattivato apposta, così l'hot reload non fa
 > scherzi. Per provare l'installazione e il funzionamento offline serve la build di produzione.
+
+---
+
+### Se la schermata resta su «Sto allacciando le ruote…»
+
+Succede quando la pagina viene aperta con un **server statico** invece che con Vite: Live Server di
+VS Code (porta 5503), `python -m http.server`, oppure il doppio clic sul file.
+
+Non è un bug: `index.html` carica `/src/main.tsx`, che è **TypeScript/JSX e deve essere compilato**.
+Un server statico lo restituisce così com'è (o con il MIME type sbagliato), il browser rifiuta di
+eseguirlo, e l'app non parte. Nella console vedi infatti `404` o
+`Failed to load module script: Expected a JavaScript-or-Wasm module script`.
+
+**Soluzione: usa Vite.**
+
+```bash
+cd projects/verso-il-17
+npm install     # solo la prima volta
+npm run dev     # oppure: npm start
+```
+
+Poi apri `http://localhost:5178`.
+
+> Da VS Code: `Cmd+Shift+P` → **Tasks: Run Task** → **verso-il-17: dev server**.
+> Il task è già configurato in `.vscode/tasks.json`, insieme a una configurazione di avvio
+> (`launch.json`) che apre direttamente l'indirizzo giusto.
+
+Dalla versione attuale, se l'app non riesce ad avviarsi la schermata **te lo dice**: dopo qualche
+secondo compare un riquadro con i passaggi da seguire, invece di restare bloccata per sempre.
+
+**Alternativa senza dev server:** pubblica la build.
+
+```bash
+npm run build
+npm run preview     # http://localhost:4178
+```
+
+Se usi Live Server e vuoi comunque vederla, fai puntare la sua root a `projects/verso-il-17/dist`
+dopo la build: lì ci sono `index.html`, `manifest.webmanifest` e le icone al posto giusto.
 
 ---
 
@@ -109,17 +174,106 @@ Per vedere in locale esattamente quello che verrà pubblicato:
 npm run preview
 ```
 
-### Pubblicazione
+### Deploy su GitHub Pages
 
-`dist/` è un sito statico: va bene qualsiasi hosting (Netlify, Vercel, GitHub Pages, un server
-Apache/nginx…). Due cose da tenere presenti:
+Il repository ha già un workflow che pubblica **l'intera repo** su GitHub Pages
+(`.github/workflows/deploy.yml`). La PWA viene compilata dentro quel sito, in una sottocartella
+dedicata:
+
+```
+https://lucagandolfi77.github.io/portfolio/verso-il-17/
+```
+
+**Non devi fare nulla a mano**: a ogni push su `main` il workflow
+
+1. installa le dipendenze del progetto (`npm ci`);
+2. esegue i test — se sono rossi il deploy si ferma, così l'app non finisce online rotta;
+3. compila la PWA con `npm run build:pages`, che scrive in `/verso-il-17/` alla radice della repo;
+4. rimuove `node_modules` dall'artefatto (sono centinaia di MB e non devono essere pubblicati);
+5. carica tutto e pubblica.
+
+#### Il percorso base (`base`)
+
+Su GitHub Pages il sito vive in una sottocartella col nome della repository, quindi tutti i percorsi
+devono essere prefissati. Vite lo gestisce con `base`, che qui si imposta con la variabile
+`BASE_PATH`:
+
+```bash
+# in locale, per provare esattamente la build di Pages
+npm run build:pages          # usa /portfolio/verso-il-17/
+npx vite preview             # poi apri http://localhost:4178/portfolio/verso-il-17/
+
+# il workflow invece lo ricava da solo dal nome della repo:
+BASE_PATH=/<nome-repo>/verso-il-17/ npm run build:pages
+```
+
+La normalizzazione accetta indifferentemente `portfolio/x`, `/portfolio/x` o `/portfolio/x/`.
+
+> Se rinomini la repository, **non serve cambiare nulla**: il workflow legge il nome da GitHub.
+> Se invece sposti l'app in un'altra cartella, aggiorna il percorso in
+> `.github/workflows/deploy.yml` (variabile `BASE_PATH`) e il default in `package.json`
+> (`build:pages`).
+
+#### Perché serve il `base` e cosa si romperebbe senza
+
+Con `base: '/'` la pagina punterebbe a `/manifest.webmanifest` e `/icons/favicon.svg`, cioè alla
+**radice del dominio** (`https://lucagandolfi77.github.io/`), dove non c'è nulla: 404 su tutte le
+icone, manifest non trovato e PWA non installabile. Con il base corretto tutto diventa
+`/portfolio/verso-il-17/...`.
+
+Due dettagli che erano sbagliati e sono stati corretti:
+
+- il `<link rel="manifest">` era scritto a mano: ora lo inietta il plugin con il percorso giusto,
+  altrimenti Vite non lo riscriveva;
+- i meta tag per lo schermo intero su iOS ora sono **due**, e devono restare entrambi:
+
+  | Tag | A cosa serve |
+  | --- | --- |
+  | `mobile-web-app-capable` | nome standard, usato da Chromium/Android |
+  | `apple-mobile-web-app-capable` | estensione Apple: è quella che iOS capisce |
+
+  [Chromium avvisa in console](https://issues.chromium.org/issues/40333176) se trova solo il tag
+  Apple senza quello standard: la correzione è **aggiungere** il tag standard, non togliere quello
+  Apple. Rimuovendo quest'ultimo l'avviso sparisce ma iPhone apre l'app dentro Safari invece che a
+  tutto schermo — e qui la piattaforma che conta è iPhone. Apple continua a documentare il tag come
+  valido ([Safari HTML Reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html),
+  *Support Level: Apple extension*). Con entrambi i tag l'avviso di Chromium non compare: verificato.
+
+`%BASE_URL%` viene usato anche in `og:image`, così l'anteprima social punta all'icona giusta.
+Per un'anteprima perfetta puoi sostituirlo con l'URL completo nel `index.html`.
+
+#### Convivenza con il resto del portfolio
+
+Il service worker è registrato con scope `/portfolio/verso-il-17/`: **non tocca** le altre pagine
+del sito, e la sua cache resta confinata alla PWA. Il portfolio continua a funzionare come prima.
+
+#### Aggiornamenti
+
+Il service worker è configurato con `skipWaiting` e `clientsClaim`: quando pubblichi una nuova
+versione, si attiva alla riapertura successiva dell'app. Se durante lo sviluppo vedi una versione
+vecchia, svuota la cache del sito o disinstalla e reinstalla la PWA dalla schermata Home.
+
+#### Primo deploy
+
+Assicurati che Pages sia attivo: **Settings → Pages → Source: GitHub Actions**. Poi fai push su
+`main` (o lancia il workflow a mano da **Actions → Deploy Portfolio to GitHub Pages → Run workflow**).
+
+### Pubblicazione su un altro hosting
+
+`dist/` è un sito statico: va bene qualsiasi hosting (Netlify, Vercel, un server Apache/nginx…).
+Tre cose da tenere presenti:
 
 - **HTTPS obbligatorio** perché il service worker e l'installazione funzionino (in locale `localhost`
   è considerato sicuro).
-- L'app è configurata per essere servita **dalla radice del sito** (`base: '/'` in `vite.config.ts`).
-  Per pubblicarla in una sottocartella, cambia `base` in `'/nome-cartella/'` e aggiorna il percorso
-  di registrazione del service worker in `src/main.tsx`.
-- Ricordati di sostituire il `<link rel="canonical">` commentato in `index.html` con il tuo dominio.
+- Se lo servi **dalla radice del sito**, la build normale (`npm run build`) va già bene.
+- Se lo servi in una **sottocartella**, usa `BASE_PATH`:
+
+  ```bash
+  BASE_PATH=/nome-cartella/ npm run build
+  ```
+
+  Il percorso di registrazione del service worker si adegua da solo, perché legge
+  `import.meta.env.BASE_URL`.
 
 ---
 
@@ -145,6 +299,9 @@ che l'utente lo chiude (o se l'app è già installata). Su Android/desktop Chrom
 
 ## 4. Struttura dei file
 
+> Il deploy su GitHub Pages genera anche una cartella **`/verso-il-17/`** alla radice della repo
+> (è la versione compilata, in `.gitignore`, prodotta dalla CI). Non fa parte del sorgente.
+
 ```text
 projects/verso-il-17/
 ├── index.html                  # shell HTML, meta iOS, tema applicato prima del primo paint
@@ -167,11 +324,14 @@ projects/verso-il-17/
     │   ├── Celebration.tsx     # celebrazione full-screen del 17 ottobre
     │   ├── RollerSkate.tsx     # illustrazione SVG del pattino (rotelle animabili)
     │   ├── Sparkles.tsx        # campo di stelline + scia luminosa
+    │   ├── Tricolore.tsx       # bandierina e striscia tricolore
     │   ├── Intro.tsx           # animazione di apertura
     │   ├── Toast.tsx           # messaggi temporanei (live region)
     │   └── InstallHint.tsx     # suggerimento di installazione
     ├── data/
-    │   └── messages.ts         # TUTTI i testi, in un unico posto
+    │   ├── messages.ts         # i testi delle caselle + findMessage()
+    │   ├── event.ts            # squadra, nazione, evento e testi del gran finale
+    │   └── event.test.ts       # test sull'identità di squadra e sui contenuti
     ├── hooks/
     │   ├── useCountdown.ts     # tick allineato al secondo, ripresa in foreground
     │   ├── useOpenedDays.ts    # caselle aperte, persistite
@@ -184,7 +344,7 @@ projects/verso-il-17/
     ├── utils/
     │   ├── dates.ts            # tutta la logica temporale (finestra, stati, countdown, chiavi)
     │   ├── storage.ts          # localStorage a prova di Safari iOS
-    │   └── dates.test.ts       # 21 test su date, contenuti e casi limite
+    │   └── dates.test.ts       # test su date, finestra e casi limite
     └── styles/
         └── globals.css         # design system: token, componenti, dark mode, responsive, reduced-motion
 ```
@@ -210,6 +370,18 @@ projects/verso-il-17/
   appuntamento.
 - Le date si ricalcolano al ritorno in primo piano (`visibilitychange`) e con un timer puntato
   esattamente alla mezzanotte successiva: è così che una casella si sblocca da sola.
+
+### I contenuti sono risolti, non indicizzati
+
+`messages.ts` non viene mai letto direttamente dai componenti: si passa sempre da
+`findMessage(indice, totale)`.
+
+Il motivo è concreto: il calendario ha **30 caselle** nel percorso classico e **31** se il diario
+viene aperto il 17 settembre. Con un semplice `messages.find(m => m.day === indice)`, nella versione
+a 30 caselle il gran finale sarebbe finito sulla casella 30 e il messaggio del Mondiale non sarebbe
+mai comparso — un bug che si vede solo provando la data vera. Le ultime quattro caselle sono quindi
+**ancorate alla fine** (`anchor: 'end'`), così vigilia, notte prima e gran finale restano al loro
+posto qualunque sia la lunghezza del calendario.
 
 ### Tre livelli di tempo, separati
 
@@ -289,44 +461,155 @@ vale la pena ricordarli perché sono facili da reintrodurre:
   continuazione, smontando e rimontando gli effetti (compreso il listener di `Esc`).
 - **La modale ha un solo gestore per il tocco sul velo**, sul backdrop stesso: con `z-index: -1`
   il velo è un bersaglio a sé e non basta confrontare `event.target === event.currentTarget`.
+- **Le ref "fotografate" si dichiarano prima di chi le usa**: `findMessage` ha bisogno del totale
+  delle caselle, quindi `totalDaysSnapshot` deve stare sopra il `useMemo` che calcola il messaggio.
+  Invertendo l'ordine si ottiene un `ReferenceError: Cannot access before initialization` che si
+  manifesta solo aprendo la modale.
+- **I contenuti non dipendono mai da un'animazione**: le righe del messaggio erano animate con
+  Framer da `opacity: 0`, e con `animate={{}}` (nessun target) restavano invisibili per sempre —
+  proprio sulla casella del 17 ottobre, la più importante. Ora il testo è leggibile **di default** e
+  l'animazione agisce solo sulla trasformazione: se non parte, il messaggio c'è comunque.
+- **`transition` va scritta su una riga sola** in CSS: l'espansione su più righe non viene
+  interpretata e l'intera dichiarazione viene scartata in silenzio (con l'effetto che l'elemento
+  restava allo stato iniziale).
+- **Mai `overflow-x: hidden` su `html` e `body` insieme.** Per specifica un asse `hidden` rende
+  l'altro `auto`: si creano così **due contenitori di scroll annidati**, e su iPhone il gesto del
+  dito viene consumato da quello interno (che non ha nulla da scorrere) senza arrivare mai a quello
+  della pagina. **Lo scroll si blocca del tutto.** La regola corretta è `overflow-x: clip`, che
+  ritaglia l'overflow orizzontale *senza* creare un contenitore di scroll. Misurato: con `hidden` un
+  trascinamento tattile scorreva 0 px, con `clip` scorre normalmente.
+- **Un contenuto da leggere non deve mai partire da `opacity: 0`.** Vale per il testo delle caselle
+  (animato da Framer con un target vuoto: restava invisibile per sempre) e per il toast. L'entrata
+  di toast e banner di installazione anima **solo la trasformazione**: l'opacità resta 1, così un
+  messaggio è leggibile anche se l'animazione non parte — animazioni ridotte, scheda in background,
+  frame non prodotti. Al massimo entra senza dissolvenza.
+- **Lo stato di uscita va azzerato quando arriva un contenuto nuovo.** Il toast riusava lo stesso
+  componente, quindi `leaving` restava `true` dopo il primo messaggio: dal secondo in poi nasceva
+  già "in uscita", cioè invisibile. Ora un messaggio nuovo riporta lo stato a "in entrata".
 
 ---
 
 ## 6. Come cambiare i contenuti
 
-Tutti i testi stanno in **un solo file**: `src/data/messages.ts`. Non serve toccare la logica.
+I testi delle caselle stanno in **`src/data/messages.ts`**; le frasi di squadra, il footer e i testi
+del gran finale in **`src/data/event.ts`**. Nessuna logica in nessuno dei due.
 
 ```ts
 export interface DailyMessage {
-  day: number;                 // posizione della casella: 1..31
+  day: number;                 // vedi la tabella qui sotto
+  anchor?: 'start' | 'end';    // 'start' = `day` caselle dall'inizio (predefinito)
+                               // 'end'   = `day` caselle dalla fine (1 = ultima)
   type: 'motivation' | 'poem' | 'thought' | 'funny';
   title: string;               // riga breve sopra il testo
   message: string;             // il contenuto (usa \n per le poesie)
   emoji?: string;
-  ritual?: string;             // micro-rituale, se vuoi uno su misura per quel giorno
+  ritual?: string;             // micro-rituale su misura per quel giorno
 }
 ```
 
-Come sono mappate le posizioni alle date:
+### Perché esiste `anchor`: il calendario ha 30 *o* 31 caselle
 
-| `day` | Data | Note |
+La finestra del calendario finisce **sempre** il 17 ottobre e comincia 29 giorni prima. Se il diario
+viene aperto il **17 settembre**, le caselle diventano 31; in tutti gli altri casi sono 30.
+
+Se le ultime caselle fossero numerate in modo assoluto, con 30 caselle il gran finale finirebbe sulla
+casella 30 e il messaggio del 17 ottobre non verrebbe mai mostrato (oppure mostrerebbe quello della
+vigilia). Per questo gli ultimi giorni sono **ancorati alla fine**:
+
+```ts
+{ day: 1, anchor: 'end', title: '17 ottobre · Campionati del Mondo' }  // sempre l'ultima
+{ day: 2, anchor: 'end', title: 'La notte prima' }                     // sempre la penultima
+{ day: 3, anchor: 'end', title: 'Vigilia' }
+{ day: 4, anchor: 'end', title: 'La valigia' }
+```
+
+Tutti gli altri messaggi usano `day` come posizione dall'inizio (1, 2, 3, …).
+
+> Se aggiungi o togli caselle, **non leggere mai `messages` direttamente**: usa sempre
+> `findMessage(indice, totale)`. È l'unico modo corretto, e i test verificano che copra ogni casella
+> di entrambe le lunghezze, senza buchi e senza doppioni.
+
+### Dove cade ogni messaggio
+
+| Posizione | Con 30 caselle | Con 31 caselle |
 | --- | --- | --- |
-| 1 | 17 settembre | esiste solo se il diario viene aperto quel giorno |
-| 2 | 18 settembre | qui comincia il percorso classico di 30 caselle |
-| 30 | 16 ottobre | la vigilia |
-| 31 | 17 ottobre | il gran finale |
+| 1 | 17 settembre *(solo con 31)* | 17 settembre |
+| 2 | 18 settembre | 18 settembre |
+| … | … | … |
+| ultima − 3 | La valigia *(solo con 31)* | La valigia |
+| ultima − 2 | Vigilia | Vigilia |
+| ultima − 1 | La notte prima | La notte prima |
+| **ultima** | **17 ottobre · Campionati del Mondo** | **17 ottobre · Campionati del Mondo** |
 
-Nel file trovi anche le frasi decorative (`AMBIENT_LINES` sotto l'header, `LOCKED_LINES` per le
-caselle chiuse, `EGG_LINES` per i segreti, `INTRO_LINES` per l'apertura) e `FINALE_COPY` per il
-testo del 17 ottobre.
+Le date vere le calcola il dispositivo (`src/utils/dates.ts`): nei testi non c'è nessuna data scritta
+a mano, quindi il calendario può spostarsi di anno senza rompere nulla.
+
+Nel file trovi anche `LOCKED_LINES` (caselle chiuse), `EGG_LINES` (easter egg) e `INTRO_LINES`
+(apertura). Le frasi dell'header, il footer e il gran finale stanno invece in `event.ts`.
 
 Distribuzione attuale: ~50% motivazione, ~20% pensieri, ~15% poesie, ~15% ironia. Tutti i testi sono
-diversi tra loro e parlano di allenamenti, ruote, musica, coreografie, cadute, squadra, palco e
-attesa — non di motivazione generica.
+diversi tra loro e parlano di allenamenti, ruote, musica, coreografie, cadute, squadra, Mondiale,
+viaggio in Paraguay e attesa — non di motivazione generica.
 
 ---
 
-## 7. Come cambiare la data finale
+## 7. Squadra, nazione ed evento
+
+Tutto ciò che riguarda la competizione vive in **`src/data/event.ts`**:
+
+```ts
+export const EVENT_YEAR = 2026;
+
+export const EVENT = {
+  name: 'Campionati del Mondo',
+  discipline: 'Pattinaggio artistico a rotelle sincronizzato',
+  place: 'Paraguay',
+  shortLabel: 'Mondiale · Paraguay',
+};
+
+export const TEAM = {
+  code: 'MPT',                       // sigla, usata nei badge compatti e nell'icona
+  name: 'Monza Precision Team',
+  country: 'Italia',
+  full: 'Monza Precision Team · Italia',
+};
+
+export const TRICOLORE = ['#0e8a52', '#f6f2ec', '#d0455a'];
+
+export const FINALE_COPY = { /* i testi del gran finale */ };
+export const AMBIENT_LINES = [ /* le frasi sotto l'header */ ];
+export const FOOTER_LINES = [ /* la firma in fondo alla pagina */ ];
+```
+
+Da qui si aggiornano in un colpo solo: lo stemma in testata, l'etichetta sotto il countdown, la
+casella del 17 ottobre, la celebrazione, il footer, il titolo della pagina e il manifest della PWA.
+
+**Se cambia qualcosa, cambia anche qui:**
+
+| Cosa | Dove |
+| --- | --- |
+| Nomi squadra / evento / luogo | `src/data/event.ts` |
+| Colori della bandiera | `TRICOLORE` in `src/data/event.ts` + i token `--flag-*` in `globals.css` |
+| Sigla sull'icona (MPT) | `scripts/generate-icons.mjs` → poi `npm run icons` |
+| Titolo e anteprima social | `index.html` (`<title>`, `og:*`, `apple-mobile-web-app-title`) |
+| Nome e descrizione della PWA | `vite.config.ts` → blocco `manifest` |
+
+**L'elenco delle atlete.** L'app non contiene nomi: sono un dato personale e non me li sono inventati.
+Se volete una dedica nominativa, aggiungetela in `src/data/event.ts`, per esempio:
+
+```ts
+export const ROSTER = ['Nome 1', 'Nome 2', 'Nome 3'];
+```
+
+e usatela in `FINALE_COPY` o in `messages.ts`. Il posto giusto per farlo è il gran finale (casella 31)
+o il rituale della vigilia.
+
+> Nota sul tono: i testi parlano di **gara**, non di risultato. Non c'è nessuna frase che promette
+> una vittoria — è una scelta voluta, e c'è un test che la protegge.
+
+---
+
+## 8. Come cambiare la data finale
 
 In `src/utils/dates.ts`:
 
@@ -346,15 +629,22 @@ Vuoi un calendario più lungo o più corto? Cambia `CALENDAR_LENGTH` e aggiungi 
 
 ---
 
-## 8. Test
+## 9. Test
 
-Il progetto include **21 test** sulla logica temporale e sui contenuti (Node 20+):
+Il progetto include **37 test** (Node 20+), su due file:
+
+```bash
+npm test
+```
+
+oppure, singolarmente:
 
 ```bash
 node --experimental-strip-types --test src/utils/dates.test.ts
+node --experimental-strip-types --test src/data/event.test.ts
 ```
 
-Coprono, tra le altre cose:
+**Date e calendario** (`dates.test.ts`)
 
 - il target è il 17 ottobre dell'anno giusto, e il 17 ottobre stesso non slitta all'anno dopo;
 - la finestra finisce sempre il 17 ottobre e **la casella di oggi esiste in ogni giorno del percorso**;
@@ -362,7 +652,18 @@ Coprono, tra le altre cose:
 - gli stati `locked` / `today` / `past` rispettano la data reale, compreso il passaggio di mezzanotte;
 - il countdown conta i giorni reali e si azzera il 17 ottobre;
 - `addDays` attraversa il cambio di mese e di ora legale senza slittamenti di ora;
-- tutte le caselle possibili hanno un messaggio, con titoli e testi tutti diversi.
+- i messaggi sono coerenti: numerazione senza buchi (posizioni assolute + ancoraggi finali), testi e
+  titoli tutti diversi.
+
+**Squadra ed evento** (`event.test.ts`)
+
+- competizione, squadra e nazione sono descritte con nome, sigla, luogo e specialità;
+- il tricolore ha tre colori distinti e validi;
+- **il gran finale è sempre l'ultima casella, con 30 o con 31 caselle**, e nomina il Mondiale, il
+  Paraguay e la squadra;
+- il resolver `findMessage` copre ogni casella di ogni lunghezza, senza buchi né doppioni;
+- le ultime caselle non sono mai ironiche: la chiusura resta emotiva;
+- nessun testo promette una vittoria.
 
 Controllo dei tipi:
 
@@ -372,7 +673,7 @@ npm run typecheck
 
 ---
 
-## 9. Accessibilità e prestazioni
+## 10. Accessibilità e prestazioni
 
 **Accessibilità**
 
@@ -384,6 +685,8 @@ npm run typecheck
 - Tutti i controlli interattivi hanno un'area di tocco di almeno **44×44 px**, e i focus state sono
   ben visibili (`:focus-visible`).
 - Il contrasto del testo principale supera **4,5:1** in entrambi i temi.
+- Il tricolore è decorativo e marcato `aria-hidden`, tranne la bandierina dell'header che ha
+  `role="img"` e `aria-label="Bandiera italiana"`: chi usa VoiceOver sa chi si rappresenta.
 - C'è un link "Salta al calendario" per la navigazione da tastiera.
 - `prefers-reduced-motion` è rispettato fino in fondo: spariscono particelle, shimmer, flip 3D,
   parallax e coriandoli, le animazioni continue si fermano, e la griglia torna allineata. L'app
@@ -395,7 +698,7 @@ npm run typecheck
 - Nessun canvas, nessuna immagine pesante (le uniche immagini sono 4 icone PNG), nessun font
   scaricato: si usano i font di sistema (`ui-rounded` / serif di sistema).
 - `backdrop-filter` ridotto sugli schermi piccoli e disattivato sulle card.
-- Bundle: **~129 kB gzip di JS** e **~7 kB gzip di CSS**.
+- Bundle: **~130 kB gzip di JS** e **~7,5 kB gzip di CSS**.
 - La stampa è gestita: niente decorazioni, solo i contenuti.
 
 ---

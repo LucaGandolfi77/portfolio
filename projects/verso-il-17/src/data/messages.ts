@@ -20,8 +20,22 @@
 export type MessageType = 'motivation' | 'poem' | 'thought' | 'funny';
 
 export interface DailyMessage {
-  /** Posizione nel calendario: 1..31. Deve combaciare con l'indice della casella. */
+  /**
+   * Posizione nel calendario: 1..31.
+   *
+   * Nella maggior parte dei casi è una posizione assoluta (dall'inizio del
+   * percorso). Le due caselle finali usano invece `anchor: 'end'`, così restano
+   * l'ultima e la penultima qualunque sia la lunghezza del calendario.
+   */
   day: number;
+  /**
+   * 'start' (predefinito): la casella numero `day` dall'inizio.
+   * 'end': la casella a `day` posizioni dalla fine (1 = ultima).
+   *
+   * Serve perché il calendario ha 30 caselle nel percorso classico e 31 se si
+   * apre il diario il 17 settembre: il gran finale deve essere sempre l'ultimo.
+   */
+  anchor?: 'start' | 'end';
   type: MessageType;
   /** Riga breve in maiuscoletto sopra il testo. */
   title: string;
@@ -258,7 +272,8 @@ export const messages: DailyMessage[] = [
     emoji: '👏',
   },
   {
-    day: 28,
+    day: 4,
+    anchor: 'end',
     type: 'motivation',
     title: 'La valigia',
     message:
@@ -266,14 +281,16 @@ export const messages: DailyMessage[] = [
     emoji: '🔥',
   },
   {
-    day: 29,
+    day: 3,
+    anchor: 'end',
     type: 'poem',
     title: 'Vigilia',
     message: 'Domani\nla musica sarà più forte,\nle mani più sudate,\nil cuore più veloce.\nUn’altra lingua\nper dire il nostro nome.\nE andrà bene così.',
     emoji: '🕯️',
   },
   {
-    day: 30,
+    day: 2,
+    anchor: 'end',
     type: 'thought',
     title: 'La notte prima',
     message:
@@ -282,7 +299,8 @@ export const messages: DailyMessage[] = [
     ritual: 'Un respiro lungo. Le spalle giù. Le ruote sono già pronte.',
   },
   {
-    day: 31,
+    day: 1,
+    anchor: 'end',
     type: 'motivation',
     title: '17 ottobre · Campionati del Mondo',
     message:
@@ -291,6 +309,19 @@ export const messages: DailyMessage[] = [
     ritual: 'Respira. Guarda le tue compagne. Sorridi. È il vostro momento.',
   },
 ];
+
+/**
+ * Trova il messaggio di una casella. È l'unico modo corretto di leggerli:
+ * il calendario può avere 30 o 31 caselle, e le due finali sono ancorate alla fine.
+ *
+ * @param index posizione della casella (1-based)
+ * @param total numero totale di caselle del calendario visualizzato
+ */
+export function findMessage(index: number, total: number): DailyMessage | undefined {
+  return messages.find((m) =>
+    (m.anchor ?? 'start') === 'end' ? total - m.day + 1 === index : m.day === index,
+  );
+}
 
 /**
  * Rituale di riserva, usato come micro-rituale per le caselle che non ne hanno

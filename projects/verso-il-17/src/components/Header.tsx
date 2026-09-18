@@ -40,6 +40,19 @@ export function Header({
     <header className={`header ${isEventDay ? 'header--event' : ''}`}>
       <Sparkles count={10} seed={3} variant="local" className="header__sparkles" />
 
+      <motion.div
+        className="header__crest"
+        initial={prefersReducedMotion ? false : { opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.61, 0.36, 1] }}
+      >
+        <Tricolore />
+        <span className="header__crest-text">
+          <strong>{TEAM.name}</strong>
+          <span className="header__crest-country">{TEAM.country}</span>
+        </span>
+      </motion.div>
+
       <div className="header__top">
         <motion.div
           className="header__title"
@@ -47,14 +60,6 @@ export function Header({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 0.61, 0.36, 1] }}
         >
-          <span className="header__crest">
-            <Tricolore />
-            <span className="header__crest-text">
-              <strong>{TEAM.name}</strong>
-              <span className="header__crest-country">{TEAM.country}</span>
-            </span>
-          </span>
-
           <h1 className="header__heading">Verso il 17 ottobre</h1>
 
           <p className="header__subtitle">

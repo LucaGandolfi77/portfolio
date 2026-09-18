@@ -83,6 +83,7 @@ export function CalendarGrid({
             key={day.key}
             day={day}
             order={i}
+            totalDays={days.length}
             state={resolveCardState(day, openedKeys.includes(day.key), now)}
             hasHiddenStar={hasHiddenStar(day.index)}
             hiddenStarFound={openedKeys.includes(day.key)}

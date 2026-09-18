@@ -117,14 +117,37 @@ html,
 body {
   margin: 0;
   padding: 0;
-  /* Nessuno scroll orizzontale, mai. */
-  overflow-x: hidden;
   max-width: 100%;
+}
+
+/*
+ * NIENTE `overflow-x: hidden` qui.
+ *
+ * Per specifica, un asse `hidden` con l'altro `visible` rende il secondo `auto`:
+ * `overflow-x: hidden` su html E body li trasformava in DUE contenitori di scroll
+ * annidati. Il gesto del dito veniva consumato dal contenitore interno (che non ha
+ * nulla da scorrere) e non arrivava mai a quello della pagina: su iPhone lo scroll
+ * si bloccava del tutto. Misurato: con `hidden` un trascinamento tattile scorreva
+ * 0px sul'app reale, con `clip` scorre normalmente.
+ *
+ * `overflow-x: clip` ritaglia l'overflow orizzontale SENZA creare un contenitore
+ * di scroll (l'asse verticale resta `visible`), quindi non interferisce con lo
+ * scorrimento. È supportato da Safari 16+, cioè da tutti gli iPhone di questa app.
+ * Su browser più vecchi la regola viene ignorata: pazienza, tanto l'app non
+ * produce overflow orizzontale (verificato su iPhone SE, 15 Pro, iPad e desktop).
+ */
+@supports (overflow-x: clip) {
+  html,
+  body {
+    overflow-x: clip;
+  }
 }
 
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Sul documento, non su body: così vale davvero per il viewport. */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -136,13 +159,22 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overscroll-behavior-y: none;
 }
 
-/* Blocco dello scroll quando una modale è aperta, senza salti di layout. */
+/*
+ * Blocco dello scroll quando una modale è aperta.
+ * Va applicato ANCHE a html, perché è html il contenitore di scroll della pagina:
+ * `overflow: hidden` sul solo body viene ignorato da iOS Safari.
+ */
 body.is-locked {
   overflow: hidden;
   touch-action: none;
+}
+
+@supports selector(html:has(body)) {
+  html:has(body.is-locked) {
+    overflow: hidden;
+  }
 }
 
 h1,
@@ -1325,12 +1357,31 @@ html[data-theme='dark'] .modal__backdrop {
   gap: 6px;
   padding: 6px 4px;
 }
+/* Le righe entrano una dopo l'altra con un piccolo salita.
+   REGOLA IMPORTANTE: il testo è leggibile SEMPRE, di default. L'animazione è
+   solo un abbellimento e agisce sulla trasformazione, mai sull'opacità: se per
+   qualsiasi motivo non parte (animazioni ridotte, scheda in background, browser
+   che ignora la regola) il messaggio resta comunque perfettamente visibile. */
 .modal__line {
   font-family: var(--font-quote);
   font-size: clamp(17px, 4.9vw, 20px);
   line-height: 1.55;
   color: var(--text);
   text-wrap: pretty;
+  opacity: 1;
+}
+
+@keyframes lineRise {
+  from {
+    transform: translateY(9px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.modal__body.is-visible .modal__line {
+  animation: lineRise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 .modal__line + .modal__line {
   font-style: italic;
@@ -1402,6 +1453,11 @@ html[data-theme='dark'] .modal__backdrop {
   padding: 0 calc(var(--sar) + 14px) 0 calc(var(--sal) + 14px);
   pointer-events: none;
 }
+/*
+ * Il toast è visibile SEMPRE: l'opacità di partenza è 1 e l'animazione di entrata
+ * è solo un abbellimento. Così un messaggio non può mai restare invisibile se
+ * l'animazione non parte (è successo davvero, con Framer Motion).
+ */
 .toast {
   display: inline-flex;
   align-items: center;
@@ -1418,6 +1474,32 @@ html[data-theme='dark'] .modal__backdrop {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: auto;
+  opacity: 1;
+  animation: toastIn 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/*
+ * Volutamente SOLO trasformazione: l'opacità resta 1 per tutta l'animazione.
+ * Un'animazione che parte da `opacity: 0` rende il messaggio invisibile ogni
+ * volta che non viene eseguita (animazioni ridotte, scheda in background,
+ * frame non prodotti). Un messaggio da leggere non può correre questo rischio:
+ * al massimo entra senza dissolvenza.
+ */
+@keyframes toastIn {
+  from {
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Uscita: stessa durata di EXIT_MS (useAnimatedExit.ts), che smonta dopo. */
+.toast--leaving {
+  animation: none;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: opacity 0.24s ease-in, transform 0.24s ease-in;
 }
 .toast svg {
   flex-shrink: 0;
@@ -1816,6 +1898,21 @@ html[data-theme='dark'] .celebration__wash {
     scroll-behavior: auto !important;
   }
 
+  /* Toast e suggerimenti: nessuna animazione, ma sempre leggibili. */
+  .toast,
+  .installhint {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Il testo è subito fermo e leggibile. */
+  .modal__body.is-visible .modal__line,
+  .modal__line {
+    animation: none !important;
+    transform: none !important;
+  }
+
   /* Le decorazioni continue spariscono del tutto: l'app resta identica ma ferma. */
   .backdrop__blob,
   .trail,
@@ -1855,6 +1952,33 @@ html[data-theme='dark'] .celebration__wash {
 
 /* Su iOS il blur del backdrop-filter su troppi elementi costa: lo riduciamo
    sugli schermi piccoli mantenendo l'effetto vetro dove serve davvero. */
+/* Entrata del suggerimento di installazione: anche qui solo trasformazione. */
+.installhint {
+  opacity: 1;
+  animation: hintIn 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes hintIn {
+  from {
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.installhint--leaving {
+  animation: none;
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  transition: opacity 0.24s ease-in, transform 0.24s ease-in;
+}
+
+/* Il pulsante "Rivedi il rituale" non serve senza un rituale da rivedere. */
+.btn[hidden] {
+  display: none;
+}
+
 @media (max-width: 480px) {
   .header,
   .countdown {
@@ -1921,16 +2045,21 @@ html[data-theme='dark'] .celebration__wash {
 }
 
 /* --- Stemma di testata: bandierina + nome squadra --- */
+/* Riga dello stemma: occupa tutta la larghezza sopra titolo e controlli,
+   così su iPhone non finisce mai sotto i pulsanti. */
 .header__crest {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px 5px 6px;
+  justify-content: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 14px;
+  padding: 6px 14px 6px 7px;
   border-radius: 999px;
   background: var(--card-soft);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-soft);
-  margin-bottom: 8px;
 }
 
 .header__crest-text {
@@ -1948,6 +2077,8 @@ html[data-theme='dark'] .celebration__wash {
   text-transform: uppercase;
   color: var(--text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header__crest-country {

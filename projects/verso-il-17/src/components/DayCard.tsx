@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { EVENT, TEAM } from '../data/event';
-import { MESSAGE_TYPE_LABEL, messages, type MessageType } from '../data/messages';
+import { MESSAGE_TYPE_LABEL, findMessage, type DailyMessage, type MessageType } from '../data/messages';
 import { getDayStatus, type CalendarDay, type DayStatus } from '../utils/dates';
 
 export type CardState = DayStatus | 'opened';
@@ -30,6 +30,8 @@ interface DayCardProps {
   onHiddenStar: (day: CalendarDay) => void;
   /** Indice progressivo usato per lo stagger dell'ingresso. */
   order: number;
+  /** Numero totale di caselle: serve a risolvere correttamente le caselle finali. */
+  totalDays: number;
 }
 
 const TYPE_ICON: Record<MessageType, typeof Heart> = {
@@ -39,8 +41,8 @@ const TYPE_ICON: Record<MessageType, typeof Heart> = {
   funny: Smile,
 };
 
-function messageFor(day: CalendarDay) {
-  return messages.find((m) => m.day === day.index);
+function messageFor(day: CalendarDay, totalDays: number): DailyMessage | undefined {
+  return findMessage(day.index, totalDays);
 }
 
 function ariaLabelFor(day: CalendarDay, state: CardState): string {
@@ -80,10 +82,11 @@ export function DayCard({
   onLocked,
   onHiddenStar,
   order,
+  totalDays,
 }: DayCardProps) {
   const prefersReducedMotion = useReducedMotion();
   const shakeRef = useRef<HTMLButtonElement | null>(null);
-  const message = messageFor(day);
+  const message = messageFor(day, totalDays);
   const TypeIcon = message ? TYPE_ICON[message.type] : SparklesIcon;
   const isToday = state === 'today';
   const isLocked = state === 'locked';

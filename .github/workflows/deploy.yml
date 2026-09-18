@@ -21,6 +21,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------------------- PWA
+      # La PWA "Verso il 17 ottobre" è un progetto Vite: va compilata prima di
+      # pubblicare, perché `dist/` è in .gitignore e non esiste nel repository.
+      # La build finisce in /verso-il-17/ (radice della repo), quindi l'app sarà
+      # raggiungibile su https://<utente>.github.io/<repo>/verso-il-17/
+      # Node 22 è il minimo per due motivi:
+      #  - Vite 8 richiede ^20.19 || >=22.12
+      #  - i test usano `node --experimental-strip-types`, disponibile da Node 22.6
+      # Con Node 20 il passo dei test fallirebbe e bloccherebbe il deploy del sito.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: projects/verso-il-17/package-lock.json
+
+      - name: Installa le dipendenze della PWA
+        working-directory: projects/verso-il-17
+        run: npm ci
+
+      - name: Test della PWA (bloccano il deploy se rossi)
+        working-directory: projects/verso-il-17
+        run: npm test
+
+      - name: Build della PWA
+        working-directory: projects/verso-il-17
+        # Il nome della repo viene letto da GitHub: se la rinomini, il percorso
+        # base si aggiorna da solo e l'app continua a funzionare.
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/verso-il-17/
+        run: npm run build:pages
+
+      # node_modules non deve finire nell'artefatto pubblicato: sono centinaia
+      # di MB e rallenterebbero (o farebbero fallire) il deploy.
+      - name: Rimuove node_modules dall'artefatto
+        run: rm -rf projects/verso-il-17/node_modules projects/verso-il-17/dist
+      # -------------------------------------------------------------------
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
