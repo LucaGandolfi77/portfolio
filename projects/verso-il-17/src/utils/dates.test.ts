@@ -207,11 +207,19 @@ test('i contenuti coprono ogni casella possibile, uno per casella, tutti diversi
     MAX_CALENDAR_LENGTH,
     `servono ${MAX_CALENDAR_LENGTH} messaggi (una casella in più per chi apre il 17 settembre)`,
   );
-  const indexes = messages.map((m) => m.day);
+  // Le caselle iniziali usano posizioni assolute; le due finali sono ancorate
+  // alla fine, così restano l'ultima e la penultima con 30 o con 31 caselle.
+  const startAnchored = messages.filter((m) => (m.anchor ?? 'start') === 'start');
+  const endAnchored = messages.filter((m) => m.anchor === 'end');
   assert.deepEqual(
-    [...indexes].sort((a, b) => a - b),
-    Array.from({ length: MAX_CALENDAR_LENGTH }, (_, i) => i + 1),
-    `ogni casella 1..${MAX_CALENDAR_LENGTH} deve avere esattamente un messaggio`,
+    startAnchored.map((m) => m.day).sort((a, b) => a - b),
+    Array.from({ length: startAnchored.length }, (_, i) => i + 1),
+    'le caselle dall’inizio devono essere numerate 1..N senza buchi',
+  );
+  assert.deepEqual(
+    endAnchored.map((m) => m.day).sort((a, b) => a - b),
+    [1, 2, 3, 4],
+    'devono esserci esattamente quattro caselle ancorate alla fine',
   );
   const bodies = messages.map((m) => m.message.trim());
   assert.equal(new Set(bodies).size, bodies.length, 'nessun testo duplicato');

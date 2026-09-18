@@ -9,17 +9,43 @@ import { VitePWA } from 'vite-plugin-pwa';
  * è supportato correttamente da Safari 11.3+ e rende l'app utilizzabile offline
  * una volta aggiunta alla schermata Home.
  */
+/**
+ * Percorso base dell'app.
+ *
+ * GitHub Pages serve il sito dentro una sottocartella con il nome del repository:
+ *   https://<utente>.github.io/portfolio/verso-il-17/
+ * quindi `base` deve valere `/portfolio/verso-il-17/`.
+ *
+ * In locale (npm run dev / npm run preview) il base resta `/`.
+ *
+ * Si imposta con la variabile d'ambiente BASE_PATH:
+ *   BASE_PATH=/portfolio/verso-il-17/ npm run build
+ * La normalizzazione qui sotto accetta sia "portfolio/x" sia "/portfolio/x/"
+ * e produce sempre "/portfolio/x/", come richiede Vite.
+ */
+function resolveBase(): string {
+  const raw = process.env.BASE_PATH?.trim();
+  if (!raw || raw === '/') return '/';
+  return `/${raw.replace(/^\/+|\/+$/g, '')}/`;
+}
+
+const base = resolveBase();
+
 export default defineConfig({
-  // Il progetto è pensato per essere servito da una cartella dedicata (root del sito).
-  // Per pubblicarlo in una sottocartella, cambia `base` in '/nome-cartella/' e
-  // aggiorna il percorso di registrazione del service worker in src/main.tsx.
-  base: '/',
+  base,
   build: {
     target: 'es2020',
     cssTarget: 'safari15',
     sourcemap: false,
   },
   plugins: [
+    {
+      // Utile per accorgersi subito se il base non è quello atteso.
+      name: 'log-base-path',
+      configResolved(config) {
+        console.log(`\n  ➜  base path: ${config.base}\n`);
+      },
+    },
     react(),
     VitePWA({
       strategies: 'generateSW',

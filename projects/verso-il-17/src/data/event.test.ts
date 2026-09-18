@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { AMBIENT_LINES, EVENT, EVENT_YEAR, FINALE_COPY, FOOTER_LINES, TEAM, TRICOLORE } from './event.ts';
-import { EGG_LINES, INTRO_LINES, LOCKED_LINES, messages } from './messages.ts';
+import { EGG_LINES, INTRO_LINES, LOCKED_LINES, findMessage, messages } from './messages.ts';
 
 /** Il testo completo dei messaggi, per le ricerche. */
 const allMessageText = messages.map((m) => `${m.title} ${m.message}`).join('\n');
@@ -68,21 +68,67 @@ test('il Mondiale è citato come traguardo, non come sfondo', () => {
   assert.match(allMessageText, /palco più grande/);
 });
 
-test('il gran finale (ultima casella) riassume squadra, nazione e luogo', () => {
-  const last = messages.find((m) => m.day === 31);
-  assert.ok(last, 'la casella 31 deve esistere');
-  assert.match(last.message, /Monza/);
-  assert.match(last.message, /Paraguay/);
-  assert.match(last.title, /Campionati del Mondo/);
+test('il gran finale è SEMPRE l’ultima casella, con 30 o con 31 caselle', () => {
+  for (const total of [30, 31]) {
+    const last = findMessage(total, total);
+    assert.ok(last, `manca il messaggio finale con ${total} caselle`);
+    assert.match(last.title, /Campionati del Mondo/, `con ${total} caselle il finale è "${last.title}"`);
+    assert.match(last.message, /Monza/);
+    assert.match(last.message, /Paraguay/);
+  }
 });
 
-test('la vigilia prepara al viaggio senza spoilerare il giorno della gara', () => {
-  const vigilia = messages.find((m) => m.day === 30);
-  assert.ok(vigilia);
-  assert.match(vigilia.message, /compagne|squadra/);
-  const poem = messages.find((m) => m.day === 29);
-  assert.ok(poem);
-  assert.match(poem.message, /Un’altra lingua/, 'la poesia della vigilia parla di gareggiare lontano');
+test('gli ultimi giorni preparano alla gara, qualunque sia la lunghezza del calendario', () => {
+  for (const total of [30, 31]) {
+    // La penultima è sempre una casella "della vigilia": con 30 caselle è la
+    // poesia della vigilia, con 31 è "La notte prima".
+    const penultima = findMessage(total - 1, total);
+    assert.ok(penultima, `manca la penultima con ${total} caselle`);
+    assert.match(penultima.title, /Vigilia|La notte prima/);
+
+    // Le ultime quattro caselle sono sempre le stesse, ancorate alla fine:
+    // vigilia, poesia del viaggio, notte prima e gran finale.
+    assert.match(findMessage(total - 2, total)!.message, /Un’altra lingua/);
+    assert.match(findMessage(total - 2, total)!.title, /Vigilia/);
+
+    // Nel calendario completo (31 caselle, apertura il 17 settembre) c'è anche
+    // la casella dei preparativi: la valigia per il Paraguay.
+    if (total === 31) {
+      const hasValigia = [total - 1, total - 2, total - 3, total - 4].some((i) =>
+        /valigia/i.test(findMessage(i, total)?.title ?? ''),
+      );
+      assert.ok(hasValigia, 'nel calendario completo manca "La valigia"');
+    }
+
+    // Le ultime quattro caselle non contengono mai un messaggio "divertente":
+    // la chiusura è sempre emotiva.
+    for (const i of [total, total - 1, total - 2]) {
+      assert.notEqual(
+        findMessage(i, total)!.type,
+        'funny',
+        `la casella ${i} di ${total} non deve essere ironica`,
+      );
+    }
+  }
+});
+
+test('il resolver copre ogni casella di ogni lunghezza, senza buchi né doppioni', () => {
+  for (const total of [30, 31]) {
+    const titles = [];
+    for (let index = 1; index <= total; index += 1) {
+      const m = findMessage(index, total);
+      assert.ok(m, `con ${total} caselle manca il messaggio per la casella ${index}`);
+      titles.push(m.title.trim());
+    }
+    assert.equal(new Set(titles).size, total, `con ${total} caselle ci sono messaggi ripetuti`);
+  }
+});
+
+test('la prima casella apre il diario e la seconda presenta la squadra', () => {
+  for (const total of [30, 31]) {
+    assert.match(findMessage(1, total)!.title, /Il diario si apre/);
+    assert.match(findMessage(2, total)!.message, /Monza Precision Team/);
+  }
 });
 
 test('le frasi decorative includono il viaggio e la squadra', () => {
@@ -102,8 +148,8 @@ test('nessun testo promette una vittoria: si parla di gara, non di risultato', (
   assert.doesNotMatch(allMessageText, vietati);
 });
 
-test('i messaggi restano coerenti: 31 caselle, testi tutti diversi', () => {
-  assert.equal(messages.length, 31);
+test('i messaggi restano coerenti: testi e titoli tutti diversi', () => {
+  assert.equal(messages.length, 31, 'i messaggi sono 31: uno in più del percorso classico');
   const bodies = messages.map((m) => m.message.trim());
   assert.equal(new Set(bodies).size, bodies.length);
   const titles = messages.map((m) => m.title.trim());

@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Feather, Heart, RotateCcw, Smile, Sparkles as SparklesIcon, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FALLBACK_RITUAL, MESSAGE_TYPE_LABEL, messages, type MessageType } from '../data/messages';
+import { FALLBACK_RITUAL, MESSAGE_TYPE_LABEL, findMessage, type MessageType } from '../data/messages';
 import { formatDayFull, type CalendarDay } from '../utils/dates';
 import { Sparkles as SparkleField } from './Sparkles';
 import { EXIT_MS, useAnimatedExit } from '../hooks/useAnimatedExit';
@@ -42,8 +42,7 @@ function ritualFor(day: CalendarDay, isAlreadyRead: boolean, total: number): str
   // Le caselle già lette non si ripetono, tranne negli ultimi giorni (vigilia e finale),
   // dove il rituale fa parte del momento.
   if (isAlreadyRead && !isSpecialDay(day.index, total)) return null;
-  const message = messages.find((m) => m.day === day.index);
-  return message?.ritual ?? FALLBACK_RITUAL;
+  return findMessage(day.index, total)?.ritual ?? FALLBACK_RITUAL;
 }
 
 /**
@@ -82,26 +81,15 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
     onReadRef.current = onRead;
   }, [onClose, onRead]);
 
-  const message = useMemo(() => messages.find((m) => m.day === day?.index), [day]);
-
   /**
-   * L'uscita è gestita da noi (vedi useAnimatedExit): dentro la card ci sono
-   * stelline animate all'infinito, e con AnimatePresence l'albero non verrebbe
-   * mai rimosso.
-   */
-  const { leaving, requestExit, reset } = useAnimatedExit(() => onCloseRef.current());
-  // Ogni nuova casella apre una modale pulita, mai gia in uscita.
-  useEffect(() => {
-    if (day) reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day?.key, reset]);
-
-  /**
-   * "Già letta" viene fotografato UNA volta per apertura, non letto a ogni render.
+   * "Già letta" e il totale delle caselle vengono fotografati UNA volta per apertura,
+   * non letti a ogni render.
    *
    * È importante: pochi istanti dopo l'apertura la casella viene marcata come letta,
    * quindi `isAlreadyRead` passa da false a true. Se l'effetto di reset dipendesse da
    * quel valore, si riavvierebbe subito e il micro-rituale non finirebbe mai.
+   *
+   * Devono stare PRIMA del calcolo del messaggio: `findMessage` ha bisogno del totale.
    */
   const alreadyReadSnapshot = useRef(isAlreadyRead);
   const totalDaysSnapshot = useRef(totalDays);
@@ -115,6 +103,23 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
   if (!day && wasOpen.current) {
     wasOpen.current = false;
   }
+
+  const message = useMemo(
+    () => (day ? findMessage(day.index, totalDaysSnapshot.current) : undefined),
+    [day],
+  );
+
+  /**
+   * L'uscita è gestita da noi (vedi useAnimatedExit): dentro la card ci sono
+   * stelline animate all'infinito, e con AnimatePresence l'albero non verrebbe
+   * mai rimosso.
+   */
+  const { leaving, requestExit, reset } = useAnimatedExit(() => onCloseRef.current());
+  // Ogni nuova casella apre una modale pulita, mai gia in uscita.
+  useEffect(() => {
+    if (day) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day?.key, reset]);
 
   // Reset dello stato a ogni apertura + decisione sul rituale.
   useEffect(() => {
@@ -138,10 +143,10 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
   }, [day?.key, stage]);
 
   useEffect(() => {
-    if (stage === 'message') {
-      const timer = window.setTimeout(() => setWordsVisible(true), prefersReducedMotion ? 0 : 420);
-      return () => window.clearTimeout(timer);
-    }
+    if (stage !== 'message') return;
+    // Piccola pausa: il testo arriva dopo la card, non insieme.
+    const timer = window.setTimeout(() => setWordsVisible(true), prefersReducedMotion ? 0 : 420);
+    return () => window.clearTimeout(timer);
   }, [stage, prefersReducedMotion]);
 
   // Focus, blocco dello scroll e chiusura con Esc.
@@ -311,21 +316,15 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
                     {message.title}
                   </h3>
 
-                  <div className="modal__body" id="modal-body">
+                  <div className={`modal__body ${wordsVisible ? 'is-visible' : ''}`} id="modal-body">
                     {words.map((line, lineIndex) => (
-                      <motion.p
+                      <p
                         key={`${line}-${lineIndex}`}
                         className="modal__line"
-                        initial={prefersReducedMotion ? false : { opacity: 0, y: 10, filter: 'blur(4px)' }}
-                        animate={wordsVisible ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
-                        transition={{
-                          duration: 0.55,
-                          delay: prefersReducedMotion ? 0 : lineIndex * 0.22,
-                          ease: [0.22, 0.61, 0.36, 1],
-                        }}
+                        style={{ animationDelay: prefersReducedMotion ? '0ms' : `${lineIndex * 160}ms` }}
                       >
                         {line}
-                      </motion.p>
+                      </p>
                     ))}
                   </div>
 

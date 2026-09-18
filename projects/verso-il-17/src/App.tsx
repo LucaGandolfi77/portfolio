@@ -16,7 +16,7 @@ import { Tricolore } from './components/Tricolore';
 
 import { AMBIENT_LINES, FOOTER_LINES } from './data/event';
 import { EVENT, TEAM } from './data/event';
-import { EGG_LINES, LOCKED_LINES, messages } from './data/messages';
+import { EGG_LINES, LOCKED_LINES, findMessage } from './data/messages';
 import { useCountdown } from './hooks/useCountdown';
 import { useEggs } from './hooks/useEggs';
 import { useInstallHint } from './hooks/useInstallHint';
@@ -212,7 +212,7 @@ export default function App() {
   }, [eggs.glitterActive]);
 
   const readCount = opened.length;
-  const finaleMessage = messages.find((m) => m.day === days.length);
+  const finaleMessage = findMessage(days.length, days.length);
 
   return (
     <div className="app">
