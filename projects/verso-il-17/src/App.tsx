@@ -114,6 +114,40 @@ export default function App() {
     };
   }, []);
 
+  /*
+   * Rete di sicurezza per iOS: quando la pagina viene ripristinata dalla cache
+   * di navigazione (bfcache) può conservare una classe di blocco dello scroll
+   * rimasta appesa, e la pagina non si muove più. Se non c'è nessuna modale o
+   * celebrazione aperta, lo stato di blocco non ha motivo di esistere.
+   */
+  useEffect(() => {
+    const onPageShow = () => {
+      const aperto = document.querySelector(
+        '.modal:not(.modal--leaving), .celebration:not(.celebration--leaving)',
+      );
+      if (!aperto) document.body.classList.remove('is-locked');
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
+  /*
+   * Rete di sicurezza per iOS: quando la pagina viene ripristinata dalla cache di
+   * navigazione (bfcache) può conservare una classe di blocco dello scroll rimasta
+   * appesa, e la pagina non si muove più. Se non c'è nessuna modale o celebrazione
+   * aperta, lo stato di blocco non ha motivo di esistere.
+   */
+  useEffect(() => {
+    const onPageShow = () => {
+      const aperto = document.querySelector(
+        '.modal:not(.modal--leaving), .celebration:not(.celebration--leaving)',
+      );
+      if (!aperto) document.body.classList.remove('is-locked');
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
   // La musica si mette in pausa quando l'app va in background.
   useEffect(() => {
     const onVisibility = () => music.handleVisibility();

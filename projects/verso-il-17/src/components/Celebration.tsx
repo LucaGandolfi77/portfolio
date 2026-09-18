@@ -74,7 +74,7 @@ export function Celebration({ open, onClose, readCount, totalCount }: Celebratio
     <>
       {open && (
         <motion.div
-          className="celebration"
+          className={`celebration ${leaving ? 'celebration--leaving' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: leaving ? 0 : 1 }}
           transition={{ duration: leaving ? EXIT_MS / 1000 : 0.5 }}

@@ -218,6 +218,18 @@ function onVisible() {
 document.addEventListener('visibilitychange', onVisible);
 window.addEventListener('focus', onVisible);
 
+/*
+ * Rete di sicurezza per iOS: quando la pagina viene ripristinata dalla cache
+ * di navigazione (bfcache) può conservare una classe di blocco dello scroll
+ * rimasta appesa, e la pagina non si muove più. Se non c'è nessuna modale o
+ * celebrazione aperta, lo stato di blocco non ha motivo di esistere.
+ */
+window.addEventListener('pageshow', () => {
+  const qualcosaAperto =
+    document.querySelector('.modal:not(.modal--leaving), .celebration:not(.celebration--leaving)');
+  if (!qualcosaAperto) document.body.classList.remove('is-locked');
+});
+
 // Il countdown ticka ogni secondo, allineato al confine del secondo.
 countdown.start(() => {
   const fresh = new Date();
