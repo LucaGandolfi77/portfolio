@@ -601,7 +601,7 @@ const PROJECTS_DATA = [
     "id": "pi-pwa-wrapper",
     "title": "Pi Agent PWA — browser wrapper",
     "description": "A PWA shell around the Pi coding agent: streaming chat with tools (read/bash/edit), thinking blocks, model switching, image attachments and extension dialogs. Run the included Node server (npm install && npm start) so the agent can work in your workspaces; install the app for a standalone window.",
-    "href": "projects/pi-pwa-wrapper/index.html",
+    "href": "projects/pi-pwa-wrapper/public/index.html",
     "emoji": "🤖",
     "badge": "AI / PWA",
     "badgeColor": "#6ea8ff"
