@@ -156,6 +156,14 @@ test('i messaggi restano coerenti: testi e titoli tutti diversi', () => {
   assert.equal(new Set(titles).size, titles.length);
 });
 
+test('ogni casella ha il suo rituale, e i rituali sono tutti diversi', () => {
+  const rituals = messages.map((m) => m.ritual);
+  rituals.forEach((r, i) => {
+    assert.ok(typeof r === 'string' && r.trim().length > 0, `manca il rituale al messaggio ${i + 1}`);
+  });
+  assert.equal(new Set(rituals).size, rituals.length, 'ogni giorno deve avere un rituale diverso');
+});
+
 test('la distribuzione dei tipi resta equilibrata', () => {
   const count = (type) => messages.filter((m) => m.type === type).length;
   const total = messages.length;
