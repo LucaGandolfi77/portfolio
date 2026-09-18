@@ -115,9 +115,28 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
    * mai rimosso.
    */
   const { leaving, requestExit, reset } = useAnimatedExit(() => onCloseRef.current());
+
+  /**
+   * Finestra durante la quale un tocco sul velo viene ignorato.
+   * Su iOS il doppio tap è un gesto comune: senza questa guardia il secondo tocco
+   * (che atterra sul velo appena comparso) apriva e richiudeva la modale in un
+   * lampo, dando l'impressione che la casella non si aprisse.
+   *
+   * Si misura con `performance.now()` e non con `Date.now()`: è monotono, quindi
+   * non risente di cambi d'ora o dell'orologio di sistema.
+   */
+  const openedAtRef = useRef(0);
+  const BACKDROP_GUARD_MS = 350;
+  const closeFromBackdrop = () => {
+    if (performance.now() - openedAtRef.current < BACKDROP_GUARD_MS) return;
+    requestExit();
+  };
   // Ogni nuova casella apre una modale pulita, mai gia in uscita.
   useEffect(() => {
-    if (day) reset();
+    if (day) {
+      reset();
+      openedAtRef.current = performance.now();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day?.key, reset]);
 
@@ -185,7 +204,20 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
       document.removeEventListener('keydown', onKeyDown);
       document.body.classList.remove('is-locked');
       window.clearTimeout(timer);
-      previouslyFocused?.focus?.();
+      // `preventScroll` evita che iOS faccia saltare la pagina riportando il
+      // focus sulla casella: un salto di scroll a ridosso del tocco successivo
+      // farebbe finire il dito altrove.
+      try {
+        previouslyFocused?.focus?.({ preventScroll: true });
+      } catch {
+        // `preventScroll` evita che iOS faccia saltare la pagina riportando il focus
+      // sulla casella: un salto a ridosso del tocco successivo manderebbe il dito altrove.
+      try {
+        previouslyFocused?.focus?.({ preventScroll: true });
+      } catch {
+        previouslyFocused?.focus?.();
+      }
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day?.key]);
@@ -197,14 +229,14 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
     <>
       {day && message && (
         <motion.div
-          className="modal"
+          className={`modal ${leaving ? 'modal--leaving' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: leaving ? 0 : 1 }}
           transition={{ duration: leaving ? EXIT_MS / 1000 : 0.28 }}
           role="presentation"
           onClick={(event) => {
             // Solo il velo chiude: la card ferma la propagazione.
-            if (event.target === event.currentTarget) requestExit();
+            if (event.target === event.currentTarget) closeFromBackdrop();
           }}
         >
           <motion.div
@@ -217,7 +249,7 @@ export function MessageModal({ day, isAlreadyRead, totalDays, onClose, onRead }:
             }
             transition={{ duration: leaving ? EXIT_MS / 1000 : 0.34 }}
             aria-hidden="true"
-            onClick={requestExit}
+            onClick={closeFromBackdrop}
           />
 
           <motion.div

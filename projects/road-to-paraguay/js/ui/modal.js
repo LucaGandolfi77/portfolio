@@ -28,12 +28,31 @@ const TYPE_ICON = {
   funny: ICONS.smile,
 };
 
-/** Vigilia e gran finale hanno sempre il loro micro-rituale. */
+/**
+ * Vigilia e gran finale hanno sempre il loro micro-rituale.
+ */
 const isSpecialDay = (index, total) => index >= total - 2;
 
-function ritualFor(day, alreadyRead, total) {
-  if (alreadyRead && !isSpecialDay(day.index, total)) return null;
+/**
+ * Il TESTO del rituale esiste sempre: quello scritto apposta per quel giorno,
+ * oppure quello di riserva. Non dipende dallo stato della casella.
+ *
+ * Prima questa funzione restituiva `null` per una casella già letta, e lo stesso
+ * valore serviva a due scopi diversi: decidere se mostrare il rituale
+ * all'apertura e decidere se il pulsante "Rivedi il rituale" fosse utilizzabile.
+ * Risultato: su una casella già letta il pulsante restava DISABILITATO e il
+ * gestore usciva subito, quindi il rituale si poteva vedere una volta sola.
+ */
+function ritualTextFor(day, total) {
   return findMessage(day.index, total)?.ritual ?? FALLBACK_RITUAL;
+}
+
+/**
+ * Il rituale si mostra DA SOLO solo la prima volta che si apre una casella,
+ * e sempre negli ultimi giorni. Resta però sempre riascoltabile a mano.
+ */
+function shouldShowRitualOnOpen(day, alreadyRead, total) {
+  return !alreadyRead || isSpecialDay(day.index, total);
 }
 
 export function createModal({ onRead, onOpenChange }) {
@@ -41,6 +60,19 @@ export function createModal({ onRead, onOpenChange }) {
   let node = null;
   let timers = [];
   let restoreFocus = null;
+  let openedAt = 0;
+  /**
+   * Finestra durante la quale un tocco sul velo viene ignorato.
+   * Serve contro il doppio tap: su iOS è un gesto comune, e senza questa guardia
+   * il secondo tocco (che atterra sul velo appena comparso) apriva e richiudeva
+   * la modale in un lampo, dando l'impressione che la casella non si aprisse.
+   *
+   * Si misura con `performance.now()` e non con `Date.now()`: è monotono, quindi
+   * non risente di cambi d'ora o dell'orologio di sistema, e resta corretto anche
+   * se il dispositivo aggiusta l'ora.
+   */
+  const BACKDROP_GUARD_MS = 350;
+  const adesso = () => performance.now();
 
   const clearTimers = () => {
     timers.forEach(window.clearTimeout);
@@ -58,7 +90,14 @@ export function createModal({ onRead, onOpenChange }) {
     onOpenChange?.(false);
     window.setTimeout(() => {
       current.remove();
-      restoreFocus?.focus?.();
+      // `preventScroll` evita che iOS faccia saltare la pagina riportando il
+      // focus sulla casella: un salto di scroll a ridosso del tocco successivo
+      // farebbe finire il dito altrove.
+      try {
+        restoreFocus?.focus?.({ preventScroll: true });
+      } catch {
+        restoreFocus?.focus?.();
+      }
       restoreFocus = null;
     }, EXIT_MS);
   }
@@ -100,7 +139,8 @@ export function createModal({ onRead, onOpenChange }) {
     if (!message) return;
 
     restoreFocus = document.activeElement;
-    const ritual = ritualFor(day, alreadyRead, total);
+    const ritual = ritualTextFor(day, total);
+    const mostraRituale = shouldShowRitualOnOpen(day, alreadyRead, total);
 
     node = document.createElement('div');
     node.className = 'modal';
@@ -118,7 +158,7 @@ export function createModal({ onRead, onOpenChange }) {
 
         <div class="ritual" data-ritual hidden>
           <span class="ritual__ring" aria-hidden="true"></span>
-          <p class="ritual__text"></p>
+          <p class="ritual__text">${ritual.replace(/</g, '&lt;')}</p>
           <span class="ritual__hint">respira…</span>
         </div>
 
@@ -139,7 +179,7 @@ export function createModal({ onRead, onOpenChange }) {
           <div class="modal__emoji" aria-hidden="true"><span>${message.emoji ?? '✨'}</span></div>
           <div class="modal__actions">
             <button type="button" class="btn btn--primary" data-close>Chiudi</button>
-            <button type="button" class="btn btn--ghost" data-ritual-again ${ritual ? '' : 'disabled'}>${ICONS.rotate(15)} ${alreadyRead ? 'Il rituale' : 'Rivedi il rituale'}</button>
+            <button type="button" class="btn btn--ghost" data-ritual-again>${ICONS.rotate(15)} Rivedi il rituale</button>
           </div>
         </div>
       </div>
@@ -187,24 +227,31 @@ export function createModal({ onRead, onOpenChange }) {
     }
 
     function showRitual() {
-      if (!ritual) return;
       contentShown = false;
       clearTimers();
       ritualBox.hidden = false;
       contentBox.hidden = true;
       bodyBox.classList.remove('is-visible');
+      // Il testo è già nel markup; qui lo riallineo per sicurezza.
       ritualBox.querySelector('.ritual__text').textContent = ritual;
       timers.push(window.setTimeout(showContent, RITUAL_MS));
     }
 
     node.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', close));
     node.querySelector('[data-ritual-again]')?.addEventListener('click', showRitual);
-    node.querySelector('.modal__backdrop')?.addEventListener('click', close);
+    const backdrop = node.querySelector('.modal__backdrop');
+    backdrop?.addEventListener('click', () => {
+      if (adesso() - openedAt < BACKDROP_GUARD_MS) return;
+      close();
+    });
     node.querySelector('.modal__card')?.addEventListener('click', (event) => event.stopPropagation());
     node.addEventListener('click', (event) => {
-      if (event.target === node) close();
+      if (event.target !== node) return;
+      if (adesso() - openedAt < BACKDROP_GUARD_MS) return;
+      close();
     });
 
+    openedAt = adesso();
     root.append(node);
     document.body.classList.add('is-locked');
     document.addEventListener('keydown', onKeyDown);
@@ -213,7 +260,7 @@ export function createModal({ onRead, onOpenChange }) {
     // Forza un frame prima di aggiungere `is-open`, così la transizione parte.
     requestAnimationFrame(() => node?.classList.add('is-open'));
 
-    if (ritual) showRitual();
+    if (mostraRituale) showRitual();
     else showContent();
 
     timers.push(window.setTimeout(() => qs('.modal__close', node)?.focus(), 260));

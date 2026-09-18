@@ -239,6 +239,33 @@ Sono **37 test** e coprono, tra le altre cose:
 
 ## 8. Note tecniche
 
+### Il micro-rituale, e perché si può sempre rivedere
+
+Alla **prima** apertura di ogni casella compare un micro-rituale di pochi secondi
+(«Respira. Metti giù le spalle. Ricorda perché hai iniziato.»), poi arriva il messaggio.
+Negli ultimi giorni — vigilia e gran finale — il rituale si ripresenta a ogni apertura, perché
+fa parte del momento.
+
+Dal pulsante **«Rivedi il rituale»** si può comunque riascoltare **quante volte si vuole**,
+anche su una casella già letta.
+
+> Questa parte aveva un difetto: il testo del rituale e la decisione di mostrarlo erano la stessa
+> variabile. Per una casella già letta quella variabile diventava `null`, e `null` serviva a due
+> scopi diversi — quindi il pulsante restava **disabilitato** e il gestore usciva subito: il rituale
+> si poteva vedere una volta sola. Ora sono due funzioni distinte: `ritualTextFor()` dice *cosa*
+> dice il rituale (c'è sempre), `shouldShowRitualOnOpen()` dice *se* mostrarlo da solo.
+
+### Gli elementi in uscita non devono rubare i tocchi
+
+Quando la modale si chiude resta nel DOM ancora ~240 ms per l'animazione di uscita. Senza
+`pointer-events: none` continuava a coprire tutto lo schermo e **inghiottiva i tocchi**: chiudendo
+una casella e toccandone subito un'altra — o la stessa, per rileggerla — il tap andava perso.
+Su iOS Safari si nota molto di più, perché il gesto è più lento e il paint può tardare.
+
+Vale per tutti gli elementi che escono: modale, celebrazione, toast e banner di installazione.
+Anche il segno della stellina trovata (`.daycard__found`) è un *fratello* della casella, non un suo
+figlio: senza `pointer-events: none` copriva una piccola zona rendendola non toccabile.
+
 ### Percorsi relativi, sempre
 
 Non c'è un solo percorso assoluto (`/qualcosa`) nel progetto. È ciò che permette di spostare la
@@ -261,6 +288,18 @@ elegante. Le entrance animano quindi solo la trasformazione.
 `sw.js` fa due cose: precarica il guscio dell'app e serve le richieste con una strategia adatta a
 un'app che cambia raramente (rete prima per le pagine, cache prima per le risorse). Sono ~100 righe
 leggibili, senza Workbox. L'unica regola da ricordare è cambiare `CACHE_VERSION` a ogni modifica.
+
+### Altre due accortezze nate da problemi reali
+
+- **Contro il doppio tap su iOS.** Un doppio tap rapido apriva la modale e la richiudeva subito,
+  perché il secondo tocco atterrava sul velo appena comparso. Ora i tocchi sul velo vengono
+  ignorati per i primi 350 ms dall'apertura.
+- **L'orologio usato per misurare è monotono.** Quella guardia usa `performance.now()` e non
+  `Date.now()`: così non risente di cambi d'ora o dell'orologio di sistema.
+- **Rete di sicurezza su `pageshow`.** Se iOS ripristina la pagina dalla cache di navigazione con
+  una classe di blocco dello scroll rimasta appesa, viene ripulita: la pagina non resta immobile.
+- **Il focus torna alla casella senza far saltare la pagina** (`focus({ preventScroll: true })`):
+  un salto di scroll a ridosso del tocco successivo manderebbe il dito altrove.
 
 ### Accessibilità
 
