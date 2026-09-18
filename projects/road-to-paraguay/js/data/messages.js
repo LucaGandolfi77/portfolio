@@ -41,6 +41,7 @@ export const messages = [
     message:
       'Siamo il Monza Precision Team, e quest’anno tocca a noi portare l’Italia in pista. Otto ruote, una musica, una traiettoria sola: non serve aprirle tutte di fila, le cose belle si gustano una alla volta.',
     emoji: '✨',
+    ritual: 'Una mano sul petto. Otto respiri lenti, uno per ogni ruota.',
   },
   {
     day: 3,
@@ -49,6 +50,7 @@ export const messages = [
     message:
       'Quattro ruote per piede, otto in tutto per una sola persona. Eppure la cosa più difficile non è tenerle in equilibrio: è fidarsi di chi ti sta accanto.',
     emoji: '🛼',
+    ritual: 'Chiudi gli occhi e resta in equilibrio su una gamba. Fidati un secondo in più del solito.',
   },
   {
     day: 4,
@@ -57,6 +59,7 @@ export const messages = [
     message:
       'I primi minuti in pista sono sempre i più duri: le gambe rigide, la musica che sembra troppo veloce. Poi il corpo si ricorda cosa fare. Dagli tempo.',
     emoji: '🎧',
+    ritual: 'Resisti dieci secondi in più. Poi il corpo sa già cosa fare.',
   },
   {
     day: 5,
@@ -65,6 +68,7 @@ export const messages = [
     message:
       'Stato attuale: gambe ufficialmente non mie, ma sorriso ancora in funzione. Le ruote hanno vinto, noi abbiamo fatto finta di niente. 🛼',
     emoji: '😅',
+    ritual: 'Sorridi e mettiti in equilibrio. Se stai ridendo, il referto è positivo.',
   },
   {
     day: 6,
@@ -73,6 +77,7 @@ export const messages = [
     message:
       'Cadi sempre nello stesso punto della coreografia? Quel punto ti sta dicendo qualcosa. Ascoltalo invece di odiarlo.',
     emoji: '💭',
+    ritual: 'Torna col pensiero al punto esatto della caduta. Ringrazialo in silenzio, poi riparti.',
   },
   {
     day: 7,
@@ -80,6 +85,7 @@ export const messages = [
     title: 'Otto ruote',
     message: 'Otto ruote,\nuna musica,\nmille respiri,\nun solo cuore:\nda Monza al mondo.',
     emoji: '💗',
+    ritual: 'Un respiro per ogni verso. Non avere fretta che la poesia finisca.',
   },
   {
     day: 8,
@@ -88,6 +94,7 @@ export const messages = [
     message:
       'La pista ricorderà tutti gli allenamenti che nessuno ha visto. Anche quelli di martedì, quando eri stanca e sei venuta lo stesso.',
     emoji: '🌙',
+    ritual: 'Un minuto a luci spente. Nel buio si vedono meglio le cose che nessuno ha guardato.',
   },
   {
     day: 9,
@@ -96,6 +103,7 @@ export const messages = [
     message:
       'Sincronizzarsi non significa muoversi nello stesso momento. Significa imparare a sentirsi, anche a occhi chiusi, anche quando la musica va veloce. Ed è quello che ci porterà in Paraguay.',
     emoji: '🎶',
+    ritual: 'Appoggia una mano sulla spalla di chi hai accanto. Quel segnale vale più di mille parole.',
   },
   {
     day: 10,
@@ -104,6 +112,7 @@ export const messages = [
     message:
       'Il costume non è un vestito: è la promessa che quello che provi in allenamento vale la pena di essere visto. Indossalo come una dichiarazione.',
     emoji: '🎀',
+    ritual: 'Raddrizza le spalle davanti allo specchio. Così sembri già in pista, in Paraguay.',
   },
   {
     day: 11,
@@ -112,6 +121,7 @@ export const messages = [
     message:
       'Ricerca scientifica condotta su di me: il 90% delle mie cadute avviene davanti a qualcuno. Il restante 10% davanti alla persona che volevo impressionare.',
     emoji: '🙃',
+    ritual: 'Fai un passo elegante, adesso che nessuno guarda. Conservalo per quando servirà.',
   },
   {
     day: 12,
@@ -120,14 +130,16 @@ export const messages = [
     message:
       'C’è un momento, prima che parta la musica, in cui vi prendete per mano. È lì che la squadra smette di essere un elenco di nomi.',
     emoji: '🤝',
+    ritual: 'Stringi per un secondo la mano di chi hai accanto. La squadra comincia così.',
   },
   {
     day: 13,
     type: 'thought',
-    title: 'Prima di entrare',
+title: 'Prima di entrare',
     message:
-      'Quell’ansia nello stomaco prima di esibirsi non è il tuo nemico. È il tuo corpo che ti dice che tieni davvero a questa cosa.',
+      'Quell’ansia nello stomaco prima di esibirti non è il tuo nemico. È il tuo corpo che ti dice che tieni davvero a questa cosa.',
     emoji: '🫧',
+    ritual: 'Mani sullo stomaco, un respiro profondo. L’ansia segue il respiro, non il contrario.',
   },
   {
     day: 14,
@@ -136,6 +148,7 @@ export const messages = [
     message:
       'Un braccio più alto di due centimetri. Uno sguardo tre secondi prima. Sono i dettagli che nessuno nota e che fanno sembrare tutto facile.',
     emoji: '🪞',
+    ritual: 'Alza le braccia di due centimetri. Ora che sai com’è fatto, portalo con te.',
   },
   {
     day: 15,
@@ -143,54 +156,61 @@ export const messages = [
     title: 'Prove',
     message: 'La pista è vuota,\nla musica no.\nContiamo otto,\npoi ancora, poi ancora —\nfinché non diventa respiro.',
     emoji: '🎵',
+    ritual: 'Conta otto battiti in silenzio. Poi ricomincia da uno, più piano.',
   },
   {
     day: 16,
     type: 'motivation',
-    title: 'Rialzarsi',
+title: 'Rialzarsi',
     message:
-      'Ogni caduta che hai preso è diventata parte della persona che oggi sa rialzarsi senza pensarci. Non è un dettaglio da poco.',
+      'Cadi, ti rialzi, continui. È la stessa storia di ogni pista. Non è la caduta che conta: è la velocità con cui decidi di ricominciare.',
     emoji: '🌱',
+    ritual: 'Accovacciati e rialzati con calma. Pensa a quante volte l’hai già fatto senza pensarci.',
   },
   {
     day: 17,
     type: 'thought',
-    title: 'Il rumore delle ruote',
+title: 'Il rumore delle ruote',
     message:
-      'C’è un suono che riconosceresti ovunque, anche a occhi chiusi, anche in mezzo alla strada: quello delle ruote che girano tutte insieme.',
+      'Il rumore delle ruote in pista ha un ritmo tutto suo. Occhi chiusi, puoi sentire dove sono tutti, senza guardare.',
     emoji: '🌀',
+    ritual: 'Chiudi gli occhi e ascolta. Da qualche parte, delle ruote stanno girando.',
   },
   {
     day: 18,
     type: 'funny',
-    title: 'Comunicazione ufficiale',
+title: 'Comunicazione ufficiale',
     message:
-      'Comunico ufficialmente che le mie gambe hanno presentato ricorso contro l’allenamento di oggi. Il ricorso è stato respinto per motivi di coreografia.',
+      'Comunicato: dopo approfondita analisi, si è stabilito che la posizione corretta dei piedi è colei che al momento sembra la più sbagliata.',
     emoji: '📋',
+    ritual: 'Fai dieci secondi di glissata sul pavimento di casa. Il ricorso è respinto: la glissata no.',
   },
   {
     day: 19,
     type: 'motivation',
-    title: 'La compagna',
+title: 'La compagna',
     message:
-      'Prima o poi troverai qualcuno che ti guarda mentre provi e ti dice la verità. Tienitela stretta: vale più di cento complimenti.',
+      'C’è quella che ti aspetta quando sbagli, quella che corre a chiederti se stai bene quando cadi, quella che grida più forte di tutte. Ricordati di essere anche tu una di quelle.',
     emoji: '💫',
+    ritual: 'Pensa a chi ti dice la verità. Domani, grazie senza spiegazioni.',
   },
   {
     day: 20,
     type: 'thought',
-    title: 'Sbagliare insieme',
+title: 'Sbagliare insieme',
     message:
-      'Sbagliare insieme è meno grave che sbagliare da soli. Si ride, si rifà, e alla fine viene meglio di come l’avevate immaginata.',
+      'La perfezione non è mai stata il punto. Succede di sbagliare, che si ricomincia, che insieme si va comunque avanti.',
     emoji: '🌷',
+    ritual: 'Fai un errore di proposito e sorridi. Le ruote sono intatte: non è successo nulla.',
   },
   {
     day: 21,
     type: 'motivation',
-    title: 'Disciplina',
+title: 'Disciplina',
     message:
-      'La disciplina non è rigidità. È la forma d’amore più concreta che puoi dare a un sogno che non sa ancora di riuscire. Il nostro sogno, quest’anno, ha una data e un posto sulla mappa.',
+      'La disciplina non è chiederti di più ogni giorno. È mostrarti che le cose si costruiscono un piccolo gesto alla volta.',
     emoji: '🕰️',
+    ritual: 'Un gesto piccolo, ripetuto, fatto bene. Le ruote si ricordano delle ripetizioni.',
   },
   {
     day: 22,
@@ -198,6 +218,7 @@ export const messages = [
     title: 'Traiettorie',
     message: 'Le ruote disegnano\ncurve che nessuno conserva.\nSolo la pista\nsa quante volte\nhai ricominciato.',
     emoji: '🌙',
+    ritual: 'Traccia una curva nell’aria con un dito. È lì che si vede chi ha ricominciato.',
   },
   {
     day: 23,
@@ -206,6 +227,7 @@ export const messages = [
     message:
       'Quando il fischio interrompe la musica non è un giudizio. È solo la possibilità di rifarlo meglio, e le seconde possibilità sono un regalo.',
     emoji: '📣',
+    ritual: 'Ripeti una cosa che oggi è venuta male. Solo una volta, ma fatta bene.',
   },
   {
     day: 24,
@@ -214,6 +236,7 @@ export const messages = [
     message:
       'Nessuno fotografa il corridoio, i capelli da rifare, le scarpe slacciate, le risate nervose. Eppure è lì che succede la parte più bella.',
     emoji: '🎭',
+    ritual: 'Guarda le tue mani, le scarpe, i capelli. C’è bellezza anche dietro le quinte.',
   },
   {
     day: 25,
@@ -222,6 +245,7 @@ export const messages = [
     message:
       'Sintomi rilevati: canticchio la coreografia sotto la doccia e conto gli otto mentre mi lavo i denti. Prognosi: irreversibile. 🛼',
     emoji: '🪥',
+    ritual: 'Canticchia la coreografia e conta gli otto. Diagnosi: non si torna più indietro.',
   },
   {
     day: 26,
@@ -230,6 +254,7 @@ export const messages = [
     message:
       'Il palco non è il posto dove ti giudicano. È il posto dove per tre minuti tutto quello che hai provato diventa visibile. E stavolta quel palco è un Mondiale.',
     emoji: '⭐',
+    ritual: 'Fermati un istante e fissa il punto del palco. È più grande di te, eppure lo riempi tu.',
   },
   {
     day: 27,
@@ -238,6 +263,7 @@ export const messages = [
     message:
       'Gli applausi durano pochi secondi. Il modo in cui ti sei sentita mentre li ricevevi, invece, te lo porti dietro per anni. Chissà che effetto fa sentirli in un’altra lingua.',
     emoji: '👏',
+    ritual: 'Batti le mani tre volte, da solo. Poi saprai che suono farà quando arriverà.',
   },
   {
     day: 4,
@@ -247,6 +273,7 @@ export const messages = [
     message:
       'Nel bagaglio ci finiranno il costume, le ruote di scorta e un po’ di casa. Nell’ultimo giro di una prova si vede chi sei davvero: quando le gambe non ci sono più e decidi comunque di finire con eleganza.',
     emoji: '🔥',
+    ritual: 'Prepara una cosa sola, con calma. La valigia comincia dalla prima cosa.',
   },
   {
     day: 3,
@@ -255,6 +282,7 @@ export const messages = [
     title: 'Vigilia',
     message: 'Domani\nla musica sarà più forte,\nle mani più sudate,\nil cuore più veloce.\nUn’altra lingua\nper dire il nostro nome.\nE andrà bene così.',
     emoji: '🕯️',
+    ritual: 'Soffia via l’aria di stasera. Domani se ne sarà già andata da sola.',
   },
   {
     day: 2,
@@ -295,7 +323,7 @@ export function findMessage(index, total) {
  * Rituale di riserva, usato come micro-rituale per le caselle che non ne hanno
  * uno scritto apposta: così ogni prima apertura ha comunque il suo momento lento.
  */
-export const FALLBACK_RITUAL = 'Respira. Metti giù le spalle. Ricorda perché hai iniziato.';
+export const FALLBACK_RITUAL = 'Fermati un istante. Un respiro profondo. Poi si riparte.';
 
 /** Frasi simpatiche quando si prova ad aprire una casella futura. */
 export const LOCKED_LINES = [
