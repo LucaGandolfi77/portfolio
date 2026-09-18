@@ -74,6 +74,7 @@
     ['solar-system-tracker', 'Solar System Tracker 3D', 'Real-time 3D solar system with JPL orbital elements and Kepler\'s equation.', 'projects/solar_system_tracker.html', '🪐', 'simulation', ['3D', 'Space']],
     ['soundscape-studio', 'Soundscape Studio', 'Ambient sound generator with mixer, equalizer, timer, and offline presets.', 'projects/soundscape-studio/index.html', '🎧', 'audio', ['Audio', 'PWA', 'Offline']],
     ['verso-il-17', 'Verso il 17', 'Countdown diary for Monza Precision Team\'s world roller skating championship.', 'projects/verso-il-17/index.html', '⛸️', 'story', ['Story', 'PWA']],
+    ['countdown-to-san-dunen', 'Countdown to San Dunén', 'Goliardic countdown to October 9, San Donnino patron of Fidenza: 31 boxes with a unique ritual each, and an 8-stage bicycle route from Zheng to the Duomo.', 'projects/countdown-to-san-dunen/index.html', '🚲', 'story', ['Story', 'PWA', 'iPhone']],
     ['web-linux', 'WebLinux', 'Linux terminal emulator in the browser using v86 x86 WASM and xterm.js.', 'projects/web-linux/index.html', '🐧', 'tools', ['Linux', 'Terminal']],
     ['panettone-quiz', 'Quiz Panettone', 'Che panettone sei? Quiz condivisibile per scoprire il tuo panettone ideale.', 'projects/quizzes/panettone_quiz.html', '🧁', 'quiz', ['Quiz', 'Share', 'iPhone']]
   ].map(([id, title, description, href, icon, category, badges]) => ({
