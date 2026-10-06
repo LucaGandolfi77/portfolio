@@ -443,9 +443,22 @@ function getNested(obj, path) {
     return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
 }
 
+// Locales con direzione di scrittura destra-sinistra: senza questo `dir` il
+// testo arabo ed ebraico viene renderizzato con l'allineamento sbagliato.
+const RTL_LANGS = ['ar', 'he', 'fa', 'ur'];
+
 // applyTranslations now uses loadTranslations (async). It sets any [data-i18n] text content.
 async function applyTranslations(lang) {
     const t = await loadTranslations(lang);
+
+    // `<html lang>` non veniva mai aggiornato: la pagina restava dichiarata
+    // lang="en" anche con la UI in cinese, arabo o giapponese. E' il primo
+    // segnale che i motori di ricerca leggono per capire in che lingua e'
+    // la pagina, quindi lasciarlo su "en" rendeva le 11 locali invisibili.
+    document.documentElement.lang = lang || 'en';
+    // E per ar/he il testo va anche letto da destra a sinistra.
+    document.documentElement.dir = RTL_LANGS.includes(lang) ? 'rtl' : 'ltr';
+
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         // prefer nested lookup in fetched JSON, fallback to embedded translations if needed
@@ -456,6 +469,86 @@ async function applyTranslations(lang) {
     });
     const select = document.getElementById('langSelect');
     if (select) select.value = lang || 'en';
+
+    // Le sezioni #experience e #achievements sono generate dai dati i18n:
+    // hanno ruoli, punti e titoli che non starebbero in un data-i18n.
+    renderExperience(t);
+    renderAchievements(t);
+}
+
+// --- #experience e #achievements -------------------------------------
+//
+// I dati arrivano da i18n/<locale>.json -> experience / achievements,
+// scritti da scripts/add_experience_i18n.py. Il markup dei contenitori e' in
+// index.html; qui si riempiono e si ricostruiscono a ogni cambio lingua.
+//
+// I testi sono tutti statici (nessun input utente), ma si usano comunque
+// textContent: se un domani i testi arrivassero da una fonte esterna, questa
+// scelta impedirebbe che vengano interpretati come HTML.
+function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null && text !== '') node.textContent = text;
+    return node;
+}
+
+function renderExperience(t) {
+    const exp = t && t.experience;
+    const rolesBox = document.getElementById('experienceRoles');
+    const eduBox = document.getElementById('experienceEducation');
+    if (!exp || !rolesBox || !eduBox) return;
+
+    rolesBox.innerHTML = '';
+    (exp.roles || []).forEach((r, i) => {
+        const item = el('article', 'timeline-event');
+        // L'alternanza odd/even e' gestita da CSS, quindi basta l'indice.
+        item.style.animationDelay = `${i * 0.08}s`;
+
+        const content = el('div', 'timeline-event-content');
+        content.appendChild(el('div', 'timeline-year', r.period));
+        content.appendChild(el('h3', 'timeline-title', r.role));
+        content.appendChild(el('div', 'timeline-company', r.company));
+        const ul = el('ul', 'exp-points');
+        (r.points || []).forEach(p => ul.appendChild(el('li', null, p)));
+        content.appendChild(ul);
+
+        const dot = el('div', 'timeline-event-dot');
+        item.appendChild(content);
+        item.appendChild(dot);
+        rolesBox.appendChild(item);
+    });
+
+    eduBox.innerHTML = '';
+    (exp.education || []).forEach((e, i) => {
+        const item = el('article', 'timeline-event');
+        item.style.animationDelay = `${i * 0.08}s`;
+
+        const content = el('div', 'timeline-event-content');
+        content.appendChild(el('div', 'timeline-year', e.period));
+        content.appendChild(el('h3', 'timeline-title', e.degree));
+        content.appendChild(el('div', 'timeline-company', e.school));
+        if (e.detail) content.appendChild(el('p', 'timeline-description', e.detail));
+
+        const dot = el('div', 'timeline-event-dot');
+        item.appendChild(content);
+        item.appendChild(dot);
+        eduBox.appendChild(item);
+    });
+}
+
+function renderAchievements(t) {
+    const ach = t && t.achievements;
+    const grid = document.getElementById('achievementsGrid');
+    if (!ach || !grid) return;
+
+    grid.innerHTML = '';
+    (ach.items || []).forEach((a, i) => {
+        const card = el('div', 'achievement-card');
+        card.style.animationDelay = `${i * 0.06}s`;
+        card.appendChild(el('div', 'achievement-label', a.label));
+        card.appendChild(el('div', 'achievement-detail', a.detail));
+        grid.appendChild(card);
+    });
 }
 
 // Load preferred language
@@ -1145,48 +1238,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     })();
 
-    // --- Timeline Events ---
-    const timelineEvents = [
-        { year: 1994, title: '🎂 Nascita', description: 'Sono nato il 28 aprile 1994 a Parma, Italia.' },
-        { year: 2000, title: '🏫 Scuola Elementare', description: 'Inizio il mio percorso scolastico con grande entusiasmo e curiosità.' },
-        { year: 2005, title: '📚 Scuola Media', description: 'Anni formativi dove comincio ad interessarmi di tecnologia e informatica.' },
-        { year: 2011, title: '💻 Primo Approccio alla Programmazione', description: 'Scopro la programmazione durante gli studi liceali, inizia la mia passione per il coding.' },
-        { year: 2013, title: '🎓 Diploma al Liceo', description: 'Ottengo il diploma al Liceo Scientifico con orientamento in Informatica.' },
-        { year: 2013, title: '🚀 Inizio Università', description: 'Mi iscrivo all\'Università per studiare Ingegneria Informatica. Cominciano nuove sfide!' },
-        { year: 2014, title: '🔧 Primo Progetto Professionale', description: 'Realizzo il mio primo progetto reale con JavaScript, HTML e CSS. Una grande soddisfazione!' },
-        { year: 2016, title: '📱 Sviluppo Mobile & Web', description: 'Espando le mie competenze in React, Node.js e sviluppo full-stack. Nascono i primi progetti personali.' },
-        { year: 2018, title: '🎓 Diploma di Laurea', description: 'Ottengo la Laurea in Ingegneria Informatica, Elettronica e delle Telecomunicazioni.' },
-        { year: 2020, title: '🌟 Portfolio e Freelancing', description: 'Lancio il mio portfolio personale e inizio a lavorare come freelancer su vari progetti utilizzando l\'AI.' },
-        { year: 2021, title: '🔧 Inizio Lavoro in Consulenza', description: 'Trovo il mio primo lavoro in Consulenza in una multinazionale nel settore Aerospazio e Difesa.' },
-        { year: 2025, title: '🎯 Oggi - Presente', description: 'Continuo a crescere come sviluppatore, cercando sempre nuove sfide e opportunità di apprendimento.' }
-    ];
-
-    (function renderTimeline(){
-        const container = document.getElementById('timelineEvents');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        timelineEvents.forEach((event, idx) => {
-            const div = document.createElement('div');
-            div.className = 'timeline-event';
-            div.style.animationDelay = `${idx * 0.1}s`;
-            
-            const content = document.createElement('div');
-            content.className = 'timeline-event-content';
-            content.innerHTML = `
-                <div class="timeline-year">${event.year}</div>
-                <div class="timeline-title">${event.title}</div>
-                <div class="timeline-description">${event.description}</div>
-            `;
-            
-            const dot = document.createElement('div');
-            dot.className = 'timeline-event-dot';
-            
-            div.appendChild(content);
-            div.appendChild(dot);
-            container.appendChild(div);
-        });
-    })();
+    // La timeline e' stata rimossa da qui: conteneva una quarta versione dei
+    // fatti biografici, con date incoerenti (diploma e inizio universita'
+    // entrambi nel 2013, primo progetto professionale nel 2014, laurea nel
+    // 2018) e un anno di nascita che contraddiceva il CV. Il container
+    // #timelineEvents non esiste in index.html, quindi il render non trovava
+    // nulla e restava codice morto.
+    //
+    // La timeline ufficiale ora vive in pages/main/timeline.html e legge
+    // i18n/<locale>.json -> timeline.events, allineata al CV da
+    // scripts/fix_timeline.py.
 
     // --- Daily Quote ---
     (async function loadDailyQuote() {
@@ -1398,6 +1459,7 @@ function toggleCommandPalette() {
 
 function filterCommands(query) {
     const list = document.getElementById('command-list');
+    const input = document.getElementById('command-input');
     list.innerHTML = '';
     
     filteredCommands = commands.filter(cmd => 
@@ -1410,8 +1472,13 @@ function filterCommands(query) {
     filteredCommands.forEach((cmd, index) => {
         const item = document.createElement('li');
         item.className = `command-item ${index === 0 ? 'selected' : ''}`;
+        // Gli <li> dentro a un role="listbox" devono essere role="option", e
+        // aria-selected dice quale dei due (mouse e tastiera) e' evidenziato.
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+        item.id = `command-option-${index}`;
         item.innerHTML = `
-            <span class="command-icon">${cmd.icon}</span>
+            <span class="command-icon" aria-hidden="true">${cmd.icon}</span>
             <div class="command-info">
                 <span class="command-title">${cmd.title}</span>
                 <span class="command-desc">${cmd.desc}</span>
@@ -1429,21 +1496,37 @@ function filterCommands(query) {
     });
     
     if (filteredCommands.length === 0) {
-        list.innerHTML = '<li class="command-item" style="cursor: default;">No results found</li>';
+        list.innerHTML = '<li class="command-item" role="option" aria-selected="false" aria-disabled="true" style="cursor: default;">No results found</li>';
     }
+
+    // Il combobox deve dichiarare se ha un menu aperto e quale option e' attiva.
+    if (input) {
+        input.setAttribute('aria-expanded', filteredCommands.length > 0 ? 'true' : 'false');
+    }
+    updateSelection();
 }
 
 function updateSelection() {
     const items = document.querySelectorAll('.command-item');
+    const input = document.getElementById('command-input');
     items.forEach((item, index) => {
-        if (index === selectedIndex) item.classList.add('selected');
-        else item.classList.remove('selected');
+        const isSelected = index === selectedIndex;
+        item.classList.toggle('selected', isSelected);
+        if (item.hasAttribute('role')) {
+            item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        }
     });
+
+    // aria-activedescendant collega l'input all'option evidenziata: e' il
+    // meccanismo previsto per i combobox quando il focus resta sul campo.
+    const active = items[selectedIndex];
+    if (input) {
+        input.setAttribute('aria-activedescendant', active && active.id ? active.id : '');
+    }
     
     // Scroll into view
-    const selected = items[selectedIndex];
-    if (selected) {
-        selected.scrollIntoView({ block: 'nearest' });
+    if (active) {
+        active.scrollIntoView({ block: 'nearest' });
     }
 }
 

@@ -1,14 +1,13 @@
 # Luca Gandolfi Portfolio
 
-Static portfolio, browser laboratory, games arcade, and interactive experiments by Luca Gandolfi.
+Static portfolio, games arcade, and interactive experiments by Luca Gandolfi.
 
 The main site is designed for GitHub Pages. The portfolio shell and most demos run entirely in the browser. A few optional projects include local Node.js, Python, or Electron tooling, but no backend is required to serve the main portfolio.
 
 ## Live Site
 
 - Portfolio: <https://lucagandolfi77.github.io/portfolio/>
-- Games directory: <https://lucagandolfi77.github.io/portfolio/games/>
-- Browser Lab: <https://lucagandolfi77.github.io/portfolio/lab/>
+- Games directory: <https://lucagandolfi77.github.io/portfolio/games.html>
 - Arcade Lab: <https://lucagandolfi77.github.io/portfolio/games/arcade-lab/>
 - QuoteSmith: <https://lucagandolfi77.github.io/portfolio/games/quotesmith/>
 
@@ -18,8 +17,7 @@ The repository is a collection of static pages rather than one framework applica
 
 - Responsive portfolio homepage with profile, work, skills, experience, education, achievements, projects, games, music, books, poems, and contact sections
 - Selected-work overview for AI, data, computer vision, peer-to-peer, and 3D projects
-- Browser Lab with ten local-first tools and experiments
-- Arcade Lab with ten playable mini-games
+- Arcade Lab with fifteen playable mini-games
 - Large games directory containing board games, card games, arcade games, simulations, multiplayer experiments, and story games
 - Multilingual interface with English, Italian, French, Spanish, Chinese, Russian, German, Japanese, Swedish, Arabic, and Hebrew translations
 - PWA manifests and service workers for selected apps
@@ -29,28 +27,9 @@ The repository is a collection of static pages rather than one framework applica
 - SEO metadata, Open Graph metadata, structured data, robots policy, sitemap, security headers, and link-audit reports
 - Mobile and iPhone-oriented layouts with safe-area handling in newer applications
 
-## Browser Lab
-
-Open [`lab/index.html`](lab/index.html) for the static project collection.
-
-| Project | Purpose | Main browser technologies |
-| --- | --- | --- |
-| Hardware Dashboard | Device orientation and motion values with a simulator fallback | Device Orientation, Device Motion, Screen Orientation, Canvas |
-| Offline Portfolio CMS | Create project records and export JSON | LocalStorage, Blob downloads, JSON |
-| Network Laboratory | WebRTC loopback data channel and message timing | RTCPeerConnection, RTCDataChannel |
-| Motion MIDI Instrument | Pointer or camera input mapped to an oscillator | MediaDevices, Web Audio, Pointer Events |
-| Private Data Observatory | Paste CSV and render a local chart | Text parsing, local data, DOM rendering |
-| Local AI Explorer | Transparent prompt token and intent classifier | JavaScript, local deterministic inference |
-| Circuit Sketcher | Place components and export a circuit sketch | Canvas, Pointer Events, JSON |
-| Markdown Vault | Write, preview, save, and reload local notes | LocalStorage, DOM rendering |
-| Shader Playground | Animated field with speed and density controls | Canvas 2D, animation frames |
-| Accessibility Inspector | Inspect pasted markup for common accessibility issues | DOMParser, HTML inspection, ARIA checks |
-
-The Lab intentionally has no server dependency. Camera and motion features fall back gracefully when permission or hardware is unavailable.
-
 ## Arcade Lab
 
-Open [`games/arcade-lab/index.html`](games/arcade-lab/index.html) for ten playable prototypes.
+Open [`games/arcade-lab/index.html`](games/arcade-lab/index.html) for fifteen playable prototypes.
 
 | Game | Core system |
 | --- | --- |
@@ -237,21 +216,40 @@ portfolio/
 ├── projects/                  # Standalone tools, PWAs, AI, audio, and visual demos
 ├── games/                    # Standalone games and game collections
 │   ├── index.html             # Games directory
-│   ├── arcade-lab/            # Ten new static game prototypes
+│   ├── arcade-lab/            # Fifteen static game prototypes
 │   └── quotesmith/            # Bilingual offline quote quiz
-├── lab/                       # Ten new static browser tools
+├── pages/                    # Main and content pages (books, blog, music, ...)
 ├── pixel-stretch-app/         # React / TypeScript application
 ├── book-writer/               # Writing tool and Python helpers
-├── deepseek-harness/          # Separate TypeScript and Python project
-├── scripts/                   # Maintenance and translation scripts
+├── scripts/                   # Maintenance, asset, and translation scripts
 ├── tools/seo/                 # SEO audit tooling
 ├── docs/                      # Architecture and project documentation
 ├── manifest.json              # Portfolio PWA manifest
 ├── sw.js                      # Portfolio service worker
 ├── robots.txt                 # Crawler policy
 ├── sitemap.xml                # Search-engine URL list
-└── _headers                  # Hosting security headers where supported
+└── .nojekyll                  # Serve the repository verbatim, no Jekyll pass
 ```
+
+Removed directories that used to appear in this tree: `lab/` (deleted in `9c4e649`) and `deepseek-harness/` (gitignored, never committed).
+
+### Hosting and security headers
+
+The site is served by **GitHub Pages**, which runs nginx and does **not** support custom
+response headers. There is no `_headers` or `.htaccess` file in the repository any more,
+because both were inert: `_headers` (a Netlify/Cloudflare Pages convention) was ignored,
+and `.htaccess` was published as a plain readable text file.
+
+What this means in practice:
+
+- `X-Frame-Options` and clickjacking protection are **absent**. A `<meta>` CSP cannot
+  express `frame-ancestors` — the specification requires browsers to ignore that
+  directive when the policy arrives via `<meta>`.
+- `X-Content-Type-Options`, `Referrer-Policy` and the rest are set as `<meta>` tags in
+  `index.html` instead, which does work.
+- To get real HTTP headers while keeping this repository and workflow untouched, put
+  **Cloudflare** (free plan, proxied DNS, Transform Rules) in front of the domain.
+  A full hosting migration to Cloudflare Pages or Netlify is the alternative.
 
 ## Mobile and Accessibility
 
@@ -265,7 +263,7 @@ The site and newer tools are designed for mobile browsers as well as desktop bro
 - Reduced-motion media-query support in newer interfaces
 - Graceful fallbacks when camera, motion, WebGL, audio, or WebRTC are unavailable
 
-Individual older experiments may have different accessibility and mobile support levels. The Browser Lab includes an accessibility inspector for testing pasted markup.
+Individual older experiments may have different accessibility and mobile support levels.
 
 ## Privacy
 
@@ -275,11 +273,11 @@ Most demos process data locally in the browser.
 - Camera, microphone, motion, location, Bluetooth, and speech features are permission-based.
 - Camera and microphone data is used by the requesting demo and is not automatically uploaded by the portfolio shell.
 - Some projects intentionally call external APIs or download browser models; those projects should explain the dependency in their own page.
-- No account is required for the main portfolio or the static Lab and Arcade Lab.
+- No account is required for the main portfolio or the static Arcade Lab.
 
 ## Adding a New Static Project
 
-1. Create a self-contained directory under `projects/`, `games/`, or `lab/`.
+1. Create a self-contained directory under `projects/` or `games/`.
 2. Use relative asset paths so the page works below `/portfolio/` on GitHub Pages.
 3. Add mobile viewport metadata and a descriptive page title.
 4. Keep permission requests inside an explicit user action.
@@ -310,7 +308,7 @@ The static architecture supports several larger additions without introducing a 
 - Music memory and rhythm games
 - Lightweight football manager simulation
 
-The first versions of these ideas are available in the Browser Lab and Arcade Lab hubs.
+The first versions of these ideas are available in the Arcade Lab hub.
 
 ## Known Limitations
 

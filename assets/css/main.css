@@ -305,7 +305,25 @@ body {
 .btn-ghost { background: transparent; color: var(--accent); border: 1px solid rgba(179, 232, 54, 0.45); }
 .btn-ghost:hover { border-color: var(--accent); background: rgba(179, 232, 54, 0.08); }
 
-.btn:focus { outline: 3px solid rgba(179,232,54,0.12); outline-offset: 3px; }
+/* Focus ring: era rgba(179,232,54,0.12), che sul fondo #0a0d0b composita a
+   1.26:1 — praticamente invisibile. WCAG 2.4.11 chiede >= 3:1 contro il fondo
+   adiacente, quindi qui si usa l'accento pieno (13.5:1) con un halo scuro che
+   garantisce il contrasto anche su pulsanti chiari in light theme. */
+.btn:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px var(--bg-900);
+}
+/* Fallback per browser senza :focus-visible (Safari < 15.4): non far dipendere
+   l'indicatore di focus solo dal selettore moderno. */
+.btn:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+.btn:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
 
 .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; margin-left: 8px; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -429,9 +447,28 @@ body {
 
 .achievements-carousel::-webkit-scrollbar-thumb:hover { background: rgba(179, 232, 54, 0.5); }
 
-.achievement-card { background: rgba(179, 232, 54, 0.5); padding: 25px; border-radius: var(--radius-m, 14px); text-align: center; border: 2px solid rgba(207, 246, 90, 0.3); transition: all 0.3s ease; min-width: 200px; flex-shrink: 0; scroll-snap-align: center; }
+/* Superficie scura con testo chiaro: la versione precedente usava
+   rgba(179,232,54,0.5) con testo scuro, che composta sul fondo della sezione
+   dava un oliva (rgb(93,121,31)) e un contrasto di 3.93:1 per l'etichetta e
+   2.45:1 per il dettaglio, entrambi sotto WCAG AA. */
+.achievement-card { background: rgba(255, 255, 255, 0.04); padding: 20px 22px; border-radius: var(--radius-m, 14px); text-align: left; border: 1px solid rgba(179, 232, 54, 0.35); transition: border-color 0.3s ease, transform 0.3s ease; min-width: 0; backdrop-filter: blur(6px); }
 
-.achievement-card:hover { border-color: #b3e836; transform: scale(1.05); }
+.achievement-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.achievement-label {
+    font-weight: 700;
+    font-size: 1.02rem;
+    color: var(--accent);
+    margin-bottom: 8px;
+}
+
+.achievement-detail {
+    font-size: 0.9rem;
+    color: var(--tx-soft);
+    line-height: 1.5;
+}
+
+[data-theme="light"] .achievement-label { color: #3d5c1a; }
+[data-theme="light"] .achievement-detail { color: #2f4020; }
 
 .achievement-icon { font-size: 3em; margin-bottom: 10px; }
 
@@ -1330,7 +1367,14 @@ body {
     border: none;
     color: white;
     font-size: 1.1rem;
-    outline: none;
+}
+
+/* Rimuovere `outline: none` qui non e' piu` necessario: il campo riceve il
+   focus ring di default del browser, e questo selettore aggiunge solo un
+   accento coerente con il tema. */
+#command-input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 [data-theme="light"] #command-input {
@@ -1398,7 +1442,9 @@ body {
     opacity: 0.7;
 }
 
-/* Mobile Search Trigger */
+/* Mobile Search Trigger.
+   Ora e' un <button>: senza i reset qui sotto comparirebbero bordo e padding
+   di default del browser, e l'icona non sarebbe piu' centrata. */
 .mobile-command-trigger {
     display: none;
     position: fixed;
@@ -1406,6 +1452,8 @@ body {
     right: 20px;
     width: 50px;
     height: 50px;
+    padding: 0;
+    border: none;
     background: var(--accent);
     border-radius: 50%;
     align-items: center;
@@ -1415,6 +1463,7 @@ body {
     cursor: pointer;
     color: var(--bg-900);
     font-size: 1.2rem;
+    font-family: inherit;
 }
 
 @media (max-width: 768px) {
@@ -1440,3 +1489,100 @@ body {
     0%, 100% { opacity: 0; transform: scale(0.5); }
     50% { opacity: 1; transform: scale(1.5); }
 }
+
+/* ============================================================
+   Focus visibility — WCAG 2.4.7 / 2.4.11
+   ============================================================
+   `.acc-btn` usa `all:unset` inline su index.html, azzerando anche
+   l'outline nativo del browser. Qui gli si restituisce un indicatore
+   conforme, cosi' l'accordion dei poem e' navigabile da tastiera.
+   ============================================================ */
+.acc-btn:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* Rete di sicurezza per gli elementi interattivi che ereditano
+   `outline: none` da altri fogli di stile (58 occorrenze nel repo).
+   Solo :focus-visible, quindi il mouse non mostra l'anello. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   #experience / #achievements
+   ============================================================
+   Riutilizza .timeline-event e .achievement-card, che erano definiti qui ma
+   non usati da nessuna pagina: main.css le aveva per la timeline sulla
+   home, poi spostata in pages/main/timeline.html.
+
+   .timeline-list e' il contenitore: in recruiter mode le schede devono
+   impilarsi invece di alternarsi ai lati di una linea verticale.
+   ============================================================ */
+.timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.timeline-list .timeline-event {
+    opacity: 0;
+    animation: fadeInUp 0.6s ease forwards;
+}
+
+/* Nella versione a colonna singola il pallino e' un marcatore a sinistra
+   e non piu' il nodo centrale di una linea verticale. */
+.timeline-list .timeline-event-content {
+    width: 100%;
+    text-align: left;
+    margin: 0;
+}
+
+.timeline-list .timeline-event-dot {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    display: none;
+}
+
+.timeline-list .timeline-event:nth-child(odd) .timeline-event-content,
+.timeline-list .timeline-event:nth-child(even) .timeline-event-content {
+    margin: 0;
+    text-align: left;
+}
+
+.exp-points {
+    margin: 10px 0 0;
+    padding-left: 20px;
+    color: var(--tx-muted);
+    line-height: 1.6;
+}
+
+.exp-points li { margin-bottom: 4px; }
+
+.subsection-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 26px 0 12px;
+}
+
+
+
+/* Recruiter mode: niente animazioni, leggibilita' da documento. Gli altri
+   override stanno in recruiter-mode.css, che viene caricato dopo main.css e
+   quindi ha la precedenza a parita' di specificita'. */
+[data-mode="business"] .timeline-list .timeline-event {
+    animation: none;
+    opacity: 1;
+}
+
+[data-mode="business"] .exp-points { color: #44515c !important; }

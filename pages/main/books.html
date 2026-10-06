@@ -298,12 +298,32 @@
             }
         }, 1000);
 
-        // Load and parse CSV '/old_books.csv'
+        // Load and parse CSV 'old_books.csv'
+        //
+        // Il file vive alla ROOT del repository, questa pagina sta in
+        // pages/main/: il path './old_books.csv' puntava a pages/main/ e
+        // restituiva 404, quindi la tabella libri restava vuota in produzione.
+        // I candidati sono provati in ordine per coprire sia il percorso di
+        // sviluppo (apertura diretta del file) sia quello deployato sotto
+        // /portfolio/.
+        const CSV_CANDIDATES = [
+            '../../old_books.csv',
+            './old_books.csv',
+            '/portfolio/old_books.csv'
+        ];
+
         async function loadCSV() {
             try {
-                const res = await fetch('./old_books.csv');
-                if (!res.ok) throw new Error('fetch failed');
-                const txt = await res.text();
+                let txt = null;
+                for (const path of CSV_CANDIDATES) {
+                    try {
+                        const res = await fetch(path);
+                        if (!res.ok) continue;
+                        txt = await res.text();
+                        if (txt) break;
+                    } catch (_) { /* candidato non raggiungibile, prova il prossimo */ }
+                }
+                if (!txt) throw new Error('old_books.csv non trovata in nessun percorso');
                 window.csvBooks = parseCSV(txt);
             } catch (err) {
                 console.warn('Could not load old_books.csv', err);

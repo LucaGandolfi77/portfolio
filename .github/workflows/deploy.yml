@@ -59,6 +59,35 @@ jobs:
         run: rm -rf projects/verso-il-17/node_modules projects/verso-il-17/dist
       # -------------------------------------------------------------------
 
+      # Anche rpg_game e' un progetto Vite, e games/rpg.html carica il suo
+      # bundle da rpg_game/dist/. Senza questo passo il bundle in dist/ non
+      # esisterebbe nella publish (dist/ e' gitignored) e il gioco mostrerebbe
+      # una pagina nera. I nomi dei file sono stabili (rpg.js / index.css,
+      # vedi rpg_game/vite.config.ts) perche' il wrapper HTML e' statico.
+      - name: Setup Node (rpg_game)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: rpg_game/package-lock.json
+
+      - name: Build rpg_game
+        working-directory: rpg_game
+        run: npm ci && npm run build
+
+      - name: Rimuove node_modules di rpg_game
+        run: rm -rf rpg_game/node_modules
+
+      # -------------------------------------------------------------------
+
+      # Il service worker usava una versione di cache fissa ('portfolio-v9'):
+      # finche' nessuno la toccava, i visitatori di ritorno continuavano a
+      # eseguire i bundle della volta in cui erano arrivati sul sito.
+      # Sostituiendo il placeholder con il commit SHA, ogni deploy produce una
+      // cache nuova e le vecchie vengono eliminate all'evento 'activate'.
+      - name: Versiona il service worker
+        run: sed -i.bak "s/__BUILD_ID__/${GITHUB_SHA}/g" sw.js && rm -f sw.js.bak
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
