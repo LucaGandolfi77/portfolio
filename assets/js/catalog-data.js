@@ -114,7 +114,7 @@
     ['tower-defense', 'Tower Defense', 'Place defenses and stop the incoming wave.', 'games/tower_defense.html', '⌂', 'strategy', ['Strategy'], false],
     ['forza4', 'Forza 4', 'Connect four pieces before your opponent.', 'games/forza4.html', '4', 'strategy', ['Board'], false],
     ['snake', 'Snake', 'Classic arcade snake with increasing speed.', 'games/snake.html', '●', 'arcade', ['Retro'], false],
-    ['rpg', 'RPG Adventure', 'A browser role-playing game with exploration and combat.', 'games/rpg_game_dist_index.html', '⚔', 'story', ['RPG'], false],
+    ['rpg', 'RPG Adventure', 'A browser role-playing game with exploration and combat.', 'games/rpg.html', '⚔', 'story', ['RPG'], false],
     ['air-hockey', 'Air Hockey', 'Full-screen touch air hockey for two players.', 'games/mobile_air_hockey.html', '🏒', 'multiplayer', ['Touch', 'Multiplayer'], false],
     ['memory', 'Memory', 'Match pairs and keep your move count low.', 'games/memory.html', '◎', 'puzzle', ['Puzzle'], false],
     ['slot-collect', 'Slot Collect', 'Build a deck and spin to collect rewards.', 'games/slot_collect.html', '🎰', 'arcade', ['Cards'], false],

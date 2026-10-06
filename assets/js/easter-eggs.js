@@ -288,8 +288,15 @@ const EasterEggs = {
     const hour = new Date().getHours();
     const month = new Date().getMonth();
     const day = new Date().getDate();
-    
-    if (hour >= 0 && hour < 6) {
+
+    // Un tema temporale non deve sovrascrivere una scelta esplicita
+    // dell'utente: chi ha scelto "light" si trovava con l'intero sito
+    // indaco dalle 00:00 alle 06:00. Il tema stagionale resta Priorita'
+    // perche' dura un giorno e l'utente non puo' prevederlo.
+    const userPickedTheme = localStorage.getItem('theme') === 'light'
+      || localStorage.getItem('theme') === 'dark';
+
+    if (!userPickedTheme && hour >= 0 && hour < 6) {
       document.documentElement.setAttribute('data-theme', 'night');
     }
     

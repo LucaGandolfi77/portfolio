@@ -9,22 +9,32 @@
 - ✅ Open Graph per social media (Facebook, LinkedIn, etc.)
 - ✅ Twitter Card per condivisione su Twitter
 - ✅ Schema.org JSON-LD (Person + WebSite)
-- ✅ Canonical URLs su tutte le pagine
+- ⚠️ Canonical URLs solo dove servono (24 pagine su 311): le altre pagine
+  duplicate-redirect sono coperte da `noindex` o non sono entry point.
+  Verificare con `grep -rl 'rel="canonical"' --include='*.html' .`
 
-### 2. **Technical SEO** ✓
+### 2. **Technical SEO** — ⚠️ parzialmente vero
 - ✅ robots.txt configurato
-- ✅ sitemap.xml creata con priorità appropriate
-- ✅ .htaccess con compression GZIP e caching
-- ✅ Security headers (CSP, X-Frame-Options, etc.)
-- ✅ HTTPS ready (con redirect configuration)
+- ⚠️ sitemap.xml generata da `config/seo.json` (28 URL su 311 pagine, senza
+  `<priority>`/`<changefreq>`). Le liste vanno mantenute a mano: `tools/seo/site_audit.py`
+  la rigenera ma la config e l'output possono divergere.
+- ❌ `.htaccess` **rimosso**: GitHub Pages non è Apache. Era pubblicato come
+  file di testo leggibile via HTTP e non produceva alcun effetto.
+- ❌ `_headers` **rimosso**: è una convenzione Netlify/Cloudflare Pages,
+  GitHub Pages lo ignorava (verificato: HTTP 404 in produzione).
+- ⚠️ Di conseguenza **non ci sono security header HTTP**: niente
+  `X-Frame-Options`, quindi nessuna protezione clickjacking. `Referrer-Policy` e
+  `X-Content-Type-Options` sono impostati come `<meta>` in `index.html`.
+  Per header veri serve Cloudflare davanti al sito (piano free).
+- ✅ HTTPS servito da GitHub (HSTS incluso)
 - ✅ Mobile-friendly design
 
 ### 3. **PWA - Progressive Web App** ✓
-- ✅ manifest.json configurato
-- ✅ Supporto offline (pronto per service worker)
-- ✅ App icons (192x192, 512x512, maskable)
-- ✅ Theme colors personalizzati
-- ✅ Shortcuts app configurati
+- ✅ manifest.json configurato (con `id`, `shortcuts` e `lang` coerente)
+- ✅ Supporto offline via `sw.js` (stale-while-revalidate su CSS/JS)
+- ✅ App icons 192/512 + maskable distinti, generate da
+  `scripts/generate_site_icons.py`; `favicon.ico` è un ICO reale (16/32/48)
+- ✅ Theme colors personalizzati (`#0a0d0b`)
 
 ### 4. **Page-Specific Meta Tags** ✓
 - ✅ index.html - Home page SEO completa
@@ -99,12 +109,11 @@
    });
    ```
 
-7. **SSL/HTTPS Certificate**
+7. **SSL/HTTPS**
    ```
-   Se non hai già HTTPS:
-   - Usa Let's Encrypt (gratuito)
-   - Abilita HTTPS redirect in .htaccess
-   - Aggiorna canonical URLs a https://
+   GitHub Pages serve già via HTTPS con HSTS: nessun certificato da gestire.
+   - Non serve (e non funziona) un redirect HTTPS in .htaccess
+   - I canonical URL sono già https://
    ```
 
 ---

@@ -62,27 +62,31 @@
         });
 
         // Try to load sample PNGs for player and enemy. Use fallback shapes when load fails.
+        //
+        // Nota: esisteva anche un tileset 8-direzioni
+        // (assets/img/space_universe/spaceship_tileset.svg) che non e' mai stato
+        // committato, quindi `tilesetLoaded` restava sempre false e la nave veniva
+        // disegnata dal ramo di fallback. Il codice e' stato rimosso: la rotazione
+        // nel ramo playerImg produce lo stesso risultato senza una richiesta 404.
         const playerImg = new Image();
-        const playerTilesetImg = new Image();
         const enemyImg = new Image();
-        let playerImgLoaded = false; let enemyImgLoaded = false; let tilesetLoaded = false;
+        let playerImgLoaded = false; let enemyImgLoaded = false;
         let mapsData = [];
 
-        // Load maps from JSON
+        // Load maps from JSON.
+        // space_universe_maps.json non e' mai stato committato: la fetch falliva
+        // con 404 e si usava sempre il fallback qui sotto. Ora il 404 e' atteso
+        // e gestito esplicitamente, senza log di errore in console.
         fetch('space_universe_maps.json')
-          .then(r=>r.json())
+          .then(r=>{ if(!r.ok) throw new Error('maps json assente (HTTP '+r.status+')'); return r.json(); })
           .then(data=>{ 
              mapsData = data; 
              console.log('Maps loaded:', mapsData.length);
              if(mapsData.length > 0) setMap(0);
           })
-          .catch(err=>{ console.warn('Failed to load maps json, using fallback:', err); });
+          .catch(err=>{ console.info('Map JSON non disponibile, uso la mappa di fallback:', err.message); });
         
         playerImg.onload = ()=>{ playerImgLoaded = true; console.log('player image loaded:', playerImg.src); };
-        playerTilesetImg.onload = ()=>{ tilesetLoaded = true; console.log('tileset loaded'); };
-        playerTilesetImg.onerror = ()=>{ console.warn('Tileset failed to load'); tilesetLoaded = false; };
-        // Tileset matches ship_03.png style (UP facing at index 0)
-        playerTilesetImg.src = '../assets/img/space_universe/spaceship_tileset.svg';
 
         playerImg.onerror = ()=>{
           console.warn('player image failed to load, generating fallback:', playerImg.src);
@@ -116,9 +120,10 @@
         playerImg._tried = {png:false,svg:false};
         enemyImg._tried = {png:false,svg:false};
         function tryLoadPlayerPNG(){ if(!playerImg._tried.png){ playerImg._tried.png = true; playerImg.src = '../assets/img/space_universe/ship_03.png'; }}
-        function tryLoadPlayerSVG(){ if(!playerImg._tried.svg){ playerImg._tried.svg = true; playerImg.src = 'assets/img/space_universe/player.svg'; }}
-        function tryLoadEnemyPNG(){ if(!enemyImg._tried.png){ enemyImg._tried.png = true; enemyImg.src = 'assets/img/space_universe/enemy.png'; }}
-        function tryLoadEnemySVG(){ if(!enemyImg._tried.svg){ enemyImg._tried.svg = true; enemyImg.src = 'assets/img/space_universe/enemy.svg'; }}
+        function tryLoadPlayerSVG(){ if(!playerImg._tried.svg){ playerImg._tried.svg = true; playerImg.src = '../assets/img/space_universe/player.svg'; }}
+        // enemy.png non e' mai stato committato (esiste solo enemy.svg), quindi il
+        // tentativo PNG produceva sempre un 404 prima di cadere sull'SVG.
+        function tryLoadEnemySVG(){ if(!enemyImg._tried.svg){ enemyImg._tried.svg = true; enemyImg.src = '../assets/img/space_universe/enemy.svg'; }}
         playerImg.onerror = ()=>{
           if(!playerImg._tried.svg) { console.warn('player.png not found, trying SVG'); tryLoadPlayerSVG(); return; }
           console.warn('player image failed to load, generating fallback:', playerImg.src);
@@ -136,8 +141,7 @@
           }catch(err){ console.error('fallback player image generation failed', err); playerImgLoaded = false; }
         };
         enemyImg.onerror = ()=>{
-          if(!enemyImg._tried.svg) { console.warn('enemy.png not found, trying SVG'); tryLoadEnemySVG(); return; }
-          console.warn('enemy image failed to load, generating fallback:', enemyImg.src);
+          console.warn('enemy SVG failed to load, generating fallback:', enemyImg.src);
           try{
             const c = document.createElement('canvas'); c.width = 64; c.height = 64;
             const cctx = c.getContext('2d');
@@ -148,8 +152,8 @@
             enemyImg.src = c.toDataURL('image/png');
           }catch(err){ console.error('fallback enemy image generation failed', err); enemyImgLoaded = false; }
         };
-        // try PNG first
-        tryLoadPlayerPNG(); tryLoadEnemyPNG();
+        // Player: PNG presente, con fallback SVG. Enemy: solo SVG.
+        tryLoadPlayerPNG(); tryLoadEnemySVG();
       let W = 0, H = 0;
       // make the world much larger for extended exploration
       const world = {w: 12000, h: 8000};
@@ -1369,29 +1373,7 @@
         ctx.beginPath(); ctx.arc(shipScreenX, shipScreenY, laserRange, 0, Math.PI*2);
         ctx.strokeStyle = 'rgba(0,200,255,0.08)'; ctx.lineWidth = 2; ctx.stroke();
         // draw player image if available
-        if(tilesetLoaded){
-          // Draw using 8-direction tileset
-          try{
-            // ship.angle is radians math angle (0=Right, PI/2=Down, -PI/2=Up)
-            // Tileset was generated from UP facing image rotated clockwise
-            // Frame 0: Up (0 deg relative to image source)
-            // Frame 1: Up-Right (45 deg)
-            // Frame 2: Right (90 deg)
-            // ...
-            
-            // Compute rotation from Up (-PI/2)
-            // angle - (-PI/2) = angle + PI/2.
-            let deg = (ship.angle + Math.PI/2) * (180/Math.PI);
-            // normalize 0-360
-            deg = (deg % 360 + 360) % 360;
-            // index 0..7
-            const tileIdx = Math.round(deg / 45) % 8;
-            
-            const size = ship.r*3.2;
-            const sx = tileIdx * 96;
-            ctx.drawImage(playerTilesetImg, sx, 0, 96, 96, shipScreenX - size/2, shipScreenY - size/2, size, size);
-          } catch(err){ tilesetLoaded = false; }
-        } else if(playerImgLoaded){
+        if(playerImgLoaded){
           try{
             const size = ship.r*3.2;
             ctx.save();
