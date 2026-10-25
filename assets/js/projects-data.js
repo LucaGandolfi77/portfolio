@@ -605,5 +605,14 @@ const PROJECTS_DATA = [
     "emoji": "🤖",
     "badge": "AI / PWA",
     "badgeColor": "#6ea8ff"
+  },
+  {
+    "id": "road-to-paraguay",
+    "title": "Road to Paraguay ✨",
+    "description": "Il diario segreto del Monza Precision Team verso i Campionati del Mondo di pattinaggio artistico a rotelle sincronizzato in Paraguay: una casella al giorno e un countdown fino al 17 ottobre. PWA installabile.",
+    "href": "projects/road-to-paraguay/index.html",
+    "emoji": "⛸️",
+    "badge": "Story / PWA",
+    "badgeColor": "#e8a2b8"
   }
 ];
