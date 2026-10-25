@@ -157,8 +157,22 @@ function createTopBar() {
 }
 
 // --- Recruiter Mode ---
-const RECRUITER_ORDER = ['experience', 'skills', 'selected-work', 'projects', 'contact', 'about', 'languages', 'achievements', 'lab', 'games', 'cabinet'];
-const RECRUITER_PRIMARY = ['experience', 'skills', 'projects', 'contact']; // shown expanded & first
+const RECRUITER_ORDER = ['about', 'skills', 'selected-work', 'projects', 'languages', 'nerve-center', 'contact', 'social-links', 'lab', 'games', 'cabinet'];
+const RECRUITER_PRIMARY = ['skills', 'projects', 'languages', 'contact']; // shown expanded & first
+
+// Restore saved light/dark theme preference immediately
+(function initSavedTheme() {
+    try {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+        const savedSeasonal = localStorage.getItem('seasonal-theme');
+        if (savedSeasonal && savedSeasonal !== 'default') {
+            applySeasonalTheme(savedSeasonal);
+        }
+    } catch (e) {}
+})();
 
 function setRecruiterMode(mode) {
     if (mode === 'business') {
@@ -214,25 +228,40 @@ function reorderSectionsForRecruiter() {
         main.dataset.originalOrder = '1';
         main._originalChildren = Array.from(main.children);
     }
+    const headerEls = [];
+    const footerEls = [];
     const sections = {};
+    const middleLeftovers = [];
+
     main._originalChildren.forEach(el => {
-        const id = el.id;
-        if (id) sections[id] = el;
+        if (el.tagName === 'HEADER' || el.classList.contains('header') || el.classList.contains('orientation') || el.classList.contains('proof-strip')) {
+            headerEls.push(el);
+        } else if (el.tagName === 'FOOTER' || el.classList.contains('footer') || el.classList.contains('closing-cta')) {
+            footerEls.push(el);
+        } else if (el.id && RECRUITER_ORDER.includes(el.id)) {
+            sections[el.id] = el;
+        } else {
+            middleLeftovers.push(el);
+        }
     });
-    // Reorder: primary first (in RECRUITER_ORDER), then the rest in original order
-    const ordered = [];
-    RECRUITER_ORDER.forEach(id => { if (sections[id]) { ordered.push(sections[id]); delete sections[id]; } });
-    // Append any leftover (header, footer, etc.) in original order
-    main._originalChildren.forEach(el => {
-        if (!RECRUITER_ORDER.includes(el.id) && !ordered.includes(el)) ordered.push(el);
+
+    const ordered = [...headerEls];
+    RECRUITER_ORDER.forEach(id => {
+        if (sections[id]) {
+            ordered.push(sections[id]);
+            delete sections[id];
+        }
     });
+    ordered.push(...middleLeftovers, ...footerEls);
     ordered.forEach(el => main.appendChild(el));
+    main.dataset.reordered = '1';
 }
 
 function restoreSectionsOrder() {
     const main = document.querySelector('main.container');
     if (!main || !main._originalChildren) return;
     main._originalChildren.forEach(el => main.appendChild(el));
+    delete main.dataset.reordered;
 }
 
 function expandPrimarySections() {
@@ -853,42 +882,35 @@ navLinks.forEach(link => {
     });
 });
 
-// Generate animated particles
-function createParticles(count = 50) {
+// Generate animated particles (lightweight — complements canvas starfield)
+function createParticles(count = 20) {
     const particles = document.getElementById('particles');
     if (!particles) return;
     particles.innerHTML = ''; // Clear existing
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+    const frag = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.className = 'particle';
         particle.style.left = Math.random() * 100 + '%';
         particle.style.animationDelay = Math.random() * 15 + 's';
         particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
-        particles.appendChild(particle);
+        frag.appendChild(particle);
     }
+    particles.appendChild(frag);
     
-    // Create stars and lights
+    // Create subtle lights and sparkles
     createStarsAndLights();
 }
 
 function createStarsAndLights() {
     const particlesContainer = document.getElementById('particles');
+    if (!particlesContainer) return;
+    const frag = document.createDocumentFragment();
     
-    // Create stars (Increased count)
-    for (let i = 0; i < 100; i++) {
-        const star = document.createElement('div');
-        star.className = 'star';
-        star.style.left = Math.random() * 100 + '%';
-        star.style.top = Math.random() * 100 + '%';
-        star.style.animationDelay = Math.random() * 3 + 's';
-        star.style.animationDuration = (Math.random() * 2 + 3) + 's';
-        star.style.opacity = Math.random() * 0.7 + 0.3;
-        particlesContainer.appendChild(star);
-    }
-    
-    // Create lights (Increased count)
-    for (let i = 0; i < 30; i++) {
+    // Create lights
+    for (let i = 0; i < 12; i++) {
         const light = document.createElement('div');
         light.className = 'light';
         light.style.left = Math.random() * 100 + '%';
@@ -896,19 +918,20 @@ function createStarsAndLights() {
         light.style.animationDelay = Math.random() * 4 + 's';
         light.style.animationDuration = (Math.random() * 3 + 4) + 's';
         light.style.setProperty('--drift-delay', (Math.random() * 6) + 's');
-        particlesContainer.appendChild(light);
+        frag.appendChild(light);
     }
 
-    // Create sparkles (New effect)
-    for (let i = 0; i < 50; i++) {
+    // Create sparkles
+    for (let i = 0; i < 16; i++) {
         const sparkle = document.createElement('div');
         sparkle.className = 'sparkle';
         sparkle.style.left = Math.random() * 100 + '%';
         sparkle.style.top = Math.random() * 100 + '%';
         sparkle.style.animationDelay = Math.random() * 2 + 's';
         sparkle.style.animationDuration = (Math.random() * 1 + 1) + 's';
-        particlesContainer.appendChild(sparkle);
+        frag.appendChild(sparkle);
     }
+    particlesContainer.appendChild(frag);
 }
 
 // Scroll animation

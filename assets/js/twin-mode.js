@@ -12,8 +12,8 @@
 (function () {
     'use strict';
 
-    // Use a reliable CORS proxy service
-    const PROXY_URL = 'https://corsproxy.io/';
+    // Direct endpoint first (Pollinations supports CORS natively), then CORS proxy fallback
+    const PROXY_SERVICES = ['', 'https://corsproxy.io/?'];
     const POLLINATIONS_URL = 'https://text.pollinations.ai/';
     const STORAGE_KEY = 'twin_history_v1';
 
@@ -180,99 +180,95 @@
         input.value = '';
         history.push({ role: 'user', content: text });
         const typing = addTyping();
-        let response;
+        let replyText = '';
         try {
-            // Try multiple proxy services for reliability
-            let proxyUsed = null;
+            const payload = JSON.stringify({
+                messages: [{ role: 'system', content: getSystemMsg() }, ...history.slice(-10)],
+                seed: Math.floor(Date.now() / 1000) % 2147483647,
+                model: 'openai'
+            });
+
             for (let i = 0; i < PROXY_SERVICES.length; i++) {
                 const proxyUrl = PROXY_SERVICES[i];
+                const targetUrl = proxyUrl ? proxyUrl + encodeURIComponent(POLLINATIONS_URL) : POLLINATIONS_URL;
                 try {
-                    response = await fetch(proxyUrl + POLLINATIONS_URL, {
+                    const res = await fetch(targetUrl, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'text/plain',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: JSON.stringify({ messages: [getSystemMsg(), ...history], seed: Math.floor(Date.now() / 1000) % 2147483647, model: 'openai' })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: payload
                     });
-                    
-                    if (response.ok) {
-                        proxyUsed = proxyUrl;
-                        break; // Success!
-                    } else {
-                        // Log the error but continue to next proxy
-                        console.log(`Proxy ${proxyUrl} failed with status ${response.status}`);
-                        continue;
+                    if (res.ok) {
+                        const raw = (await res.text()).trim();
+                        if (raw) {
+                            try {
+                                const parsed = JSON.parse(raw);
+                                replyText = (parsed?.choices?.[0]?.message?.content || raw).trim();
+                            } catch (_) {
+                                replyText = raw;
+                            }
+                            break;
+                        }
                     }
-                } catch (e) {
-                    console.log(`Proxy ${proxyUrl} error:`, e.message);
-                    continue; // Try next proxy
+                } catch (err) {
+                    // Try next endpoint
                 }
-            }
-            
-            typing.remove();
-            
-            if (!response || !response.ok) {
-                // All proxies failed, try local fallback
-                const fallbackResponse = await handleLocalFallback(text);
-                if (fallbackResponse) {
-                    response = fallbackResponse;
-                    // Handle success...
-                } else {
-                    const msg = currentLang() === 'it' 
-                        ? '⚠️ Tutti i servizi proxy sono temporaneamente non disponibili. Riprova più tardi o usa le risposte locali.'
-                        : '⚠️ All proxy services are temporarily unavailable. Please retry later or use local responses.';
-                    addMsg(msg, 'twin-sys');
-                    history.pop();
-                }
-            } else {
-                const reply = (await response.text()).trim() || '…';
-                history.push({ role: 'assistant', content: reply });
-                saveHistory();
-                addMsg(reply, 'twin-bot');
             }
         } catch (e) {
-            typing.remove();
-            // Try local fallback as last resort
-            const fallbackResponse = await handleLocalFallback(text);
-            if (fallbackResponse) {
-                response = fallbackResponse;
-                // Handle success...
-            } else {
-                addMsg('⚠️ ' + (currentLang() === 'it' ? 'Connessione fallita. Controlla la rete.' : 'Connection failed. Check your network.'), 'twin-sys');
-                history.pop();
-            }
+            // Fall through to local knowledge base fallback
         } finally {
-            busy = false;
-            sendBtn.disabled = false;
-            input.focus();
+            typing.remove();
         }
+
+        if (!replyText) {
+            replyText = getLocalFallbackReply(text);
+        }
+
+        history.push({ role: 'assistant', content: replyText });
+        saveHistory();
+        addMsg(replyText, 'twin-bot');
+        busy = false;
+        sendBtn.disabled = false;
+        input.focus();
     }
 
-    async function handleLocalFallback(userMessage) {
+    function getLocalFallbackReply(userMessage) {
         const lang = currentLang();
-        const fallbackResponses = LOCAL_FALLBACK_RESPONSES[lang] || LOCAL_FALLBACK_RESPONSES.en;
-        
-        // Simple keyword matching for relevant responses
-        const lowerMsg = userMessage.toLowerCase();
-        let selectedResponse = fallbackResponses[0]; // Default to first response
-        
-        if (lowerMsg.includes('who is') || lowerMsg.includes('chi è')) {
-            selectedResponse = fallbackResponses[0];
-        } else if (lowerMsg.includes('skill') || lowerMsg.includes('competenza') || lowerMsg.includes('cosa sa fare')) {
-            selectedResponse = fallbackResponses[1];
-        } else if (lowerMsg.includes('contatt') || lowerMsg.includes('come contatt')) {
-            selectedResponse = fallbackResponses[2];
+        const isIt = lang === 'it';
+        const q = (userMessage || '').toLowerCase();
+
+        if (/skill|competenz|linguagg|stack|tecnolog|python|javascript|react|c\+\+/i.test(q)) {
+            return isIt
+                ? 'Competenze principali di Luca:\n• Expert: Python, C++, C, Bash, JavaScript\n• Advanced: React, Node.js, CSS/SCSS\n• Intermediate: Go, Java, SQL, MongoDB, OpenGL\n• Ambiti: Full-Stack Web, AI/ML in-browser, Embedded Systems & V&V aerospaziale.'
+                : 'Luca\'s core technical skills:\n• Expert: Python, C++, C, Bash, JavaScript\n• Advanced: React, Node.js, CSS/SCSS\n• Intermediate: Go, Java, SQL, MongoDB, OpenGL\n• Domains: Full-Stack Web, in-browser AI/ML, Embedded Systems & Aerospace V&V.';
         }
-        
-        // Return a mock response object
-        return new Response(JSON.stringify({
-            choices: [{
-                message: {
-                    content: selectedResponse
-                }
-            }]
-        }));
+        if (/experien|esperienz|lavor|work|job|alten|tutor|carriera|azienda/i.test(q)) {
+            return isIt
+                ? 'Esperienza lavorativa di Luca:\n• 2022–Oggi: Full-Stack Developer @ Alten Italia (SW engineering, testing, V&V e integrazione HW/SW per Aerospazio & Difesa)\n• 2021–2022: ICT Developer @ Alten Italia\n• 2019–2021: Tutor Universitario @ Università di Parma (Go, Python, C).'
+                : 'Luca\'s work experience:\n• 2022–Present: Full-Stack Developer @ Alten Italia (SW engineering, testing, V&V, HW/SW integration for Aerospace & Defence)\n• 2021–2022: ICT Developer @ Alten Italia\n• 2019–2021: University Tutor @ University of Parma (teaching Go, Python, C).';
+        }
+        if (/stud|educat|laurea|universit|scuola|degree|parma/i.test(q)) {
+            return isIt
+                ? 'Formazione:\n• Laurea in Ingegneria Informatica, Elettronica e delle Telecomunicazioni presso l\'Università degli Studi di Parma (2018)\n• Diploma di Liceo Scientifico con orientamento Informatico (2013).'
+                : 'Education:\n• BSc in Computer, Electronic & Telecommunications Engineering at the University of Parma (2018)\n• Scientific High School Diploma with IT specialization (2013).';
+        }
+        if (/project|progett|game|gioc|lab|app|pwa/i.test(q)) {
+            return isIt
+                ? 'Luca ha realizzato oltre 65 progetti e 65+ giochi browser/PWA! Tra i principali: Tiny Local AI (LLM nel browser con WebGPU), FaceMesh Camera, Vola! 3D, Payamazadi Mesh P2P, QuoteSmith, De Rerum Gatta, Zero Assoluto e Coverage Galaxy. Puoi esplorarli nelle sezioni Projects e Arcade!'
+                : 'Luca has built 65+ browser projects and 65+ games/PWAs! Highlights include Tiny Local AI (in-browser WebGPU LLMs), FaceMesh Camera, Vola! 3D, Payamazadi P2P Mesh, QuoteSmith, De Rerum Gatta, Zero Assoluto, and Coverage Galaxy. Explore them in the Projects and Arcade sections!';
+        }
+        if (/contact|contatt|mail|email|phone|telefon|linkedin|github|reach/i.test(q)) {
+            return isIt
+                ? 'Puoi contattare Luca tramite:\n• Email: luca.gandolfi7@hotmail.com\n• Telefono: +39 333 1827 911\n• GitHub: github.com/LucaGandolfi77\n• LinkedIn: it.linkedin.com/in/luca-gandolfi7\n• Località: Milano / Fidenza (PR), Italia.'
+                : 'You can reach Luca via:\n• Email: luca.gandolfi7@hotmail.com\n• Phone: +39 333 1827 911\n• GitHub: github.com/LucaGandolfi77\n• LinkedIn: it.linkedin.com/in/luca-gandolfi7\n• Location: Milan / Fidenza (PR), Italy.';
+        }
+        if (/cv|curriculum|resume/i.test(q)) {
+            return isIt
+                ? 'Puoi scaricare il CV completo di Luca in PDF cliccando su "Scarica CV" nell\'header della pagina (assets/CV_Gandolfi_Luca.pdf) oppure attivando la modalità "Business" nella barra in alto!'
+                : 'You can download Luca\'s full PDF resume by clicking "Download CV" in the hero header (assets/CV_Gandolfi_Luca.pdf) or by toggling "Business" mode in the top bar!';
+        }
+
+        const fallbackResponses = LOCAL_FALLBACK_RESPONSES[lang] || LOCAL_FALLBACK_RESPONSES.en;
+        return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
     }
 
     function buildUI() {

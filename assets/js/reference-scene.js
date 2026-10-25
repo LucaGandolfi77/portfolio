@@ -2,6 +2,8 @@
    Reference scenes — moving starfield background + "dotted"
    point-cloud imagery (wireframe cube + constellations).
    Vanilla JS, canvas-2D, no dependencies.
+   Performance: scenes outside the viewport (IntersectionObserver)
+   and hidden tabs (document.hidden) are never redrawn.
    ============================================================ */
 (function () {
   "use strict";
@@ -9,7 +11,32 @@
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var docEl = document.documentElement;
   var canvasStore = [];
+  var sceneLoop = [];
 
+  /* ---------------- visibility plumbing ---------------- */
+  var visibleSet = typeof Set !== "undefined" ? new Set() : null;
+  var io = null;
+  if ("IntersectionObserver" in window) {
+    io = new IntersectionObserver(function (entries) {
+      for (var e = 0; e < entries.length; e++) {
+        if (!visibleSet) break;
+        if (entries[e].isIntersecting) visibleSet.add(entries[e].target);
+        else visibleSet.delete(entries[e].target);
+      }
+    }, { rootMargin: "120px" });
+  }
+  function observeScene(el) {
+    if (!el) return;
+    if (io) io.observe(el);
+    else if (visibleSet) visibleSet.add(el);
+  }
+  function sceneVisible(el) {
+    if (document.hidden) return false;
+    if (!io || !visibleSet) return true;
+    return visibleSet.has(el);
+  }
+
+  /* ---------------- helpers ---------------- */
   function isLight() {
     return docEl.getAttribute("data-theme") === "light";
   }
@@ -30,7 +57,6 @@
     return [(n >> 16) & 255, ((n >> 8) & 255), n & 255];
   }
 
-  /* ---------------- helpers ---------------- */
   function makeCanvas(cls) {
     var c = document.createElement("canvas");
     c.className = cls;
@@ -113,7 +139,8 @@
       resize();
       build();
     });
-    canvasStore.push({ draw: draw });
+    observeScene(canvas);
+    canvasStore.push({ el: canvas, draw: draw });
   }
 
   /* ---------------- point-cloud scenes ---------------- */
@@ -152,9 +179,10 @@
   function initCubeScene(container) {
     var canvas = makeCanvas("dot-scene-canvas");
     container.appendChild(canvas);
+    observeScene(container);
     var ctx = canvas.getContext("2d");
     var cube = buildCubePoints();
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: container, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       ctx.clearRect(0, 0, w, h);
       var cx = w / 2, cy = h / 2, ang = t / 2600;
@@ -185,12 +213,13 @@
         ctx.arc(cx + r[0] * scale * s, cy + r[1] * scale * s, (1.1 + d) * 0.8, 0, Math.PI * 2);
         ctx.fill();
       }
-    });
+    } });
   }
 
   function initFieldScene(container) {
     var canvas = makeCanvas("dot-scene-canvas");
     container.appendChild(canvas);
+    observeScene(container);
     var ctx = canvas.getContext("2d");
     var pts = [];
     function seed(w, h) {
@@ -200,7 +229,7 @@
         pts.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3 });
       }
     }
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: container, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       if (!pts.length) seed(w, h);
       ctx.clearRect(0, 0, w, h);
@@ -232,15 +261,16 @@
         ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2);
         ctx.fill();
       }
-    });
+    } });
   }
 
   /* ---------------- rich scenes: wave / rings / galaxy ---------------- */
   function initWaveScene(container) {
     var canvas = makeCanvas("dot-scene-canvas");
     container.appendChild(canvas);
+    observeScene(container);
     var ctx = canvas.getContext("2d");
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: container, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = "rgba(" + accentRGB() + ",0.6)";
@@ -256,14 +286,15 @@
           ctx.fill();
         }
       }
-    });
+    } });
   }
 
   function initRingsScene(container) {
     var canvas = makeCanvas("dot-scene-canvas");
     container.appendChild(canvas);
+    observeScene(container);
     var ctx = canvas.getContext("2d");
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: container, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       ctx.clearRect(0, 0, w, h);
       var cx = w / 2, cy = h / 2;
@@ -283,14 +314,15 @@
           ctx.fill();
         }
       }
-    });
+    } });
   }
 
   function initGalaxyScene(container) {
     var canvas = makeCanvas("dot-scene-canvas");
     container.appendChild(canvas);
+    observeScene(container);
     var ctx = canvas.getContext("2d");
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: container, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       ctx.clearRect(0, 0, w, h);
       var cx = w / 2, cy = h / 2;
@@ -315,12 +347,10 @@
       ctx.beginPath();
       ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
       ctx.fill();
-    });
+    } });
   }
 
   /* ---------------- bootstrap scenes ---------------- */
-  var sceneLoop = [];
-
   function initDotScenes() {
     var containers = document.querySelectorAll("[data-dot-scene]");
     for (var i = 0; i < containers.length; i++) {
@@ -342,6 +372,7 @@
   }
 
   function initFieldInto(card, canvas) {
+    observeScene(card);
     var ctx = canvas.getContext("2d");
     var pts = [];
     function seed(w, h) {
@@ -351,7 +382,7 @@
         pts.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25 });
       }
     }
-    sceneLoop.push(function (t) {
+    sceneLoop.push({ el: card, draw: function (t) {
       var w = sizeTo(canvas, ctx)[0], h = sizeTo(canvas, ctx)[1];
       if (!pts.length) seed(w, h);
       ctx.clearRect(0, 0, w, h);
@@ -377,19 +408,34 @@
         ctx.arc(p.x, p.y, 1.3, 0, Math.PI * 2);
         ctx.fill();
       }
-    });
+    } });
   }
 
   function loop(t) {
-    for (var i = 0; i < sceneLoop.length; i++) sceneLoop[i](t);
-    for (var j = 0; j < canvasStore.length; j++) canvasStore[j].draw(t);
+    if (document.hidden) return; // no drawing while the tab is hidden
+    for (var i = 0; i < sceneLoop.length; i++) {
+      var s = sceneLoop[i];
+      if (s && s.draw && sceneVisible(s.el)) s.draw(t);
+    }
+    for (var j = 0; j < canvasStore.length; j++) {
+      var st = canvasStore[j];
+      if (st && st.draw && sceneVisible(st.el)) st.draw(t);
+    }
   }
 
   function start() {
     initStarfield();
     initDotScenes();
     if (reduced) {
-      loop(0);          // single static frame
+      // single static frame for reduced-motion users
+      for (var i = 0; i < sceneLoop.length; i++) {
+        var s = sceneLoop[i];
+        if (s && s.draw && sceneVisible(s.el)) s.draw(0);
+      }
+      for (var j = 0; j < canvasStore.length; j++) {
+        var st = canvasStore[j];
+        if (st && st.draw && sceneVisible(st.el)) st.draw(0);
+      }
       return;
     }
     function frame(t) { loop(t); requestAnimationFrame(frame); }

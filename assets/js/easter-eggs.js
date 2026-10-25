@@ -67,13 +67,12 @@ const EasterEggs = {
     }, 10000);
   },
   
-  // 2. Logo Click Explosion
+  // 2. Logo Click Explosion (runs alongside lightbox without blocking)
   initLogoExplosion() {
     const logo = document.querySelector('.profile-img');
     if (!logo) return;
     
-    logo.addEventListener('click', (e) => {
-      e.stopPropagation();
+    logo.addEventListener('dblclick', (e) => {
       this.createExplosion(e.clientX, e.clientY);
     });
   },
@@ -283,30 +282,19 @@ const EasterEggs = {
     if (window.PortfolioXP) window.PortfolioXP.add(8, 'Random theme', { toast: false });
   },
   
-  // 7. Time-based Themes
+  // 7. Time-based Themes (only if user hasn't explicitly set a theme or business mode)
   initTimeBased() {
-    const hour = new Date().getHours();
+    if (document.documentElement.getAttribute('data-mode') === 'business') return;
+    if (localStorage.getItem('theme') || localStorage.getItem('seasonal-theme')) return;
+
     const month = new Date().getMonth();
     const day = new Date().getDate();
-
-    // Un tema temporale non deve sovrascrivere una scelta esplicita
-    // dell'utente: chi ha scelto "light" si trovava con l'intero sito
-    // indaco dalle 00:00 alle 06:00. Il tema stagionale resta Priorita'
-    // perche' dura un giorno e l'utente non puo' prevederlo.
-    const userPickedTheme = localStorage.getItem('theme') === 'light'
-      || localStorage.getItem('theme') === 'dark';
-
-    if (!userPickedTheme && hour >= 0 && hour < 6) {
-      document.documentElement.setAttribute('data-theme', 'night');
-    }
     
     if (month === 11 && day === 25) {
-      document.documentElement.setAttribute('data-theme', 'christmas');
+      document.documentElement.setAttribute('data-seasonal-theme', 'christmas');
       this.showHint('🎄 Merry Christmas!');
-    }
-    
-    if (month === 9 && day === 31) {
-      document.documentElement.setAttribute('data-theme', 'halloween');
+    } else if (month === 9 && day === 31) {
+      document.documentElement.setAttribute('data-seasonal-theme', 'halloween');
       this.showHint('👻 Happy Halloween!');
     }
   },
@@ -342,14 +330,7 @@ const EasterEggs = {
   }
 };
 
-// Avvia al DOM ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => EasterEggs.init());
-} else {
-  EasterEggs.init();
-}
-
-// Guard: disable easter eggs in Recruiter/Business mode
+// Guard: disable easter eggs in Recruiter/Business mode (must patch BEFORE init!)
 (function patchEasterEggsForRecruiterMode() {
   const originals = {
     initKonami: EasterEggs.initKonami,
@@ -361,7 +342,8 @@ if (document.readyState === 'loading') {
   };
 
   function isDisabled() {
-    return document.documentElement.dataset.easterDisabled === '1';
+    return document.documentElement.dataset.easterDisabled === '1' ||
+           document.documentElement.getAttribute('data-mode') === 'business';
   }
 
   EasterEggs.initKonami = function () {
@@ -384,7 +366,7 @@ if (document.readyState === 'loading') {
       if (isDisabled()) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       const handler = this.shortcuts[e.key];
-      if (handler && e.key !== '?') handler(); // keep ? help disabled in business
+      if (handler) handler();
     });
   };
 
@@ -408,3 +390,10 @@ if (document.readyState === 'loading') {
     return originals.applyRandomTheme.call(this);
   };
 })();
+
+// Avvia al DOM ready (dopo il patch per Business Mode)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => EasterEggs.init());
+} else {
+  EasterEggs.init();
+}

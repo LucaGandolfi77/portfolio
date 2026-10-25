@@ -3,10 +3,17 @@ if (!document.getElementById('site-top-bar')) {
   (function(){
     const BAR_HEIGHT = 36; // px
 
-    // no inline CSS fallback here; pages may choose to declare `--site-top-bar-height` if needed
+    // Resolve the site root from THIS script's own URL. Works identically on
+    // GitHub Pages project sites (/portfolio/...), localhost subfolders and
+    // custom domains — no depth guessing from location.pathname, no 404s.
+    let SITE_ROOT = './';
+    try {
+      const src = (document.currentScript && document.currentScript.src) || '';
+      if (src) SITE_ROOT = src.replace(/top_buttons\.js(\?.*)?$/, '');
+    } catch (e) { /* fallback below keeps relative candidates */ }
 
-    // Remove any legacy top-left/top-right overlays if present
-    ['top-left','top-right'].forEach(c => {
+    // Remove any legacy overlays and duplicate language selectors if present
+    ['top-left','top-right','lang-top-left'].forEach(c => {
       document.querySelectorAll('.' + c).forEach(el => el.remove());
     });
 
@@ -40,17 +47,9 @@ if (!document.getElementById('site-top-bar')) {
     if (document.getElementById('exitTop')) {
       const old2 = document.getElementById('exitTop'); if (old2.parentNode) old2.parentNode.removeChild(old2);
     }
-    // Compute the path back to site index.html based on current page depth.
-    // Resolves to './index.html', '../index.html', '../../index.html' ... so it works on any host
-    // (including GitHub Pages project sites served under a subpath) without relying on '/index.html'.
+    // Always navigate to the resolved site home — deterministic on every host.
     function homeHref() {
-      const p = location.pathname;
-      const depth = p.split('/').filter(Boolean).length;
-      // If the last segment is a file (has a dot) subtract 1
-      const last = p.split('/').filter(Boolean).pop() || '';
-      const dirs = (last.indexOf('.') >= 0) ? depth - 1 : depth;
-      if (dirs <= 0) return './index.html';
-      return '../'.repeat(dirs) + 'index.html';
+      return SITE_ROOT + 'index.html';
     }
 
     const exitBtn = document.createElement('button');
@@ -59,34 +58,14 @@ if (!document.getElementById('site-top-bar')) {
     exitBtn.textContent = '← Home';
     exitBtn.addEventListener('click', () => {
       try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-      const home = homeHref();
-      try {
-        if (window.history && window.history.length > 1) {
-          window.history.back();
-        } else if (document.referrer && document.referrer !== '') {
-          try {
-            const ref = new URL(document.referrer, location.href);
-            if (ref.origin === location.origin) {
-              window.location.href = document.referrer;
-            } else {
-              window.location.href = home;
-            }
-          } catch (e) {
-            window.location.href = home;
-          }
-        } else {
-          window.location.href = home;
-        }
-      } catch(e) {
-        try { window.location.href = home; } catch(e) { window.location.href = 'index.html'; }
-      }
+      window.location.href = homeHref();
     });
 
     // Create or reuse language selector (select with options like index.html)
     // Remove older language controls if present
     ['siteLangBtn','langBtn','siteLangSelect'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
 
-    function getLang() { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'en'); }
+    function getLang() { try { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'en'); } catch (e) { return 'en'; } }
     function setLang(v){ try { localStorage.setItem('site_lang', v); localStorage.setItem('lang', v); } catch(e){} updateLangUI(); }
 
     // Build select element with language list (same options as index.html)
@@ -103,25 +82,14 @@ if (!document.getElementById('site-top-bar')) {
     });
     langSelect.addEventListener('change', () => setLang(langSelect.value));
     async function loadTranslations(lang) {
-      // Resolve i18n/ relative to the current page depth so the FIRST
-      // candidate is already correct — no 404 noise on Live Server,
-      // GitHub Pages subpaths, or file:// previews. Extra candidates are
-      // fallbacks for unusual hosting layouts.
-      let up;
-      const p = location.pathname || '/';
-      if (p.endsWith('/')) {
-        up = './';
-      } else {
-        const segs = p.split('/').filter(Boolean);
-        const dirs = Math.max(0, segs.length - 1);
-        up = dirs === 0 ? './' : '../'.repeat(dirs);
-      }
+      // The FIRST candidate (script-derived site root) is already correct on
+      // every host — GitHub Pages project sites, Live Server, file:// previews.
+      // The remaining entries are fallbacks for unusual hosting layouts.
       const candidates = [
-        `${up}i18n/${lang}.json`,
-        `./i18n/${lang}.json`,
-        `../i18n/${lang}.json`,
-        `/i18n/${lang}.json`,
-        `/portfolio/i18n/${lang}.json`
+        `${SITE_ROOT}i18n/${lang}.json`,
+        './i18n/' + lang + '.json',
+        '../i18n/' + lang + '.json',
+        '../../i18n/' + lang + '.json'
       ];
 
       for (const path of candidates) {
@@ -179,7 +147,7 @@ if (!document.getElementById('site-top-bar')) {
       });
     }
 
-    function updateLangUI(){ const v = getLang() || 'it'; try { langSelect.value = v; } catch(e){} loadTranslations(v); }
+    function updateLangUI(){ const v = getLang() || 'en'; try { langSelect.value = v; } catch(e){} loadTranslations(v); }
 
     left.appendChild(exitBtn);
     right.appendChild(langSelect);
@@ -195,7 +163,7 @@ if (!document.getElementById('site-top-bar')) {
 
     // Accessibility: allow focus to first element
     exitBtn.setAttribute('aria-label', 'Return to home');
-    if (langSelect) langSelect.setAttribute('aria-label', 'Toggle language');
+    if (langSelect) langSelect.setAttribute('aria-label', 'Select language');
 
     updateLangUI();
   })();
