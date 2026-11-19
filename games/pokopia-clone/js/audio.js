@@ -1,92 +1,87 @@
-// audio.js — sintetizzatore chiptune via WebAudio. Musica giorno/notte, SFX, versi Pokémon, fanfare, note flauto.
-var AUDIO = (function(){
-  var ctx=null, master=null, musicGain=null, sfxGain=null;
-  var started=false, musicTimer=null, musicPattern=null;
-  var enabled=false, muted=false, vol=0.5;
+/* DITTOPIA — procedural audio */
 
-  function init(){
-    if(ctx) return;
-    try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }
-    catch(e){ return; }
-    master=ctx.createGain(); master.gain.value=vol; master.connect(ctx.destination);
-    musicGain=ctx.createGain(); musicGain.gain.value=0.5; musicGain.connect(master);
-    sfxGain=ctx.createGain(); sfxGain.gain.value=0.7; sfxGain.connect(master);
-    enabled=true;
-  }
-  function resume(){ init(); if(ctx && ctx.state==='suspended') ctx.resume(); }
-  function setMute(m){ muted=m; if(master) master.gain.value=m?0:vol; }
-  function setVolume(v){ vol=v; if(master && !muted) master.gain.value=v; }
+import { state } from './state.js';
 
-  // tono base: square wave con envelope
-  function tone(freq, t, dur, type, gainNode, peak){
-    type=type||'square'; peak=peak===undefined?0.3:peak;
-    if(!ctx) return;
-    var o=ctx.createOscillator(); o.type=type; o.frequency.value=freq;
-    var g=ctx.createGain(); g.gain.value=0;
-    g.connect(gainNode||master);
-    var at=Math.min(0.02,dur*0.3), rl=Math.min(0.08,dur*0.4);
-    g.gain.setValueAtTime(0,t);
-    g.gain.linearRampToValueAtTime(peak,t+at);
-    g.gain.setValueAtTime(peak,t+dur-rl);
-    g.gain.linearRampToValueAtTime(0,t+dur);
-    o.connect(g); o.start(t); o.stop(t+dur+0.02);
-  }
+let ctx = null;
+let master = null;
+let musicTimer = 0;
+let musicNotes = [];
 
-  // ─── SFX ───
-  function sfxPickup(){ resume(); if(!ctx)return; var t=ctx.currentTime;
-    tone(660,t,0.06,'square',sfxGain,0.25); tone(880,t+0.05,0.07,'square',sfxGain,0.25); }
-  function sfxStep(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(120,t,0.04,'triangle',sfxGain,0.08); }
-  function sfxChop(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(200,t,0.05,'sawtooth',sfxGain,0.3); tone(140,t+0.04,0.1,'sawtooth',sfxGain,0.25); }
-  function sfxSmash(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(120,t,0.08,'square',sfxGain,0.3); tone(90,t+0.05,0.15,'sawtooth',sfxGain,0.3); }
-  function sfxWater(){ resume(); if(!ctx)return; var t=ctx.currentTime; for(var i=0;i<4;i++) tone(400+i*120,t+i*0.04,0.06,'sine',sfxGain,0.2); }
-  function sfxCraft(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(523,t,0.08,'triangle',sfxGain,0.25); tone(659,t+0.07,0.08,'triangle',sfxGain,0.25); tone(784,t+0.14,0.1,'triangle',sfxGain,0.25); }
-  function sfxSparkle(){ resume(); if(!ctx)return; var t=ctx.currentTime; for(var i=0;i<6;i++) tone(1046+i*120,t+i*0.03,0.08,'sine',sfxGain,0.18); }
-  function sfxError(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(200,t,0.08,'square',sfxGain,0.2); tone(160,t+0.07,0.12,'square',sfxGain,0.2); }
-  function sfxSelect(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(880,t,0.04,'square',sfxGain,0.15); }
-  function sfxText(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(660,t,0.015,'square',sfxGain,0.06); }
-  // fanfare amicizia
-  var FANFARE=[523,659,784,1046,784,1046,1318];
-  function sfxFanfare(){ resume(); if(!ctx)return; var t=ctx.currentTime;
-    FANFARE.forEach(function(f,i){ tone(f,t+i*0.12,0.14,'square',sfxGain,0.28); }); }
-  // verso Pokémon da pattern [ms,Hz,...]
-  function cry(pattern){ resume(); if(!ctx||!pattern)return; var t=ctx.currentTime;
-    var acc=0; for(var i=0;i<pattern.length;i+=2){ var ms=pattern[i], hz=pattern[i+1];
-      tone(hz,t+acc/1000,(ms)/1000,'square',sfxGain,0.3); acc+=ms; } }
-  // nota del flauto (per minigioco Simon)
-  var FLUTE_NOTES=[523,587,659,784,880,988];
-  function fluteNote(idx){ resume(); if(!ctx)return; var t=ctx.currentTime;
-    var f=FLUTE_NOTES[idx]||523; tone(f,t,0.4,'sine',sfxGain,0.4); tone(f*2,t,0.4,'sine',sfxGain,0.15); }
-  function fluteFail(){ resume(); if(!ctx)return; var t=ctx.currentTime; tone(196,t,0.3,'sawtooth',sfxGain,0.3); }
-  function fluteSuccess(){ sfxFanfare(); }
+function ensure() {
+  if (ctx) return true;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = state.settings.sound ? 0.16 : 0;
+    master.connect(ctx.destination);
+    return true;
+  } catch (e) { return false; }
+}
 
-  // ─── MUSICA (loop arpeggiato) ───
-  // due pattern: giorno (allegro maggiore) e notte (calmo minore, lento)
-  var DAY=[ [523,0.25],[659,0.25],[784,0.25],[1046,0.25],[784,0.25],[659,0.25],[587,0.25],[523,0.25],
-            [440,0.5],[523,0.5], [392,0.5],[523,0.5], [659,0.25],[784,0.25],[880,0.25],[988,0.25] ];
-  var NIGHT=[ [392,0.5],[523,0.5],[659,0.5],[523,0.5],[349,0.5],[440,0.5],[523,0.5],[440,0.5],
-              [330,1],[392,0.5],[294,0.5],[392,1] ];
-  var bassDay=[ [131,1],[196,1],[165,1],[196,1] ];
-  var bassNight=[ [98,2],[110,2] ];
-  function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null; } musicPattern=null; }
-  function playMusic(mode){ resume(); if(!ctx) return; stopMusic();
-    var pat= mode==='night'?NIGHT:DAY; var bass= mode==='night'?bassNight:bassDay;
-    var tempo= mode==='night'?0.6:0.35;
-    musicPattern={pat:pat,bass:bass,tempo:tempo,step:0};
-    var stepMs=tempo*1000;
-    musicTimer=setInterval(function(){
-      if(!ctx||muted) return;
-      var st=musicPattern.step; var t=ctx.currentTime;
-      var note=musicPattern.pat[st % musicPattern.pat.length];
-      tone(note[0],t,note[1]*musicPattern.tempo*0.9,'square',musicGain,0.12);
-      if(st%4===0){ var b=musicPattern.bass[(st/4)%musicPattern.bass.length]; tone(b[0],t,b[1]*musicPattern.tempo*0.95,'triangle',musicGain,0.18); }
-      musicPattern.step++;
-    }, stepMs);
-  }
+export function resume() {
+  if (!ensure()) return;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+}
 
-  return { init:init, resume:resume, setMute:setMute, setVolume:setVolume,
-    sfxPickup:sfxPickup, sfxStep:sfxStep, sfxChop:sfxChop, sfxSmash:sfxSmash, sfxWater:sfxWater,
-    sfxCraft:sfxCraft, sfxSparkle:sfxSparkle, sfxError:sfxError, sfxSelect:sfxSelect, sfxText:sfxText,
-    sfxFanfare:sfxFanfare, cry:cry, fluteNote:fluteNote, fluteFail:fluteFail, fluteSuccess:fluteSuccess,
-    playMusic:playMusic, stopMusic:stopMusic,
-    isMuted:function(){return muted;} };
-})();
+export function isMuted() { return !state.settings.sound; }
+export function setMute(value) {
+  state.settings.sound = !value;
+  if (master) master.gain.value = state.settings.sound ? 0.16 : 0;
+}
+
+function tone(freq, dur, type = 'square', gain = 0.12, delay = 0, endFreq = null) {
+  if (!ensure() || !state.settings.sound) return;
+  try {
+    const t = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const amp = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + dur);
+    amp.gain.setValueAtTime(0.0001, t);
+    amp.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(amp);
+    amp.connect(master);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  } catch (e) { /* ignore */ }
+}
+
+function seq(notes, type = 'triangle', gain = 0.14, spacing = 0.1) {
+  notes.forEach((n, i) => tone(n, spacing * 1.5, type, gain, i * spacing));
+}
+
+export function sfxSelect() { tone(660, 0.06, 'square', 0.1); }
+export function sfxStep() { tone(140, 0.035, 'triangle', 0.05, 0, 90); }
+export function sfxPickup() { seq([660, 880, 1100], 'square', 0.1, 0.05); }
+export function sfxChop() { tone(180, 0.12, 'sawtooth', 0.13, 0, 70); }
+export function sfxSmash() { tone(120, 0.16, 'sawtooth', 0.14, 0, 55); }
+export function sfxWater() { tone(420, 0.2, 'sine', 0.12, 0, 700); }
+export function sfxCraft() { seq([440, 554, 659], 'square', 0.12, 0.07); }
+export function sfxError() { tone(180, 0.15, 'square', 0.1, 0, 120); }
+export function sfxFanfare() { seq([523, 659, 784, 1046], 'triangle', 0.15, 0.1); }
+export function sfxSparkle() { seq([1046, 1318, 1568], 'sine', 0.09, 0.05); }
+export function sfxText() { tone(880, 0.02, 'square', 0.03); }
+export function cry(notes) {
+  if (!notes || notes.length < 2) return;
+  const dur = notes[0];
+  for (let i = 1; i < notes.length; i += 2) tone(notes[i], dur / 1000, 'triangle', 0.12, (i - 1) / 2 * dur / 1000);
+}
+export function fluteNote(n) { tone([523,587,659,698,784,880][n] || 523, 0.24, 'sine', 0.16); }
+export function fluteFail() { tone(220, 0.28, 'sawtooth', 0.12, 0, 120); }
+export function fluteSuccess() { sfxFanfare(); }
+
+export function playMusic(kind) {
+  if (!ensure()) return;
+  clearInterval(musicTimer);
+  musicNotes = kind === 'night' ? [262, 311, 392, 311] : [392, 494, 587, 494];
+  let index = 0;
+  musicTimer = setInterval(() => {
+    if (!state.settings.sound) return;
+    tone(musicNotes[index % musicNotes.length], 0.5, 'sine', 0.035);
+    index++;
+  }, 700);
+}

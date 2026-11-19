@@ -1,2 +1,65 @@
-self.addEventListener('install',()=>self.skipWaiting());
-self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
+/* Offline Editor Studio — app shell precache + local-first strategies */
+"use strict";
+
+const CACHE = 'oes-v2';
+const ASSETS = [
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './editor.js',
+  './storage.js',
+  './files.js',
+  './ui.js',
+  './manifest.webmanifest',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg',
+  './icons/icon-maskable.svg'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Navigations: prefer the network so updates land, fall back to the cached shell.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match('./index.html').then(hit => hit || Response.error()))
+    );
+    return;
+  }
+
+  // Static assets: cache-first, with a network fill on a miss.
+  event.respondWith(
+    caches.match(event.request).then(hit => hit || fetch(event.request).then(response => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }))
+  );
+});

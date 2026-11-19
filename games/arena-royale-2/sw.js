@@ -1,50 +1,73 @@
-/* Arena Royale 2+ — service worker: app shell offline */
+/* Arena Royale 2.3 — app shell offline */
 "use strict";
 
-const CACHE = "arena-v2";
+const CACHE = "arena-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
-  "./js/main.js",
-  "./js/vendor/three.module.js",
   "./manifest.json",
+  "./js/main.js",
+  "./js/config.js",
+  "./js/state.js",
+  "./js/store.js",
+  "./js/i18n.js",
+  "./js/audio.js",
+  "./js/dispose.js",
+  "./js/effects.js",
+  "./js/world.js",
+  "./js/entities.js",
+  "./js/combat.js",
+  "./js/storm.js",
+  "./js/input.js",
+  "./js/ui.js",
+  "./js/vendor/three.module.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/apple-touch-icon.png",
+  "./icons/apple-touch-icon.png"
 ];
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(
+self.addEventListener("install", event => {
+  event.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(ASSETS))
+      .then(cache => cache.addAll(ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
+self.addEventListener("activate", event => {
+  event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  if (url.href.includes("three.module.js")) {
-    e.respondWith(
-      caches.match(e.request).then((hit) => {
-        if (hit) return hit;
-        return fetch(e.request).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-          return res;
-        });
-      })
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match("./index.html").then(hit => hit || Response.error()))
     );
     return;
   }
-  if (url.origin !== self.location.origin) return;
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+
+  event.respondWith(
+    caches.match(event.request).then(hit => hit || fetch(event.request).then(response => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }))
+  );
 });

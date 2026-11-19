@@ -1,200 +1,471 @@
-// ui.js — HUD, dialoghi typewriter, menu, craft, Pokédex, minigioco flauto, titolo/customizzazione, touch.
-var UI = (function(){
-  var els={};
-  var mode='play';
-  var dialogueQueue=[]; var dialogueCb=null; var dialogueChars=0; var dialogueTimer=0; var dialogueFull='';
-  var craftSelected=0; var craftList=[]; var dexSel=0; var menuSel=0;
-  var fluteSeq=[]; var fluteInput=[]; var flutePlayer=false; var fluteCb=null;
-  var customizeCb=null;
-  var toastT=null;
+/* DITTOPIA — HUD, dialogs, menus, journal and panels */
 
-  // ─── init ───
-  function init(){
-    var idmap={hud:'hud',clock:'clock',obj:'objective',inv:'inv',hotbar:'hotbar',dialogue:'dialogue',dText:'dText',dName:'dName',dPrompt:'dPrompt',menu:'menu',craft:'craft',craftList:'craftList',dex:'dex',dexList:'dexList',flute:'flute',fluteSeq:'fluteSeq',fluteIn:'fluteIn',fluteMsg:'fluteMsg',title:'title',customize:'customize',notify:'notify',touch:'touch',touchpad:'touchpad',btnA:'btnA',btnB:'btnB',tip:'tip',toast:'toast',touchBtns:'touchBtns'};
-    Object.keys(idmap).forEach(function(k){ els[k]=document.getElementById(idmap[k]); });
+import { ITEMS, MOVES, MOVE_ORDER, SPECIES, ACHIEVEMENTS, ZONES } from './config.js';
+import { state, hasSave, exportB64, importB64, reset as resetSave } from './state.js';
+import { t, applyI18n } from './i18n.js';
+import * as AUDIO from './audio.js';
+import { pokemon } from './pokemon.js';
+import { world } from './world.js';
+import { allQuests, objectiveFor } from './quests.js';
+
+const $ = id => document.getElementById(id);
+
+class UI {
+  constructor() {
+    this.mode = 'title';
+    this.queue = [];
+    this.cb = null;
+    this.chars = 0;
+    this.timer = 0;
+    this.full = '';
+    this.craftSel = 0;
+    this.craftList = [];
+    this.dexSel = 0;
+    this.menuSel = 0;
+    this.fluteSeq = [];
+    this.fluteInput = [];
+    this.flutePlaying = false;
+    this.fluteCb = null;
+    this.fluteTimer = null;
+    this.custom = { skin: 0, hair: 0, shirt: 0 };
+    this.customCb = null;
+    this.toastTimer = null;
+    this.callbacks = {};
   }
 
-  // ─── stato UI ───
-  function modeOf(){ return mode; }
-  function isModal(){ return mode!=='play'; }
-  function isTouch(){ return ('ontouchstart' in window) || navigator.maxTouchPoints>0; }
-
-  // ─── HUD ───
-  function refreshHUD(state){
-    var t=state.time; var h=Math.floor(t/60)%24; var mins=Math.floor(t%60);
-    var isNight=h<6||h>=20;
-    els.clock.textContent=(h<10?'0':'')+h+':'+(mins<10?'0':'')+mins+' '+(isNight?'☾':'☀');
-    var q=QUESTS.find(function(x){return x.id===state.quest.current;});
-    els.obj.textContent = q?('★ '+q.title+' — '+q.goal):'';
-    // inventario risorse
-    var p=state.player;
-    var html=''; Object.keys(p.inv).forEach(function(k){ var n=p.inv[k]; if(n>0 && ITEMS[k] && ITEMS[k].kind==='res'){ html+='<span class="ic" title="'+ITEMS[k].name+'"><i data-r="'+k+'"></i>×'+n+'</span>'; } });
-    els.inv.innerHTML=html;
-    // hotbar mosse
-    html=''; MOVE_ORDER.forEach(function(mv,i){ if(p.moves[mv]){ var key=(i+1); html+='<div class="hb'+(p.curMove===mv?' sel':'')+'" data-mv="'+mv+'">'+key+'·'+MOVES[mv].name+'</div>'; } });
-    els.hotbar.innerHTML=html;
-    if(els.touch) els.touch.style.display = isTouch()?'block':'none';
+  init(callbacks) {
+    this.callbacks = callbacks;
+    applyI18n(document);
+    this.showTitle();
   }
 
-  // ─── toast ───
-  function notify(msg){ if(!els.toast)return; els.toast.textContent=msg; els.toast.style.opacity='1'; if(toastT)clearTimeout(toastT); toastT=setTimeout(function(){els.toast.style.opacity='0';},2600); }
+  modeOf() { return this.mode; }
+  isModal() { return this.mode !== 'play'; }
+  isTouch() { return 'ontouchstart' in window || navigator.maxTouchPoints > 0; }
 
-  // ─── dialogo ───
-  function dialogue(name,text,cb){ dialogueQueue=[{n:name,t:text}]; dialogueCb=cb; startNextDialog(); }
-  function dialogueMulti(lines,cb){ dialogueQueue=lines.map(function(l){ return typeof l==='string'?{t:l}:{n:l.n||'',t:l.t}; }); dialogueCb=cb; startNextDialog(); }
-  function startNextDialog(){
-    if(dialogueQueue.length===0){ mode='play'; els.dialogue.style.display='none'; var cb=dialogueCb; dialogueCb=null; if(cb)cb(); return; }
-    var d=dialogueQueue[0]; mode='dialogue'; els.dialogue.style.display='block'; els.dPrompt.style.display='none';
-    els.dName.textContent=d.n||''; dialogueFull=d.t; dialogueChars=0; dialogueTimer=0; els.dText.textContent='';
-  }
-  function update(dt){
-    if(mode!=='dialogue')return;
-    if(dialogueChars<dialogueFull.length){
-      dialogueTimer+=dt; var speed=0.022; var n=Math.floor(dialogueTimer/speed);
-      if(n>dialogueChars){ var prev=Math.floor(dialogueChars/3); var now=Math.floor(n/3); if(now>prev)AUDIO.sfxText(); dialogueChars=Math.min(n,dialogueFull.length); els.dText.textContent=dialogueFull.slice(0,dialogueChars); }
-    } else { els.dPrompt.style.display='block'; }
-  }
-  function dialogueAdvance(){
-    if(mode!=='dialogue')return;
-    if(dialogueChars<dialogueFull.length){ dialogueChars=dialogueFull.length; els.dText.textContent=dialogueFull; els.dPrompt.style.display='block'; }
-    else { dialogueQueue.shift(); startNextDialog(); }
+  notify(message) {
+    const el = $('toast');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add('on');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
   }
 
-  // ─── menu principale ───
-  function openMenu(state){ mode='menu'; menuSel=0; els.menu.style.display='flex'; renderMenu(state); }
-  function closeMenu(){ els.menu.style.display='none'; mode='play'; }
-  function renderMenu(state){
-    var opts=['Pokédex','Salva ora','Esporta salvataggio','Importa salvataggio','Modalità GB: '+(state.settings.gb?'ON':'OFF'),'Audio: '+(AUDIO.isMuted()?'OFF':'ON'),'Cancella salvataggio','Chiudi'];
-    els.menu.innerHTML='<div class="mt">MENU</div>'+opts.map(function(o,i){return '<div class="mo'+(i===menuSel?' sel':'')+'" data-i="'+i+'">'+o+'</div>';}).join('');
+  refreshHUD(state, info = {}) {
+    const hour = Math.floor(state.time / 60) % 24;
+    const mins = Math.floor(state.time % 60);
+    const night = hour < 6 || hour >= 20;
+    $('clock').textContent = `${String(hour).padStart(2,'0')}:${String(mins).padStart(2,'0')} ${night ? '☾' : '☀'}`;
+    $('objective').textContent = objectiveFor(state);
+    const weather = $('weatherTag');
+    if (weather) weather.textContent = `${t(info.season || 'spring')} · ${t(info.weather || 'clear')} · ${world.zoneAt(state.player.x, state.player.y).name}`;
+
+    const p = state.player;
+    $('inv').innerHTML = Object.entries(p.inv)
+      .filter(([key, amount]) => amount > 0 && ITEMS[key] && ITEMS[key].kind === 'res')
+      .map(([key, amount]) => `<span class="ic">${ITEMS[key].name} ×${amount}</span>`).join('');
+
+    $('hotbar').innerHTML = MOVE_ORDER
+      .map((mv, i) => ({ mv, i: i + 1 }))
+      .filter(({ mv }) => p.moves[mv])
+      .map(({ mv, i }) => `<button type="button" class="hb${p.curMove === mv ? ' sel' : ''}" data-mv="${mv}">${i}·${MOVES[mv].name}</button>`)
+      .join('');
   }
-  function menuMove(dir,state){ var opts=8; menuSel=(menuSel+dir+opts)%opts; AUDIO.sfxSelect(); renderMenu(state); }
-  function menuAction(i,state){
-    switch(i){
-      case 0: closeMenu(); openDex(state); break;
-      case 1: SAVE.saveState(state); notify('Salvataggio completo.'); AUDIO.sfxCraft(); break;
-      case 2: try{ var b=SAVE.exportB64(); prompt('Copia questo codice:',b); }catch(e){ notify('Errore export.'); } break;
-      case 3: var v=prompt('Incolla il codice di salvataggio:'); if(v&&SAVE.importB64(v)){ notify('Importato! Ricarica...'); setTimeout(function(){location.reload();},900);} else notify('Codice non valido.'); break;
-      case 4: state.settings.gb=!state.settings.gb; renderMenu(state); break;
-      case 5: AUDIO.setMute(!AUDIO.isMuted()); renderMenu(state); break;
-      case 6: if(confirm('Cancellare il salvataggio?')){ SAVE.reset(); notify('Salvataggio cancellato.'); } break;
-      case 7: closeMenu(); break;
+
+  dialogue(name, text, cb) { this.dialogueMulti([{ n: name, t: text }], cb); }
+  dialogueMulti(lines, cb) {
+    this.queue = lines.map(line => typeof line === 'string' ? { t: line } : line);
+    this.cb = cb || null;
+    this.nextDialog();
+  }
+  nextDialog() {
+    if (!this.queue.length) {
+      this.mode = 'play';
+      $('dialogue').classList.remove('on');
+      const cb = this.cb; this.cb = null;
+      if (cb) cb();
+      return;
+    }
+    const line = this.queue[0];
+    this.mode = 'dialogue';
+    $('dialogue').classList.add('on');
+    $('dName').textContent = line.n || '';
+    this.full = line.t;
+    this.chars = 0;
+    this.timer = 0;
+    $('dText').textContent = '';
+    $('dPrompt').style.opacity = '0';
+  }
+  advanceDialogue() {
+    if (this.mode !== 'dialogue') return;
+    if (this.chars < this.full.length) {
+      this.chars = this.full.length;
+      $('dText').textContent = this.full;
+      $('dPrompt').style.opacity = '1';
+    } else {
+      this.queue.shift();
+      this.nextDialog();
+    }
+  }
+  update(dt) {
+    if (this.mode !== 'dialogue') return;
+    if (this.chars < this.full.length) {
+      this.timer += dt;
+      const count = Math.floor(this.timer / 0.018);
+      if (count > this.chars) {
+        if (Math.floor(count / 4) !== Math.floor(this.chars / 4)) AUDIO.sfxText();
+        this.chars = Math.min(count, this.full.length);
+        $('dText').textContent = this.full.slice(0, this.chars);
+      }
+    } else $('dPrompt').style.opacity = '1';
+  }
+
+  showTitle() {
+    this.mode = 'title';
+    const el = $('title');
+    el.classList.add('on');
+    el.innerHTML = `<div class="tlogo">DITTOPIA</div><div class="tsub">un omaggio a Pokémon Pokopia</div>
+      <button class="tbtn" type="button" data-act="new">▣ ${t('newGame')}</button>
+      <button class="tbtn" type="button" data-act="continue"${hasSave() ? '' : ' disabled'}>▣ ${t('continue')}</button>
+      <p class="tdisc">${t('disclaimer')}</p>`;
+  }
+  hideTitle() { $('title').classList.remove('on'); this.mode = 'play'; }
+
+  showCustomize(cb) {
+    this.mode = 'customize';
+    this.customCb = cb;
+    this.custom = { skin: 0, hair: 0, shirt: 0 };
+    $('customize').classList.add('on');
+    this.renderCustomize();
+  }
+  renderCustomize() {
+    const rows = [['skin', t('skin'), 4], ['hair', t('hair'), 5], ['shirt', t('shirt'), 5]];
+    $('customize').innerHTML = `<div class="panel"><div class="mt">${t('create')}</div>
+      <div class="cust-preview" id="custPreview"></div>
+      ${rows.map(([key, label, max]) => `<div class="custRow"><span>${label}</span>
+        <button type="button" data-c="${key}" data-d="-1">‹</button>
+        <span>${this.custom[key] + 1}/${max}</span>
+        <button type="button" data-c="${key}" data-d="1">›</button></div>`).join('')}
+      <button class="tbtn" type="button" data-act="go">✔ ${t('startAdventure')}</button></div>`;
+    this.callbacks.onPreview?.(this.custom, $('custPreview'));
+  }
+  customChoose(key, delta) {
+    const max = { skin: 4, hair: 5, shirt: 5 }[key];
+    this.custom[key] = (this.custom[key] + delta + max) % max;
+    AUDIO.sfxSelect();
+    this.renderCustomize();
+  }
+  confirmCustom() {
+    const values = this.callbacks.onPalette?.(this.custom) || this.custom;
+    $('customize').classList.remove('on');
+    this.mode = 'play';
+    const cb = this.customCb; this.customCb = null;
+    this.callbacks.onStartAdventure?.(values);
+    if (cb) cb(values);
+  }
+
+  openMenu() {
+    this.mode = 'menu';
+    this.menuSel = 0;
+    $('menu').classList.add('on');
+    this.renderMenu();
+  }
+  closeMenu() { $('menu').classList.remove('on'); this.mode = 'play'; }
+  renderMenu() {
+    const options = [
+      t('pokedex'), t('journal'), t('map'), t('photo'), t('saveNow'),
+      t('exportSave'), t('importSave'), `${t('gbMode')}: ${state.settings.gb ? 'ON' : 'OFF'}`,
+      `${t('audio')}: ${AUDIO.isMuted() ? 'OFF' : 'ON'}`,
+      `${t('quality')}: ${state.settings.quality}`, `🌐 ${state.settings.lang === 'it' ? 'Italiano' : 'English'}`,
+      t('deleteSave'), t('close')
+    ];
+    $('menu').innerHTML = `<div class="panel"><div class="mt">${t('menu')}</div>
+      ${options.map((o, i) => `<button type="button" class="mo${i === this.menuSel ? ' sel' : ''}" data-i="${i}">${o}</button>`).join('')}
+      <p class="hint">${t('controls')}</p></div>`;
+  }
+  menuMove(dir) {
+    const count = 13;
+    this.menuSel = (this.menuSel + dir + count) % count;
+    AUDIO.sfxSelect();
+    this.renderMenu();
+  }
+  menuAction(index) {
+    switch (index) {
+      case 0: this.closeMenu(); this.openDex(); break;
+      case 1: this.closeMenu(); this.openJournal(); break;
+      case 2: this.closeMenu(); this.openMap(); break;
+      case 3: this.closeMenu(); this.openPhoto(); break;
+      case 4: this.callbacks.onSave?.(); this.notify(t('saved')); break;
+      case 5: { const code = exportB64(); window.prompt('Codice salvataggio:', code); break; }
+      case 6: {
+        const value = window.prompt('Codice salvataggio:');
+        if (value && importB64(value)) { this.notify(t('imported')); setTimeout(() => location.reload(), 900); }
+        else this.notify(t('invalid'));
+        break;
+      }
+      case 7: state.settings.gb = !state.settings.gb; this.callbacks.onSave?.(); this.renderMenu(); break;
+      case 8: AUDIO.setMute(!AUDIO.isMuted()); this.callbacks.onSave?.(); this.renderMenu(); break;
+      case 9: state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; this.callbacks.onSave?.(); this.renderMenu(); break;
+      case 10:
+        state.settings.lang = state.settings.lang === 'it' ? 'en' : 'it';
+        this.callbacks.onSave?.();
+        applyI18n(document);
+        this.renderMenu();
+        break;
+      case 11:
+        if (window.confirm(t('resetConfirm'))) { resetSave(); this.notify('OK'); }
+        break;
+      case 12: this.closeMenu(); break;
     }
   }
 
-  // ─── crafting ───
-  function openCraft(state){ mode='craft'; craftSelected=0; buildCraftList(state); renderCraft(state); }
-  function closeCraft(){ els.craft.style.display='none'; mode='play'; }
-  function buildCraftList(state){ craftList=[]; Object.keys(ITEMS).forEach(function(k){ var it=ITEMS[k]; if(it.kind!=='place')return; if(it.move && it.move!=='base' && !state.player.moves[it.move]) return; craftList.push(k); }); }
-  function canAfford(state,cost){ if(!cost)return true; for(var k in cost) if((state.player.inv[k]||0)<cost[k]) return false; return true; }
-  function costStr(cost){ if(!cost)return ''; return Object.keys(cost).map(function(k){return ITEMS[k].name+'×'+cost[k];}).join(', '); }
-  function renderCraft(state){
-    var html='<div class="mt"><b>BANCO DA LAVORO</b> — ↑↓scegli · E crea · Esc chiudi</div>';
-    if(craftList.length===0){ html+='<div>Niente da craftare. Raccogli risorse!</div>'; }
-    craftList.forEach(function(k,i){ var it=ITEMS[k]; var can=canAfford(state,it.cost); var sel=i===craftSelected;
-      html+='<div class="mo'+(sel?' sel':'')+'" data-i="'+i+'"><b>'+it.name+'</b> — '+costStr(it.cost)+(can?'':' <span style="color:#f88">✗</span>')+(it.desc?'<br><small>'+it.desc+'</small>':'')+'</div>'; });
-    els.craft.innerHTML=html; els.craft.style.display='flex';
-  }
-  function craftMove(dir,state){ if(!craftList.length)return; craftSelected=(craftSelected+dir+craftList.length)%craftList.length; AUDIO.sfxSelect(); renderCraft(state); }
-  function craftConfirm(state){
-    var k=craftList[craftSelected]; if(!k)return; var it=ITEMS[k];
-    if(!canAfford(state,it.cost)){ AUDIO.sfxError(); notify('Risorse insufficienti.'); return; }
-    for(var r in it.cost){ state.player.inv[r]-=it.cost[r]; if(state.player.inv[r]<0)state.player.inv[r]=0; }
-    state.player.inv[k]=(state.player.inv[k]||0)+1;
-    AUDIO.sfxCraft(); notify('Craftato: '+it.name+' ×1'); GAME.onCraft(k); renderCraft(state);
-  }
-
-  // ─── Pokédex ───
-  function openDex(state){ mode='dex'; dexSel=0; renderDex(state); }
-  function closeDex(){ els.dex.style.display='none'; mode='play'; }
-  function renderDex(state){
-    var dex=MONS.pokedex(); var keys=Object.keys(SPECIES);
-    var html='<div class="mt">POKéDEX — visti '+MONS.dexCount()+' · amici '+MONS.friendsCount()+' (Esc chiudi)</div>';
-    keys.forEach(function(sp,i){ var s=SPECIES[sp]; var e=dex[sp]||{seen:false,friends:false}; var sel=i===dexSel;
-      var n='#'+String(s.n).padStart(3,'0'); var name=e.seen?s.name:'???';
-      html+='<div class="mo'+(sel?' sel':'')+'" data-i="'+i+'"><b>'+n+'</b> '+name+(e.friends?' ❤':'')+(e.seen&&!e.friends?' ○':'')+'</div>';
-      if(sel){ html+='<div class="dexEntry">'+(e.seen?'<i data-mon="'+sp+'"></i>':'<i class="sil"></i>')+'<div>'+(e.seen?s.flavor:'Pokémon non ancora scoperto.')+'</div><div><small>'+s.type+'</small></div></div>'; }
+  openCraft(state) {
+    this.mode = 'craft';
+    this.craftSel = 0;
+    this.craftList = Object.keys(ITEMS).filter(key => {
+      const item = ITEMS[key];
+      if (item.kind !== 'place') return false;
+      return !item.move || item.move === 'base' || state.player.moves[item.move];
     });
-    els.dex.innerHTML=html; els.dex.style.display='flex';
+    this.renderCraft(state);
   }
-  function dexMove(dir,state){ var keys=Object.keys(SPECIES); dexSel=(dexSel+dir+keys.length)%keys.length; AUDIO.sfxSelect(); renderDex(state); }
+  closeCraft() { $('craft').classList.remove('on'); this.mode = 'play'; }
+  canAfford(cost) { return !cost || Object.entries(cost).every(([key, amount]) => (state.player.inv[key] || 0) >= amount); }
+  costText(cost) { return cost ? Object.entries(cost).map(([key, amount]) => `${ITEMS[key].name}×${amount}`).join(', ') : ''; }
+  renderCraft(state) {
+    $('craft').innerHTML = `<div class="panel"><div class="mt">${t('craft')}</div>
+      ${this.craftList.length ? this.craftList.map((key, i) => {
+        const item = ITEMS[key];
+        const afford = this.canAfford(item.cost);
+        return `<button type="button" class="mo${i === this.craftSel ? ' sel' : ''}" data-i="${i}">
+          <b>${item.name}</b> — ${this.costText(item.cost)} ${afford ? '' : '✗'}</button>`;
+      }).join('') : `<p>Raccogli risorse per craftare.</p>`}</div>`;
+    $('craft').classList.add('on');
+  }
+  craftMove(dir) {
+    if (!this.craftList.length) return;
+    this.craftSel = (this.craftSel + dir + this.craftList.length) % this.craftList.length;
+    AUDIO.sfxSelect();
+    this.renderCraft(state);
+  }
+  craftConfirm() {
+    const key = this.craftList[this.craftSel];
+    if (!key) return;
+    const item = ITEMS[key];
+    if (!this.canAfford(item.cost)) { AUDIO.sfxError(); this.notify('Risorse insufficienti.'); return; }
+    for (const [res, amount] of Object.entries(item.cost || {})) state.player.inv[res] = Math.max(0, (state.player.inv[res] || 0) - amount);
+    state.player.inv[key] = (state.player.inv[key] || 0) + 1;
+    state.stats.crafted++;
+    AUDIO.sfxCraft();
+    this.notify(`Craftato: ${item.name}`);
+    this.callbacks.onCraft?.(key);
+    this.renderCraft(state);
+  }
 
-  // ─── minigioco flauto (Simon) ───
-  function startFlute(seq,cb){ fluteSeq=seq.slice(); fluteInput=[]; flutePlayer=false; fluteCb=cb; mode='flute'; els.flute.style.display='flex'; playFluteSeq(); }
-  function playFluteSeq(){
-    els.fluteMsg.textContent='Ascolta la melodia...'; fluteStepWait(0);
+  openDex() {
+    this.mode = 'dex';
+    this.dexSel = 0;
+    $('dex').classList.add('on');
+    this.renderDex();
   }
-  function fluteStepWait(i){
-    if(i>=fluteSeq.length){ els.fluteMsg.textContent='Tocca a te! Ripeti con 1-6 (o pulsanti).'; fluteInput=[]; flutePlayer=true; els.fluteIn.innerHTML=''; return; }
-    var n=fluteSeq[i]; AUDIO.fluteNote(n);
-    els.fluteSeq.innerHTML=fluteSeq.slice(0,i+1).map(function(x){return '<b class="fn'+x+'">'+(['Do','Re','Mi','Fa','Sol','La'][x])+'</b>';}).join(' ');
-    fluteSeqTimer=setTimeout(function(){ fluteStepWait(i+1); }, 520);
+  closeDex() { $('dex').classList.remove('on'); this.mode = 'play'; }
+  renderDex() {
+    const keys = Object.keys(SPECIES);
+    const seen = pokemon.dexCount(), friends = pokemon.friendsCount();
+    $('dex').innerHTML = `<div class="panel"><div class="mt">${t('dex')} — ${t('seen')} ${seen} · ${t('friends')} ${friends}</div>
+      <div class="dex-list">${keys.map((key, i) => {
+        const sp = SPECIES[key], entry = pokemon.pokedex()[key] || {};
+        return `<button type="button" class="mo${i === this.dexSel ? ' sel' : ''}" data-i="${i}">
+          <b>#${String(sp.n).padStart(3,'0')}</b> ${entry.seen ? sp.name : '???'} ${entry.friends ? '❤' : entry.seen ? '○' : ''}</button>`;
+      }).join('')}</div>
+      ${this.dexPanel(keys[this.dexSel])}</div>`;
   }
-  var fluteSeqTimer=null;
-  function fluteInputNote(n){
-    if(mode!=='flute'||!flutePlayer)return;
-    AUDIO.fluteNote(n); fluteInput.push(n);
-    els.fluteIn.innerHTML=fluteInput.map(function(x){return '<b class="fn'+x+'">'+(['Do','Re','Mi','Fa','Sol','La'][x])+'</b>';}).join(' ');
-    var idx=fluteInput.length-1;
-    if(fluteInput[idx]!==fluteSeq[idx]){ AUDIO.fluteFail(); els.fluteMsg.textContent='Nota sbagliata! Riprova.'; flutePlayer=false; clearTimeout(fluteSeqTimer); setTimeout(playFluteSeq,1300); return; }
-    if(fluteInput.length>=fluteSeq.length){ flutePlayer=false; AUDIO.fluteSuccess(); els.fluteMsg.textContent='Perfetto! Mosslax si sveglia...'; setTimeout(function(){ closeFlute(); if(fluteCb)fluteCb(true); },900); }
+  dexPanel(key) {
+    if (!key) return '';
+    const sp = SPECIES[key], entry = pokemon.pokedex()[key] || {};
+    return `<div class="dexEntry"><div><b>${entry.seen ? sp.name : '???'}</b><br>
+      ${entry.seen ? sp.flavor : 'Pokémon non ancora scoperto.'}<br><small>${sp.type} · #${sp.n}</small></div></div>`;
   }
-  function closeFlute(){ clearTimeout(fluteSeqTimer); els.flute.style.display='none'; mode='play'; fluteCb=null; flutePlayer=false; }
+  dexMove(dir) {
+    const count = Object.keys(SPECIES).length;
+    this.dexSel = (this.dexSel + dir + count) % count;
+    AUDIO.sfxSelect();
+    this.renderDex();
+  }
 
-  // ─── titolo ───
-  function showTitle(){ mode='title'; els.title.style.display='flex';
-    els.title.innerHTML='<div class="tlogo">DITTOPIA</div><div class="tsub">un omaggio a Pokémon Pokopia</div>'+
-      '<div class="tbtn" data-act="new">▣ NUOVA PARTITA</div>'+
-      '<div class="tbtn" data-act="continue"'+(SAVE.hasSave()?'':' style="opacity:.3"')+'>▣ CONTINUA</div>'+
-      '<div class="tdisc">Fan game non ufficiale. Non affiliato a Nintendo/Game Freak/The Pokémon Company.</div>'; }
-  function hideTitle(){ els.title.style.display='none'; mode='play'; }
-
-  // ─── customizzazione ───
-  var cust={skin:0,hair:0,shirt:0};
-  var SKINS=[[[232,184,148]],[[200,150,110]],[[150,100,70]],[[240,210,180]]];
-  var HAIRS=[[[60,40,30]],[[140,80,40]],[[180,140,60]],[[60,60,80]],[[200,60,60]]];
-  var SHIRTS=[[[60,90,150]],[[200,60,60]],[[60,160,80]],[[180,60,160]],[[230,160,40]]];
-  function showCustomize(cb){ mode='customize'; customizeCb=cb; cust={skin:0,hair:0,shirt:0}; els.customize.style.display='flex'; renderCustomize(); }
-  function renderCustomize(){
-    var skin=SKINS[cust.skin][0],hair=HAIRS[cust.hair][0],shirt=SHIRTS[cust.shirt][0];
-    var h='<div class="mt">Crea il tuo Ditto umano</div><canvas id="prevC" width="96" height="96"></canvas>'+
-      '<div class="custRow"><span>Pelle</span><button data-c="skin" data-d="-1">‹</button><span>'+(cust.skin+1)+'/'+SKINS.length+'</span><button data-c="skin" data-d="1">›</button></div>'+
-      '<div class="custRow"><span>Capelli</span><button data-c="hair" data-d="-1">‹</button><span>'+(cust.hair+1)+'/'+HAIRS.length+'</span><button data-c="hair" data-d="1">›</button></div>'+
-      '<div class="custRow"><span>Maglietta</span><button data-c="shirt" data-d="-1">‹</button><span>'+(cust.shirt+1)+'/'+SHIRTS.length+'</span><button data-c="shirt" data-d="1">›</button></div>'+
-      "<div class=\"tbtn\" data-act=\"go\">✔ INIZIA L'AVVENTURA</div>";
-    els.customize.innerHTML=h;
-    var cv=document.getElementById('prevC'); if(cv){ var cx=cv.getContext('2d'); cx.imageSmoothingEnabled=false; cx.clearRect(0,0,96,96); drawPlayer(cx,0,4,6,{skin:skin,hair:hair,shirt:shirt}); }
+  openJournal() {
+    this.mode = 'journal';
+    const quests = allQuests();
+    $('journal').innerHTML = `<div class="panel"><div class="mt">${t('journal')}</div>
+      ${quests.map(q => {
+        const current = state.quest.current === q.id;
+        const done = current ? false : !!(state.quest.flags[q.id + '_done']);
+        return `<div class="quest${current ? ' current' : ''}"><b>${current ? '★ ' : '✓ '}${q.title}</b>
+          <p>${q.goal}</p></div>`;
+      }).join('')}
+      <div class="stats-grid">
+        <div><b>${state.stats.crafted}</b><span>craft</span></div>
+        <div><b>${pokemon.friendsCount()}</b><span>amici</span></div>
+        <div><b>${pokemon.dexCount()}</b><span>Pokédex</span></div>
+        <div><b>${state.stats.photos}</b><span>foto</span></div>
+      </div>
+      <div class="achievement-list">${ACHIEVEMENTS.map(a => `<span class="ach${state.achievements[a.id] ? ' done' : ''}">${a.icon} ${a.label}</span>`).join('')}</div>
+    </div>`;
+    $('journal').classList.add('on');
   }
-  function custChoose(cat,dir){ if(cat==='skin')cust.skin=(cust.skin+dir+SKINS.length)%SKINS.length; else if(cat==='hair')cust.hair=(cust.hair+dir+HAIRS.length)%HAIRS.length; else cust.shirt=(cust.shirt+dir+SHIRTS.length)%SHIRTS.length; AUDIO.sfxSelect(); renderCustomize(); }
-  function custConfirm(){ var v={skin:SKINS[cust.skin][0],hair:HAIRS[cust.hair][0],shirt:SHIRTS[cust.shirt][0]}; mode='play'; els.customize.style.display='none'; var cb=customizeCb; customizeCb=null; if(cb)cb(v); }
+  closeJournal() { $('journal').classList.remove('on'); this.mode = 'play'; }
 
-  // ─── input tastiera UI ───
-  function handleKey(e,state){
-    var k=e.key;
-    if(mode==='title'){ if(k==='Enter'||k===' '){ if(SAVE.hasSave())GAME.continueGame(); else GAME.newGame(); } return true; }
-    if(mode==='customize'){ if(k==='Enter')custConfirm(); return true; }
-    if(mode==='dialogue'){ if(k==='Enter'||k===' '||k==='e'||k==='E')dialogueAdvance(); return true; }
-    if(mode==='menu'){ if(k==='Escape'||k==='q'||k==='Q')closeMenu(); else if(k==='ArrowUp'||k==='w'||k==='W')menuMove(-1,state); else if(k==='ArrowDown'||k==='s'||k==='S')menuMove(1,state); else if(k==='Enter'||k===' '||k==='e'||k==='E')menuAction(menuSel,state); return true; }
-    if(mode==='craft'){ if(k==='Escape'||k==='q'||k==='Q')closeCraft(); else if(k==='ArrowUp'||k==='w'||k==='W')craftMove(-1,state); else if(k==='ArrowDown'||k==='s'||k==='S')craftMove(1,state); else if(k==='Enter'||k===' '||k==='e'||k==='E')craftConfirm(state); return true; }
-    if(mode==='dex'){ if(k==='Escape'||k==='q'||k==='Q'||k==='t'||k==='T')closeDex(); else if(k==='ArrowUp'||k==='w'||k==='W')dexMove(-1,state); else if(k==='ArrowDown'||k==='s'||k==='S')dexMove(1,state); return true; }
-    if(mode==='flute'){ var m={'1':0,'2':1,'3':2,'4':3,'5':4,'6':5}; if(m[k]!==undefined)fluteInputNote(m[k]); else if(k==='Escape'){ closeFlute(); if(fluteCb)fluteCb(false); } return true; }
+  openMap() {
+    this.mode = 'map';
+    $('map').classList.add('on');
+    this.callbacks.onMap?.($('mapCanvas'));
+  }
+  closeMap() { $('map').classList.remove('on'); this.mode = 'play'; }
+
+  openPhoto() {
+    this.mode = 'photo';
+    $('photo').classList.add('on');
+    const data = this.callbacks.onPhoto?.();
+    $('photoImg').src = data || '';
+  }
+  closePhoto() { $('photo').classList.remove('on'); this.mode = 'play'; }
+
+  startFlute(seq, cb) {
+    this.fluteSeq = seq.slice();
+    this.fluteInput = [];
+    this.flutePlaying = false;
+    this.fluteCb = cb;
+    this.mode = 'flute';
+    $('flute').classList.add('on');
+    this.playFluteSequence();
+  }
+  playFluteSequence() {
+    $('fluteMsg').textContent = 'Ascolta la melodia…';
+    this.fluteStep(0);
+  }
+  fluteStep(index) {
+    if (index >= this.fluteSeq.length) {
+      $('fluteMsg').textContent = 'Tocca a te! Ripeti con 1-6.';
+      this.fluteInput = [];
+      this.flutePlaying = true;
+      $('fluteIn').textContent = '';
+      return;
+    }
+    const note = this.fluteSeq[index];
+    AUDIO.fluteNote(note);
+    $('fluteSeq').textContent = this.fluteSeq.slice(0, index + 1).map(n => ['Do','Re','Mi','Fa','Sol','La'][n]).join(' ');
+    this.fluteTimer = setTimeout(() => this.fluteStep(index + 1), 540);
+  }
+  fluteInputNote(note) {
+    if (this.mode !== 'flute' || !this.flutePlaying) return;
+    AUDIO.fluteNote(note);
+    this.fluteInput.push(note);
+    $('fluteIn').textContent = this.fluteInput.map(n => ['Do','Re','Mi','Fa','Sol','La'][n]).join(' ');
+    const index = this.fluteInput.length - 1;
+    if (this.fluteInput[index] !== this.fluteSeq[index]) {
+      AUDIO.fluteFail();
+      $('fluteMsg').textContent = 'Nota sbagliata! Riprova.';
+      this.flutePlaying = false;
+      clearTimeout(this.fluteTimer);
+      setTimeout(() => this.playFluteSequence(), 1300);
+      return;
+    }
+    if (this.fluteInput.length >= this.fluteSeq.length) {
+      this.flutePlaying = false;
+      AUDIO.fluteSuccess();
+      $('fluteMsg').textContent = 'Perfetto!';
+      setTimeout(() => {
+        $('flute').classList.remove('on');
+        this.mode = 'play';
+        const cb = this.fluteCb; this.fluteCb = null;
+        if (cb) cb(true);
+      }, 800);
+    }
+  }
+  closeFlute() {
+    clearTimeout(this.fluteTimer);
+    $('flute').classList.remove('on');
+    this.mode = 'play';
+    const cb = this.fluteCb; this.fluteCb = null;
+    if (cb) cb(false);
+  }
+
+  handleKey(e, state) {
+    const key = e.key;
+    if (this.mode === 'title') {
+      if (key === 'Enter' || key === ' ') this.callbacks.onContinue?.();
+      return true;
+    }
+    if (this.mode === 'customize') {
+      if (key === 'Enter') this.confirmCustom();
+      return true;
+    }
+    if (this.mode === 'dialogue') {
+      if (['Enter',' ','e','E'].includes(key)) this.advanceDialogue();
+      return true;
+    }
+    if (this.mode === 'menu') {
+      if (['Escape','q','Q'].includes(key)) this.closeMenu();
+      else if (['ArrowUp','w','W'].includes(key)) this.menuMove(-1);
+      else if (['ArrowDown','s','S'].includes(key)) this.menuMove(1);
+      else if (['Enter',' ','e','E'].includes(key)) this.menuAction(this.menuSel);
+      return true;
+    }
+    if (this.mode === 'craft') {
+      if (['Escape','q','Q','c','C'].includes(key)) this.closeCraft();
+      else if (['ArrowUp','w','W'].includes(key)) this.craftMove(-1);
+      else if (['ArrowDown','s','S'].includes(key)) this.craftMove(1);
+      else if (['Enter',' ','e','E'].includes(key)) this.craftConfirm();
+      return true;
+    }
+    if (this.mode === 'dex') {
+      if (['Escape','q','Q','t','T'].includes(key)) this.closeDex();
+      else if (['ArrowUp','w','W'].includes(key)) this.dexMove(-1);
+      else if (['ArrowDown','s','S'].includes(key)) this.dexMove(1);
+      return true;
+    }
+    if (this.mode === 'journal') { if (['Escape','j','J'].includes(key)) this.closeJournal(); return true; }
+    if (this.mode === 'map') { if (['Escape','m','M'].includes(key)) this.closeMap(); return true; }
+    if (this.mode === 'photo') { if (['Escape'].includes(key)) this.closePhoto(); return true; }
+    if (this.mode === 'flute') {
+      const map = { '1':0,'2':1,'3':2,'4':3,'5':4,'6':5 };
+      if (map[key] !== undefined) this.fluteInputNote(map[key]);
+      else if (key === 'Escape') this.closeFlute();
+      return true;
+    }
     return false;
   }
 
-  // ─── click delegato ───
-  function onClick(ev,state){
-    var t=ev.target; var a, c, d, i;
-    if(mode==='title'){ a=t.getAttribute&&t.getAttribute('data-act'); if(a==='new')GAME.newGame(); else if(a==='continue')GAME.continueGame(); return; }
-    if(mode==='customize'){ c=t.getAttribute&&t.getAttribute('data-c'); if(c){ d=parseInt(t.getAttribute('data-d')); custChoose(c,d); } else if(t.getAttribute&&t.getAttribute('data-act')==='go') custConfirm(); return; }
-    if(mode==='menu'){ i=t.getAttribute&&t.getAttribute('data-i'); if(i!==null){ menuSel=parseInt(i); menuAction(menuSel,state); } return; }
-    if(mode==='craft'){ i=t.getAttribute&&t.getAttribute('data-i'); if(i!==null){ craftSelected=parseInt(i); AUDIO.sfxSelect(); renderCraft(state); } return; }
-    if(mode==='dex'){ i=t.getAttribute&&t.getAttribute('data-i'); if(i!==null){ var keys=Object.keys(SPECIES); dexSel=parseInt(i); AUDIO.sfxSelect(); renderDex(state); } return; }
-    if(mode==='flute'){ a=t.getAttribute&&t.getAttribute('data-n'); if(a!==null) fluteInputNote(parseInt(a)); return; }
-  }
+  onClick(e) {
+    const target = e.target;
+    const act = target.dataset && target.dataset.act;
+    const index = target.dataset && target.dataset.i;
+    const dir = target.dataset && target.dataset.d;
+    const customKey = target.dataset && target.dataset.c;
+    const note = target.dataset && target.dataset.n;
+    const move = target.dataset && target.dataset.mv;
 
-  return { init:init, refreshHUD:refreshHUD, notify:notify, dialogue:dialogue, dialogueMulti:dialogueMulti,
-    update:update, modeOf:modeOf, isModal:isModal, handleKey:handleKey, onClick:onClick,
-    dialogueAdvance:dialogueAdvance, fluteInputNote:fluteInputNote,
-    openMenu:openMenu, closeMenu:closeMenu, openCraft:openCraft, closeCraft:closeCraft,
-    openDex:openDex, closeDex:closeDex, startFlute:startFlute, closeFlute:closeFlute,
-    showTitle:showTitle, hideTitle:hideTitle, showCustomize:showCustomize, isTouch:isTouch };
-})();
+    if (this.mode === 'title') {
+      if (act === 'new') this.callbacks.onNewGame?.();
+      else if (act === 'continue') this.callbacks.onContinue?.();
+      return;
+    }
+    if (this.mode === 'customize') {
+      if (customKey) this.customChoose(customKey, Number(dir));
+      else if (act === 'go') this.confirmCustom();
+      return;
+    }
+    if (this.mode === 'menu') { if (index !== undefined) { this.menuSel = Number(index); this.menuAction(this.menuSel); } return; }
+    if (this.mode === 'craft') { if (index !== undefined) { this.craftSel = Number(index); this.renderCraft(state); } return; }
+    if (this.mode === 'dex') { if (index !== undefined) { this.dexSel = Number(index); this.renderDex(); } return; }
+    if (this.mode === 'flute') { if (note !== undefined) this.fluteInputNote(Number(note)); return; }
+    if (move && state.player.moves[move]) {
+      state.player.curMove = move;
+      AUDIO.sfxSelect();
+      this.refreshHUD(state);
+    }
+  }
+}
+
+export const ui = new UI();

@@ -1,11 +1,155 @@
 <!DOCTYPE html>
-<html lang="it"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#141824"><meta name="description" content="Privacy Audit — trasparenza dati locali, zero server."><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"><title>Privacy Audit</title></head>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#141824">
+<meta name="description" content="Privacy Audit — inspect local cookies, storage, IndexedDB and permissions. Values stay on your device.">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Privacy Audit</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./styles.css">
+</head>
 <body>
-<div id="app"><header id="topbar"><h1>Privacy Audit</h1><nav id="tabs"><button class="tab active" data-tab="overview">Panoramica</button><button class="tab" data-tab="controls">Controlli</button><button class="tab" data-tab="export">Esporta</button></nav></header>
-<main id="content">
-<section id="tab-overview" class="tab-content active"><h2>Dati locali rilevati</h2><div class="audit-row"><span>Cookie attivi</span><span id="audit-cookies">0</span></div><div class="audit-row"><span>Voci IndexedDB</span><span id="audit-idb">0</span></div><div class="audit-row"><span>LocalStorage chiavi</span><span id="audit-ls">0</span></div><div class="audit-row"><span>Notifiche autorizzate</span><span id="audit-notif">No</span></div></section>
-<section id="tab-controls" class="tab-content"><h2>Controlli granulari</h2><button id="btn-clear-cookies">Cancella cookie</button><button id="btn-clear-idb">Cancella IndexedDB</button><button id="btn-clear-ls">Cancella localStorage</button><button id="btn-revoke-notif">Revoca notifiche</button><p id="audit-msg"></p></section>
-<section id="tab-export" class="tab-content"><h2>Esporta audit</h2><p>Scarica report locale come file testo.</p><button id="btn-export">Esporta .txt</button></section>
-</main></div>
-<script src="app.js"></script>
-</body></html>
+
+<div id="app">
+  <header class="topbar">
+    <a class="back" href="../../index.html#projects">← <span data-i18n="back">Portfolio</span></a>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🔍</span>
+      <div class="brand-text"><h1>Privacy Audit</h1><small data-i18n="tagline">Local data transparency · zero server</small></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="lang-btn" type="button" aria-label="Language">🇬🇧 EN</button>
+      <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme">☀️</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab active" type="button" role="tab" data-tab="overview" data-i18n="tabOverview" aria-selected="true">Overview</button>
+    <button class="tab" type="button" role="tab" data-tab="details" data-i18n="tabDetails" aria-selected="false">Details</button>
+    <button class="tab" type="button" role="tab" data-tab="controls" data-i18n="tabControls" aria-selected="false">Controls</button>
+    <button class="tab" type="button" role="tab" data-tab="export" data-i18n="tabExport" aria-selected="false">Export</button>
+    <button class="tab" type="button" role="tab" data-tab="log" data-i18n="tabLog" aria-selected="false">Activity</button>
+  </nav>
+
+  <main class="workspace">
+    <section class="pane active" id="tab-overview" role="tabpanel">
+      <div class="overview-head">
+        <div><h2 data-i18n="overviewTitle">Local data detected</h2><small><span data-i18n="lastScan">Last scan</span>: <span id="audit-time">—</span></small></div>
+        <button class="ghost-btn" id="btn-refresh" type="button">↻ <span data-i18n="refresh">Refresh</span></button>
+      </div>
+
+      <div class="overview-grid">
+        <div class="card score-card">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 110 110" aria-hidden="true">
+              <circle class="ring-track" cx="55" cy="55" r="46"></circle>
+              <circle class="ring-fill" id="score-ring" cx="55" cy="55" r="46"></circle>
+            </svg>
+            <div class="ring-center"><b id="score-value">100</b><small data-i18n="risk">Privacy surface</small></div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat"><span>🍪 <span data-i18n="cookiesSection">Cookies</span></span><b id="stat-cookies">0</b></div>
+          <div class="stat"><span>🗝️ localStorage</span><b id="stat-ls">0</b></div>
+          <div class="stat"><span>🗄️ IndexedDB</span><b id="stat-idb">0</b></div>
+          <div class="stat"><span>🔔 <span data-i18n="permSection">Permissions</span></span><b id="stat-notif">—</b></div>
+        </div>
+      </div>
+
+      <div class="pill-row">
+        <span class="pill" id="secure-pill">—</span>
+        <span class="pill" id="sw-pill">—</span>
+      </div>
+    </section>
+
+    <section class="pane" id="tab-details" role="tabpanel">
+      <h2 class="pane-title" data-i18n="detailsTitle">Item-by-item detail</h2>
+      <div class="details" id="details-content"></div>
+    </section>
+
+    <section class="pane" id="tab-controls" role="tabpanel">
+      <h2 class="pane-title" data-i18n="controlsTitle">Granular controls</h2>
+      <div class="control-grid">
+        <div class="control-card">
+          <h3>🍪 <span data-i18n="clearCookies">Clear cookies</span></h3>
+          <div class="btn-row">
+            <button class="ghost-btn" id="btn-clear-cookies" type="button"><span data-i18n="scopeApp">App data only</span></button>
+            <button class="ghost-btn danger" id="btn-clear-cookies-all" type="button"><span data-i18n="scopeAll">All site data</span></button>
+          </div>
+        </div>
+        <div class="control-card">
+          <h3>🗝️ <span data-i18n="clearLs">Clear localStorage</span></h3>
+          <div class="btn-row">
+            <button class="ghost-btn" id="btn-clear-ls" type="button"><span data-i18n="scopeApp">App data only</span></button>
+            <button class="ghost-btn danger" id="btn-clear-ls-all" type="button"><span data-i18n="scopeAll">All site data</span></button>
+          </div>
+        </div>
+        <div class="control-card">
+          <h3>🗄️ <span data-i18n="clearIdb">Clear IndexedDB</span></h3>
+          <div class="btn-row">
+            <button class="ghost-btn" id="btn-clear-idb" type="button"><span data-i18n="scopeApp">App data only</span></button>
+            <button class="ghost-btn danger" id="btn-clear-idb-all" type="button"><span data-i18n="scopeAll">All site data</span></button>
+          </div>
+        </div>
+        <div class="control-card wide">
+          <h3>🔔 <span data-i18n="notifTitle">Notifications</span> · <small id="notif-status">—</small></h3>
+          <p class="muted small" data-i18n="notifHint">Browsers do not expose an API to revoke notification permission.</p>
+          <button class="ghost-btn" id="btn-notif" type="button" data-i18n="notifBtn">How to revoke</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" id="tab-export" role="tabpanel">
+      <h2 class="pane-title" data-i18n="exportTitle">Export audit</h2>
+      <div class="card export-card">
+        <p class="muted" data-i18n="exportHint">Download a local report. Values are hidden by default.</p>
+        <div class="field"><span data-i18n="formatLabel">Format</span>
+          <div class="radio-row">
+            <label><input type="radio" name="fmt" id="fmt-json" checked> JSON</label>
+            <label><input type="radio" name="fmt" id="fmt-txt"> TXT</label>
+          </div>
+        </div>
+        <label class="switch"><input type="checkbox" id="include-values"><span data-i18n="includeValues">Include raw values</span></label>
+        <button class="primary-btn" id="btn-export" type="button">⬇ <span data-i18n="downloadJson">Download JSON</span></button>
+      </div>
+    </section>
+
+    <section class="pane" id="tab-log" role="tabpanel">
+      <div class="overview-head"><h2 class="pane-title" data-i18n="logTitle">Activity log</h2>
+        <button class="ghost-btn" id="btn-clear-log" type="button">🗑 <span data-i18n="clearLog">Clear log</span></button></div>
+      <ul class="log-list" id="log-list"></ul>
+    </section>
+  </main>
+
+  <div class="side-foot" id="offline-state"><span class="offline-dot"></span><span data-i18n="offlineReady">Offline ready</span></div>
+</div>
+
+<dialog class="dialog" id="danger-dialog">
+  <form method="dialog">
+    <h3>⚠ <span data-i18n="dangerTitle">Confirm action</span></h3>
+    <p class="muted" id="danger-text"></p>
+    <input type="text" id="danger-input" aria-label="Confirmation" autocomplete="off" spellcheck="false">
+    <div class="dialog-actions">
+      <button value="cancel" class="ghost-btn" type="submit" data-i18n="cancel">Cancel</button>
+      <button value="ok" class="btn-danger" type="submit" data-i18n="confirm">Confirm</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="notif-dialog">
+  <form method="dialog">
+    <h3>🔔 <span data-i18n="notifTitle">Notifications</span></h3>
+    <p class="muted" data-i18n="notifHint">Browsers do not expose an API to revoke notification permission.</p>
+    <p class="muted small">Chrome: Settings → Privacy and security → Site settings → Notifications.<br>Firefox: Settings → Privacy & Security → Permissions → Notifications.</p>
+    <div class="dialog-actions"><button value="ok" class="primary-btn" type="submit" data-i18n="confirm">Confirm</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="./app.js"></script>
+<script src="../../top_buttons.js"></script>
+</body>
+</html>
