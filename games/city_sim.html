@@ -1,1598 +1,578 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>City Sim - Mobile</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      touch-action: none;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      overflow: hidden;
-      background: #1a1a2e;
-    }
-
-    #gameCanvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    #topPanel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(10px);
-      padding: 8px 10px;
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    #clockRow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    #clock {
-      font-size: 28px;
-      font-weight: bold;
-      color: #fff;
-      font-family: 'Courier New', monospace;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    }
-
-    #dayIndicator {
-      font-size: 14px;
-      color: #aaa;
-      margin-left: 10px;
-    }
-
-    #speedControls {
-      display: flex;
-      gap: 5px;
-    }
-
-    .speedBtn {
-      padding: 8px 14px;
-      border: none;
-      border-radius: 6px;
-      background: #333;
-      color: #fff;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .speedBtn.active {
-      background: #4ecdc4;
-      color: #000;
-    }
-
-    #countersRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: center;
-    }
-
-    .counter {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      color: #fff;
-    }
-
-    .counter .icon {
-      font-size: 14px;
-    }
-
-    .counter .value {
-      font-weight: bold;
-      min-width: 18px;
-      text-align: center;
-    }
-
-    #simPopup {
-      position: fixed;
-      display: none;
-      background: rgba(0, 0, 0, 0.9);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      padding: 16px;
-      z-index: 200;
-      min-width: 200px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    }
-
-    #simPopup.visible {
-      display: block;
-    }
-
-    #simPopup h3 {
-      margin-bottom: 10px;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    #simPopup .simColor {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    #simPopup .stat {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 14px;
-    }
-
-    #simPopup .stat:last-child {
-      border-bottom: none;
-    }
-
-    #simPopup .energyBar {
-      width: 100%;
-      height: 8px;
-      background: #333;
-      border-radius: 4px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-
-    #simPopup .energyFill {
-      height: 100%;
-      background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
-      transition: width 0.3s;
-    }
-
-    #closePopup {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-      opacity: 0.7;
-    }
-
-    #closePopup:hover {
-      opacity: 1;
-    }
-
-    #instructions {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 12px;
-      z-index: 50;
-      text-align: center;
-      opacity: 1;
-      transition: opacity 1s;
-    }
-
-    #instructions.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #zoomControls {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 100;
-    }
-
-    .zoomBtn {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(255, 255, 255, 0.9);
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .zoomBtn:active {
-      transform: scale(0.9);
-    }
-
-    #statsPanel {
-      position: fixed;
-      top: 50%;
-      right: -350px;
-      transform: translateY(-50%);
-      width: 340px;
-      max-height: 70vh;
-      background: rgba(0, 0, 0, 0.9);
-      backdrop-filter: blur(10px);
-      border-radius: 16px 0 0 16px;
-      padding: 20px;
-      z-index: 150;
-      overflow-y: auto;
-      transition: right 0.3s ease;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-    }
-
-    #statsPanel.open {
-      right: 0;
-    }
-
-    #statsToggle {
-      position: fixed;
-      top: 50%;
-      right: 20px;
-      transform: translateY(-50%);
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(78, 205, 196, 0.9);
-      font-size: 24px;
-      cursor: pointer;
-      z-index: 100;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      transition: all 0.2s;
-    }
-
-    #statsToggle:active {
-      transform: translateY(-50%) scale(0.9);
-    }
-
-    #statsPanel h2 {
-      color: #fff;
-      margin-bottom: 15px;
-      font-size: 20px;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-      padding-bottom: 10px;
-    }
-
-    .simStat {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 10px;
-      border-left: 4px solid;
-    }
-
-    .simStat h3 {
-      margin: 0 0 8px 0;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .simStat .simIcon {
-      font-size: 24px;
-    }
-
-    .simStat p {
-      margin: 4px 0;
-      font-size: 13px;
-      color: #ddd;
-    }
-
-    .simStat .location {
-      background: rgba(0, 0, 0, 0.3);
-      padding: 6px;
-      border-radius: 6px;
-      margin-top: 6px;
-      font-size: 12px;
-    }
-
-    /* ===== Menu / pausa ===== */
-    #menuBtn {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      border: none;
-      background: #333;
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-      flex: none;
-      transition: transform 0.15s;
-    }
-    #menuBtn:active { transform: scale(0.9); }
-
-    #menuOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.72);
-      backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 300;
-      padding: 20px;
-    }
-    #menuOverlay.open { display: flex; }
-    .menuPanel {
-      background: rgba(20, 22, 40, 0.96);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 20px;
-      padding: 26px 24px;
-      max-width: 380px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-      max-height: 88vh;
-      overflow-y: auto;
-    }
-    .menuPanel h2 { color: #fff; margin: 0 0 16px; font-size: 22px; }
-    .menuBig {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 14px;
-      background: linear-gradient(92deg, #4ecdc4, #2fbfa8);
-      color: #063a33;
-      font-size: 16px;
-      font-weight: 800;
-      cursor: pointer;
-      margin-bottom: 14px;
-      font-family: inherit;
-    }
-    .menuBig:active { transform: scale(0.97); }
-    .menuSection {
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 14px;
-      text-align: left;
-    }
-    .menuLabel {
-      color: #9fb0c9;
-      font-size: 11px;
-      font-weight: 700;
-      margin: 10px 0 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .menuLabel:first-child { margin-top: 0; }
-    .segRow { display: flex; gap: 8px; }
-    .segRow .speedBtn,
-    .segRow .segBtn {
-      flex: 1;
-      padding: 10px 8px;
-      border: none;
-      border-radius: 10px;
-      background: #2a2f45;
-      color: #dfe7f5;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .segRow .speedBtn.active,
-    .segRow .segBtn.active { background: #4ecdc4; color: #063a33; }
-    .menuActions { display: flex; flex-direction: column; gap: 8px; }
-    .menuBtn2 {
-      padding: 13px;
-      border: none;
-      border-radius: 12px;
-      background: #2a2f45;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .menuBtn2:active { transform: scale(0.97); }
-    .menuBtn2.danger { background: #c0392b; color: #fff; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#080d18">
+<title>City Sim — Vita urbana</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080d18;--panel:rgba(12,20,36,.84);--panel2:rgba(18,28,48,.96);
+  --line:rgba(150,195,255,.13);--line2:rgba(150,195,255,.26);
+  --txt:#eaf3ff;--dim:#8b9fbe;--cyan:#4de8ff;--green:#5ef0a8;--gold:#ffd166;--pink:#ff6b9e;--red:#ff5f6d;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:Inter,system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+#game{position:fixed;inset:0;display:block;touch-action:none;cursor:crosshair}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.top{position:fixed;top:calc(var(--site-top-bar-height,0px) + env(safe-area-inset-top,0px) + 8px);left:8px;right:8px;
+  z-index:20;display:flex;align-items:center;gap:8px;padding:8px 11px;flex-wrap:wrap}
+.brand{font-weight:900;font-size:.95rem;letter-spacing:.02em;white-space:nowrap}
+.brand i{font-style:normal;margin-right:5px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:700;color:var(--cyan);white-space:nowrap}
+.day{font-size:.73rem;color:var(--dim);white-space:nowrap}
+.weather{font-size:.73rem;color:var(--gold);white-space:nowrap}
+.spacer{flex:1}
+.tb{min-height:34px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--dim);font:inherit;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.tb:hover,.tb.on{color:var(--cyan);border-color:rgba(77,232,255,.4);background:rgba(77,232,255,.1)}
+.tb.dan{color:var(--red)}
+.side{position:fixed;left:8px;top:calc(var(--site-top-bar-height,0px) + env(safe-area-inset-top,0px) + 66px);z-index:19;
+  width:250px;max-height:calc(100vh - 160px);overflow-y:auto;padding:13px;scrollbar-width:thin}
+.side h3{font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:800;
+  margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.side h3 button{border:none;background:none;color:var(--dim);cursor:pointer;font-size:.9rem}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:.75rem;padding:5px 0;border-bottom:1px solid var(--line)}
+.row b{color:var(--txt);font-weight:700}
+.need{margin:7px 0}
+.need label{display:flex;justify-content:space-between;font-size:.68rem;color:var(--dim);margin-bottom:3px}
+.bar{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.tag{display:inline-block;font-size:.63rem;font-weight:800;padding:3px 8px;border-radius:20px;
+  background:rgba(77,232,255,.12);color:var(--cyan);margin:2px 3px 2px 0}
+.right{position:fixed;right:8px;top:calc(var(--site-top-bar-height,0px) + env(safe-area-inset-top,0px) + 66px);z-index:19;
+  width:250px;max-height:calc(100vh - 160px);overflow-y:auto;padding:13px;scrollbar-width:thin}
+.event{font-size:.7rem;color:var(--dim);padding:5px 0;border-bottom:1px solid var(--line);line-height:1.45}
+.event b{color:var(--gold)}
+.chart{display:flex;align-items:flex-end;gap:4px;height:64px;margin-top:8px}
+.chart i{flex:1;background:linear-gradient(180deg,var(--cyan),rgba(77,232,255,.15));border-radius:3px 3px 0 0;min-height:2px}
+.tools{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:20;
+  display:flex;gap:5px;padding:6px;max-width:calc(100vw - 16px);overflow-x:auto}
+.tool{min-width:54px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  color:var(--dim);font:inherit;font-size:.68rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;white-space:nowrap}
+.tool span{font-size:1rem}
+.tool.on{color:var(--cyan);border-color:var(--cyan);background:rgba(77,232,255,.12)}
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 72px);
+  z-index:18;font-size:.7rem;color:var(--dim);background:rgba(8,14,26,.75);padding:7px 12px;border-radius:20px;
+  pointer-events:none;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 80px);transform:translateX(-50%) translateY(10px);
+  z-index:100;background:var(--panel2);border:1px solid var(--line2);border-radius:22px;padding:10px 17px;
+  font-size:.78rem;font-weight:700;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+@media(max-width:900px){.side,.right{display:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-  <div id="topPanel">
-    <div id="clockRow">
-      <div>
-        <span id="clock">00:00</span>
-        <span id="dayIndicator">Giorno 1</span>
-      </div>
-      <div id="speedControls">
-        <button class="speedBtn active" data-speed="1">1x</button>
-        <button class="speedBtn" data-speed="2">2x</button>
-        <button class="speedBtn" data-speed="5">5x</button>
-      </div>
-      <button id="menuBtn" title="Menu">☰</button>
-    </div>
-    <div id="countersRow">
-      <div class="counter"><span class="icon">🛏️</span><span class="value" id="countSleep">0</span></div>
-      <div class="counter"><span class="icon">🍽️</span><span class="value" id="countEat">0</span></div>
-      <div class="counter"><span class="icon">💼</span><span class="value" id="countWork">0</span></div>
-      <div class="counter"><span class="icon">🛒</span><span class="value" id="countMall">0</span></div>
-      <div class="counter"><span class="icon">🎓</span><span class="value" id="countSchool">0</span></div>
-      <div class="counter"><span class="icon">🚶</span><span class="value" id="countWalk">0</span></div>
-      <div class="counter"><span class="icon">🐕</span><span class="value" id="countDog">0</span></div>
-      <div class="counter"><span class="icon">🍕</span><span class="value" id="countPizza">0</span></div>
-    </div>
-  </div>
+<canvas id="game"></canvas>
+<div class="top panel">
+  <div class="brand"><i>🏙️</i>CITY SIM</div><span class="clock" id="clock">06:00</span>
+  <span class="day" id="day">Giorno 1</span><span class="weather" id="weather">☀️ Sereno</span>
+  <span class="spacer"></span>
+  <button class="tb" id="pauseBtn">⏸</button>
+  <button class="tb" data-speed="1">1×</button><button class="tb on" data-speed="2">2×</button>
+  <button class="tb" data-speed="4">4×</button><button class="tb" data-speed="8">8×</button>
+  <button class="tb" id="saveBtn">💾</button><button class="tb" id="loadBtn">📂</button>
+</div>
 
-  <canvas id="gameCanvas"></canvas>
+<div class="side panel" id="simPanel">
+  <h3>Cittadini <span id="popBadge">0</span></h3>
+  <div id="simInfo"><div class="row"><span>Tocca un SIM sulla mappa</span></div></div>
+</div>
 
-  <div id="simPopup">
-    <button id="closePopup">✕</button>
-    <h3><span class="simColor" id="popupColor"></span><span id="popupName">Nome</span></h3>
-    <div class="stat"><span>Stato:</span><span id="popupState">-</span></div>
-    <div class="stat"><span>Età:</span><span id="popupAge">-</span></div>
-    <div class="stat"><span>Occupazione:</span><span id="popupJob">-</span></div>
-    <div class="stat"><span>Energia:</span><span id="popupEnergy">-</span></div>
-    <div class="energyBar"><div class="energyFill" id="popupEnergyBar"></div></div>
-  </div>
+<div class="right panel">
+  <h3>Città <span id="cityStats">—</span></h3>
+  <div class="row"><span>Popolazione</span><b id="stPop">0</b></div>
+  <div class="row"><span>Occupati</span><b id="stWork">0</b></div>
+  <div class="row"><span>Famiglie</span><b id="stFam">0</b></div>
+  <div class="row"><span>Umore medio</span><b id="stMood">—</b></div>
+  <div class="row"><span>Denaro totale</span><b id="stMoney">—</b></div>
+  <div class="chart" id="chart"></div>
+  <h3 style="margin-top:14px">Eventi</h3><div id="events"></div>
+</div>
 
-  <div id="instructions">
-    Trascina per muovere la mappa • Pizzica per zoom • Tocca un Sim per info
-  </div>
+<div class="tools panel" id="tools">
+  <button class="tool on" data-tool="inspect"><span>👆</span>Ispeziona</button>
+  <button class="tool" data-tool="house"><span>🏠</span>Casa</button>
+  <button class="tool" data-tool="shop"><span>🏪</span>Negozio</button>
+  <button class="tool" data-tool="park"><span>🌳</span>Parco</button>
+  <button class="tool" data-tool="office"><span>🏢</span>Ufficio</button>
+  <button class="tool" data-tool="bulldoze"><span>🧨</span>Demolisci</button>
+</div>
+<div id="hint">Trascina per spostarti · pinch/rotellina per zoom · tocca un SIM per ispezionarlo</div>
+<div id="toast" role="status"></div>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
 
-  <div id="zoomControls">
-    <button class="zoomBtn" id="zoomIn">+</button>
-    <button class="zoomBtn" id="zoomOut">−</button>
-  </div>
+/* ===================== CONFIG ===================== */
+const STEP=150, ROAD=24, GRID=14, WORLD=GRID*STEP;
+const TYPES={
+  house:{name:'Casa',color:'#e8a87c',icon:'🏠'},
+  apartment:{name:'Palazzo',color:'#c38bb8',icon:'🏢'},
+  office:{name:'Ufficio',color:'#7fa8d9',icon:'💼'},
+  shop:{name:'Negozio',color:'#8fd6bb',icon:'🏪'},
+  restaurant:{name:'Ristorante',color:'#f0a35e',icon:'🍽️'},
+  pizzeria:{name:'Pizzeria',color:'#ff8a5c',icon:'🍕'},
+  school:{name:'Scuola',color:'#b28dff',icon:'🎓'},
+  park:{name:'Parco',color:'#5ecb8a',icon:'🌳'},
+  hospital:{name:'Ospedale',color:'#ff7b8a',icon:'🏥'},
+  cinema:{name:'Cinema',color:'#64d2ff',icon:'🎬'},
+  gym:{name:'Palestra',color:'#ffd166',icon:'💪'}
+};
+const JOBS=[
+  {name:'Impiegato',pay:60,type:'office'},{name:'Insegnante',pay:70,type:'school'},
+  {name:'Medico',pay:110,type:'hospital'},{name:'Commerciante',pay:75,type:'shop'},
+  {name:'Cuoco',pay:65,type:'restaurant'},{name:'Studente',pay:15,type:'school'},
+  {name:'Pensionato',pay:35,type:'park'},{name:'Libero professionista',pay:90,type:'office'}
+];
+const NAMES=['Marco','Giulia','Luca','Sofia','Alessandro','Francesca','Andrea','Chiara','Matteo','Sara','Davide','Anna',
+  'Lorenzo','Valentina','Simone','Elisa','Federico','Martina','Giacomo','Laura','Riccardo','Elena','Nicola','Giorgia',
+  'Paolo','Federica','Stefano','Alice','Daniele','Beatrice','Tommaso','Greta','Edoardo','Irene','Samuele','Noemi'];
+const SURNAMES=['Rossi','Ferrari','Romano','Colombo','Ricci','Marino','Greco','Bruno','Gallo','Conti','Costa','Giordano',
+  'Rizzo','Lombardi','Moretti','Fontana','Santoro','Caruso','Rinaldi','Serra','Vitale','Martini'];
+const COLORS=['#ff6b6b','#4de8ff','#ffe66d','#5ef0a8','#f38181','#a98bff','#fcbad3','#64d2ff','#ffaaa5','#dcedc1',
+  '#ff9f68','#8fd6bb','#ff6b9e','#b28dff','#f0c987'];
+const ACT={
+  HOME:{name:'A casa',icon:'🏠',type:'house',dur:[60,180]},
+  SLEEP:{name:'Dormire',icon:'🛏️',type:'house',dur:[300,480]},
+  EAT:{name:'Mangiare',icon:'🍽️',type:'restaurant',dur:[25,50]},
+  PIZZA:{name:'Pizzeria',icon:'🍕',type:'pizzeria',dur:[35,60]},
+  WORK:{name:'Lavoro',icon:'💼',type:'office',dur:[200,360]},
+  SCHOOL:{name:'Scuola',icon:'🎓',type:'school',dur:[240,360]},
+  SHOP:{name:'Spesa',icon:'🛒',type:'shop',dur:[30,70]},
+  PARK:{name:'Parco',icon:'🌳',type:'park',dur:[30,90]},
+  GYM:{name:'Palestra',icon:'💪',type:'gym',dur:[45,90]},
+  CINEMA:{name:'Cinema',icon:'🎬',type:'cinema',dur:[90,140]},
+  HOSPITAL:{name:'Ospedale',icon:'🏥',type:'hospital',dur:[60,180]},
+  SOCIAL:{name:'Incontro',icon:'💬',type:'park',dur:[30,80]}
+};
+const NEEDS=[
+  {k:'hunger',name:'Fame',color:'#ffd166',good:'high'},
+  {k:'energy',name:'Energia',color:'#5ef0a8',good:'high'},
+  {k:'social',name:'Social',color:'#4de8ff',good:'high'},
+  {k:'fun',name:'Divertimento',color:'#ff6b9e',good:'high'},
+  {k:'hygiene',name:'Igiene',color:'#a98bff',good:'high'},
+  {k:'health',name:'Salute',color:'#ff8a5c',good:'high'}
+];
 
-  <button id="statsToggle">📊</button>
+/* ===================== STATE ===================== */
+const KEY='city-sim-v3';
+const S={
+  time:6*60,day:1,speed:2,paused:false,
+  sims:[],buildings:[],events:[],history:[],
+  selected:null,tool:'inspect',weather:'clear',weatherT:0,showNames:true,socialT:0,
+  cam:{x:0,y:0,z:.55},population:300,stats:[]
+};
+const camera=S.cam;
+let W=0,H=0,dpr=1,canvas=$('game'),ctx=canvas.getContext('2d'),last=0,acc=0,uid=1,toastT=null;
 
-  <div id="statsPanel">
-    <h2>📊 Statistiche Sims</h2>
-    <div id="statsContent"></div>
-  </div>
-
-  <!-- Menu / pausa -->
-  <div id="menuOverlay">
-    <div class="menuPanel">
-      <h2>⏸️ PAUSA</h2>
-      <button class="menuBig" id="menuResume">▶ Riprendi</button>
-      <div class="menuSection">
-        <div class="menuLabel">⚡ Velocità</div>
-        <div class="segRow">
-          <button class="speedBtn active" data-speed="1">1x</button>
-          <button class="speedBtn" data-speed="2">2x</button>
-          <button class="speedBtn" data-speed="5">5x</button>
-        </div>
-        <div class="menuLabel">🚶 Aspetto degli NPC</div>
-        <div class="segRow">
-          <button class="segBtn active" id="styleDots">🔴 Puntini</button>
-          <button class="segBtn" id="styleEmoji">🚶 Emoji</button>
-        </div>
-        <div class="menuLabel">🏷️ Nomi degli NPC</div>
-        <div class="segRow">
-          <button class="segBtn active" id="namesOn">Sì</button>
-          <button class="segBtn" id="namesOff">No</button>
-        </div>
-      </div>
-      <div class="menuActions">
-        <button class="menuBtn2" id="menuStats">📊 Statistiche</button>
-        <button class="menuBtn2" id="menuRegen">🔄 Rigenera città</button>
-        <button class="menuBtn2 danger" id="menuExit">🚪 Esci</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ==================== CONSTANTS ====================
-    const ACTIVITIES = {
-      SLEEP: { name: 'Dormire', icon: '🛏️', counterId: 'countSleep' },
-      EAT: { name: 'Mangiare', icon: '🍽️', counterId: 'countEat' },
-      WORK: { name: 'Lavoro', icon: '💼', counterId: 'countWork' },
-      MALL: { name: 'Centro Commerciale', icon: '🛒', counterId: 'countMall' },
-      SCHOOL: { name: 'Scuola', icon: '🎓', counterId: 'countSchool' },
-      WALK: { name: 'Passeggiata', icon: '🚶', counterId: 'countWalk' },
-      DOG: { name: 'Portare Cane', icon: '🐕', counterId: 'countDog' },
-      PIZZA: { name: 'Pizzeria', icon: '🍕', counterId: 'countPizza' }
-    };
-
-    const NAMES = [
-      'Marco', 'Giulia', 'Luca', 'Sofia', 'Alessandro', 'Francesca', 
-      'Andrea', 'Chiara', 'Matteo', 'Sara', 'Davide', 'Anna',
-      'Lorenzo', 'Valentina', 'Simone', 'Elisa', 'Federico', 'Martina',
-      'Giacomo', 'Laura', 'Riccardo', 'Elena', 'Nicola', 'Giorgia'
-    ];
-
-    const JOBS = ['Impiegato', 'Insegnante', 'Medico', 'Commerciante', 'Studente', 'Pensionato', 'Libero Professionista'];
-
-    const SIM_COLORS = [
-      '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181',
-      '#aa96da', '#fcbad3', '#a8d8ea', '#ffaaa5', '#dcedc1'
-    ];
-
-    // ==================== GAME STATE ====================
-    const gameState = {
-      // Time
-      gameTime: 6 * 60, // Minutes since midnight (start at 6:00 AM)
-      day: 1,
-      speed: 1,
-      lastRealTime: 0,
-
-      // Camera
-      camera: { x: 0, y: 0, zoom: 1.5, minZoom: 0.3, maxZoom: 3 },
-      
-      // Touch handling
-      touch: {
-        isDragging: false,
-        isPinching: false,
-        lastX: 0,
-        lastY: 0,
-        lastDist: 0
-      },
-
-      // City data
-      buildings: [],
-      roads: [],
-      sims: [],
-
-      // Counters
-      counters: {
-        SLEEP: 0, EAT: 0, WORK: 0, MALL: 0, SCHOOL: 0, WALK: 0, DOG: 0, PIZZA: 0
-      },
-
-      // Selected sim
-      selectedSim: null,
-
-      // Menu / opzioni
-      paused: false,
-      renderStyle: 'dots',   // 'dots' | 'emoji'
-      showNames: true
-    };
-
-    // ==================== CANVAS SETUP ====================
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+/* ===================== CITY ===================== */
+function nodeX(gx){return -WORLD/2+gx*STEP+ROAD/2}
+function nodeY(gy){return -WORLD/2+gy*STEP+ROAD/2}
+function generateCity(){
+  S.buildings=[];
+  const counts={house:42,apartment:26,office:18,shop:16,restaurant:10,pizzeria:8,school:7,park:22,hospital:3,cinema:4,gym:5};
+  const used=new Set();
+  for(const type in counts){
+    for(let i=0;i<counts[type];i++){
+      let gx,gy,key,tries=0;
+      do{gx=Math.floor(Math.random()*GRID);gy=Math.floor(Math.random()*GRID);key=gx+','+gy;tries++}while((used.has(key)||tries<10&&Math.random()<.5)&&tries<40);
+      used.add(key);
+      const x=-WORLD/2+gx*STEP+ROAD+4,y=-WORLD/2+gy*STEP+ROAD+4,size=STEP-ROAD-8;
+      S.buildings.push({id:uid++,type,x,y,w:size,h:size,
+        cx:x+size/2,cy:y+size/2,
+        gx,gy,lit:new Set(),occupants:0});
     }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+  }
+  // parchi extra
+  for(let i=0;i<8;i++){
+    const gx=Math.floor(Math.random()*GRID),gy=Math.floor(Math.random()*GRID),key=gx+','+gy;
+    if(used.has(key))continue;
+    used.add(key);
+    const x=-WORLD/2+gx*STEP+ROAD+4,y=-WORLD/2+gy*STEP+ROAD+4,size=STEP-ROAD-8;
+    S.buildings.push({id:uid++,type:'park',x,y,w:size,h:size,cx:x+size/2,cy:y+size/2,gx,gy,lit:new Set(),occupants:0});
+  }
+}
+function buildingsOf(type){return S.buildings.filter(b=>b.type===type)}
+function nearestBuilding(type,x,y){
+  const arr=buildingsOf(type);if(!arr.length)return null;
+  let best=arr[0],bd=Infinity;
+  for(const b of arr){const d=(b.cx-x)**2+(b.cy-y)**2;if(d<bd){bd=d;best=b}}
+  return best;
+}
+function nodeOf(b){return {gx:clamp(b.gx,0,GRID-1),gy:clamp(b.gy,0,GRID-1)}}
 
-    // ==================== CITY GENERATION ====================
-    const CITY_SIZE = 2000;
-    const BLOCK_SIZE = 150;
-    const ROAD_WIDTH = 30;
+/* pathfinding sulla griglia stradale (BFS) */
+function findPath(x0,y0,x1,y1){
+  const gx0=clamp(Math.round((x0+WORLD/2-ROAD/2)/STEP),0,GRID-1);
+  const gy0=clamp(Math.round((y0+WORLD/2-ROAD/2)/STEP),0,GRID-1);
+  const gx1=clamp(Math.round((x1+WORLD/2-ROAD/2)/STEP),0,GRID-1);
+  const gy1=clamp(Math.round((y1+WORLD/2-ROAD/2)/STEP),0,GRID-1);
+  const start=gy0*GRID+gx0,goal=gy1*GRID+gx1;
+  if(start===goal)return [{x:x1,y:y1}];
+  const prev=new Int32Array(GRID*GRID).fill(-1),seen=new Uint8Array(GRID*GRID);
+  const q=[start];seen[start]=1;
+  for(let h=0;h<q.length;h++){
+    const cur=q[h];if(cur===goal)break;
+    const cx=cur%GRID,cy=(cur/GRID)|0;
+    if(cx>0){const n=cur-1;if(!seen[n]){seen[n]=1;prev[n]=cur;q.push(n)}}
+    if(cx<GRID-1){const n=cur+1;if(!seen[n]){seen[n]=1;prev[n]=cur;q.push(n)}}
+    if(cy>0){const n=cur-GRID;if(!seen[n]){seen[n]=1;prev[n]=cur;q.push(n)}}
+    if(cy<GRID-1){const n=cur+GRID;if(!seen[n]){seen[n]=1;prev[n]=cur;q.push(n)}}
+  }
+  const pts=[];let cur=goal,guard=0;
+  while(cur!==-1&&guard++<GRID*GRID){pts.push({x:nodeX(cur%GRID),y:nodeY((cur/GRID)|0)});cur=prev[cur]}
+  pts.reverse();pts.push({x:x1,y:y1});
+  return pts;
+}
 
-    function generateCity() {
-      // Generate road grid
-      for (let x = -CITY_SIZE/2; x < CITY_SIZE/2; x += BLOCK_SIZE + ROAD_WIDTH) {
-        gameState.roads.push({
-          x: x,
-          y: -CITY_SIZE/2,
-          width: ROAD_WIDTH,
-          height: CITY_SIZE,
-          horizontal: false
-        });
-      }
-      for (let y = -CITY_SIZE/2; y < CITY_SIZE/2; y += BLOCK_SIZE + ROAD_WIDTH) {
-        gameState.roads.push({
-          x: -CITY_SIZE/2,
-          y: y,
-          width: CITY_SIZE,
-          height: ROAD_WIDTH,
-          horizontal: true
-        });
-      }
+/* ===================== SIM ===================== */
+class Sim{
+  constructor(i){
+    this.id=i;this.name=pick(NAMES)+' '+pick(SURNAMES);
+    this.age=Math.floor(rnd(18,80));
+    this.job=this.age<23?JOBS[5]:(this.age>66?JOBS[6]:pick(JOBS));
+    this.color=pick(COLORS);
+    this.home=nearestBuilding(Math.random()<.55?'house':'apartment',rnd(-WORLD/3,WORLD/3),rnd(-WORLD/3,WORLD/3))||S.buildings[0];
+    this.work=nearestBuilding(this.job.type,rnd(-WORLD/2,WORLD/2),rnd(-WORLD/2,WORLD/2));
+    this.x=this.home.cx+rnd(-30,30);this.y=this.home.cy+rnd(-30,30);
+    this.needs={hunger:rnd(55,95),energy:rnd(55,95),social:rnd(35,85),fun:rnd(35,85),hygiene:rnd(45,90),health:rnd(70,100)};
+    this.money=rnd(120,900);this.car=Math.random()<.45;
+    this.dog=Math.random()<.18;this.personality=rnd(-1,1);
+    this.friends=[];this.partner=null;this.children=[];
+    this.state='HOME';this.timer=rnd(30,120);this.target=null;
+    this.path=[];this.pi=0;this.inCar=false;this.mood=70;this.alive=true;
+  }
+  get hour(){return (S.time/60)%24}
+  get weekend(){return S.day%7===0||S.day%7===6}
+  workHour(){return !this.weekend&&this.hour>=8&&this.hour<17}
+  decide(){
+    const n=this.needs,h=this.hour,sc={};
+    sc.HOME=8;
+    sc.SLEEP=(100-n.energy)*1.5+(h>=22||h<6?60:0);
+    sc.EAT=(100-n.hunger)*1.8+(h>11&&h<15?28:0);
+    sc.PIZZA=(100-n.hunger)*1.3+(h>=18?22:0);
+    sc.WORK=this.workHour()&&this.job.name!=='Studente'&&this.job.name!=='Pensionato'?85:0;
+    sc.SCHOOL=this.workHour()&&this.job.name==='Studente'?90:0;
+    sc.SHOP=(100-n.hunger)*.5+(this.money>100?12:0);
+    sc.PARK=(100-n.fun)*.9+(100-n.social)*.5+(h>=9&&h<19?18:0);
+    sc.SOCIAL=(100-n.social)*1.4;
+    sc.GYM=(100-n.health)*.8+(this.personality>.3?12:0);
+    sc.CINEMA=(100-n.fun)*.8+(h>=18?20:0)-(this.money<80?30:0);
+    sc.HOSPITAL=n.health<35?150:0;
+    if(n.energy<20&&h>=22)sc.SLEEP+=200;
+    if(n.hunger<15)sc.EAT+=200;
+    let best='HOME',bv=-Infinity;
+    for(const k in sc){if(sc[k]>bv){bv=sc[k];best=k}}
+    this.start(best);
+  }
+  start(act){
+    if(this.state&&this.target)this.target.occupants=Math.max(0,this.target.occupants-1);
+    this.state=act;
+    const a=ACT[act];
+    this.target=a.type==='house'||a.type==='apartment'?this.home:(nearestBuilding(a.type,this.x,this.y)||this.home);
+    this.target.occupants=(this.target.occupants||0)+1;
+    this.timer=rnd(a.dur[0],a.dur[1]);
+    const dist=Math.hypot(this.target.cx-this.x,this.target.cy-this.y);
+    this.inCar=this.car&&dist>260&&act!=='PARK'&&act!=='SOCIAL';
+    this.path=findPath(this.x,this.y,this.target.cx,this.target.cy);this.pi=0;
+    this.moving=this.path.length>0;
+    if(act==='WORK'||act==='SCHOOL')this.money+=this.job.pay;
+    if(act==='EAT'||act==='PIZZA'||act==='SHOP'||act==='GYM'||act==='CINEMA')this.money-=Math.round(rnd(8,35));
+    if(Math.random()<.05)logEvent(this.name+(act==='WORK'?' è andato a lavoro':act==='SLEEP'?' si è addormentato':' ha scelto '+ACT[act].name.toLowerCase()));
+  }
+  update(dt){
+    if(!this.alive)return;
+    const n=this.needs;
+    n.hunger=clamp(n.hunger-dt*.11,0,100);
+    n.social=clamp(n.social-dt*.05,0,100);
+    n.fun=clamp(n.fun-dt*.055,0,100);
+    n.hygiene=clamp(n.hygiene-dt*.035,0,100);
+    if(this.state==='SLEEP')n.energy=clamp(n.energy+dt*.55,0,100);
+    else n.energy=clamp(n.energy-dt*.045,0,100);
+    if(this.state==='EAT'||this.state==='PIZZA')n.hunger=clamp(n.hunger+dt*2.2,0,100);
+    if(this.state==='PARK'||this.state==='SOCIAL'){n.fun=clamp(n.fun+dt*1.4,0,100);n.social=clamp(n.social+dt*1.7,0,100)}
+    if(this.state==='GYM'){n.health=clamp(n.health+dt*.9,0,100);n.fun=clamp(n.fun+dt*.6,0,100)}
+    if(this.state==='HOSPITAL')n.health=clamp(n.health+dt*1.8,0,100);
+    if(this.state==='CINEMA')n.fun=clamp(n.fun+dt*1.5,0,100);
+    if(n.hunger<8||n.energy<8)n.health=clamp(n.health-dt*.08,0,100);
 
-      // Generate buildings (fewer but more detailed)
-      const buildingTypes = [
-        { type: 'house', color: '#4a90d9', activity: 'SLEEP', icon: '🏠', count: 8, hasRooms: true },
-        { type: 'office', color: '#7f8c8d', activity: 'WORK', icon: '🏢', count: 3, hasRooms: true },
-        { type: 'school', color: '#f1c40f', activity: 'SCHOOL', icon: '🏫', count: 2, hasRooms: true },
-        { type: 'mall', color: '#e74c3c', activity: 'MALL', icon: '🛒', count: 2, hasRooms: true },
-        { type: 'pizzeria', color: '#e67e22', activity: 'PIZZA', icon: '🍕', count: 3, hasRooms: true },
-        { type: 'park', color: '#27ae60', activity: 'WALK', icon: '🌳', count: 4, hasRooms: false },
-        { type: 'restaurant', color: '#9b59b6', activity: 'EAT', icon: '🍽️', count: 3, hasRooms: true }
-      ];
-
-      let buildingId = 0;
-      const gridCols = Math.floor(CITY_SIZE / (BLOCK_SIZE + ROAD_WIDTH));
-      const gridRows = Math.floor(CITY_SIZE / (BLOCK_SIZE + ROAD_WIDTH));
-      const usedCells = new Set();
-
-      buildingTypes.forEach(bt => {
-        for (let i = 0; i < bt.count; i++) {
-          let attempts = 0;
-          while (attempts < 50) {
-            const col = Math.floor(Math.random() * gridCols);
-            const row = Math.floor(Math.random() * gridRows);
-            const key = `${col},${row}`;
-            
-            if (!usedCells.has(key)) {
-              usedCells.add(key);
-              
-              const x = -CITY_SIZE/2 + col * (BLOCK_SIZE + ROAD_WIDTH) + ROAD_WIDTH + 10;
-              const y = -CITY_SIZE/2 + row * (BLOCK_SIZE + ROAD_WIDTH) + ROAD_WIDTH + 10;
-              const width = BLOCK_SIZE - 10;
-              const height = BLOCK_SIZE - 10;
-              
-              gameState.buildings.push({
-                id: buildingId++,
-                type: bt.type,
-                color: bt.color,
-                activity: bt.activity,
-                icon: bt.icon,
-                hasRooms: bt.hasRooms,
-                x, y, width, height,
-                centerX: x + width/2,
-                centerY: y + height/2
-              });
-              break;
-            }
-            attempts++;
-          }
-        }
-      });
+    this.mood=clamp((n.hunger+n.energy+n.social+n.fun+n.health)/5+this.personality*5,0,100);
+    this.timer-=dt;
+    if(this.moving){
+      const spd=(this.inCar?190:78)*dt;
+      const p=this.path[this.pi];
+      if(p){const dx=p.x-this.x,dy=p.y-this.y,d=Math.hypot(dx,dy);
+        if(d<spd){this.x=p.x;this.y=p.y;this.pi++;if(this.pi>=this.path.length){this.moving=false;this.inCar=false}}
+        else{this.x+=dx/d*spd;this.y+=dy/d*spd}}
+      else this.moving=false;
     }
+    if(this.timer<=0&&!this.moving)this.decide();
+  }
+}
 
-    // ==================== SIM CLASS ====================
-    class Sim {
-      constructor(id) {
-        this.id = id;
-        this.name = NAMES[Math.floor(Math.random() * NAMES.length)];
-        this.age = 18 + Math.floor(Math.random() * 50);
-        this.job = this.age < 22 ? 'Studente' : (this.age > 65 ? 'Pensionato' : JOBS[Math.floor(Math.random() * (JOBS.length - 2))]);
-        this.color = SIM_COLORS[id % SIM_COLORS.length];
-        this.energy = 80 + Math.random() * 20;
-        this.hasDog = Math.random() < 0.3;
+/* ===================== SIM LOGICA ===================== */
+function logEvent(msg){S.events.unshift({d:S.day,t:fmtTime(),msg});if(S.events.length>120)S.events.pop()}
+function fmtTime(){const h=Math.floor(S.time/60)%24,m=Math.floor(S.time%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+function socialTick(){
+  const near=[];
+  for(const s of S.sims){for(const o of S.sims){if(o===s)continue;
+    if(Math.hypot(s.x-o.x,s.y-o.y)<45&&s.state!=='SLEEP'&&o.state!=='SLEEP'){
+      if(!s.friends.includes(o.id)&&Math.random()<.006){s.friends.push(o.id);o.friends.push(s.id);
+        if(Math.random()<.35){s.partner=o.id;o.partner=s.id;logEvent(s.name+' e '+o.name+' sono diventati una coppia 💞')}}
+      s.needs.social=clamp(s.needs.social+0.06,0,100);
+      o.needs.social=clamp(o.needs.social+0.06,0,100);
+    }}}
+}
+function dailyTick(){
+  logEvent('🌅 Inizia il giorno '+S.day);
+  const weather=['clear','cloud','rain','sunny'][Math.floor(Math.random()*4)];S.weather=weather;
+  for(const s of S.sims){
+    s.money-=Math.round(rnd(8,20));
+    if(s.money<0)s.money=0;
+    if(s.age%5===0&&Math.random()<.05){s.children.push(pick(NAMES));logEvent(s.name+' ha avuto un figlio 👶')}
+  }
+  S.stats.push({day:S.day,mood:Math.round(S.sims.reduce((a,s)=>a+s.mood,0)/Math.max(1,S.sims.length))});
+  if(S.stats.length>30)S.stats.shift();
+}
 
-        // Assign home
-        const homes = gameState.buildings.filter(b => b.type === 'house');
-        if (homes.length === 0) {
-          console.error('No houses found! Cannot create Sim.');
-          this.home = { centerX: 0, centerY: 0 };
-        } else {
-          this.home = homes[Math.floor(Math.random() * homes.length)];
+/* ===================== RENDER ===================== */
+function resize(){const c=canvas;dpr=Math.min(devicePixelRatio||1,2);c.width=innerWidth*dpr;c.height=innerHeight*dpr;
+  W=innerWidth;H=innerHeight;ctx.setTransform(dpr,0,0,dpr,0,0)}
+function worldToScreen(x,y){return {x:(x-camera.x)*camera.z+W/2,y:(y-camera.y)*camera.z+H/2}}
+function screenToWorld(x,y){return {x:(x-W/2)/camera.z+camera.x,y:(y-H/2)/camera.z+camera.y}}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function lightLevel(){const h=(S.time/60)%24;
+  if(h>=6&&h<8)return lerp(.35,1,(h-6)/2);
+  if(h>=8&&h<17)return 1;
+  if(h>=17&&h<20)return lerp(1,.3,(h-17)/3);
+  return .25}
+function render(){
+  const L=lightLevel(),z=camera.z;
+  const sky=L>.6?'#0f2033':L>.35?'#111a2c':'#070c18';
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // terreno
+  const tl=worldToScreen(-WORLD/2-100,-WORLD/2-100),br=worldToScreen(WORLD/2+100,WORLD/2+100);
+  ctx.fillStyle=L>.4?'#1d3529':'#12231c';ctx.fillRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
+  // strade
+  ctx.fillStyle=L>.4?'#2b3242':'#1a2130';
+  ctx.fillRect(tl.x,worldToScreen(0,-WORLD/2-40).y,br.x-tl.x,ROAD*z*1.4);
+  ctx.fillRect(worldToScreen(-WORLD/2-40,0).x,tl.y,ROAD*z*1.4,br.y-tl.y);
+  for(let i=0;i<=GRID;i++){
+    const a=worldToScreen(nodeX(i),-WORLD/2-100),b=worldToScreen(nodeX(i),WORLD/2+100);
+    ctx.fillRect(a.x-ROAD*z/2,a.y,ROAD*z,b.y-a.y);
+    const c=worldToScreen(-WORLD/2-100,nodeY(i)),d=worldToScreen(WORLD/2+100,nodeY(i));
+    ctx.fillRect(c.x,d.y-ROAD*z/2,d.x-c.x,ROAD*z);
+  }
+  // marcature
+  if(z>.42){ctx.strokeStyle='rgba(255,255,255,.13)';ctx.lineWidth=Math.max(1,z*1.5);ctx.setLineDash([z*8,z*10]);
+    for(let i=0;i<=GRID;i++){const a=worldToScreen(nodeX(i),-WORLD/2),b=worldToScreen(nodeX(i),WORLD/2);
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+      const c=worldToScreen(-WORLD/2,nodeY(i)),d=worldToScreen(WORLD/2,nodeY(i));
+      ctx.beginPath();ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke()}}
+  ctx.setLineDash([]);
+  // edifici
+  const litThreshold=.55;
+  for(const b of S.buildings){
+    const p=worldToScreen(b.x,b.y),w=b.w*z,h=b.h*z;
+    if(p.x+w<0||p.y+h<0||p.x>W||p.y>H)continue;
+    const t=TYPES[b.type];
+    ctx.fillStyle='rgba(0,0,0,.28)';rr(p.x+3,p.y+4,w,h,5);ctx.fill();
+    ctx.fillStyle=t.color;rr(p.x,p.y,w,h,5);ctx.fill();
+    ctx.strokeStyle=L>.4?'rgba(255,255,255,.16)':'rgba(150,190,255,.1)';ctx.lineWidth=1;ctx.stroke();
+    if(z>.32){
+      if(b.type==='park'){
+        ctx.fillStyle=L>.4?'rgba(60,160,90,.65)':'rgba(30,90,55,.7)';rr(p.x+2,p.y+2,w-4,h-4,5);ctx.fill();
+        for(let k=0;k<4;k++){const tx=p.x+((k*37)%Math.max(8,w-8))+4,ty=p.y+((k*53)%Math.max(8,h-8))+4;
+          ctx.fillStyle='#2f7d4f';ctx.beginPath();ctx.arc(tx,ty,Math.max(2,z*4),0,6.3);ctx.fill()}
+      }else{
+        const glow=L<litThreshold;
+        ctx.fillStyle=glow?'rgba(255,214,120,.85)':'rgba(255,255,255,.22)';
+        const cols=Math.max(2,Math.floor(w/14)),rows=Math.max(2,Math.floor(h/12));
+        for(let cx=0;cx<cols;cx++)for(let cy=0;cy<rows;cy++){
+          const on=glow?((b.id+cx*7+cy*13)%4!==0):((cx+cy)%3===0);
+          if(!on)continue;
+          ctx.fillRect(p.x+4+cx*(w-8)/cols,p.y+4+cy*(h-8)/rows,Math.max(2,(w-8)/cols*.45),Math.max(2,(h-8)/rows*.4))
         }
-        
-        // Start at home
-        this.x = this.home.centerX || 0;
-        this.y = this.home.centerY || 0;
-        
-        console.log(`Sim ${id} (${this.name}) initialized at position: (${this.x}, ${this.y})`);
-        
-        // State
-        this.state = null; // Start with no state so counters work correctly
-        this.targetBuilding = null;
-        this.isMoving = false;
-        this.inCar = false;
-        this.path = [];
-        this.pathIndex = 0;
-        
-        // Schedule
-        this.stateTimer = 0;
-        this.lastStateChange = 0;
-      }
-
-      getScheduleProbabilities(hour) {
-        const probs = {};
-        const isStudent = this.job === 'Studente';
-        const isRetired = this.job === 'Pensionato';
-        const isWeekend = gameState.day % 7 === 0 || gameState.day % 7 === 6;
-
-        // Night (23:00 - 6:00)
-        if (hour >= 23 || hour < 6) {
-          probs.SLEEP = 0.95;
-          probs.EAT = 0.03;
-          probs.WALK = 0.02;
-        }
-        // Early morning (6:00 - 8:00)
-        else if (hour >= 6 && hour < 8) {
-          probs.SLEEP = 0.3;
-          probs.EAT = 0.4;
-          probs.WALK = this.hasDog ? 0.2 : 0.05;
-          probs.DOG = this.hasDog ? 0.05 : 0;
-        }
-        // Morning work/school (8:00 - 12:00)
-        else if (hour >= 8 && hour < 12) {
-          if (isStudent && !isWeekend) {
-            probs.SCHOOL = 0.8;
-            probs.WALK = 0.1;
-          } else if (!isRetired && !isWeekend) {
-            probs.WORK = 0.75;
-            probs.MALL = 0.1;
-          } else {
-            probs.WALK = 0.3;
-            probs.MALL = 0.3;
-            probs.DOG = this.hasDog ? 0.2 : 0;
-          }
-          probs.EAT = 0.1;
-        }
-        // Lunch (12:00 - 14:00)
-        else if (hour >= 12 && hour < 14) {
-          probs.EAT = 0.5;
-          probs.PIZZA = 0.2;
-          probs.WORK = isStudent || isRetired || isWeekend ? 0 : 0.2;
-          probs.WALK = 0.1;
-        }
-        // Afternoon (14:00 - 18:00)
-        else if (hour >= 14 && hour < 18) {
-          if (isStudent && !isWeekend) {
-            probs.SCHOOL = 0.5;
-            probs.WALK = 0.2;
-          } else if (!isRetired && !isWeekend) {
-            probs.WORK = 0.6;
-          }
-          probs.MALL = 0.2;
-          probs.WALK = (probs.WALK || 0) + 0.1;
-          probs.DOG = this.hasDog ? 0.1 : 0;
-        }
-        // Evening (18:00 - 21:00)
-        else if (hour >= 18 && hour < 21) {
-          probs.EAT = 0.25;
-          probs.PIZZA = 0.2;
-          probs.WALK = 0.2;
-          probs.MALL = 0.15;
-          probs.DOG = this.hasDog ? 0.1 : 0;
-          probs.SLEEP = 0.1;
-        }
-        // Late evening (21:00 - 23:00)
-        else {
-          probs.SLEEP = 0.5;
-          probs.EAT = 0.15;
-          probs.PIZZA = 0.15;
-          probs.WALK = 0.1;
-          probs.DOG = this.hasDog ? 0.1 : 0;
-        }
-
-        // Energy modifier
-        if (this.energy < 30) {
-          probs.SLEEP = (probs.SLEEP || 0) + 0.4;
-        }
-
-        // Normalize probabilities
-        const total = Object.values(probs).reduce((a, b) => a + b, 0);
-        Object.keys(probs).forEach(k => probs[k] /= total);
-
-        return probs;
-      }
-
-      chooseNextActivity() {
-        const hour = Math.floor(gameState.gameTime / 60);
-        const probs = this.getScheduleProbabilities(hour);
-        
-        const rand = Math.random();
-        let cumulative = 0;
-        
-        for (const [activity, prob] of Object.entries(probs)) {
-          cumulative += prob;
-          if (rand < cumulative) {
-            return activity;
-          }
-        }
-        
-        return 'SLEEP';
-      }
-
-      findBuildingForActivity(activity) {
-        const activityToType = {
-          SLEEP: 'house',
-          EAT: 'restaurant',
-          WORK: 'office',
-          MALL: 'mall',
-          SCHOOL: 'school',
-          WALK: 'park',
-          DOG: 'park',
-          PIZZA: 'pizzeria'
-        };
-
-        if (activity === 'SLEEP') return this.home;
-
-        const type = activityToType[activity];
-        const buildings = gameState.buildings.filter(b => b.type === type);
-        
-        if (buildings.length === 0) return this.home;
-
-        // Choose nearest or random
-        if (Math.random() < 0.7) {
-          buildings.sort((a, b) => {
-            const distA = Math.hypot(a.centerX - this.x, a.centerY - this.y);
-            const distB = Math.hypot(b.centerX - this.x, b.centerY - this.y);
-            return distA - distB;
-          });
-          return buildings[0];
-        }
-        
-        return buildings[Math.floor(Math.random() * buildings.length)];
-      }
-
-      startActivity(activity) {
-        // Update counter - always decrement old state and increment new state
-        if (this.state && this.state !== activity && gameState.counters[this.state] !== undefined) {
-          gameState.counters[this.state] = Math.max(0, gameState.counters[this.state] - 1);
-        }
-        
-        // Always increment new activity counter
-        if (gameState.counters[activity] !== undefined) {
-          gameState.counters[activity]++;
-        }
-        
-        this.state = activity;
-        updateCounters();
-        
-        this.targetBuilding = this.findBuildingForActivity(activity);
-        this.isMoving = true;
-        
-        // Use car for longer distances
-        const dist = Math.hypot(this.targetBuilding.centerX - this.x, this.targetBuilding.centerY - this.y);
-        this.inCar = dist > 300 && activity !== 'WALK' && activity !== 'DOG';
-        
-        // Set activity duration (in game minutes)
-        const durations = {
-          SLEEP: 360 + Math.random() * 120,
-          EAT: 30 + Math.random() * 30,
-          WORK: 240 + Math.random() * 120,
-          MALL: 60 + Math.random() * 60,
-          SCHOOL: 300 + Math.random() * 60,
-          WALK: 30 + Math.random() * 30,
-          DOG: 20 + Math.random() * 20,
-          PIZZA: 45 + Math.random() * 30
-        };
-        this.stateTimer = durations[activity] || 60;
-        this.lastStateChange = gameState.gameTime;
-      }
-
-      update(deltaMinutes) {
-        // Check if should change activity
-        const elapsed = (gameState.gameTime - this.lastStateChange + 1440) % 1440;
-        if (elapsed >= this.stateTimer && !this.isMoving) {
-          const nextActivity = this.chooseNextActivity();
-          this.startActivity(nextActivity);
-        }
-
-        // Movement
-        if (this.isMoving && this.targetBuilding) {
-          const speed = (this.inCar ? 150 : 40) * (deltaMinutes / 60);
-          const dx = this.targetBuilding.centerX - this.x;
-          const dy = this.targetBuilding.centerY - this.y;
-          const dist = Math.hypot(dx, dy);
-
-          if (dist < speed) {
-            this.x = this.targetBuilding.centerX;
-            this.y = this.targetBuilding.centerY;
-            this.isMoving = false;
-            this.inCar = false;
-          } else {
-            this.x += (dx / dist) * speed;
-            this.y += (dy / dist) * speed;
-          }
-        }
-
-        // Energy management
-        if (this.state === 'SLEEP') {
-          this.energy = Math.min(100, this.energy + deltaMinutes * 0.3);
-        } else if (this.state === 'EAT' || this.state === 'PIZZA') {
-          this.energy = Math.min(100, this.energy + deltaMinutes * 0.2);
-        } else {
-          this.energy = Math.max(0, this.energy - deltaMinutes * 0.05);
-        }
-      }
-
-      draw(ctx) {
-        ctx.save();
-
-        // Stile "puntini": cerchi colorati autonomi (default)
-        if (gameState.renderStyle === 'dots') {
-          const r = this.inCar ? 9 : 6.5;
-          // ombra
-          ctx.beginPath();
-          ctx.arc(this.x, this.y + 2, r, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(0,0,0,0.35)';
-          ctx.fill();
-          // corpo
-          ctx.beginPath();
-          ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-          ctx.fillStyle = this.inCar ? '#4a6fa5' : this.color;
-          ctx.fill();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-          ctx.stroke();
-          // cane al guinzaglio
-          if (this.hasDog && (this.state === 'DOG' || this.state === 'WALK')) {
-            ctx.beginPath();
-            ctx.arc(this.x + r + 5, this.y + 3, 3, 0, Math.PI * 2);
-            ctx.fillStyle = '#b08d57';
-            ctx.fill();
-          }
-          // selezione
-          if (gameState.selectedSim === this) {
-            ctx.lineWidth = 2.5;
-            ctx.strokeStyle = '#ffd54a';
-            ctx.setLineDash([4, 3]);
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-          // nome
-          if (gameState.showNames) {
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'center';
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-            ctx.strokeText(this.name, this.x, this.y - r - 6);
-            ctx.fillStyle = '#fff';
-            ctx.fillText(this.name, this.x, this.y - r - 6);
-          }
-          ctx.restore();
-          return;
-        }
-
-        // Stile emoji (originale)
-        ctx.font = `${this.inCar ? '40' : '32'}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Shadow for better visibility
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-        
-        if (this.inCar) {
-          // Car emoji
-          ctx.fillText('🚗', this.x, this.y);
-        } else if (this.hasDog && (this.state === 'DOG' || this.state === 'WALK')) {
-          // Person with dog
-          ctx.fillText('🚶', this.x - 8, this.y);
-          ctx.font = '20px Arial';
-          ctx.fillText('🐕', this.x + 12, this.y + 8);
-        } else {
-          // Person emoji
-          const personEmojis = ['🚶', '👨', '👩', '🧑', '👦'];
-          ctx.fillText(personEmojis[this.id % personEmojis.length], this.x, this.y);
-        }
-        
-        // Name tag (small, above sim)
-        ctx.shadowBlur = 2;
-        ctx.font = 'bold 10px Arial';
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.strokeText(this.name, this.x, this.y - 25);
-        ctx.fillText(this.name, this.x, this.y - 25);
-
-        ctx.restore();
-      }
-
-      isClicked(worldX, worldY) {
-        const size = this.inCar ? 35 : 30;
-        return Math.hypot(worldX - this.x, worldY - this.y) < size;
+        if(z>.7){ctx.fillStyle='rgba(255,255,255,.7)';ctx.font=Math.max(9,z*10)+'px Inter';ctx.textAlign='center';
+          ctx.fillText(t.icon,p.x+w/2,p.y+h/2+4)}
       }
     }
-
-    // ==================== RENDERING ====================
-    function getDaylightColor() {
-      const hour = gameState.gameTime / 60;
-      
-      if (hour >= 6 && hour < 8) {
-        // Sunrise
-        const t = (hour - 6) / 2;
-        return lerpColor('#1a1a3a', '#87ceeb', t);
-      } else if (hour >= 8 && hour < 18) {
-        // Day
-        return '#87ceeb';
-      } else if (hour >= 18 && hour < 20) {
-        // Sunset
-        const t = (hour - 18) / 2;
-        return lerpColor('#87ceeb', '#ff7f50', t);
-      } else if (hour >= 20 && hour < 21) {
-        // Dusk
-        const t = hour - 20;
-        return lerpColor('#ff7f50', '#1a1a3a', t);
-      } else {
-        // Night
-        return '#1a1a3a';
-      }
+  }
+  // SIM
+  for(const s of S.sims){
+    const p=worldToScreen(s.x,s.y);
+    if(p.x<-30||p.y<-30||p.x>W+30||p.y>H+30)continue;
+    if(s.inCar){
+      ctx.fillStyle=s.color;rr(p.x-9*z,p.y-5*z,18*z,10*z,3*z);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillRect(p.x-3*z,p.y-3*z,6*z,6*z);
+    }else{
+      ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.arc(p.x+1,p.y+2,5*z,0,6.3);ctx.fill();
+      ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p.x,p.y,4*z,0,6.3);ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.stroke();
+      if(s.dog&&z>.6){ctx.fillStyle='#c9a227';ctx.beginPath();ctx.arc(p.x+8*z,p.y+5*z,2.5*z,0,6.3);ctx.fill()}
     }
+    if(S.selected===s){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,11*z,0,6.3);ctx.stroke()}
+    if(z>1.1&&S.showNames){ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='10px Inter';ctx.textAlign='center';
+      ctx.fillText(s.name.split(' ')[0],p.x,p.y-9*z)}
+  }
+  // notte / meteo
+  if(L<1){ctx.fillStyle='rgba(10,18,45,'+(1-L)*.62+')';ctx.fillRect(0,0,W,H)}
+  if(S.weather==='rain'){ctx.strokeStyle='rgba(150,200,255,.18)';ctx.lineWidth=1;
+    const t=performance.now()/18;for(let i=0;i<70;i++){const x=(i*97+t)%W,y=(i*61+t*3)%H;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+12);ctx.stroke()}}
+  if(S.weather==='cloud'){ctx.fillStyle='rgba(190,205,230,.05)';ctx.fillRect(0,0,W,H)}
+  drawMini();
+}
+function drawMini(){const m=$('miniMap'),x=m.getContext('2d'),w=m.width,h=m.height;
+  x.fillStyle='#0a1322';x.fillRect(0,0,w,h);const s=w/WORLD;
+  for(const b of S.buildings){x.fillStyle=TYPES[b.type].color;x.globalAlpha=.75;
+    x.fillRect(b.x*s+w/2,b.y*s+h/2,Math.max(1,b.w*s),Math.max(1,b.h*s))}
+  x.globalAlpha=1;
+  for(const sim of S.sims){x.fillStyle=sim.color;x.fillRect(sim.x*s+w/2-1,sim.y*s+h/2-1,2,2)}
+  x.strokeStyle='#4de8ff';x.lineWidth=1;
+  x.strokeRect((camera.x-W/(2*camera.z))*s+w/2,(camera.y-H/(2*camera.z))*s+h/2,
+    W/camera.z*s,H/camera.z*s)}
 
-    function lerpColor(c1, c2, t) {
-      const r1 = parseInt(c1.slice(1, 3), 16);
-      const g1 = parseInt(c1.slice(3, 5), 16);
-      const b1 = parseInt(c1.slice(5, 7), 16);
-      const r2 = parseInt(c2.slice(1, 3), 16);
-      const g2 = parseInt(c2.slice(3, 5), 16);
-      const b2 = parseInt(c2.slice(5, 7), 16);
-      
-      const r = Math.round(r1 + (r2 - r1) * t);
-      const g = Math.round(g1 + (g2 - g1) * t);
-      const b = Math.round(b1 + (b2 - b1) * t);
-      
-      return `rgb(${r},${g},${b})`;
-    }
+/* ===================== UI ===================== */
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove('on'),1900)}
+function updateUI(){
+  $('clock').textContent=fmtTime();$('day').textContent='Giorno '+S.day;
+  $('weather').textContent={clear:'☀️ Sereno',sunny:'🌞 Sole',cloud:'☁️ Nuvoloso',rain:'🌧️ Pioggia'}[S.weather];
+  $('popBadge').textContent=S.sims.length;
+  $('stPop').textContent=S.sims.length;
+  $('stWork').textContent=S.sims.filter(s=>s.state==='WORK'||s.state==='SCHOOL').length;
+  $('stFam').textContent=S.sims.filter(s=>s.partner!==null).length;
+  $('stMood').textContent=Math.round(S.sims.reduce((a,s)=>a+s.mood,0)/Math.max(1,S.sims.length))+'%';
+  $('stMoney').textContent=Math.round(S.sims.reduce((a,s)=>a+s.money,0))+' €';
+  $('events').innerHTML=S.events.slice(0,14).map(e=>'<div class="event"><b>'+e.t+'</b> '+esc(e.msg)+'</div>').join('');
+  const ch=$('chart'),max=Math.max(1,...S.stats.map(s=>s.mood));
+  ch.innerHTML=S.stats.slice(-18).map(s=>'<i style="height:'+(s.mood/max*64)+'px" title="Giorno '+s.day+': '+s.mood+'%"></i>').join('');
+  if(S.selected)renderSimPanel();
+  updateDots();
+}
+function renderSimPanel(){
+  const s=S.selected;if(!s)return;
+  const rel=[];
+  if(s.partner!==null)rel.push('<span class="tag">💞 Coppia</span>');
+  if(s.children.length)rel.push('<span class="tag">👶 '+s.children.length+' figli</span>');
+  if(s.friends.length)rel.push('<span class="tag">👥 '+s.friends.length+' amici</span>');
+  $('simInfo').innerHTML='<h3>'+esc(s.name)+' <button id="closeSim">✕</button></h3>'+
+    '<div class="row"><span>Età</span><b>'+s.age+'</b></div>'+
+    '<div class="row"><span>Lavoro</span><b>'+s.job.name+'</b></div>'+
+    '<div class="row"><span>Stato</span><b>'+ACT[s.state].icon+' '+ACT[s.state].name+'</b></div>'+
+    '<div class="row"><span>Denaro</span><b>'+Math.round(s.money)+' €</b></div>'+
+    '<div class="row"><span>Umore</span><b>'+Math.round(s.mood)+'%</b></div>'+
+    '<div style="margin-top:8px">'+rel.join('')+'</div>'+
+    NEEDS.map(n=>'<div class="need"><label><span>'+n.name+'</span><span>'+Math.round(s.needs[n.k])+'</span></label>'+
+      '<div class="bar"><i style="width:'+s.needs[n.k]+'%;background:'+n.color+'"></i></div></div>').join('');
+  $('closeSim').onclick=()=>{S.selected=null;updateUI()};
+}
+function updateDots(){document.querySelectorAll('[data-speed]').forEach(b=>b.classList.toggle('on',+b.dataset.speed===S.speed));
+  $('pauseBtn').textContent=S.paused?'▶':'⏸';$('pauseBtn').classList.toggle('on',S.paused)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-    function render() {
-      const { camera } = gameState;
-      
-      // Clear with sky color
-      ctx.fillStyle = getDaylightColor();
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+/* ===================== INPUT ===================== */
+let drag=false,lastX=0,lastY=0,pinch=0,pinchZ=0;
+canvas.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;drag=true;lastX=e.clientX;lastY=e.clientY;
+  try{canvas.setPointerCapture(e.pointerId)}catch(x){}
+  if(S.tool==='inspect'){
+    const w=screenToWorld(e.clientX,e.clientY);let best=null,bd=22/camera.z;
+    for(const s of S.sims){const d=Math.hypot(s.x-w.x,s.y-w.y);if(d<bd){bd=d;best=s}}
+    S.selected=best;updateUI();
+  }
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  camera.x-=(e.clientX-lastX)/camera.z;camera.y-=(e.clientY-lastY)/camera.z;
+  lastX=e.clientX;lastY=e.clientY;clampCam();
+});
+canvas.addEventListener('pointerup',e=>{
+  if(!drag)return;drag=false;
+  if(Math.hypot(e.clientX-lastX,e.clientY-lastY)<4&&S.tool!=='inspect'){
+    const w=screenToWorld(e.clientX,e.clientY);placeBuilding(w.x,w.y,S.tool)}
+});
+canvas.addEventListener('wheel',e=>{e.preventDefault();
+  const f=e.deltaY>0?.9:1.1;camera.z=clamp(camera.z*f,.22,2.4);clampCam()},{passive:false});
+function clampCam(){const m=WORLD/2+120;camera.x=clamp(camera.x,-m,m);camera.y=clamp(camera.y,-m,m)}
+function placeBuilding(x,y,type){
+  const gx=clamp(Math.round((x+WORLD/2-ROAD)/STEP),0,GRID-1),gy=clamp(Math.round((y+WORLD/2-ROAD)/STEP),0,GRID-1);
+  if(type==='bulldoze'){
+    const idx=S.buildings.findIndex(b=>b.gx===gx&&b.gy===gy);
+    if(idx>=0){const b=S.buildings[idx];S.sims.forEach(s=>{if(s.home===b)s.home=nearestBuilding('house',0,0)||S.buildings[0];
+      if(s.work===b)s.work=nearestBuilding('office',0,0)});S.buildings.splice(idx,1);toast('Demolito')}return}
+  if(S.buildings.some(b=>b.gx===gx&&b.gy===gy)){toast('Cella occupata');return}
+  const bx=-WORLD/2+gx*STEP+ROAD+4,by=-WORLD/2+gy*STEP+ROAD+4,size=STEP-ROAD-8;
+  S.buildings.push({id:uid++,type,x:bx,y:by,w:size,h:size,cx:bx+size/2,cy:by+size/2,gx,gy,lit:new Set(),occupants:0});
+  toast(TYPES[type].name+' costruito');
+}
+document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.speed;updateDots()});
+$('pauseBtn').onclick=()=>{S.paused=!S.paused;updateDots()};
+document.querySelectorAll('#tools .tool').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tools .tool').forEach(x=>x.classList.toggle('on',x===b));
+  S.tool=b.dataset.tool;
+  $('hint').textContent=S.tool==='inspect'?'Tocca un SIM per ispezionarlo':'Tocca una cella libera per costruire';
+});
+$('saveBtn').onclick=()=>{try{localStorage.setItem(KEY,JSON.stringify({day:S.day,time:S.time,weather:S.weather,
+  buildings:S.buildings,sims:S.sims.map(s=>({id:s.id,name:s.name,age:s.age,job:s.job.name,color:s.color,
+    x:s.x,y:s.y,needs:s.needs,money:s.money,state:s.state,timer:s.timer,friends:s.friends,partner:s.partner,children:s.children,car:s.car,dog:s.dog,personality:s.personality})),
+  events:S.events,stats:S.stats}))}catch(e){}toast('Partita salvata')};
+$('loadBtn').onclick=()=>{try{const d=JSON.parse(localStorage.getItem(KEY));if(!d)return toast('Nessun salvataggio');
+  S.day=d.day;S.time=d.time;S.weather=d.weather;S.buildings=d.buildings;S.events=d.events||[];S.stats=d.stats||[];
+  S.sims=d.sims.map(x=>{const s=new Sim(x.id);Object.assign(s,x);s.job=JOBS.find(j=>j.name===x.job)||JOBS[0];
+    s.home=nearestBuilding('house',x.x,x.y)||S.buildings[0];s.work=nearestBuilding(s.job.type,x.x,x.y);
+    s.target=null;s.path=[];s.moving=false;return s});
+  S.selected=null;toast('Partita caricata');updateUI()}catch(e){toast('Salvataggio non valido')}};
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){S.selected=null;updateUI()}
+  if(e.key===' '){e.preventDefault();S.paused=!S.paused;updateDots()}
+  if(e.key>='1'&&e.key<='4'){S.speed=+e.key;updateDots()}
+});
 
-      ctx.save();
-      
-      // Apply camera transformation
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.scale(camera.zoom, camera.zoom);
-      ctx.translate(-camera.x, -camera.y);
-
-      // Draw grass base
-      ctx.fillStyle = '#2d5a27';
-      ctx.fillRect(-CITY_SIZE/2, -CITY_SIZE/2, CITY_SIZE, CITY_SIZE);
-
-      // Draw roads
-      ctx.fillStyle = '#333';
-      gameState.roads.forEach(road => {
-        ctx.fillRect(road.x, road.y, road.width, road.height);
-        
-        // Road markings
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([20, 15]);
-        if (road.horizontal) {
-          ctx.beginPath();
-          ctx.moveTo(road.x, road.y + road.height/2);
-          ctx.lineTo(road.x + road.width, road.y + road.height/2);
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(road.x + road.width/2, road.y);
-          ctx.lineTo(road.x + road.width/2, road.y + road.height);
-          ctx.stroke();
-        }
-        ctx.setLineDash([]);
-      });
-
-      // Night overlay for buildings
-      const hour = gameState.gameTime / 60;
-      const isNight = hour < 6 || hour >= 20;
-
-      // Draw buildings
-      gameState.buildings.forEach(b => {
-        // Building shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.fillRect(b.x + 5, b.y + 5, b.width, b.height);
-        
-        // Building
-        ctx.fillStyle = b.color;
-        ctx.fillRect(b.x, b.y, b.width, b.height);
-        
-        // Building border
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(b.x, b.y, b.width, b.height);
-
-        // Draw rooms if building has them
-        if (b.hasRooms) {
-          const roomPadding = 10;
-          const wallThickness = 3;
-          
-          // Room walls
-          ctx.strokeStyle = '#333';
-          ctx.lineWidth = wallThickness;
-          
-          if (b.type === 'house') {
-            // Houses: 2x2 rooms
-            ctx.beginPath();
-            ctx.moveTo(b.x + b.width/2, b.y + roomPadding);
-            ctx.lineTo(b.x + b.width/2, b.y + b.height - roomPadding);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(b.x + roomPadding, b.y + b.height/2);
-            ctx.lineTo(b.x + b.width - roomPadding, b.y + b.height/2);
-            ctx.stroke();
-            
-            // Furniture icons
-            ctx.font = '16px Arial';
-            ctx.fillStyle = '#000';
-            ctx.fillText('🛏️', b.x + b.width * 0.25, b.y + b.height * 0.25);
-            ctx.fillText('🍽️', b.x + b.width * 0.75, b.y + b.height * 0.25);
-            ctx.fillText('🛋️', b.x + b.width * 0.25, b.y + b.height * 0.75);
-            ctx.fillText('🚿', b.x + b.width * 0.75, b.y + b.height * 0.75);
-          } else if (b.type === 'office') {
-            // Offices: cubicles
-            const cols = 3;
-            const rows = 2;
-            for (let i = 1; i < cols; i++) {
-              ctx.beginPath();
-              ctx.moveTo(b.x + (b.width / cols) * i, b.y + roomPadding);
-              ctx.lineTo(b.x + (b.width / cols) * i, b.y + b.height - roomPadding);
-              ctx.stroke();
-            }
-            for (let i = 1; i < rows; i++) {
-              ctx.beginPath();
-              ctx.moveTo(b.x + roomPadding, b.y + (b.height / rows) * i);
-              ctx.lineTo(b.x + b.width - roomPadding, b.y + (b.height / rows) * i);
-              ctx.stroke();
-            }
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#000';
-            ctx.fillText('💻', b.x + b.width * 0.33, b.y + b.height * 0.35);
-            ctx.fillText('💻', b.x + b.width * 0.66, b.y + b.height * 0.35);
-          } else if (b.type === 'school') {
-            // Schools: classrooms
-            ctx.beginPath();
-            ctx.moveTo(b.x + roomPadding, b.y + b.height/2);
-            ctx.lineTo(b.x + b.width - roomPadding, b.y + b.height/2);
-            ctx.stroke();
-            ctx.font = '16px Arial';
-            ctx.fillStyle = '#000';
-            ctx.fillText('📚', b.x + b.width * 0.3, b.y + b.height * 0.3);
-            ctx.fillText('📚', b.x + b.width * 0.7, b.y + b.height * 0.3);
-            ctx.fillText('🎨', b.x + b.width * 0.5, b.y + b.height * 0.7);
-          } else if (b.type === 'pizzeria' || b.type === 'restaurant') {
-            // Restaurants: tables
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#000';
-            ctx.fillText('🪑', b.x + b.width * 0.25, b.y + b.height * 0.3);
-            ctx.fillText('🪑', b.x + b.width * 0.75, b.y + b.height * 0.3);
-            ctx.fillText('🪑', b.x + b.width * 0.25, b.y + b.height * 0.7);
-            ctx.fillText('🪑', b.x + b.width * 0.75, b.y + b.height * 0.7);
-            ctx.fillText('🍳', b.x + b.width * 0.5, b.y + b.height * 0.5);
-          } else if (b.type === 'mall') {
-            // Mall: aisles
-            const aisles = 4;
-            for (let i = 1; i < aisles; i++) {
-              ctx.beginPath();
-              ctx.moveTo(b.x + roomPadding, b.y + (b.height / aisles) * i);
-              ctx.lineTo(b.x + b.width - roomPadding, b.y + (b.height / aisles) * i);
-              ctx.stroke();
-            }
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#000';
-            ctx.fillText('🛍️', b.x + b.width * 0.5, b.y + b.height * 0.5);
-          }
-        }
-
-        // Windows (lit at night)
-        if (isNight && !b.hasRooms) {
-          ctx.fillStyle = 'rgba(255, 255, 150, 0.8)';
-          const windowSize = 10;
-          const padding = 15;
-          for (let wx = b.x + padding; wx < b.x + b.width - padding; wx += 25) {
-            for (let wy = b.y + padding; wy < b.y + b.height - padding; wy += 25) {
-              if (Math.random() > 0.3) {
-                ctx.fillRect(wx, wy, windowSize, windowSize);
-              }
-            }
-          }
-        }
-
-        // Building icon on top
-        ctx.font = '32px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
-        ctx.strokeText(b.icon, b.centerX, b.y + 30);
-        ctx.fillStyle = '#000';
-        ctx.fillText(b.icon, b.centerX, b.y + 30);
-      });
-
-      // Draw Sims (always on top)
-      gameState.sims.forEach(sim => {
-        sim.draw(ctx);
-      });
-
-      ctx.restore();
-
-      // Night overlay
-      if (isNight) {
-        const nightAlpha = hour < 6 ? 0.4 : Math.min(0.4, (hour - 20) * 0.1);
-        ctx.fillStyle = `rgba(0, 0, 30, ${nightAlpha})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    }
-
-    // ==================== UI UPDATES ====================
-    function updateClock() {
-      const hours = Math.floor(gameState.gameTime / 60) % 24;
-      const minutes = Math.floor(gameState.gameTime % 60);
-      document.getElementById('clock').textContent = 
-        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      document.getElementById('dayIndicator').textContent = `Giorno ${gameState.day}`;
-    }
-
-    function updateCounters() {
-      Object.keys(ACTIVITIES).forEach(key => {
-        const el = document.getElementById(ACTIVITIES[key].counterId);
-        if (el) el.textContent = gameState.counters[key];
-      });
-    }
-
-    function updateStatsPanel() {
-      const statsContent = document.getElementById('statsContent');
-      if (!statsContent) return;
-      
-      statsContent.innerHTML = '';
-      
-      gameState.sims.forEach(sim => {
-        const statDiv = document.createElement('div');
-        statDiv.className = 'simStat';
-        statDiv.style.borderLeftColor = sim.color;
-        
-        const emoji = sim.inCar ? '🚗' : (sim.hasDog && (sim.state === 'DOG' || sim.state === 'WALK') ? '🚶🐕' : '🚶');
-        const activity = ACTIVITIES[sim.state];
-        
-        statDiv.innerHTML = `
-          <h3><span class="simIcon">${emoji}</span> ${sim.name}</h3>
-          <p>💼 ${sim.job}, ${sim.age} anni</p>
-          <p>⚡ Energia: ${Math.round(sim.energy)}%</p>
-          <p>🎯 Stato: ${activity?.icon || ''} ${activity?.name || sim.state}</p>
-          <div class="location">📍 Posizione: (${Math.round(sim.x)}, ${Math.round(sim.y)})</div>
-        `;
-        
-        statsContent.appendChild(statDiv);
-      });
-    }
-
-    // ==================== TOUCH HANDLING ====================
-    function screenToWorld(screenX, screenY) {
-      const { camera } = gameState;
-      return {
-        x: (screenX - canvas.width/2) / camera.zoom + camera.x,
-        y: (screenY - canvas.height/2) / camera.zoom + camera.y
-      };
-    }
-
-    function getTouchDistance(touches) {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.hypot(dx, dy);
-    }
-
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      
-      if (e.touches.length === 1) {
-        gameState.touch.isDragging = true;
-        gameState.touch.lastX = e.touches[0].clientX;
-        gameState.touch.lastY = e.touches[0].clientY;
-        
-        // Check for sim click
-        const world = screenToWorld(e.touches[0].clientX, e.touches[0].clientY);
-        for (const sim of gameState.sims) {
-          if (sim.isClicked(world.x, world.y)) {
-            showSimPopup(sim, e.touches[0].clientX, e.touches[0].clientY);
-            gameState.touch.isDragging = false;
-            return;
-          }
-        }
-      } else if (e.touches.length === 2) {
-        gameState.touch.isPinching = true;
-        gameState.touch.isDragging = false;
-        gameState.touch.lastDist = getTouchDistance(e.touches);
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      
-      if (gameState.touch.isDragging && e.touches.length === 1) {
-        const dx = e.touches[0].clientX - gameState.touch.lastX;
-        const dy = e.touches[0].clientY - gameState.touch.lastY;
-        
-        gameState.camera.x -= dx / gameState.camera.zoom;
-        gameState.camera.y -= dy / gameState.camera.zoom;
-        
-        gameState.touch.lastX = e.touches[0].clientX;
-        gameState.touch.lastY = e.touches[0].clientY;
-      } else if (gameState.touch.isPinching && e.touches.length === 2) {
-        const dist = getTouchDistance(e.touches);
-        const scale = dist / gameState.touch.lastDist;
-        
-        gameState.camera.zoom = Math.max(
-          gameState.camera.minZoom,
-          Math.min(gameState.camera.maxZoom, gameState.camera.zoom * scale)
-        );
-        
-        gameState.touch.lastDist = dist;
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) gameState.touch.isPinching = false;
-      if (e.touches.length < 1) gameState.touch.isDragging = false;
-    });
-
-    // Mouse support for desktop
-    canvas.addEventListener('mousedown', (e) => {
-      gameState.touch.isDragging = true;
-      gameState.touch.lastX = e.clientX;
-      gameState.touch.lastY = e.clientY;
-      
-      const world = screenToWorld(e.clientX, e.clientY);
-      for (const sim of gameState.sims) {
-        if (sim.isClicked(world.x, world.y)) {
-          showSimPopup(sim, e.clientX, e.clientY);
-          gameState.touch.isDragging = false;
-          return;
-        }
-      }
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-      if (gameState.touch.isDragging) {
-        const dx = e.clientX - gameState.touch.lastX;
-        const dy = e.clientY - gameState.touch.lastY;
-        
-        gameState.camera.x -= dx / gameState.camera.zoom;
-        gameState.camera.y -= dy / gameState.camera.zoom;
-        
-        gameState.touch.lastX = e.clientX;
-        gameState.touch.lastY = e.clientY;
-      }
-    });
-
-    canvas.addEventListener('mouseup', () => {
-      gameState.touch.isDragging = false;
-    });
-
-    canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      gameState.camera.zoom = Math.max(
-        gameState.camera.minZoom,
-        Math.min(gameState.camera.maxZoom, gameState.camera.zoom * zoomFactor)
-      );
-    }, { passive: false });
-
-    // Zoom buttons
-    document.getElementById('zoomIn').addEventListener('click', () => {
-      gameState.camera.zoom = Math.min(gameState.camera.maxZoom, gameState.camera.zoom * 1.3);
-    });
-    document.getElementById('zoomOut').addEventListener('click', () => {
-      gameState.camera.zoom = Math.max(gameState.camera.minZoom, gameState.camera.zoom * 0.7);
-    });
-
-    // Stats panel toggle
-    document.getElementById('statsToggle').addEventListener('click', () => {
-      const panel = document.getElementById('statsPanel');
-      const isOpen = panel.classList.contains('open');
-      
-      if (isOpen) {
-        panel.classList.remove('open');
-      } else {
-        panel.classList.add('open');
-        updateStatsPanel();
-      }
-    });
-
-    // ==================== SIM POPUP ====================
-    const popup = document.getElementById('simPopup');
-
-    function showSimPopup(sim, screenX, screenY) {
-      gameState.selectedSim = sim;
-      
-      document.getElementById('popupColor').style.backgroundColor = sim.color;
-      document.getElementById('popupName').textContent = sim.name;
-      document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
-      document.getElementById('popupAge').textContent = sim.age + ' anni';
-      document.getElementById('popupJob').textContent = sim.job + (sim.hasDog ? ' 🐕' : '');
-      document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
-      document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
-      
-      // Position popup
-      let left = screenX + 10;
-      let top = screenY + 10;
-      
-      if (left + 220 > window.innerWidth) left = screenX - 220;
-      if (top + 200 > window.innerHeight) top = screenY - 200;
-      
-      popup.style.left = Math.max(10, left) + 'px';
-      popup.style.top = Math.max(10, top) + 'px';
-      popup.classList.add('visible');
-    }
-
-    document.getElementById('closePopup').addEventListener('click', () => {
-      popup.classList.remove('visible');
-      gameState.selectedSim = null;
-    });
-
-    canvas.addEventListener('click', (e) => {
-      const world = screenToWorld(e.clientX, e.clientY);
-      let clickedSim = false;
-      
-      for (const sim of gameState.sims) {
-        if (sim.isClicked(world.x, world.y)) {
-          clickedSim = true;
-          break;
-        }
-      }
-      
-      if (!clickedSim) {
-        popup.classList.remove('visible');
-        gameState.selectedSim = null;
-      }
-    });
-
-    // ==================== SPEED CONTROLS ====================
-    function setSpeed(v) {
-      gameState.speed = parseInt(v, 10) || 1;
-      document.querySelectorAll('.speedBtn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.speed) === gameState.speed));
-    }
-    document.querySelectorAll('.speedBtn').forEach(btn => {
-      btn.addEventListener('click', () => setSpeed(btn.dataset.speed));
-    });
-
-    // ==================== MENU / PAUSA ====================
-    function openMenu() {
-      gameState.paused = true;
-      document.getElementById('menuOverlay').classList.add('open');
-      document.getElementById('simPopup').classList.remove('visible');
-      gameState.selectedSim = null;
-      // sincronizza lo stato delle opzioni
-      document.querySelectorAll('.speedBtn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.speed) === gameState.speed));
-      document.getElementById('styleDots').classList.toggle('active', gameState.renderStyle === 'dots');
-      document.getElementById('styleEmoji').classList.toggle('active', gameState.renderStyle === 'emoji');
-      document.getElementById('namesOn').classList.toggle('active', !!gameState.showNames);
-      document.getElementById('namesOff').classList.toggle('active', !gameState.showNames);
-    }
-    function closeMenu() {
-      gameState.paused = false;
-      document.getElementById('menuOverlay').classList.remove('open');
-    }
-    function setNpcStyle(style) {
-      gameState.renderStyle = style;
-      document.getElementById('styleDots').classList.toggle('active', style === 'dots');
-      document.getElementById('styleEmoji').classList.toggle('active', style === 'emoji');
-    }
-    function setShowNames(v) {
-      gameState.showNames = !!v;
-      document.getElementById('namesOn').classList.toggle('active', !!v);
-      document.getElementById('namesOff').classList.toggle('active', !v);
-    }
-    function regenerateWorld() {
-      gameState.buildings = [];
-      gameState.roads = [];
-      gameState.sims = [];
-      gameState.selectedSim = null;
-      gameState.counters = { SLEEP: 0, EAT: 0, WORK: 0, MALL: 0, SCHOOL: 0, WALK: 0, DOG: 0, PIZZA: 0 };
-      generateCity();
-      for (let i = 0; i < 5; i++) {
-        const sim = new Sim(i);
-        sim.startActivity('SLEEP');
-        gameState.sims.push(sim);
-      }
-      document.getElementById('simPopup').classList.remove('visible');
-      updateCounters();
-      closeMenu();
-    }
-    function exitCitySim() {
-      try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (e) {}
-      try {
-        if (window.history && window.history.length > 1) window.history.back();
-        else if (document.referrer) window.location.href = document.referrer;
-        else window.location.href = '../index.html#games';
-      } catch (e) { window.location.href = '../index.html#games'; }
-    }
-    document.getElementById('menuBtn').addEventListener('click', openMenu);
-    document.getElementById('menuResume').addEventListener('click', closeMenu);
-    document.getElementById('menuStats').addEventListener('click', () => {
-      closeMenu();
-      const panel = document.getElementById('statsPanel');
-      if (!panel.classList.contains('open')) { panel.classList.add('open'); updateStatsPanel(); }
-    });
-    document.getElementById('menuRegen').addEventListener('click', regenerateWorld);
-    document.getElementById('menuExit').addEventListener('click', exitCitySim);
-    document.getElementById('styleDots').addEventListener('click', () => setNpcStyle('dots'));
-    document.getElementById('styleEmoji').addEventListener('click', () => setNpcStyle('emoji'));
-    document.getElementById('namesOn').addEventListener('click', () => setShowNames(true));
-    document.getElementById('namesOff').addEventListener('click', () => setShowNames(false));
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const menu = document.getElementById('menuOverlay');
-        if (menu.classList.contains('open')) closeMenu(); else openMenu();
-      }
-    });
-
-    // ==================== GAME LOOP ====================
-    function gameLoop(timestamp) {
-      if (!gameState.lastRealTime) gameState.lastRealTime = timestamp;
-      
-      const realDelta = (timestamp - gameState.lastRealTime) / 1000; // seconds
-      gameState.lastRealTime = timestamp;
-
-      if (!gameState.paused) {
-        // 1 real second = 1 game minute
-        const gameMinutes = realDelta * 1 * gameState.speed;
-        
-        // Update game time
-        gameState.gameTime += gameMinutes;
-        if (gameState.gameTime >= 1440) {
-          gameState.gameTime -= 1440;
-          gameState.day++;
-        }
-
-        // Update sims
-        gameState.sims.forEach(sim => sim.update(gameMinutes));
-
-        // Update popup if a sim is selected
-        if (gameState.selectedSim) {
-          const sim = gameState.selectedSim;
-          document.getElementById('popupState').textContent = ACTIVITIES[sim.state]?.icon + ' ' + ACTIVITIES[sim.state]?.name || sim.state;
-          document.getElementById('popupEnergy').textContent = Math.round(sim.energy) + '%';
-          document.getElementById('popupEnergyBar').style.width = sim.energy + '%';
-        }
-
-        // Update UI
-        updateClock();
-        
-        // Update stats panel if open
-        const statsPanel = document.getElementById('statsPanel');
-        if (statsPanel && statsPanel.classList.contains('open')) {
-          updateStatsPanel();
-        }
-      }
-      
-      // Render
-      render();
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    // ==================== INITIALIZATION ====================
-    function init() {
-      // Generate city
-      generateCity();
-
-      // Create sims
-      for (let i = 0; i < 5; i++) {
-        const sim = new Sim(i);
-        sim.startActivity('SLEEP');
-        gameState.sims.push(sim);
-        console.log(`Sim ${i} created: ${sim.name} at (${sim.x}, ${sim.y})`);
-      }
-      
-      console.log(`Total sims: ${gameState.sims.length}`);
-      console.log(`Initial counters:`, gameState.counters);
-
-      updateCounters();
-
-      // Hide instructions after 5 seconds
-      setTimeout(() => {
-        document.getElementById('instructions').classList.add('hidden');
-      }, 5000);
-
-      // Start game loop
-      requestAnimationFrame(gameLoop);
-    }
-
-    init();
-  </script>
+/* ===================== LOOP ===================== */
+function loop(ts){
+  if(!last)last=ts;
+  const dt=Math.min(.15,(ts-last)/1000);last=ts;
+  if(!S.paused){
+    const gm=dt*2*S.speed; // 1s reale = 2 minuti di gioco a velocità 1
+    S.time+=gm;
+    while(S.time>=1440){S.time-=1440;S.day++;dailyTick()}
+    S.weatherT+=gm;
+    if(S.weatherT>240){S.weatherT=0;S.weather=pick(['clear','sunny','cloud','rain'])}
+    for(const s of S.sims)s.update(gm);
+    S.socialT+=dt;if(S.socialT>.8){S.socialT=0;socialTick()}
+    acc+=gm;if(acc>30){acc=0;updateUI()}
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+function init(){
+  resize();addEventListener('resize',resize);
+  const mini=document.createElement('canvas');mini.id='miniMap';mini.width=170;mini.height=170;
+  mini.className='panel';mini.style.cssText='position:fixed;left:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 72px);z-index:19;padding:0;border-radius:12px';
+  document.body.appendChild(mini);
+  generateCity();
+  S.sims=[];for(let i=0;i<S.population;i++){const s=new Sim(i);s.decide();S.sims.push(s)}
+  logEvent('🌆 La città si sveglia con '+S.population+' cittadini');
+  updateUI();render();requestAnimationFrame(loop);
+  window.__city={S:S,findPath:findPath,Sim:Sim,generateCity:generateCity,placeBuilding:placeBuilding};
+}
+init();
+})();
+</script>
 </body>
 </html>
