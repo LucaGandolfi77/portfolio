@@ -1,1003 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Ace</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; text-shadow: 1px 1px 2px black; font-weight: bold; }
-        .modal-screen {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85); color: white; padding: 40px; text-align: center;
-            display: none; border-radius: 15px; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            min-width: 300px;
-        }
-        button { 
-            padding: 12px 24px; font-size: 1.2rem; cursor: pointer; 
-            background: #ff9800; border: none; border-radius: 5px; color: white; font-weight: bold;
-            transition: transform 0.1s;
-            margin-top: 20px;
-        }
-        button:hover { transform: scale(1.05); background: #f57c00; }
-        #controls-hint {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            color: rgba(255,255,255,0.9); font-size: 1rem; pointer-events: none;
-            background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px;
-        }
-        #back-btn {
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(0,0,0,0.3); padding: 10px 20px;
-            border-radius: 8px; color: white; text-decoration: none;
-            font-size: 0.9rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
-            z-index: 10001;
-        }
-        #back-btn:hover { background: rgba(0,0,0,0.5); }
-
-        /* Place Flip near FIRE/BOMB controls (bottom-right) */
-        #flip-btn {
-            position: absolute; right: 30px; bottom: 140px;
-            background: rgba(0,0,0,0.3); padding: 10px 14px;
-            border-radius: 8px; color: white; text-decoration: none;
-            font-size: 0.95rem; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
-            cursor: pointer; z-index: 10001;
-        }
-        #flip-btn:hover { background: rgba(0,0,0,0.5); }
-
-        /* Mobile Controls */
-        .mobile-controls {
-            display: none;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        .btn-area {
-            position: absolute;
-            width: 60px; height: 60px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            pointer-events: auto;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold;
-            border: 2px solid rgba(255,255,255,0.4);
-            font-size: 0.8rem;
-        }
-        /* D-Pad style on left */
-        #btn-up { left: 80px; bottom: 100px; }
-        #btn-down { left: 80px; bottom: 20px; }
-        #btn-left { left: 20px; bottom: 60px; }
-        #btn-right { left: 140px; bottom: 60px; }
-        
-        /* Actions on right */
-        #btn-fire { right: 30px; bottom: 40px; background: rgba(255,50,50,0.3); border-color: rgba(255,100,100,0.5); width: 80px; height: 80px; font-size: 1rem; }
-        /* Bomb button shown to the left of FIRE on touch devices */
-        #btn-bomb { right: 120px; bottom: 40px; background: rgba(255,200,50,0.25); border-color: rgba(255,200,50,0.5); width: 80px; height: 80px; font-size: 1rem; }
-
-        @media (max-width: 768px) {
-            .mobile-controls { display: block; }
-            #controls-hint { display: none; }
-        }
-        /* Also show mobile controls on touch-capable devices (iPhone, Android) */
-        @media (pointer: coarse) {
-            .mobile-controls { display: block; }
-            #controls-hint { display: none; }
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#050a20">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sky Ace">
+<meta name="description" content="Sky Ace: a neon sidescrolling air combat arcade with five missions, four bosses and pickups.">
+<title>Sky Ace — Aces of the Neon Front</title>
+<link rel="manifest" href="plane/manifest.webmanifest">
+<link rel="stylesheet" href="plane/styles.css">
 </head>
 <body>
-    <a href="../index.html" id="back-btn">Exit Game</a>
-    <button id="flip-btn">Flip</button>
-    
-    <div id="ui">
-        <h2 style="margin:0 0 10px 0">Sky Ace</h2>
-        <div style="font-size: 1.2rem;">Level: <span id="level-display">1</span></div>
-        <div style="font-size: 1rem;">Enemies: <span id="enemies-left">0</span></div>
-        <div style="font-size: 1rem; margin-top:5px;">Health: <span id="health" style="color:#4caf50">100</span>%</div>
+
+<canvas id="game"></canvas>
+
+<div id="hud" aria-hidden="true">
+  <div class="hud-left">
+    <div class="hud-top">
+      <span class="hud-chip accent" id="hudLevel">MISSION 1/5</span>
+      <span class="hud-chip" id="hudMission">DAWN PATROL</span>
     </div>
-
-    <div id="controls-hint">ARROWS to Fly • SPACE to Shoot</div>
-
-    <div id="game-over" class="modal-screen">
-        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #ff4d4d;">MISSION FAILED</h2>
-        <p style="font-size: 1.2rem;">You were shot down.</p>
-        <button onclick="location.reload()">Retry Mission</button>
+    <div class="hud-top">
+      <span class="hud-chip gold" data-i18n="score">SCORE</span>
+      <span class="hud-value" id="hudScore">0</span>
+      <span class="hud-chip combo" id="hudComboWrap">×<span id="hudCombo">0</span></span>
     </div>
-
-    <div id="level-complete" class="modal-screen">
-        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #4caf50;">MISSION ACCOMPLISHED</h2>
-        <p style="font-size: 1.2rem;">Area Cleared!</p>
-        <button onclick="nextLevel()">Start Next Mission</button>
+    <div class="health-row">
+      <span class="hud-chip" data-i18n="health">HULL</span>
+      <div class="health-track"><div id="healthFill"></div></div>
+      <span class="hud-value" id="hudHealth">100%</span>
     </div>
-    
-    <div id="game-win" class="modal-screen">
-        <h2 style="font-size: 2.5rem; margin-bottom: 10px; color: #ffd700;">VICTORY!</h2>
-        <p style="font-size: 1.2rem;">You are the Sky Ace!</p>
-        <button onclick="location.reload()">Play Again</button>
+    <div class="hud-top small">
+      <span class="hud-chip" data-i18n="enemies">HOSTILES</span><span class="hud-value" id="hudEnemies">0</span>
+      <span class="hud-chip" data-i18n="bombs">BOMBS</span><span class="hud-value" id="hudBombs">3</span>
+      <span class="hud-chip shield hidden" id="hudShield" data-i18n="shield">SHIELD</span>
     </div>
+  </div>
+  <button id="btnPause" class="pause-btn" data-action="pause" type="button" aria-label="Pause">❚❚</button>
+</div>
 
-    <div class="mobile-controls">
-        <div id="btn-up" class="btn-area">UP</div>
-        <div id="btn-down" class="btn-area">DOWN</div>
-        <div id="btn-fire" class="btn-area">FIRE</div>
-        <div id="btn-bomb" class="btn-area">BOMB</div>
+<div id="toast"></div>
+
+<div class="overlay" id="menuOverlay">
+  <div class="panel start-panel">
+    <div class="logo-mark">✈️</div>
+    <h1 data-i18n="title">SKY ACE</h1>
+    <p class="subtitle" data-i18n="subtitle">ACES OF THE NEON FRONT</p>
+    <p class="tagline" data-i18n="tagline">A sidescrolling air combat arcade.</p>
+    <button class="mbtn primary" id="btnCampaign" type="button">▶ <span data-i18n="campaign">START CAMPAIGN</span></button>
+    <div class="row-btns">
+      <button class="mbtn small" id="btnTutorial" type="button">? <span data-i18n="tutorial">TUTORIAL</span></button>
+      <button class="mbtn small" id="btnStats" type="button">▤ <span data-i18n="stats">PILOT RECORD</span></button>
     </div>
-
-    <canvas id="gameCanvas"></canvas>
-
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Game State
-        let level = 1;
-        let worldWidth = 0;
-        let cameraX = 0;
-        let gameOver = false;
-        let gamePaused = false;
-        
-        // Entities
-        const player = {
-            x: 100,
-            y: 200,
-            width: 50,
-            height: 20,
-            vx: 6,
-            vy: 0,
-            speed: 6,
-            angle: 0, // radians: 0 = right
-            targetAngle: 0,
-            health: 100,
-            reload: 0
-            ,verticalImpulse: 0,
-            flipped: false
-        };
-
-        let enemies = [];
-        let projectiles = [];
-        let bombs = [];
-        let particles = [];
-        let clouds = [];
-        let boss = null;
-
-        // Input
-        const keys = {
-            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-            w: false, s: false, a: false, d: false,
-            " ": false
-        };
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        // Input Listeners
-        window.addEventListener('keydown', e => {
-            // single-key actions
-            if (e.key === 'b' || e.key === 'B') { dropBomb(); }
-            else keys[e.key] = true;
-        });
-        window.addEventListener('keyup', e => keys[e.key] = false);
-
-        // Mobile Input
-        const bindTouch = (id, key) => {
-            const el = document.getElementById(id);
-            if(el) {
-                el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
-                el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
-            }
-        };
-        bindTouch('btn-up', 'ArrowUp');
-        bindTouch('btn-down', 'ArrowDown');
-        bindTouch('btn-fire', ' ');
-        // Add mouse/touch handlers for FIRE and BOMB UI buttons
-        const fireEl = document.getElementById('btn-fire');
-        if (fireEl) {
-            // touch handlers already bound via bindTouch, add mouse support
-            fireEl.addEventListener('mousedown', e => { e.preventDefault(); keys[' '] = true; });
-            fireEl.addEventListener('mouseup', e => { e.preventDefault(); keys[' '] = false; });
-            fireEl.addEventListener('mouseleave', e => { keys[' '] = false; });
-        }
-
-        const bombEl = document.getElementById('btn-bomb');
-        if (bombEl) {
-            bombEl.addEventListener('touchstart', e => { e.preventDefault(); dropBomb(); }, { passive: false });
-            bombEl.addEventListener('mousedown', e => { e.preventDefault(); dropBomb(); });
-            bombEl.addEventListener('click', e => { e.preventDefault(); dropBomb(); });
-        }
-
-        // Flip button: rotate the plane 180° (change flight direction)
-        const flipBtn = document.getElementById('flip-btn');
-        if (flipBtn) flipBtn.addEventListener('click', () => {
-            // Keep motion consistent: add PI to angle and targetAngle so the plane faces opposite direction
-            player.angle += Math.PI;
-            player.targetAngle += Math.PI;
-            // Normalize angles to avoid unbounded growth
-            function normalize(a){
-                while(a > Math.PI) a -= Math.PI*2;
-                while(a <= -Math.PI) a += Math.PI*2;
-                return a;
-            }
-            player.angle = normalize(player.angle);
-            player.targetAngle = normalize(player.targetAngle);
-        });
-
-        // Back button: behave like browser back with sensible fallbacks
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) backBtn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            try { sessionStorage.setItem('index_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch(e){}
-            try {
-                if (window.history && window.history.length > 1) {
-                    window.history.back();
-                } else if (document.referrer && document.referrer !== '') {
-                    try {
-                        const ref = new URL(document.referrer, location.href);
-                        if (ref.origin === location.origin) {
-                            window.location.href = document.referrer;
-                        } else {
-                            window.location.href = '../index.html';
-                        }
-                    } catch (e) {
-                        window.location.href = '../index.html';
-                    }
-                } else {
-                    window.location.href = '../index.html';
-                }
-            } catch(e) {
-                try { window.location.href = '../index.html'; } catch(e) { window.location.href = '/index.html'; }
-            }
-        });
-
-        // iPhone / touch controls: joystick on left half, fire on right half, long-press or two-finger for bomb
-        (function setupTouchControls(){
-            let longPressTimer = null;
-            const LONGPRESS_MS = 600;
-            const MAX_PITCH = 0.9; // radians max pitch for touch
-
-            function handleTouchStart(e){
-                // prevent default scrolling/zooming
-                e.preventDefault();
-                const touches = e.touches;
-                // two-finger tap/drop bomb immediately
-                if (touches.length >= 2) {
-                    dropBomb();
-                    return;
-                }
-                const t = touches[0];
-                const x = t.clientX;
-                const y = t.clientY;
-
-                if (x < window.innerWidth / 2) {
-                    // left half: set target angle based on vertical touch position
-                    const norm = 1 - (y / canvas.height); // 0..1 top..bottom
-                    player.targetAngle = (norm - 0.5) * 2 * MAX_PITCH;
-                } else {
-                    // right half: start firing and set up long-press to drop bomb
-                    keys[' '] = true;
-                    longPressTimer = setTimeout(() => { dropBomb(); longPressTimer = null; }, LONGPRESS_MS);
-                }
-            }
-
-            function handleTouchMove(e){
-                e.preventDefault();
-                const touches = e.touches;
-                if (touches.length === 0) return;
-                const t = touches[0];
-                const x = t.clientX;
-                const y = t.clientY;
-                if (x < window.innerWidth / 2) {
-                    const norm = 1 - (y / canvas.height);
-                    player.targetAngle = (norm - 0.5) * 2 * MAX_PITCH;
-                }
-            }
-
-            function handleTouchEnd(e){
-                e.preventDefault();
-                // stop firing and cancel longpress
-                keys[' '] = false;
-                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-            }
-
-            // Use non-passive listeners so we can preventDefault on iPhone
-            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-        })();
-
-        function initLevel(lvl) {
-            level = lvl;
-            gameOver = false;
-            gamePaused = false;
-            
-            // Level Config
-            worldWidth = 3000 + (lvl * 2000); // Lvl 1: 5000, Lvl 2: 7000
-            const enemyCount = 10 + (lvl * 10);
-            
-            // Reset Player
-            player.x = 100;
-            player.y = canvas.height / 2;
-            player.vx = 0;
-            player.vy = 0;
-            player.health = 100;
-            player.angle = 0;
-            player.targetAngle = 0;
-            
-            // Reset Entities
-            enemies = [];
-            projectiles = [];
-            particles = [];
-            cameraX = 0;
-            
-            // Spawn Enemies
-            for(let i=0; i<enemyCount; i++) {
-                spawnEnemy(i, enemyCount);
-            }
-
-            // Boss: spawn a final boss for higher levels
-            if (lvl >= 2) {
-                boss = {
-                    baseX: worldWidth - 600,
-                    x: worldWidth - 600,
-                    y: 80,
-                    w: 120,
-                    h: 60,
-                    hp: 400,
-                    color: '#8b00ff',
-                    reload: 120,
-                    fireRate: 100,
-                    movePhase: 0
-                };
-            } else {
-                boss = null;
-            }
-            
-            // Init Clouds
-            clouds = [];
-            for(let i=0; i<30; i++) {
-                clouds.push({
-                    x: Math.random() * worldWidth,
-                    y: Math.random() * (canvas.height/2),
-                    w: 60 + Math.random() * 100,
-                    speed: 0.2 + Math.random() * 0.5
-                });
-            }
-
-            // UI
-            document.querySelectorAll('.modal-screen').forEach(el => el.style.display = 'none');
-            updateUI();
-        }
-
-        function spawnEnemy(index, total) {
-            const type = Math.random() > 0.6 ? 'air' : 'ground';
-            // Spread enemies across the map, starting from x=800
-            const minX = 800;
-            const maxX = worldWidth - 200;
-            const x = minX + Math.random() * (maxX - minX);
-            
-            let enemy = {
-                x: x,
-                y: 0,
-                w: 40,
-                h: 30,
-                hp: level === 1 ? 2 : 4, // Harder in lvl 2
-                type: type,
-                color: type === 'ground' ? '#556b2f' : '#8b0000',
-                reload: Math.random() * 200,
-                fireRate: level === 1 ? 150 : 100
-            };
-
-            if (type === 'ground') {
-                enemy.y = canvas.height - 60;
-                enemy.w = 50;
-                enemy.h = 30;
-                // some ground enemies launch missiles
-                if (Math.random() < 0.35) {
-                    enemy.launcher = true;
-                    enemy.launchCooldown = 80 + Math.random() * 180;
-                    enemy.launchRate = 100 + Math.random() * 140;
-                    enemy.missileSpeed = 7 + Math.random() * 2;
-                    enemy.color = '#6b3e00';
-                }
-            } else {
-                enemy.y = 50 + Math.random() * (canvas.height - 200);
-                enemy.w = 40;
-                enemy.h = 20;
-            }
-            enemies.push(enemy);
-        }
-
-        function nextLevel() {
-            if (level < 2) {
-                initLevel(level + 1);
-            } else {
-                // Game Win
-                document.getElementById('game-win').style.display = 'block';
-            }
-        }
-
-        function updateUI() {
-            document.getElementById('level-display').innerText = level;
-            document.getElementById('enemies-left').innerText = enemies.length;
-            document.getElementById('health').innerText = Math.floor(player.health);
-        }
-
-        function update() {
-            if (gameOver || gamePaused) return;
-            // --- Player Movement (forward flight with pitch control) ---
-            // Controls: up/down change pitch (targetAngle). Plane always moves forward along its angle.
-            const pitchSpeed = 0.035; // radians per frame when holding up/down
-            if (keys.ArrowUp || keys.w) player.targetAngle -= pitchSpeed;
-            if (keys.ArrowDown || keys.s) player.targetAngle += pitchSpeed;
-
-            // Smooth angle change
-            player.angle += (player.targetAngle - player.angle) * 0.08;
-
-            // Compute forward velocity from angle
-            player.vx = Math.cos(player.angle) * player.speed;
-            player.vy = Math.sin(player.angle) * player.speed;
-
-            // Move (apply vertical impulse for bounces)
-            player.x += player.vx;
-            player.y += player.vy + (player.verticalImpulse || 0);
-            player.verticalImpulse = (player.verticalImpulse || 0) * 0.92;
-            if (Math.abs(player.verticalImpulse) < 0.01) player.verticalImpulse = 0;
-
-            // Bounds
-            if (player.y < 20) player.y = 20; // Ceiling
-            const groundLimit = canvas.height - 60;
-            if (player.y > groundLimit) {
-                // bounce instead of hard stop
-                const impact = player.vy + (player.verticalImpulse || 0);
-                player.y = groundLimit;
-                if (impact > 4) {
-                    // strong impact: bounce up and take some damage
-                    player.verticalImpulse = -Math.abs(impact) * 0.6;
-                    damagePlayer(Math.min(20, Math.round(impact * 2)));
-                } else if (impact > 0.5) {
-                    // small bounce
-                    player.verticalImpulse = -Math.abs(impact) * 0.4;
-                } else {
-                    player.verticalImpulse = 0;
-                }
-            }
-            if (player.x < 50) player.x = 50;
-            if (player.x > worldWidth - 50) player.x = worldWidth - 50;
-
-            // Camera Follow
-            // Center camera on player, but clamp to world bounds
-            let targetCamX = player.x - canvas.width / 3;
-            if (targetCamX < 0) targetCamX = 0;
-            if (targetCamX > worldWidth - canvas.width) targetCamX = worldWidth - canvas.width;
-            
-            // Smooth camera
-            cameraX += (targetCamX - cameraX) * 0.1;
-
-            // Shooting (fires from plane's nose along angle)
-            if (player.reload > 0) player.reload--;
-            if (keys[" "] && player.reload <= 0) {
-                const muzzleSpeed = 15;
-                const noseX = player.x + Math.cos(player.angle) * 30;
-                const noseY = player.y + Math.sin(player.angle) * 30;
-                projectiles.push({
-                    x: noseX,
-                    y: noseY,
-                    vx: Math.cos(player.angle) * muzzleSpeed + player.vx,
-                    vy: Math.sin(player.angle) * muzzleSpeed + player.vy,
-                    owner: 'player',
-                    life: 100,
-                    color: '#fff'
-                });
-                player.reload = 10;
-            }
-
-            // Bombs update
-            for (let bi = bombs.length - 1; bi >= 0; bi--) {
-                const b = bombs[bi];
-                // gravity
-                b.vy += b.g;
-                    b.x += b.vx;
-                    b.y += b.vy;
-
-                    // trail particles (smoke + ember)
-                    // small semi-transparent smoke
-                    particles.push({ x: b.x, y: b.y, vx: -b.vx*0.15 + (Math.random()-0.5), vy: -0.5 + (Math.random()-0.5)*0.5, life: 18 + Math.random()*12, color: 'rgba(120,120,120,0.5)', size: 3 + Math.random()*3 });
-                    // occasional ember
-                    if (Math.random() < 0.3) particles.push({ x: b.x, y: b.y, vx: -b.vx*0.2 + (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 8+Math.random()*8, color: 'rgba(255,150,60,0.9)', size: 2 });
-
-                // simple ground collision
-                    if (b.y > canvas.height - 40) {
-                            // explosion that also damages enemies within radius (colorful)
-                            createExplosion(b.x, canvas.height - 60, '#ff6600', 60, { radius: 140, damage: 120, colorful: true });
-                        bombs.splice(bi, 1);
-                    }
-            }
-
-            // --- Enemies ---
-            enemies.forEach(e => {
-                // AI: Air enemies move slightly
-                if (e.type === 'air') {
-                    // Bobbing
-                    e.y += Math.sin(Date.now() / 500) * 0.5;
-                    
-                    // Move towards player if close
-                    const dist = Math.abs(player.x - e.x);
-                    if (dist < 600) {
-                        if (e.x > player.x + 200) e.x -= 1;
-                        if (e.x < player.x - 200) e.x += 1;
-                    }
-                }
-
-                // Shooting
-                const dist = Math.sqrt((player.x - e.x)**2 + (player.y - e.y)**2);
-                if (dist < 800) { // Range
-                    e.reload--;
-                    if (e.reload <= 0) {
-                        const angle = Math.atan2(player.y - e.y, player.x - e.x);
-                        projectiles.push({
-                            x: e.x,
-                            y: e.y,
-                            vx: Math.cos(angle) * 6,
-                            vy: Math.sin(angle) * 6,
-                            owner: 'enemy',
-                            life: 200,
-                            color: '#ff0'
-                        });
-                        e.reload = e.fireRate;
-                    }
-                }
-
-                // Missile launcher behavior for ground enemies
-                if (e.launcher) {
-                    e.launchCooldown--;
-                    if (e.launchCooldown <= 0) {
-                        const angle = Math.atan2(player.y - (e.y - 10), player.x - (e.x + e.w/2));
-                        // spawn a heavier missile as a projectile
-                        projectiles.push({
-                            x: e.x + e.w/2,
-                            y: e.y - 10,
-                            vx: Math.cos(angle) * e.missileSpeed,
-                            vy: Math.sin(angle) * e.missileSpeed - 0.5,
-                            owner: 'enemy',
-                            life: 400,
-                            color: '#ff4444',
-                            size: 5,
-                            damage: 25
-                        });
-                        // smoke and flashes
-                        for (let s=0; s<6; s++) particles.push({ x: e.x + e.w/2, y: e.y - 8, vx: (Math.random()-0.5)*1.5, vy: -Math.random()*1.5, life: 20+Math.random()*20, color: 'rgba(120,40,30,0.6)', size: 3 });
-                        e.launchCooldown = e.launchRate + Math.random()*80;
-                    }
-                }
-            });
-
-            // --- Projectiles ---
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                let p = projectiles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
-
-                let hit = false;
-                
-                // Ground collision
-                if (p.y > canvas.height - 40) {
-                    createExplosion(p.x, p.y, '#8b4513');
-                    hit = true;
-                }
-
-                if (!hit) {
-                    if (p.owner === 'player') {
-                        for (let j = enemies.length - 1; j >= 0; j--) {
-                            let e = enemies[j];
-                            if (checkRectCollide(p.x, p.y, 5, 5, e.x, e.y, e.w, e.h)) {
-                                hit = true;
-                                e.hp--;
-                                createExplosion(p.x, p.y, '#ffaa00', 5);
-                                if (e.hp <= 0) {
-                                    createExplosion(e.x + e.w/2, e.y + e.h/2, '#ff4400', 20);
-                                    enemies.splice(j, 1);
-                                    updateUI();
-                                    checkWin();
-                                }
-                                break;
-                            }
-                        }
-                        // Hit boss
-                        if (!hit && boss) {
-                            if (checkRectCollide(p.x, p.y, 6, 6, boss.x - boss.w/2, boss.y - boss.h/2, boss.w, boss.h)) {
-                                hit = true;
-                                boss.hp -= (p.damage || 10);
-                                createExplosion(p.x, p.y, '#ffaa00', 6);
-                                if (boss.hp <= 0) {
-                                    createExplosion(boss.x, boss.y, '#ff44ff', 40, {colorful:true});
-                                    boss = null;
-                                    updateUI();
-                                    checkWin();
-                                }
-                            }
-                        }
-                    } else {
-                        // Enemy bullet hitting player
-                        if (checkRectCollide(p.x, p.y, 5, 5, player.x - 20, player.y - 10, 40, 20)) {
-                            hit = true;
-                            damagePlayer(10);
-                            createExplosion(p.x, p.y, '#ff0000', 5);
-                        }
-                    }
-                }
-
-                if (hit || p.life <= 0) {
-                    projectiles.splice(i, 1);
-                }
-            }
-
-
-            // Particles
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
-                if (p.life <= 0) particles.splice(i, 1);
-            }
-
-            // helper: shade a hex color by percent (-100..100)
-            function shadeColor(hex, percent) {
-                if (!hex || hex[0] !== '#') return hex;
-                const f = parseInt(hex.slice(1), 16);
-                const t = percent < 0 ? 0 : 255;
-                const p = Math.abs(percent) / 100;
-                const R = f >> 16;
-                const G = (f >> 8) & 0x00FF;
-                const B = f & 0x0000FF;
-                const newR = Math.round((t - R) * p) + R;
-                const newG = Math.round((t - G) * p) + G;
-                const newB = Math.round((t - B) * p) + B;
-                return '#' + (0x1000000 + (newR << 16) + (newG << 8) + newB).toString(16).slice(1);
-            }
-
-                // Bombs drawing handled in draw()
-        }
-
-        function checkWin() {
-            // Player wins when all enemies are gone and boss (if any) is defeated
-            if (enemies.length === 0 && !boss) {
-                gamePaused = true;
-                if (level === 1) {
-                    document.getElementById('level-complete').style.display = 'block';
-                } else {
-                    document.getElementById('game-win').style.display = 'block';
-                }
-            }
-        }
-
-        function damagePlayer(amount) {
-            player.health -= amount;
-            updateUI();
-            if (player.health <= 0) {
-                gameOver = true;
-                document.getElementById('game-over').style.display = 'block';
-            }
-        }
-
-        function checkRectCollide(x1, y1, w1, h1, x2, y2, w2, h2) {
-            return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
-        }
-
-        function createExplosion(x, y, color, count=10, options = {}) {
-            // spawn visual particles
-            // flash + colorful burst for bomb explosions when requested
-            const colorful = options.colorful || false;
-            for(let i=0; i<count; i++) {
-                if (colorful) {
-                    // generate hues around orange/red
-                    const t = Math.random();
-                    const r = 200 + Math.floor(Math.random()*55);
-                    const g = 80 + Math.floor(Math.random()*120);
-                    const b = Math.floor(Math.random()*40);
-                    const col = `rgba(${r},${g},${b},${0.9 - Math.random()*0.5})`;
-                    particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 20 + Math.random() * 30, color: col, size: 3 + Math.random() * 6 });
-                } else {
-                    particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, life: 20 + Math.random() * 10, color: color, size: 2 + Math.random() * 3 });
-                }
-            }
-
-            // add a bright flash particle (short-lived, large)
-            particles.push({ x: x, y: y, vx: 0, vy: 0, life: 8, color: 'rgba(255,240,200,0.95)', size: 18 });
-
-            // optional damage to enemies within radius
-            const radius = options.radius || 0;
-            const damage = options.damage || 0;
-            if (radius > 0 && damage > 0) {
-                for (let i = enemies.length - 1; i >= 0; i--) {
-                    const e = enemies[i];
-                    // approximate enemy center
-                    const ex = e.x + (e.w || 0) / 2;
-                    const ey = e.y + (e.h || 0) / 2;
-                    const dx = ex - x;
-                    const dy = ey - y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist <= radius) {
-                        // scale damage by proximity (closer -> more damage)
-                        const frac = 1 - (dist / radius);
-                        const dealt = Math.max(1, Math.round(damage * frac));
-                        e.hp -= dealt;
-                        // small hit particle burst on enemy
-                        for (let p = 0; p < 6; p++) {
-                            particles.push({ x: ex, y: ey, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 10+Math.random()*10, color: '#ffcc66', size: 2 });
-                        }
-                        if (e.hp <= 0) {
-                            // remove enemy and create bigger explosion
-                            createExplosion(ex, ey, '#ff4400', 12);
-                            enemies.splice(i, 1);
-                            updateUI();
-                            checkWin();
-                        }
-                    }
-                }
-                // Boss damage from explosion
-                if (boss) {
-                    const bx = boss.x;
-                    const by = boss.y;
-                    const dx = bx - x;
-                    const dy = by - y;
-                    const distBoss = Math.sqrt(dx*dx + dy*dy);
-                    if (distBoss <= radius) {
-                        const frac = 1 - (distBoss / radius);
-                        const dealt = Math.max(1, Math.round(damage * frac));
-                        boss.hp -= dealt;
-                        if (boss.hp <= 0) {
-                            createExplosion(boss.x, boss.y, '#ff44ff', 40, {colorful:true});
-                            boss = null;
-                            updateUI();
-                            checkWin();
-                        }
-                    }
-                }
-            }
-        }
-
-        // Drop a bomb from the plane
-        function dropBomb() {
-            // spawn bomb at plane nose, initial horizontal speed similar to plane
-            const noseX = player.x + Math.cos(player.angle) * 30;
-            const noseY = player.y + Math.sin(player.angle) * 30;
-            bombs.push({
-                x: noseX,
-                y: noseY + 10,
-                vx: player.vx * 0.9 + Math.cos(player.angle) * 1.5,
-                vy: player.vy + 2,
-                g: 0.35
-            });
-
-            // initial launch flare + a few ember particles
-            createExplosion(noseX, noseY, '#ffcc33', 8, { colorful: false });
-            for (let i=0;i<6;i++) particles.push({ x: noseX, y: noseY, vx: -player.vx*0.2 + (Math.random()-0.5)*3, vy: (Math.random()-0.5)*2, life: 10+Math.random()*10, color: 'rgba(255,180,60,0.95)', size: 2+Math.random()*3 });
-        }
-
-        function draw() {
-            // Sky
-            ctx.fillStyle = '#87CEEB';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.save();
-            ctx.translate(-cameraX, 0);
-
-            // Clouds (Parallax)
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            clouds.forEach(c => {
-                ctx.beginPath();
-                ctx.arc(c.x, c.y, c.w/2, 0, Math.PI*2);
-                ctx.arc(c.x + c.w*0.4, c.y - c.w*0.2, c.w*0.4, 0, Math.PI*2);
-                ctx.arc(c.x - c.w*0.4, c.y - c.w*0.2, c.w*0.4, 0, Math.PI*2);
-                ctx.fill();
-            });
-
-            // Ground
-            ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, canvas.height - 40, worldWidth, 40);
-            
-            // Ground details
-            ctx.fillStyle = '#006400';
-            for(let i=0; i<worldWidth; i+=100) {
-                ctx.fillRect(i, canvas.height - 40, 20, 40);
-            }
-            
-            // World Borders
-            ctx.fillStyle = 'rgba(255,0,0,0.3)';
-            ctx.fillRect(-10, 0, 10, canvas.height); // Left wall
-            ctx.fillRect(worldWidth, 0, 10, canvas.height); // Right wall
-
-            // Enemies
-            enemies.forEach(e => {
-                ctx.fillStyle = e.color;
-                if (e.type === 'ground') {
-                    // Tank
-                    ctx.fillRect(e.x, e.y, e.w, e.h);
-                    ctx.fillStyle = '#000';
-                    ctx.beginPath(); ctx.arc(e.x + e.w/2, e.y, 10, 0, Math.PI, true); ctx.fill();
-                    // Turret
-                    const angle = Math.atan2(player.y - e.y, player.x - e.x);
-                    ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
-                    ctx.beginPath(); ctx.moveTo(e.x + e.w/2, e.y); 
-                    ctx.lineTo(e.x + e.w/2 + Math.cos(angle)*20, e.y + Math.sin(angle)*20);
-                    ctx.stroke();
-                } else {
-                    // Plane
-                    ctx.beginPath();
-                    ctx.moveTo(e.x, e.y);
-                    ctx.lineTo(e.x + e.w, e.y + e.h/2);
-                    ctx.lineTo(e.x, e.y + e.h);
-                    ctx.fill();
-                }
-            });
-
-            // Boss behavior
-            if (boss) {
-                boss.movePhase = (boss.movePhase || 0) + 0.02;
-                boss.x = boss.baseX + Math.sin(boss.movePhase) * 120;
-                // slow vertical bob
-                boss.y = 60 + Math.cos(boss.movePhase * 0.7) * 30;
-
-                boss.reload--;
-                if (boss.reload <= 0) {
-                    // fire a volley of missiles aimed at player
-                    for (let m=0; m<3; m++) {
-                        const aimAngle = Math.atan2(player.y - boss.y, player.x - (boss.x - boss.w/4 + m*20));
-                        projectiles.push({ x: boss.x - boss.w/4 + m*20, y: boss.y, vx: Math.cos(aimAngle) * 9, vy: Math.sin(aimAngle) * 9, owner: 'enemy', life: 400, color: '#ff88ff', size: 6, damage: 30 });
-                    }
-                    // boss visual flare
-                    for (let s=0; s<8; s++) particles.push({ x: boss.x, y: boss.y, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 20+Math.random()*20, color: 'rgba(255,120,200,0.8)', size: 3 });
-                    boss.reload = boss.fireRate + Math.random()*60;
-                }
-            }
-
-            // Player
-            ctx.save();
-            ctx.translate(player.x, player.y);
-            // Always rotate first so the plane can face any angle correctly
-            ctx.rotate(player.angle);
-            // Apply manual flip (from Flip button) only — avoid auto-flip based on vx
-            if (player.flipped) ctx.scale(-1, 1);
-
-            // Body
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.moveTo(20, 0);
-            ctx.lineTo(-20, -10);
-            ctx.lineTo(-20, 10);
-            ctx.fill();
-
-            // Wings
-            ctx.fillStyle = '#ccc';
-            ctx.fillRect(-10, -20, 10, 40);
-
-            // Cockpit
-            ctx.fillStyle = '#00d4ff';
-            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
-
-            // Engine flame
-            if (Math.abs(player.vx) > 2) {
-                ctx.fillStyle = '#ffaa00';
-                ctx.beginPath();
-                ctx.moveTo(-20, 0);
-                ctx.lineTo(-30 - Math.random()*10, 0);
-                ctx.stroke();
-            }
-
-            ctx.restore();
-        
-            // Mini-map in top-right showing player, enemies, boss and terrain
-            (function drawMinimap(){
-                const mapW = Math.min(220, canvas.width * 0.28);
-                const mapH = 90;
-                const margin = 12;
-                const x0 = canvas.width - mapW - margin;
-                // Respect the site top bar if present (CSS var --site-top-bar-height)
-                const topBarHeightVal = getComputedStyle(document.body).getPropertyValue('--site-top-bar-height') || '';
-                const topBarHeight = parseInt(topBarHeightVal, 10) || 0;
-                const y0 = margin + topBarHeight;
-                // background
-                ctx.save();
-                ctx.globalAlpha = 0.9;
-                ctx.fillStyle = 'rgba(10,10,10,0.6)';
-                ctx.fillRect(x0, y0, mapW, mapH);
-                // terrain
-                ctx.fillStyle = '#2e7d32';
-                const ty = y0 + mapH - 18;
-                ctx.fillRect(x0, ty, mapW, 8);
-                // scale
-                const sx = mapW / Math.max(worldWidth, 1);
-                const sy = (mapH - 24) / canvas.height;
-                // enemies
-                enemies.forEach(e => {
-                    const px = x0 + (e.x * sx);
-                    const py = y0 + (e.y * sy) + 6;
-                    ctx.fillStyle = e.launcher ? '#ff8844' : '#ffcc00';
-                    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
-                });
-                // boss
-                if (boss) {
-                    const bx = x0 + (boss.x * sx);
-                    const by = y0 + (boss.y * sy) + 6;
-                    ctx.fillStyle = '#ff66ff'; ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI*2); ctx.fill();
-                }
-                // player
-                const px = x0 + (player.x * sx);
-                const py = y0 + (player.y * sy) + 6;
-                ctx.fillStyle = '#00ffff'; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2); ctx.fill();
-                // camera viewport rect
-                const camX = cameraX * sx;
-                const camW = canvas.width * sx;
-                ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
-                ctx.strokeRect(x0 + camX, y0 + 6, camW, mapH - 24);
-                ctx.restore();
-            })();
-
-            // Draw boss (over world)
-            if (boss) {
-                ctx.save();
-                ctx.fillStyle = boss.color || '#8b00ff';
-                // boss body
-                ctx.fillRect(boss.x - boss.w/2, boss.y - boss.h/2, boss.w, boss.h);
-                // boss turret
-                ctx.fillStyle = '#220022';
-                ctx.beginPath(); ctx.arc(boss.x, boss.y, 10, 0, Math.PI*2); ctx.fill();
-                // boss health bar
-                const hbW = 120; const hbH = 8;
-                const hpPct = Math.max(0, (boss.hp || 0) / 400);
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(boss.x - hbW/2, boss.y - boss.h/2 - 14, hbW, hbH);
-                ctx.fillStyle = '#ff4444'; ctx.fillRect(boss.x - hbW/2 + 2, boss.y - boss.h/2 - 12, (hbW-4) * hpPct, hbH-4);
-                ctx.restore();
-            }
-
-            // Projectiles
-            projectiles.forEach(p => {
-                ctx.fillStyle = p.color || '#fff';
-                const r = p.size || 3;
-                ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
-            });
-
-                // Bombs
-                bombs.forEach(b => {
-                    ctx.save();
-                    ctx.fillStyle = '#aa3300';
-                    ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI*2); ctx.fill();
-                    // trail
-                    ctx.fillStyle = 'rgba(255,160,60,0.6)';
-                    ctx.beginPath(); ctx.ellipse(b.x - b.vx*2, b.y - b.vy*2, 6, 3, 0, 0, Math.PI*2); ctx.fill();
-                    ctx.restore();
-                });
-
-            // Particles
-            particles.forEach(p => {
-                ctx.globalAlpha = p.life / 20;
-                ctx.fillStyle = p.color;
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
-                ctx.globalAlpha = 1;
-            });
-
-            ctx.restore();
-        }
-
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
-
-        // Start Game
-        initLevel(1);
-        loop();
-
-    </script>
+    <div class="difficulty">
+      <span data-i18n="difficulty">DIFFICULTY</span>
+      <div class="diff-row">
+        <button type="button" data-difficulty="easy" data-i18n="easy">ROOKIE</button>
+        <button type="button" data-difficulty="medium" class="active" data-i18n="medium">ACE</button>
+        <button type="button" data-difficulty="hard" data-i18n="hard">LEGEND</button>
+      </div>
+    </div>
+    <p class="record" id="menuRecord">BEST: 0</p>
+    <div class="menu-foot">
+      <button class="mbtn tiny" id="btnLang" type="button"><span id="btnLangText">IT / EN</span></button>
+      <button class="mbtn tiny" id="btnSound" type="button"><span id="btnSoundText">SOUND: ON</span></button>
+    </div>
+    <p class="hint" data-i18n="controls">↑ ↓ / W S = PITCH · SPACE = FIRE</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="briefOverlay">
+  <div class="panel">
+    <div class="logo-mark">🎯</div>
+    <p class="eyebrow" id="briefNum">MISSION 1 / 5</p>
+    <h2 id="briefName">DAWN PATROL</h2>
+    <div class="brief-grid">
+      <div><span data-i18n="enemies">HOSTILES</span><b id="briefEnemies">16</b></div>
+      <div><span data-i18n="boss">BOSS</span><b id="briefBoss">—</b></div>
+      <div><span data-i18n="difficulty">DIFFICULTY</span><b id="briefDiff">ACE</b></div>
+    </div>
+    <button class="mbtn primary" id="btnLaunch" type="button">🚀 <span data-i18n="startMission">LAUNCH</span></button>
+    <button class="mbtn ghost" id="btnBriefBack" type="button" data-i18n="backMenu">MAIN MENU</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="pauseOverlay">
+  <div class="panel small-panel">
+    <div class="logo-mark">⏸</div>
+    <h2 data-i18n="pause">PAUSED</h2>
+    <button class="mbtn primary" id="btnResume" type="button" data-i18n="resume">RESUME</button>
+    <button class="mbtn ghost" id="btnRestart" type="button" data-i18n="restart">RESTART</button>
+    <button class="mbtn ghost" id="btnQuit" type="button" data-i18n="quit">ABORT</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="levelOverlay">
+  <div class="panel small-panel">
+    <div class="logo-mark">🏁</div>
+    <h2 id="levelDoneTitle" class="win" data-i18n="levelComplete">AREA CLEARED</h2>
+    <p class="record" id="levelDoneScore">SCORE: 0</p>
+    <p class="record gold" id="levelDoneBonus">+0</p>
+    <button class="mbtn primary" id="btnNext" type="button" data-i18n="nextMission">NEXT MISSION</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="gameoverOverlay">
+  <div class="panel small-panel">
+    <div class="logo-mark">💥</div>
+    <h2 class="lose" data-i18n="gameOver">SHOT DOWN</h2>
+    <p class="tagline" data-i18n="gameOverText">Your hull gave out.</p>
+    <p class="record" id="goScore">SCORE: 0</p>
+    <p class="record" id="goLevel">MISSION 1</p>
+    <p class="record gold hidden" id="goRecord" data-i18n="newRecord">NEW RECORD!</p>
+    <button class="mbtn primary" id="btnRetry" type="button" data-i18n="retry">RETRY MISSION</button>
+    <button class="mbtn ghost" id="btnMenuGameover" type="button" data-i18n="backMenu">MAIN MENU</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="victoryOverlay">
+  <div class="panel small-panel">
+    <div class="logo-mark">🏆</div>
+    <h2 class="win" data-i18n="victory">SKY ACE</h2>
+    <p class="tagline" data-i18n="victoryText">The whole front is yours.</p>
+    <p class="record" id="vicScore">SCORE: 0</p>
+    <p class="record" id="vicKills">KILLS: 0</p>
+    <p class="record gold hidden" id="vicRecord" data-i18n="newRecord">NEW RECORD!</p>
+    <button class="mbtn primary" id="btnAgain" type="button" data-i18n="playAgain">FLY AGAIN</button>
+    <button class="mbtn ghost" id="btnMenuVictory" type="button" data-i18n="backMenu">MAIN MENU</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="tutorialOverlay">
+  <div class="panel">
+    <div class="logo-mark">🎓</div>
+    <h2 data-i18n="tutorialTitle">FLIGHT SCHOOL</h2>
+    <div id="tutorialList"></div>
+    <p class="hint" data-i18n="touchHint">Left half = pitch · Right half = fire</p>
+    <button class="mbtn primary" id="btnTutorialBack" type="button" data-i18n="ok">GOT IT</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="statsOverlay">
+  <div class="panel small-panel">
+    <div class="logo-mark">📊</div>
+    <h2 data-i18n="stats">PILOT RECORD</h2>
+    <div class="stats-grid">
+      <div><span data-i18n="best">BEST</span><b id="statBest">0</b></div>
+      <div><span data-i18n="easy">ROOKIE</span><b id="statEasy">0</b></div>
+      <div><span data-i18n="medium">ACE</span><b id="statMedium">0</b></div>
+      <div><span data-i18n="hard">LEGEND</span><b id="statHard">0</b></div>
+      <div><span data-i18n="runs">SORTIES</span><b id="statRuns">0</b></div>
+      <div><span data-i18n="wins">CAMPAIGNS</span><b id="statWins">0</b></div>
+      <div><span data-i18n="totalKills">TOTAL KILLS</span><b id="statKills">0</b></div>
+      <div><span data-i18n="accuracy">ACCURACY</span><b id="statAcc">0%</b></div>
+      <div><span data-i18n="progress">PROGRESS</span><b id="statProgress">1/5</b></div>
+    </div>
+    <button class="mbtn primary" id="btnStatsBack" type="button" data-i18n="back">BACK</button>
+  </div>
+</div>
+
+<div id="touchControls" class="hidden">
+  <div class="pad left-pad">
+    <button class="pad-btn" data-action="up" type="button" aria-label="Up">▲</button>
+    <button class="pad-btn" data-action="down" type="button" aria-label="Down">▼</button>
+  </div>
+  <div class="pad right-pad">
+    <button class="pad-btn bomb" data-action="bomb" type="button" aria-label="Bomb">✸<small>BOMB</small></button>
+    <button class="pad-btn fire" data-action="fire" type="button" aria-label="Fire">●<small>FIRE</small></button>
+    <button class="pad-btn flip" data-action="flip" type="button" aria-label="Flip">⇄<small>FLIP</small></button>
+  </div>
+</div>
+
+<script type="module" src="plane/js/main.js"></script>
+<script src="../top_buttons.js"></script>
 </body>
 </html>
