@@ -40,14 +40,35 @@ Si gioca in **orizzontale** su mobile (avviso di rotazione incluso).
 
 ```
 games/arena-royale-2/
-├── index.html        # canvas + HUD + overlay + avviso rotazione
-├── style.css         # stile dark mobile-first, safe-area
-├── js/main.js        # tutto il gioco
-├── js/vendor/three.module.js  # Three.js 0.160 locale
+├── index.html        # shell: canvas, HUD, overlay, controlli
+├── style.css         # design system arcade, glassmorphism, safe-area
+├── js/main.js        # bootstrap, loop e reset partita
+├── js/config.js      # costanti, 12 armi, loot tables
+├── js/state.js       # stato runtime condiviso
+├── js/store.js       # statistiche/impostazioni validate
+├── js/i18n.js        # EN/IT
+├── js/audio.js       # WebAudio + haptics
+├── js/dispose.js     # cleanup GPU (no leak tra partite)
+├── js/effects.js     # particelle, confetti, kill feed, feedback
+├── js/world.js       # scena, foresta, ostacoli, loot, tempesta visual
+├── js/entities.js    # player, bot, movimento e raccolta
+├── js/combat.js      # armi, proiettili, danno, esiti partita
+├── js/storm.js       # fasi tempesta e danno
+├── js/input.js       # joystick, mouse, tastiera, KONAMI
+├── js/ui.js          # HUD, minimap, overlay
+├── js/vendor/three.module.js  # Three.js locale
 ├── manifest.json     # PWA (landscape)
 ├── sw.js             # offline (app shell + three locale)
 └── icons/            # icone 192/512 + apple-touch-icon
 ```
+
+## ✨ Novità 2.3
+- Architettura modulare: 14 moduli ES con responsabilità separate.
+- Kill feed, indicatore direzionale del danno, pallini munizioni,
+  anello countdown tempesta, indicatore FPS/DPR.
+- Statistiche corrette (le eliminazioni non vengono più contate due volte
+  in caso di vittoria) e cleanup completo della memoria GPU tra partite.
+- Confetti dt-based e canvas DPR-aware, interfaccia EN/IT, accessibilità.
 
 ## ▶️ Esecuzione
 

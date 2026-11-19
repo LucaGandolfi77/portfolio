@@ -108,7 +108,7 @@
     ['sky-ace', 'Sky Ace', 'Side-scrolling aerial combat.', 'games/plane.html', '✈️', 'arcade', ['Arcade'], false],
     ['aviator', 'Aviator', 'Flight-themed risk and timing game.', 'games/aviator.html', '🛩️', 'arcade', ['Arcade'], false],
     ['shotmind', 'Shotmind', 'A focused browser shooting and reaction game.', 'games/shotmind/index.html', '+', 'arcade', ['Arcade', 'PWA'], false],
-    ['cdd', 'CDD', 'A compact competitive card and strategy experiment.', 'games/CDD.html', '♣', 'cards', ['Cards'], false],
+    ['cdd', 'CDD', 'A compact competitive card and strategy experiment.', 'games/cdd.html', '♣', 'cards', ['Cards'], false],
     ['brawl-stars', 'Brawl Stars Map', 'Action arena and map experiment.', 'games/brawl_stars.html', '★', 'arcade', ['Action'], false],
     ['tower-defense', 'Tower Defense', 'Place defenses and stop the incoming wave.', 'games/tower_defense.html', '⌂', 'strategy', ['Strategy'], false],
     ['forza4', 'Forza 4', 'Connect four pieces before your opponent.', 'games/forza4.html', '4', 'strategy', ['Board'], false],

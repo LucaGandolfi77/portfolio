@@ -1,425 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kinect Game</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        body { 
-            margin: 0; 
-            background: #000; 
-            overflow: hidden; 
-            font-family: 'Inter', sans-serif;
-            touch-action: none; 
-        }
-        #video-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 0;
-            overflow: hidden;
-        }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1); /* Mirror the video */
-        }
-        canvas { 
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%; 
-            height: 100%; 
-            z-index: 1;
-            pointer-events: none;
-        }
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
-            box-sizing: border-box;
-            z-index: 2;
-        }
-        #score-board {
-            color: #00d4ff;
-            font-size: 48px;
-            font-weight: 800;
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-        }
-        #status {
-            color: white;
-            font-size: 18px;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 16px;
-            border-radius: 20px;
-            align-self: center;
-            backdrop-filter: blur(4px);
-        }
-        .back-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: white;
-            text-decoration: none;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 12px;
-            border-radius: 8px;
-            backdrop-filter: blur(4px);
-            font-size: 14px;
-            pointer-events: auto;
-            z-index: 100;
-        }
-        #start-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
-            color: white;
-            text-align: center;
-        }
-        button {
-            background: #00d4ff;
-            color: #000;
-            border: none;
-            padding: 15px 40px;
-            font-size: 24px;
-            font-weight: bold;
-            border-radius: 50px;
-            cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
-            transition: transform 0.2s;
-            pointer-events: auto;
-        }
-        button:active { transform: scale(0.95); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070b16">
+<meta name="description" content="Kinetic — an AI hand-tracking arcade: catch falling orbs with your hands, entirely in your browser.">
+<title>Kinetic — Hand Tracking Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kinect.css">
 </head>
-<body>
-    <a href="../pages/main/technology.html" class="back-btn">Exit</a>
-    
-    <div id="start-screen">
-        <h1 style="font-size: 3rem; margin-bottom: 10px; color: #00d4ff;">KINECT WEB</h1>
-        <p style="max-width: 300px; line-height: 1.5; color: #a0c0e0;">
-            Use your body to play!<br>
-            Move your hands to hit the falling objects.<br>
-            Enable camera to start.
-        </p>
-        <button onclick="startGame()">START</button>
+<body data-state="idle">
+
+<div id="stage" aria-hidden="true">
+  <div id="video-wrap"><video id="video" playsinline autoplay muted></video></div>
+  <div id="vignette"></div>
+  <canvas id="game-canvas"></canvas>
+  <div id="hit-flash"></div>
+</div>
+
+<header id="hud" class="hud is-hidden">
+  <div class="hud-side hud-left">
+    <div class="hud-brand"><span class="brand-mark">◈</span><span data-i18n="brand">KINETIC</span></div>
+    <div class="score-card">
+      <span class="score-label" data-i18n="score">SCORE</span>
+      <span class="score-value" id="score">0</span>
+      <span class="combo-chip is-hidden" id="combo">x2 COMBO</span>
+    </div>
+  </div>
+  <div class="hud-side hud-right">
+    <div class="hud-actions">
+      <button id="sound-btn" class="icon-btn" type="button" aria-label="Toggle sound" title="Sound">🔊</button>
+      <button id="pause-btn" class="icon-btn" type="button" aria-label="Pause game" title="Pause">⏸</button>
+    </div>
+    <div class="hud-stats">
+      <div class="stat"><span data-i18n="time">TIME</span><b id="time">90</b></div>
+      <div class="stat"><span data-i18n="level">LEVEL</span><b id="level">1</b></div>
+      <div class="stat"><span data-i18n="accuracy">ACCURACY</span><b id="accuracy">—</b></div>
+    </div>
+  </div>
+  <div class="xp-track"><div class="xp-fill" id="level-fill"></div></div>
+</header>
+
+<div id="hand-hint" class="hand-hint is-hidden">
+  <span class="hand-hint-dot"></span><span data-i18n="handHint">Show your hand to the camera</span>
+</div>
+
+<div id="overlay" class="overlay">
+
+  <section class="card card-start" id="card-start" aria-labelledby="start-title">
+    <div class="card-glow"></div>
+    <div class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="eyebrow">AI POWERED ARCADE</span></div>
+    <div class="hero-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M25 34V13a4 4 0 0 1 8 0v15-4a4 4 0 0 1 8 0v5a4 4 0 0 1 8 0v9c0 9-6 15-15 15h-4c-6 0-9-2-12-6l-8-11a4 4 0 0 1 6-5l7 7"/>
+      </svg>
+    </div>
+    <h1 id="start-title" data-i18n="title">KINETIC</h1>
+    <p class="lead" data-i18n="intro">Catch the falling orbs with your bare hands. No controller, no download — just you and your camera.</p>
+
+    <div class="howto">
+      <div class="howto-item"><span class="howto-step">01</span><span class="howto-ico">📷</span><span data-i18n="step1">Allow camera access</span></div>
+      <div class="howto-item"><span class="howto-step">02</span><span class="howto-ico">✋</span><span data-i18n="step2">Move your index finger into an orb</span></div>
+      <div class="howto-item"><span class="howto-step">03</span><span class="howto-ico">⚡</span><span data-i18n="step3">Chain hits to build your combo</span></div>
     </div>
 
-    <div id="ui-layer">
-        <div id="score-board">0</div>
-        <div id="status">Loading AI...</div>
+    <button class="primary-btn" id="start-btn" type="button"><span data-i18n="start">START GAME</span><span class="btn-arrow">→</span></button>
+    <div class="card-foot">
+      <span class="privacy">🔒 <span data-i18n="privacy">Video is processed locally. Nothing is uploaded.</span></span>
+      <span class="best-line" data-i18n="best" data-vars='{"score":"0"}'>BEST 0</span>
     </div>
+    <div class="keys"><kbd>ENTER</kbd> <span data-i18n="toStart">to start</span> · <kbd>SPACE</kbd> <span data-i18n="toPause">pause</span> · <kbd>R</kbd> <span data-i18n="toRestart">restart</span></div>
+  </section>
 
-    <div id="video-container">
-        <video id="video" playsinline autoplay muted></video>
+  <section class="card card-loading is-hidden" id="card-loading" aria-labelledby="loading-title">
+    <div class="spinner" aria-hidden="true"></div>
+    <h2 id="loading-title" data-i18n="loadingTitle">GETTING READY</h2>
+    <p class="lead" data-i18n="loadingLead">Loading the hand-tracking model…</p>
+    <ul class="steps">
+      <li id="step-model"><span class="step-dot"></span><span data-i18n="stepModel">AI model</span></li>
+      <li id="step-camera"><span class="step-dot"></span><span data-i18n="stepCamera">Camera access</span></li>
+      <li id="step-ready"><span class="step-dot"></span><span data-i18n="stepReady">Calibrating</span></li>
+    </ul>
+  </section>
+
+  <section class="card card-error is-hidden" id="card-error" aria-labelledby="error-title">
+    <div class="error-icon" aria-hidden="true">⚠</div>
+    <h2 id="error-title" data-i18n="errorTitle">SOMETHING WENT WRONG</h2>
+    <p class="lead" id="error-msg"></p>
+    <button class="primary-btn" id="retry-btn" type="button"><span data-i18n="retry">TRY AGAIN</span><span class="btn-arrow">↻</span></button>
+  </section>
+
+  <section class="card card-pause is-hidden" id="card-pause" aria-labelledby="pause-title">
+    <div class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="pausedEyebrow">TAKE A BREATH</span></div>
+    <h2 id="pause-title" data-i18n="pauseTitle">PAUSED</h2>
+    <div class="mini-stats">
+      <div><b id="pause-score">0</b><span data-i18n="score">SCORE</span></div>
+      <div><b id="pause-time">90</b><span data-i18n="timeLeft">TIME LEFT</span></div>
+      <div><b id="pause-acc">—</b><span data-i18n="accuracy">ACCURACY</span></div>
     </div>
-    <canvas id="canvas"></canvas>
+    <button class="primary-btn" id="resume-btn" type="button"><span data-i18n="resume">RESUME</span><span class="btn-arrow">→</span></button>
+    <button class="ghost-btn" id="restart-btn-pause" type="button" data-i18n="restart">RESTART</button>
+  </section>
 
-    <!-- Load MediaPipe Hands -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <section class="card card-over is-hidden" id="card-over" aria-labelledby="over-title">
+    <div class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="overEyebrow">RUN COMPLETE</span></div>
+    <h2 id="over-title" data-i18n="overTitle">NICE MOVES!</h2>
+    <div class="final-score"><span id="final-score">0</span><small data-i18n="points">POINTS</small></div>
+    <div class="mini-stats">
+      <div><b id="over-acc">—</b><span data-i18n="accuracy">ACCURACY</span></div>
+      <div><b id="over-combo">0</b><span data-i18n="maxCombo">MAX COMBO</span></div>
+      <div><b id="over-best">0</b><span data-i18n="bestScore">BEST SCORE</span></div>
+    </div>
+    <button class="primary-btn" id="restart-btn-over" type="button"><span data-i18n="playAgain">PLAY AGAIN</span><span class="btn-arrow">↻</span></button>
+  </section>
 
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score-board');
-        const statusEl = document.getElementById('status');
-        const startScreen = document.getElementById('start-screen');
+</div>
 
-        let hands = null;
-        let camera = null;
-        let isGameRunning = false;
-        let score = 0;
-        let particles = [];
-        let targets = [];
-        let detectedHands = [];
-        let lastFrameTime = 0;
-        let spawnTimer = 0;
-        let difficulty = 1;
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-        // Game Configuration
-        const TARGET_RADIUS = 30;
-        const HIT_RADIUS = 40; 
-        
-        function onResults(results) {
-            detectedHands = results.multiHandLandmarks;
-        }
-
-        async function loadModel() {
-            statusEl.innerText = "Loading AI...";
-            hands = new Hands({locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-            }});
-            hands.setOptions({
-                maxNumHands: 2,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-            hands.onResults(onResults);
-            statusEl.innerText = "AI Loaded";
-        }
-
-        async function startGame() {
-            startScreen.style.display = 'none';
-            if (!hands) await loadModel();
-            
-            statusEl.innerText = "Starting Camera...";
-            
-            camera = new Camera(video, {
-                onFrame: async () => {
-                    await hands.send({image: video});
-                },
-                width: 640,
-                height: 480
-            });
-            await camera.start();
-            
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            
-            isGameRunning = true;
-            statusEl.style.display = 'none';
-            gameLoop();
-        }
-
-        function createTarget() {
-            const x = Math.random() * (canvas.width - TARGET_RADIUS * 2) + TARGET_RADIUS;
-            targets.push({
-                x: x,
-                y: -TARGET_RADIUS,
-                vx: (Math.random() - 0.5) * 2,
-                vy: 2 + Math.random() * 3 * difficulty,
-                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-                radius: TARGET_RADIUS,
-                active: true
-            });
-        }
-
-        function createExplosion(x, y, color) {
-            for (let i = 0; i < 10; i++) {
-                particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    life: 1.0,
-                    color: color
-                });
-            }
-        }
-
-        function gameLoop() {
-            if (!isGameRunning) {
-                requestAnimationFrame(gameLoop);
-                return;
-            }
-
-            // 2. Update Game State
-            const now = Date.now();
-            const dt = (now - lastFrameTime) / 1000;
-            lastFrameTime = now;
-
-            // Spawn targets
-            spawnTimer += dt;
-            if (spawnTimer > 2.0 / difficulty) {
-                createTarget();
-                spawnTimer = 0;
-                difficulty += 0.01; 
-            }
-
-            // Update targets
-            targets.forEach(t => {
-                t.x += t.vx;
-                t.y += t.vy;
-                if (t.x < t.radius || t.x > canvas.width - t.radius) t.vx *= -1;
-                if (t.y > canvas.height + t.radius) t.active = false;
-            });
-
-            // Update particles
-            particles.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 0.05;
-            });
-            particles = particles.filter(p => p.life > 0);
-
-            // Calculate Scaling to match object-fit: cover
-            // We need to know how the video is being displayed
-            const videoWidth = video.videoWidth || 640;
-            const videoHeight = video.videoHeight || 480;
-            const screenWidth = canvas.width;
-            const screenHeight = canvas.height;
-
-            const videoRatio = videoWidth / videoHeight;
-            const screenRatio = screenWidth / screenHeight;
-
-            let drawWidth, drawHeight, startX, startY;
-
-            if (screenRatio > videoRatio) {
-                // Screen is wider than video -> Video fits width, cropped height
-                drawWidth = screenWidth;
-                drawHeight = screenWidth / videoRatio;
-                startX = 0;
-                startY = (screenHeight - drawHeight) / 2;
-            } else {
-                // Screen is taller than video -> Video fits height, cropped width
-                drawHeight = screenHeight;
-                drawWidth = screenHeight * videoRatio;
-                startX = (screenWidth - drawWidth) / 2;
-                startY = 0;
-            }
-
-            // Collision Detection
-            if (detectedHands && detectedHands.length > 0) {
-                targets.forEach(t => {
-                    if (!t.active) return;
-                    
-                    detectedHands.forEach(handLandmarks => {
-                        // Check Index Finger Tip (8) and Wrist (0)
-                        [0, 8].forEach(idx => {
-                            const pt = handLandmarks[idx];
-                            
-                            // Map normalized coordinates to screen coordinates
-                            // Note: Video is mirrored via CSS transform: scaleX(-1)
-                            // MediaPipe returns unmirrored coordinates (0 is left of camera view)
-                            // If we display mirrored, visual left is camera right.
-                            // So we need to mirror the X coordinate: (1 - pt.x)
-                            
-                            const x = (1 - pt.x) * drawWidth + startX;
-                            const y = pt.y * drawHeight + startY;
-                            
-                            const dx = x - t.x;
-                            const dy = y - t.y;
-                            const dist = Math.sqrt(dx*dx + dy*dy);
-                            
-                            if (dist < t.radius + HIT_RADIUS) {
-                                t.active = false;
-                                score += 10;
-                                scoreEl.innerText = score;
-                                createExplosion(t.x, t.y, t.color);
-                                if (navigator.vibrate) navigator.vibrate(50);
-                            }
-                        });
-                    });
-                });
-            }
-            
-            targets = targets.filter(t => t.active);
-
-            // 3. Draw
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Hands
-            if (detectedHands && detectedHands.length > 0) {
-                detectedHands.forEach(handLandmarks => {
-                    // Draw connections
-                    ctx.save();
-                    ctx.strokeStyle = '#00d4ff';
-                    ctx.lineWidth = 4;
-                    
-                    if (window.HAND_CONNECTIONS) {
-                        for (const connection of window.HAND_CONNECTIONS) {
-                            const p1 = handLandmarks[connection[0]];
-                            const p2 = handLandmarks[connection[1]];
-                            
-                            const x1 = (1 - p1.x) * drawWidth + startX;
-                            const y1 = p1.y * drawHeight + startY;
-                            const x2 = (1 - p2.x) * drawWidth + startX;
-                            const y2 = p2.y * drawHeight + startY;
-                            
-                            ctx.beginPath();
-                            ctx.moveTo(x1, y1);
-                            ctx.lineTo(x2, y2);
-                            ctx.stroke();
-                        }
-                    }
-                    ctx.restore();
-
-                    // Draw Joints
-                    for (const pt of handLandmarks) {
-                        const x = (1 - pt.x) * drawWidth + startX;
-                        const y = pt.y * drawHeight + startY;
-                        
-                        ctx.beginPath();
-                        ctx.arc(x, y, 4, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#fff';
-                        ctx.fill();
-                    }
-                    
-                    // Highlight Index and Wrist
-                    [0, 8].forEach(idx => {
-                        const pt = handLandmarks[idx];
-                        const x = (1 - pt.x) * drawWidth + startX;
-                        const y = pt.y * drawHeight + startY;
-                        
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(x, y, HIT_RADIUS, 0, 2 * Math.PI);
-                        ctx.strokeStyle = '#00d4ff';
-                        ctx.lineWidth = 4;
-                        ctx.stroke();
-                        
-                        ctx.beginPath();
-                        ctx.arc(x, y, 20, 0, 2 * Math.PI);
-                        ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                        ctx.fill();
-                        ctx.restore();
-                    });
-                });
-            }
-
-            // Draw Targets & Particles
-            targets.forEach(t => {
-                ctx.beginPath();
-                ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
-                ctx.fillStyle = t.color;
-                ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            });
-
-            particles.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life;
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-            });
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-
-        loadModel();
-
-    </script>
+<script type="module" src="kinect/app.js"></script>
+<script src="../top_buttons.js"></script>
 </body>
-<script src="top_buttons.js"></script>
 </html>

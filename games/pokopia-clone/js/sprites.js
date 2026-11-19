@@ -580,3 +580,4 @@ function drawTile(ctx, tile, tx, ty, dx, dy, scale, frame, light){
     ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(dx,dy+scale-2,scale,2);
   }
 }
+export { PAL, SHINY, drawSprite, drawPlayer, drawIcon, drawTile };

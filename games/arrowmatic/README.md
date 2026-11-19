@@ -2,7 +2,7 @@
 
 > *L'eroe pigro che spara solo da fermo*
 
-Roguelite auto-archer | HTML5 Canvas | Zero dependencies | Single-file (68 KB)
+Roguelite auto-archer | HTML5 Canvas | Zero dependencies | Modular ES modules
 
 ---
 
@@ -21,8 +21,11 @@ Roguelite auto-archer | HTML5 Canvas | Zero dependencies | Single-file (68 KB)
 | Meta-Upgrades | 5 stats, 8 levels each, exponential cost scaling |
 | Chapters | 6 visual themes with gradient backgrounds |
 | Audio | 12+ procedural sound effects (Web Audio API, no files) |
-| Storage | Full localStorage persistence (coins, upgrades, loadout) |
-| Platform | HTML5 Canvas 2D, vanilla JS, zero dependencies |
+| Storage | Versioned localStorage save (v2) with validation, export/import |
+| Onboarding | 3-slide first-launch tutorial |
+| Live Ops | Daily reward with 7-day streak, daily missions, achievements |
+| Settings | Audio, haptics, reduced motion, EN/IT language, backup/reset |
+| Platform | HTML5 Canvas 2D, vanilla ES modules, zero dependencies |
 
 ### Tech Stack
 
@@ -30,9 +33,9 @@ Roguelite auto-archer | HTML5 Canvas | Zero dependencies | Single-file (68 KB)
 |-------|-----------|
 | Rendering | HTML5 Canvas 2D |
 | Audio | Web Audio API (oscillators + noise buffers) |
-| Language | Vanilla JavaScript ES6+ (single IIFE, strict mode) |
-| UI/HUD | HTML/CSS overlays with CSS variables |
-| Storage | localStorage |
+| Language | Vanilla JavaScript ES modules (10 modules in `js/`) |
+| UI/HUD | HTML/CSS overlays with CSS variables, native-game design system |
+| Storage | Versioned localStorage save with migration from v1 |
 | Mobile | Touch joystick, safe-area insets, viewport-fit=cover |
 | Framework | **None** — zero external dependencies |
 

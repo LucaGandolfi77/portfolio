@@ -1,42 +1,63 @@
-/*  precision-skating-game/sw.js  */
-var CACHE = 'ps-v1';
-var ASSETS = [
+/* Precision Skating — offline app shell */
+"use strict";
+
+const CACHE = 'ps-v2';
+const ASSETS = [
   './',
   './index.html',
-  './js/data.js',
-  './js/game.js',
-  './manifest.webmanifest'
+  './styles.css',
+  './manifest.webmanifest',
+  './icon.svg',
+  './js/main.js',
+  './js/config.js',
+  './js/state.js',
+  './js/engine.js',
+  './js/championship.js',
+  './js/render.js',
+  './js/audio.js',
+  './js/ui.js',
+  '../top_buttons.js',
+  '../i18n/en.json',
+  '../i18n/it.json'
 ];
 
-self.addEventListener('install', function (e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function (c) { return c.addAll(ASSETS); })
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-self.addEventListener('activate', function (e) {
-  e.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
-        keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })
-      );
-    })
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(function (r) {
-      return r || fetch(e.request).then(function (resp) {
-        var clone = resp.clone();
-        caches.open(CACHE).then(function (c) { c.put(e.request, clone); });
-        return resp;
-      });
-    }).catch(function () {
-      return caches.match('./index.html');
-    })
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match('./index.html').then(hit => hit || Response.error()))
+    );
+    return;
+  }
+  event.respondWith(
+    caches.match(event.request).then(hit => hit || fetch(event.request).then(response => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }))
   );
 });
