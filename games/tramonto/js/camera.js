@@ -1,131 +1,102 @@
-/**
- * Sunset Compass — Camera AR Mode
- * Tap to mark obstacles on the horizon
- */
-window.CameraAR = (function() {
-  let stream = null;
-  let obstacles = [];
-  let onObstacleAdd = null;
-  let onObstacleRemove = null;
+/* Sunset Compass — camera stream, obstacle storage and AR geometry */
 
-  async function start(videoEl, callback) {
-    onObstacleAdd = callback;
+const KEY = 'sunset_obstacles';
+
+export class CameraAR {
+  constructor() {
+    this.stream = null;
+    this.obstacles = [];
+    this.onAdd = null;
+    this.onRemove = null;
+  }
+
+  async start(videoEl) {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
       });
-      videoEl.srcObject = stream;
+      videoEl.srcObject = this.stream;
       await videoEl.play();
       return true;
     } catch (e) {
-      console.warn('Camera access denied:', e);
+      this.stream = null;
       return false;
     }
   }
 
-  function stop() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
+  stop() {
+    if (!this.stream) return;
+    this.stream.getTracks().forEach(track => track.stop());
+    this.stream = null;
   }
 
-  function isActive() { return stream !== null; }
+  isActive() { return this.stream !== null; }
 
-  function loadObstacles() {
+  load() {
     try {
-      const saved = localStorage.getItem('sunset_obstacles');
-      if (saved) obstacles = JSON.parse(saved);
-    } catch(e) { obstacles = []; }
-    return obstacles;
+      const raw = localStorage.getItem(KEY);
+      this.obstacles = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(this.obstacles)) this.obstacles = [];
+    } catch (e) { this.obstacles = []; }
+    return this.obstacles;
   }
 
-  function saveObstacles() {
-    localStorage.setItem('sunset_obstacles', JSON.stringify(obstacles));
+  save() {
+    try { localStorage.setItem(KEY, JSON.stringify(this.obstacles)); } catch (e) { /* ignore */ }
   }
 
-  function addObstacle(azimuth, altitude) {
-    const obs = { id: Date.now(), azimuth: Math.round(azimuth * 10) / 10, altitude: Math.round(altitude * 10) / 10, time: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) };
-    obstacles.push(obs);
-    saveObstacles();
-    if (onObstacleAdd) onObstacleAdd(obs);
+  add(azimuth, altitude) {
+    const obs = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      azimuth: Math.round(azimuth * 10) / 10,
+      altitude: Math.round(altitude * 10) / 10,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    this.obstacles.push(obs);
+    this.save();
+    this.onAdd?.(obs);
     return obs;
   }
 
-  function removeObstacle(id) {
-    obstacles = obstacles.filter(o => o.id !== id);
-    saveObstacles();
-    if (onObstacleRemove) onObstacleRemove(id);
+  remove(id) {
+    this.obstacles = this.obstacles.filter(o => o.id !== id);
+    this.save();
+    this.onRemove?.(id);
   }
 
-  function getObstacles() { return obstacles; }
+  clear() { this.obstacles = []; this.save(); }
+  list() { return this.obstacles; }
 
-  function clearObstacles() {
-    obstacles = [];
-    saveObstacles();
+  /** Nearest stored obstacle to the sun azimuth, within 30°. */
+  nearest(sunAz) {
+    let best = null, min = Infinity;
+    for (const obs of this.obstacles) {
+      let diff = Math.abs(sunAz - obs.azimuth);
+      if (diff > 180) diff = 360 - diff;
+      if (diff < min) { min = diff; best = obs; }
+    }
+    return min < 30 ? best : null;
   }
 
-  // Map sun position to screen coordinates (simplified: azimuth -> x, altitude -> y)
-  function sunToScreen(sunAz, sunAlt, heading, screenW, screenH) {
-    // Field of view: ~60 degrees horizontal
+  /** Screen position for a sun/obstacle in a ~60° horizontal FOV. */
+  sunToScreen(azimuth, altitude, heading, w, h) {
     const fov = 60;
-    const relAz = sunAz - heading;
-    // Wrap to -180..180
-    let rel = relAz;
-    if (rel > 180) rel -= 360;
-    if (rel < -180) rel += 360;
-
-    // Only show if within FOV
+    let rel = azimuth - heading;
+    rel = ((rel + 180) % 360 + 360) % 360 - 180;
     if (Math.abs(rel) > fov / 2) return null;
-
-    const x = (rel / (fov / 2)) * (screenW / 2) + screenW / 2;
-    // Map altitude: -10 (below) to +60 (high) -> screen Y
-    const y = screenH - ((sunAlt + 10) / 70) * screenH;
-
-    return { x, y };
+    return {
+      x: (rel / (fov / 2)) * (w / 2) + w / 2,
+      y: h - ((altitude + 10) / 70) * h
+    };
   }
 
-  // Draw sun path arc on SVG overlay
-  function drawSunPath(svgEl, sunPositions, heading, screenW, screenH) {
-    let svg = '';
-    const points = [];
-
-    sunPositions.forEach(sp => {
-      const pos = sunToScreen(sp.azimuth, sp.altitude, heading, screenW, screenH);
-      if (pos) {
-        points.push({ ...pos, alt: sp.altitude, time: sp.time, isNow: sp.isNow || false });
-      }
-    });
-
-    if (points.length < 2) {
-      svgEl.innerHTML = svg;
-      return;
-    }
-
-    // Draw path
-    let pathD = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 1; i < points.length; i++) {
-      pathD += ` L ${points[i].x} ${points[i].y}`;
-    }
-    svg += `<path d="${pathD}" fill="none" stroke="#f0a030" stroke-width="2" opacity="0.5" stroke-dasharray="6,4"/>`;
-
-    // Draw points
-    points.forEach(p => {
-      const r = p.isNow ? 5 : 2;
-      const color = p.isNow ? '#f0a030' : '#c08020';
-      svg += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${color}" opacity="${p.isNow ? 1 : 0.5}"/>`;
-      if (p.isNow) {
-        svg += `<circle cx="${p.x}" cy="${p.y}" r="10" fill="none" stroke="#f0a030" stroke-width="1" opacity="0.3"/>`;
-      }
-    });
-
-    svgEl.innerHTML = svg;
+  /** Inverse of sunToScreen, used when tapping the horizon. */
+  screenToWorld(x, y, heading, w, h) {
+    const relAz = ((x - w / 2) / (w / 2)) * 30;
+    return {
+      azimuth: ((heading + relAz) % 360 + 360) % 360,
+      altitude: ((h - y) / h) * 70 - 10
+    };
   }
-
-  return {
-    start, stop, isActive,
-    loadObstacles, saveObstacles,
-    addObstacle, removeObstacle, getObstacles, clearObstacles,
-    sunToScreen, drawSunPath
-  };
-})();
+}
