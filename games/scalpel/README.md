@@ -83,9 +83,23 @@ games/scalpel/
 | UI | showOverlay, showAccuracy, addScore, showResults |
 | Save | saveGame, load, updateSaveStats |
 
+## Meta Layer (carriera e missioni)
+
+Sopra al motore storico è stato aggiunto un layer modulare che non modifica la chirurgia:
+
+- `css/modern.css` — design system medico-sci-fi, responsive, accessibile
+- `js/meta/i18n.js` — dizionario IT/EN autonomo
+- `js/meta/profile.js` — profilo chirurgo con XP, livelli, crediti, titoli e statistiche
+- `js/meta/missions.js` — missioni giornaliere, settimanali, permanenti, contratti per capitolo e battle pass a 20 livelli
+- `js/meta/hooks.js` — eventi dal motore (`scalpel:event`) → profilo e missioni
+- `js/meta/ui.js` — pannelli Missioni, Profilo, Statistiche, Impostazioni e Contract Mode
+- `js/meta/main.js` — bootstrap, PWA events e scorciatoie `?panel=...`
+
+Il menu include la sezione **CAREER & MISSIONS**. Modalità Contract applica modificatori (tempo ridotto, tremore, visione ridotta, punteggio doppio) e assegna XP/crediti extra. Il salvataggio meta usa `scalpel_meta_v1` ed è separato da `scalpel_save`.
+
 ## Menu Principale
 
-Il menu è organizzato in 3 sezioni per facile accesso:
+Il menu è organizzato in 4 sezioni per facile accesso:
 
 ```
 ┌─────────────────────────────────┐
@@ -97,6 +111,13 @@ Il menu è organizzato in 3 sezioni per facile accesso:
 │  [↻ CONTINUE]                   │
 │  [📅 DAILY SURGERY]             │
 │  [📖 MEDICAL JOURNAL]           │
+│                                 │
+│  ─── CAREER & MISSIONS ─────── │
+│  [🎯 MISSIONS]                  │
+│  [👤 SURGEON PROFILE]           │
+│  [📋 CONTRACT MODE]             │
+│  [📊 CAREER STATS]              │
+│  [⚙️ SETTINGS]                  │
 │                                 │
 │  ─── CHALLENGE MODE ────────── │
 │  [⚡ SPEED RUN]                 │
