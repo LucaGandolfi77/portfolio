@@ -17,8 +17,8 @@ const ASSETS = [
   './js/audio.js',
   './js/ui.js',
   '../top_buttons.js',
-  '../i18n/en.json',
-  '../i18n/it.json'
+  '../../i18n/en.json',
+  '../../i18n/it.json'
 ];
 
 self.addEventListener('install', event => {

@@ -1,6 +1,7 @@
 const CACHE = 'forza4-v2';
 const ASSETS = [
   './forza4.html', './forza4/styles.css',
+  './forza4/icons/icon-192.png', './forza4/icons/icon-512.png', './forza4/icons/icon-maskable.png', './forza4/icons/icon.svg',
   './forza4/js/ai.js', './forza4/js/effects.js', './forza4/js/main.js',
   './forza4/js/rules.js', './forza4/js/state.js', './forza4/js/ui.js',
   './_kit/storage.js', './_kit/progression.js', './_kit/meta-layer.js', './top_buttons.js'

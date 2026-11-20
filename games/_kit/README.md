@@ -12,6 +12,19 @@ Condividi le fondamenta tra i giochi del portfolio. Ogni modulo è opzionale: im
 | `progression.js` | XP, livelli, unlock, streak, achievement |
 | `pwa.js` | registrazione service worker, canvas DPR-aware |
 | `test-harness.js` | assert minimale per `node --test` |
+| `campaign.js` | classifica ELO locale, rank, streak, sfida giornaliera |
+| `meta-layer.js` | missioni, achievement e XP condivisi tra i giochi |
+| `arcade.js` + `arcade.css` | guscio arcade completo (menu, modalità, HUD, record) |
+| `a11y.css` | baseline accessibilità (focus visibile, reduced-motion) |
+
+## Verifiche
+
+```bash
+node games/_kit/test/run-all.mjs
+```
+
+Esegue tutte le suite di logica, controlla che ogni path del catalogo esista e che
+il precache di ogni service worker sia completo.
 
 ## Uso
 

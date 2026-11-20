@@ -8,7 +8,7 @@ const PRECACHE = [
   './index.html',
   './styles.css',
   './manifest.webmanifest',
-  './vendor/three.module.js',
+  '../_vendor/three.module.js',
   './src/main.js',
   './src/scene.js',
   './src/combat.js',
