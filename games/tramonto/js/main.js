@@ -1,286 +1,298 @@
-(function(){
-  const $ = id => document.getElementById(id);
-  let mode = 'compass';
-  let gpsPos = null;
-  let heading = 0;
-  let updateTimer = null;
-  let arActive = false;
+/* Sunset Compass — bootstrap, sensor orchestration and UI router */
 
-  // === STARS BACKGROUND ===
-  function createStars() {
-    const c = $('stars');
-    for (let i = 0; i < 60; i++) {
-      const s = document.createElement('div');
-      s.className = 'star';
-      s.style.left = Math.random() * 100 + '%';
-      s.style.top = Math.random() * 100 + '%';
-      s.style.animationDelay = Math.random() * 3 + 's';
-      s.style.opacity = Math.random() * 0.5 + 0.1;
-      c.appendChild(s);
-    }
+import { DEFAULT_POS } from './config.js';
+import { t, getLang, setLang, syncFromStorage, onLanguageChange } from './i18n.js';
+import { calcSunAzAlt, getSunTimes, getSunAtTime, getEventDates, nextEvent, phaseOf } from './sun.js';
+import { Compass, formatCoord } from './compass.js';
+import { CameraAR } from './camera.js';
+import * as Tracker from './tracker.js';
+import { applyTheme, createStars, renderCompass, renderAR, setCountdownRing } from './render.js';
+
+const $ = id => document.getElementById(id);
+const compass = new Compass();
+const camera = new CameraAR();
+
+let started = false;
+let mode = 'compass';
+let position = { ...DEFAULT_POS };
+let heading = 0;
+let demo = false;
+let loopTimer = null;
+let currentPhase = 'night';
+let lang = getLang();
+
+/* ---------- i18n ---------- */
+function applyLanguage() {
+  lang = getLang();
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-sa-i18n]').forEach(el => { el.textContent = t(el.dataset.saI18n); });
+  $('btn-lang').textContent = lang === 'it' ? 'EN' : 'IT';
+  $('perm-private').innerHTML = t('permPrivate');
+  if (started) {
+    refreshAll();
   }
+}
 
-  // === PERMISSIONS ===
-  async function requestPermissions() {
-    // GPS
-    if (navigator.geolocation) {
-      try {
-        const pos = await new Promise((res, rej) => {
-          navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 });
+onLanguageChange(() => applyLanguage());
+
+/* ---------- views ---------- */
+function showView(name) {
+  ['view-perm', 'view-compass', 'view-camera', 'view-tracker'].forEach(id => {
+    const el = $(id);
+    if (el) el.style.display = 'none';
+  });
+  if (name === 'perm') {
+    $('view-perm').style.display = 'flex';
+    return;
+  }
+  $('view-main').style.display = 'flex';
+  const view = $('view-' + name);
+  if (view) view.style.display = name === 'camera' ? 'block' : 'flex';
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.mode === name);
+  });
+  document.querySelector('.nav').dataset.active = name;
+}
+
+function switchMode(next) {
+  mode = next;
+  if (next !== 'camera' && camera.isActive()) camera.stop();
+  showView(next);
+  if (next === 'camera') startCamera();
+  if (next === 'tracker') refreshTracker();
+  if (next === 'compass') refreshCompass();
+}
+
+/* ---------- sensors ---------- */
+async function startSensors() {
+  // iOS requires the orientation request to happen inside a user gesture.
+  compass.startOrientation(h => { heading = h; onHeading(); });
+
+  let fix = null;
+  if (navigator.geolocation) {
+    try {
+      fix = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 8000, maximumAge: 10000
         });
-        gpsPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-      } catch(e) {
-        // Fallback: Milan
-        gpsPos = { lat: 45.4642, lon: 9.1900 };
-      }
-    } else {
-      gpsPos = { lat: 45.4642, lon: 9.1900 };
-    }
-
-    // Orientation (iOS needs user gesture)
-    return true;
-  }
-
-  // === UI ===
-  function showView(name) {
-    ['view-perm','view-compass','view-camera','view-tracker'].forEach(id => {
-      $(id).style.display = 'none';
-    });
-    if (name === 'perm') $('view-perm').style.display = '';
-    else {
-      $('view-main').style.display = '';
-      $('view-' + name).style.display = name === 'compass' ? '' : name === 'camera' ? '' : '';
-      if (name === 'tracker') $('view-tracker').style.display = '';
-    }
-  }
-
-  function switchMode(m) {
-    mode = m;
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
-    $('nav-' + m).classList.add('on');
-
-    // Stop camera if leaving camera mode
-    if (m !== 'camera' && arActive) {
-      CameraAR.stop();
-      arActive = false;
-    }
-
-    showView(m);
-
-    if (m === 'camera') startCameraAR();
-    if (m === 'tracker') updateTracker();
-  }
-
-  function updateClock() {
-    const now = new Date();
-    $('clock').textContent = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-
-  function updateCountdown() {
-    if (!gpsPos) return;
-    const now = new Date();
-    const times = SunCalc.getSunTimes(gpsPos.lat, gpsPos.lon, now);
-
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const sunsetMinutes = times.sunset.hours * 60 + times.sunset.minutes;
-    const diff = sunsetMinutes - nowMinutes;
-
-    if (diff > 0) {
-      const h = Math.floor(diff / 60);
-      const m = Math.floor(diff % 60);
-      $('cd-time').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      $('cd-sub').textContent = `Tramonto alle ${times.sunset.string}`;
-    } else {
-      $('cd-time').textContent = '🌙';
-      const nextSunrise = times.sunrise.hours * 60 + times.sunrise.minutes;
-      const toRise = (24 * 60 - nowMinutes) + nextSunrise;
-      const rh = Math.floor(toRise / 60);
-      const rm = Math.floor(toRise % 60);
-      $('cd-sub').textContent = `Alba tra ${rh}h ${rm}m (${times.sunrise.string})`;
-    }
-  }
-
-  function updateLocation() {
-    if (gpsPos) {
-      $('loc-text').textContent = Compass.formatCoord(gpsPos.lat, gpsPos.lon);
-    }
-  }
-
-  // === COMPASS UPDATE ===
-  function onHeading(h) {
-    heading = h;
-    if (mode === 'compass' && gpsPos) {
-      const now = new Date();
-      const sunPos = SunCalc.calcSunAzAlt(gpsPos.lat, gpsPos.lon, now);
-      const obstacles = CameraAR.getObstacles();
-      const nearestObs = findNearestObstacle(sunPos.azimuth, obstacles);
-      Compass.renderCompassSVG($('compass-svg'), sunPos.azimuth, sunPos.altitude, nearestObs?.azimuth, nearestObs?.altitude, h);
-    }
-    if (mode === 'camera' && arActive) {
-      updateAROverlay();
-    }
-  }
-
-  function findNearestObstacle(sunAz, obstacles) {
-    let nearest = null;
-    let minDist = Infinity;
-    obstacles.forEach(obs => {
-      let diff = Math.abs(sunAz - obs.azimuth);
-      if (diff > 180) diff = 360 - diff;
-      if (diff < minDist) { minDist = diff; nearest = obs; }
-    });
-    return minDist < 30 ? nearest : null;
-  }
-
-  // === CAMERA AR ===
-  async function startCameraAR() {
-    const ok = await CameraAR.start($('ar-video'), (obs) => {
-      updateARInfo();
-    });
-    arActive = ok;
-    if (!ok) {
-      $('ar-tap').innerHTML = '<div style="text-align:center;padding:40px;color:var(--dim)">📷 Camera non disponibile<br><small>Abilita i permessi della fotocamera</small></div>';
-    }
-    updateARInfo();
-  }
-
-  function updateAROverlay() {
-    if (!gpsPos || !arActive) return;
-    const now = new Date();
-    const sunPos = SunCalc.calcSunAzAlt(gpsPos.lat, gpsPos.lon, now);
-
-    // Generate sun path for next 2 hours (every 10 min)
-    const pathPoints = [];
-    const tzOffset = -now.getTimezoneOffset() / 60;
-    for (let m = -30; m <= 120; m += 10) {
-      const future = new Date(now.getTime() + m * 60000);
-      const futureUTC = future.getUTCHours() + future.getUTCMinutes() / 60;
-      const sp = SunCalc.getSunAtTime(gpsPos.lat, gpsPos.lon, future, futureUTC);
-      pathPoints.push({
-        azimuth: sp.azimuth,
-        altitude: sp.altitude,
-        time: future.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
-        isNow: m === 0
       });
-    }
-
-    // Get screen dimensions from SVG
-    const svgRect = $('ar-svg').getBoundingClientRect();
-    const w = svgRect.width || 400;
-    const h = svgRect.height || 400;
-
-    CameraAR.drawSunPath($('ar-svg'), pathPoints, heading, w, h);
-
-    // Update info badges
-    $('ar-sun-info').textContent = `☀️ ${Math.round(sunPos.altitude)}° ${Compass.compassPoint(sunPos.azimuth)}`;
-    const obs = CameraAR.getObstacles();
-    $('ar-horizon-info').textContent = `🏔️ ${obs.length} ostacol${obs.length === 1 ? 'o' : 'i'}`;
+    } catch (e) { /* fallback below */ }
   }
 
-  function updateARInfo() {
-    if (!gpsPos) return;
-    const now = new Date();
-    const sunPos = SunCalc.calcSunAzAlt(gpsPos.lat, gpsPos.lon, now);
-    $('ar-sun-info').textContent = `☀️ ${Math.round(sunPos.altitude)}° ${Compass.compassPoint(sunPos.azimuth)}`;
-    const obs = CameraAR.getObstacles();
-    $('ar-horizon-info').textContent = `🏔️ ${obs.length} ostacol${obs.length === 1 ? 'o' : 'i'}`;
+  if (fix) {
+    position = { lat: fix.coords.latitude, lon: fix.coords.longitude, accuracy: fix.coords.accuracy };
+  } else {
+    demo = true;
+    position = { ...DEFAULT_POS };
   }
 
-  function handleARTap(e) {
-    if (!gpsPos) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-    const w = rect.width;
-    const h = rect.height;
+  compass.startGPS(pos => { position = pos; demo = false; refreshAll(); });
+  refreshAll();
+}
 
-    // Convert screen position to azimuth/altitude
-    const fov = 60;
-    const relAz = ((x - w/2) / (w/2)) * (fov / 2);
-    const azimuth = (heading + relAz + 360) % 360;
-    const altitude = ((h - y) / h) * 70 - 10;
-
-    const obs = CameraAR.addObstacle(azimuth, altitude);
-    updateARInfo();
-
-    // Show confirmation
-    const marker = document.createElement('div');
-    marker.className = 'ar-obstacle fade-in';
-    marker.style.left = x + 'px';
-    marker.style.top = y + 'px';
-    marker.onclick = () => { marker.remove(); CameraAR.removeObstacle(obs.id); updateARInfo(); };
-    e.currentTarget.parentElement.appendChild(marker);
-    setTimeout(() => marker.style.opacity = '0.5', 2000);
+async function startCamera() {
+  const ok = await camera.start($('ar-video'));
+  if (!ok) {
+    camera.stop();
+    $('ar-fallback').classList.remove('hidden');
+    $('ar-fallback-title').textContent = t('cameraUnavailable');
+    $('ar-fallback-text').textContent = t('cameraHint');
+  } else {
+    $('ar-fallback').classList.add('hidden');
   }
+  refreshAR();
+}
 
-  // === TRACKER ===
-  function updateTracker() {
-    if (!gpsPos) return;
-    const data = Tracker.generateTimeline(gpsPos.lat, gpsPos.lon, new Date());
-    Tracker.renderTimeline($('trail-scroll'), data);
-  }
+/* ---------- live data ---------- */
+function onHeading() {
+  if (mode === 'compass') refreshCompass();
+  if (mode === 'camera') refreshAR();
+}
 
-  // === MODAL ===
-  function showModal(icon, title, txt, buttons) {
-    $('modal-icon').textContent = icon;
-    $('modal-title').textContent = title;
-    $('modal-txt').textContent = txt;
-    $('modal-acts').innerHTML = buttons.map((b, i) => `<button class="btn ${b.cls||''}" data-bi="${i}">${b.label}</button>`).join('');
-    $('modal-acts').querySelectorAll('button').forEach(btn => {
-      btn.onclick = () => { buttons[+btn.dataset.bi].fn(); $('modal').classList.remove('on'); };
+function sunNow() {
+  return calcSunAzAlt(position.lat, position.lon, new Date());
+}
+
+function refreshCompass() {
+  if (!started) return;
+  const sun = sunNow();
+  const obstacle = camera.nearest(sun.azimuth);
+  renderCompass($('compass-svg'), {
+    sunAz: sun.azimuth, sunAlt: sun.altitude,
+    obstacle, heading, phase: currentPhase
+  });
+  $('sun-readout').textContent = `${t('sun')} ${Math.round(sun.altitude)}° · ${Math.round(sun.azimuth)}°`;
+}
+
+function refreshAR() {
+  if (!started || mode !== 'camera') return;
+  const now = new Date();
+  const points = [];
+  for (let m = -30; m <= 120; m += 10) {
+    const future = new Date(now.getTime() + m * 60000);
+    const utcH = future.getUTCHours() + future.getUTCMinutes() / 60;
+    const sp = getSunAtTime(position.lat, position.lon, future, utcH);
+    points.push({
+      az: sp.azimuth, alt: sp.altitude, time: future.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isNow: m === 0
     });
-    $('modal').classList.add('on');
+  }
+  const rect = $('ar-svg').getBoundingClientRect();
+  const w = rect.width || 400, h = rect.height || 400;
+  $('ar-svg').setAttribute('viewBox', `0 0 ${w} ${h}`);
+  renderAR($('ar-svg'), {
+    points: points.map(p => {
+      const screen = camera.sunToScreen(p.az, p.alt, heading, w, h);
+      return screen ? { ...screen, alt: p.alt, time: p.time, isNow: p.isNow } : null;
+    }).filter(Boolean),
+    obstacles: camera.list(),
+    heading, phase: currentPhase, w, h
+  });
+  const sun = sunNow();
+  $('ar-sun-info').textContent = `☀ ${Math.round(sun.altitude)}°`;
+  const n = camera.list().length;
+  $('ar-obs-info').textContent = `🏔 ${n} ${n === 1 ? t('obstacleOne') : t('obstacles')}`;
+}
+
+function refreshTracker() {
+  if (!started) return;
+  Tracker.update($('trail-scroll'), position.lat, position.lon, camera.list());
+}
+
+function fmtDuration(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = n => String(n).padStart(2, '0');
+  return d > 0 ? `${d}${t('daysShort')} ${pad(h)}:${pad(m)}`
+               : `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function refreshCountdown() {
+  if (!started) return;
+  const now = Date.now();
+  const events = getEventDates(position.lat, position.lon, new Date());
+  const times = getSunTimes(position.lat, position.lon, new Date());
+  const sunset = nextEvent(events, 'sunset', now);
+  const sunrise = nextEvent(events, 'sunrise', now);
+
+  if (sunset && (!sunrise || sunset.time < sunrise.time)) {
+    const remaining = sunset.time - now;
+    $('cd-time').textContent = fmtDuration(remaining);
+    $('cd-sub').textContent = `${t('sunsetAt')} ${times.sunset.string}`;
+    $('cd-label').textContent = t('nextSunset');
+    setCountdownRing($('cd-ring'), 1 - remaining / (18 * 3600000));
+    $('countdown-box').classList.remove('is-night');
+  } else if (sunrise) {
+    const remaining = sunrise.time - now;
+    $('cd-time').textContent = '🌙 ' + fmtDuration(remaining);
+    $('cd-sub').textContent = `${t('sunriseIn')} ${times.sunrise.string}`;
+    $('cd-label').textContent = t('nightFallback');
+    setCountdownRing($('cd-ring'), 1 - remaining / (12 * 3600000));
+    $('countdown-box').classList.add('is-night');
+  }
+}
+
+function refreshAll() {
+  if (!started) return;
+  $('loc-text').textContent = demo ? t('gpsDenied') : formatCoord(position.lat, position.lon);
+  const sun = sunNow();
+  currentPhase = phaseOf(sun.altitude);
+  applyTheme(currentPhase, sun.altitude);
+  $('phase-chip').textContent = t(currentPhase);
+  refreshCountdown();
+  refreshCompass();
+  if (mode === 'camera') refreshAR();
+  if (mode === 'tracker') refreshTracker();
+}
+
+function tick() {
+  syncFromStorage();
+  $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  refreshAll();
+}
+
+/* ---------- modal ---------- */
+function showModal(icon, title, text, buttons) {
+  $('modal-icon').textContent = icon;
+  $('modal-title').textContent = title;
+  $('modal-text').textContent = text;
+  $('modal-actions').innerHTML = buttons.map((b, i) =>
+    `<button class="btn ${b.cls || ''}" data-i="${i}">${b.label}</button>`).join('');
+  $('modal-actions').querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => { buttons[+btn.dataset.i].fn?.(); closeModal(); };
+  });
+  $('modal').classList.add('on');
+}
+function closeModal() { $('modal').classList.remove('on'); }
+
+/* ---------- AR markers ---------- */
+function handleARTap(e) {
+  if (!camera.isActive()) return;
+  const rect = $('ar-tap').getBoundingClientRect();
+  const x = (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left;
+  const y = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top;
+  const world = camera.screenToWorld(x, y, heading, rect.width, rect.height);
+  camera.add(world.azimuth, world.altitude);
+  toast('🏔 ' + Math.round(world.altitude) + '°');
+  refreshAR();
+}
+
+let toastTimer = null;
+function toast(text) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1400);
+}
+
+/* ---------- init ---------- */
+function init() {
+  createStars($('stars'));
+  applyLanguage();
+  showView('perm');
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
-  // === MAIN LOOP ===
-  function startUpdateLoop() {
-    updateClock();
-    updateCountdown();
-    updateLocation();
-    setInterval(() => {
-      updateClock();
-      updateCountdown();
-    }, 1000);
-  }
-
-  // === INIT ===
-  async function init() {
-    createStars();
-
-    $('btn-start').onclick = async () => {
-      $('btn-start').textContent = 'Caricamento...';
-      $('btn-start').disabled = true;
-      await requestPermissions();
-
-      // Start compass
-      Compass.startOrientation(onHeading);
-      Compass.startGPS((pos) => {
-        gpsPos = pos;
-        updateLocation();
-        updateCountdown();
-        if (mode === 'compass') onHeading(heading);
-        if (mode === 'tracker') updateTracker();
-      });
-
-      CameraAR.loadObstacles();
-      showView('compass');
-      switchMode('compass');
-      startUpdateLoop();
-    };
-
-    // Nav
-    $('nav-compass').onclick = () => switchMode('compass');
-    $('nav-camera').onclick = () => switchMode('camera');
-    $('nav-tracker').onclick = () => switchMode('tracker');
-
-    // AR tap
-    $('ar-tap').onclick = handleARTap;
-
-    // Service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  $('btn-start').addEventListener('click', async () => {
+    const btn = $('btn-start');
+    btn.textContent = t('loading');
+    btn.disabled = true;
+    await startSensors();
+    started = true;
+    camera.load();
+    showView('compass');
+    switchMode('compass');
+    tick();
+    if (demo) {
+      showModal('📍', t('demoTitle'), t('demoText'), [{ label: t('ok'), cls: 'sun' }]);
     }
-  }
+    if (!loopTimer) loopTimer = setInterval(tick, 1000);
+  });
 
-  init();
-})();
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+  });
+
+  $('btn-lang').addEventListener('click', () => {
+    setLang(lang === 'it' ? 'en' : 'it');
+  });
+
+  $('ar-tap').addEventListener('click', handleARTap);
+  $('btn-clear-obs').addEventListener('click', () => {
+    camera.clear();
+    refreshAR();
+    toast(t('cleared'));
+  });
+  $('modal-close').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
+}
+
+init();
