@@ -5,6 +5,20 @@
   const save = window.QuoteSmithSave;
   const analytics = window.QuoteSmithAnalytics;
   const M = window.QuoteSmithMonetization;
+
+  let depth = null;
+  import('../_kit/meta-layer.js').then(({ createMetaLayer }) => {
+    depth = createMetaLayer({
+      key: 'quotesmith.meta.v1',
+      missions: [
+        { id: 'rounds10', event: 'round', goal: 10, label: '10 rounds', reward: 60 },
+        { id: 'perfect1', event: 'perfect', goal: 1, label: 'Perfect round', reward: 120 }
+      ],
+      achievements: [
+        { id: 'correct100', event: 'correct', goal: 100, label: '100 correct quotes', reward: 200 }
+      ]
+    });
+  }).catch(() => {});
   let database = [];
   const state = {
     lang: 'en',
@@ -236,6 +250,7 @@
     state.answers[state.questionIndex] = correct;
     if (correct) {
       state.score += 1;
+      depth?.record('correct');
       state.streak += 1;
       state.bestRoundStreak = Math.max(state.bestRoundStreak, state.streak);
       if (navigator.vibrate) navigator.vibrate(25);
@@ -266,10 +281,14 @@
   function finishRound() {
     saveBest();
     finishRoundAndTrack();
+    const unlocked = depth
+      ? [...depth.record('round'), ...(state.score === state.round.length ? depth.record('perfect') : [])]
+      : [];
     $('result-score').textContent = state.score;
     $('result-streak').textContent = state.bestRoundStreak;
     $('result-best').textContent = `${state.bestScore}/10`;
     $('result-rating').textContent = engine.scoreLabel(state.score, state.round.length, state.lang);
+    if (unlocked.length) $('result-rating').textContent += ' · ★ ' + depth.announce(unlocked);
     const wrapper = $('review-list');
     wrapper.innerHTML = '';
     state.round.forEach((question, index) => {
