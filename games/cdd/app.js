@@ -7,6 +7,25 @@ import { initInput } from './input.js';
 import { sfx, ensureAudio } from './audio.js';
 import * as FX from './effects.js';
 import { UI } from './ui.js';
+import { createMetaLayer } from '../_kit/meta-layer.js';
+
+const depth = createMetaLayer({
+  key: 'cdd.meta.v1',
+  missions: [
+    { id: 'coins100', event: 'coin', goal: 100, label: '100 coins', reward: 60 },
+    { id: 'level3', event: 'level', goal: 3, label: 'Reach level 3', reward: 80 },
+    { id: 'near20', event: 'near', goal: 20, label: '20 near misses', reward: 50 }
+  ],
+  achievements: [
+    { id: 'runs5', event: 'gameover', goal: 5, label: '5 runs', reward: 40 },
+    { id: 'coins500', event: 'coin', goal: 500, label: '500 coins total', reward: 120 }
+  ]
+});
+
+function announceDepth(unlocked) {
+  if (!unlocked.length) return;
+  FX.floatText(world.dims.w / 2, world.dims.h * 0.32, depth.announce(unlocked), '#ffd166');
+}
 
 let paused = false;
 let last = 0;
@@ -105,12 +124,14 @@ function onEvent(event) {
       FX.burst(pos.x, pos.y + 6, '#a5b4fc', 5, 60);
       break;
     case 'coin':
+      announceDepth(depth.record('coin'));
       FX.burst(pos.x, pos.y - 40, '#ffd166', 9, 120);
       FX.floatText(pos.x, pos.y - 60, '+' + (100 * event.multiplier), '#ffd166');
       if (event.combo % 5 === 0) { sfx('combo'); FX.floatText(pos.x, pos.y - 88, '×' + event.multiplier, '#a98bff'); }
       else sfx('coin');
       break;
     case 'near':
+      announceDepth(depth.record('near'));
       sfx('near');
       FX.floatText(pos.x, pos.y - 70, '+30 NEAR', '#6ee7ff');
       break;
@@ -128,10 +149,12 @@ function onEvent(event) {
       sfx('shield');
       break;
     case 'level':
+      announceDepth(depth.record('level'));
       FX.floatText(world.dims.w / 2, world.dims.horizon + 40, 'LEVEL ' + event.level, '#5ef0a8');
       sfx('level');
       break;
     case 'gameover':
+      announceDepth(depth.record('gameover'));
       saveSession(world.session());
       const record = setHighScore(world.score);
       ui.setBest(meta.highScore);

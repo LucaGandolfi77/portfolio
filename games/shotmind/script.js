@@ -9,6 +9,21 @@
   const G = window.ShotmindGame;
   const $ = (id) => document.getElementById(id);
 
+  /* Meta progression — dynamically imported so classic scripts can use the kit */
+  let depth = null;
+  import('../_kit/meta-layer.js').then(({ createMetaLayer }) => {
+    depth = createMetaLayer({
+      key: 'shotmind.meta.v1',
+      missions: [
+        { id: 'wins3', event: 'win', goal: 3, label: '3 wins', reward: 60 },
+        { id: 'games10', event: 'game', goal: 10, label: '10 games', reward: 80 }
+      ],
+      achievements: [
+        { id: 'streak5', event: 'win', goal: 5, label: '5 wins in a row', reward: 150 }
+      ]
+    });
+  }).catch(() => {});
+
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const COLORS = ['#ffd23f', '#ff3d6e', '#2ec27e', '#8f7bff', '#ff9f1a', '#41d6ff'];
   const CONFETTI_EMOJI = ['🍺', '🥃', '✨'];
@@ -366,6 +381,7 @@
   function endGame(won) {
     state.running = false;
     keepAwake(false);
+    const unlocked = depth ? [...depth.record('game'), ...(won ? depth.record('win') : [])] : [];
     const used = state.attempt;
     const gName = state.players[state.guesser].name;
     const mName = state.mode === 'maker' ? state.players[state.maker].name : 'l\u2019App';
@@ -397,6 +413,12 @@
       item.innerHTML = '<span class="who">' + r.who + '</span><span class="what">' + r.what + '</span>';
       box.appendChild(item);
     });
+    if (unlocked.length) {
+      const item = document.createElement('div');
+      item.className = 'recap-item hot';
+      item.innerHTML = '<span class="who">★ META</span><span class="what">' + depth.announce(unlocked) + '</span>';
+      $('endRecap').appendChild(item);
+    }
     renderVictims();
     renderScoreStrip();
     show('screen-end');

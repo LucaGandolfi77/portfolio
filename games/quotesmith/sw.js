@@ -1,7 +1,8 @@
-const CACHE_NAME = 'quotesmith-v8';
+const CACHE_NAME = 'quotesmith-v9';
 const ASSETS = [
   './', './index.html', './style.css', './engine.js', './data.js', './script.js',
-  './src/touch.js', './src/save.js', './src/analytics.js', './quotes.json', './manifest.webmanifest', './icons/icon.svg'
+  './src/touch.js', './src/save.js', './src/analytics.js', './quotes.json', './manifest.webmanifest', './icons/icon.svg',
+  '../_kit/storage.js', '../_kit/progression.js', '../_kit/meta-layer.js'
 ];
 
 self.addEventListener('install', (event) => {

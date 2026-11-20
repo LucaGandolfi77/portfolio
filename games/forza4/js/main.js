@@ -5,6 +5,19 @@ import { chooseMove, hintMove } from './ai.js';
 import { state, save, setSetting, recordResult, resetStats } from './state.js';
 import { initEffects, sfx, confetti, shake } from './effects.js';
 import * as UI from './ui.js';
+import { createMetaLayer } from '../../_kit/meta-layer.js';
+
+const depth = createMetaLayer({
+  key: 'forza4.meta.v1',
+  missions: [
+    { id: 'wins3', event: 'win', goal: 3, label: '3 wins', reward: 60 },
+    { id: 'games10', event: 'game', goal: 10, label: '10 matches', reward: 80 }
+  ],
+  achievements: [
+    { id: 'hardwin', event: 'hardwin', goal: 1, label: 'Beat the legend AI', reward: 150 },
+    { id: 'wins25', event: 'win', goal: 25, label: '25 wins', reward: 200 }
+  ]
+});
 
 let board = createBoard();
 let current = P1;
@@ -66,6 +79,13 @@ function refresh() {
 }
 
 function endGame(winner) {
+  const playerWon = winner === P1;
+  const unlocked = depth.record('game');
+  if (playerWon) {
+    unlocked.push(...depth.record('win'));
+    if (state.settings.difficulty === 'hard') unlocked.push(...depth.record('hardwin'));
+  }
+  if (unlocked.length) UI.toast(depth.announce(unlocked));
   gameActive = false;
   thinking = false;
   clearTimeout(aiTimer);

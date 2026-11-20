@@ -16,6 +16,9 @@ const ASSETS = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  '../_kit/storage.js',
+  '../_kit/progression.js',
+  '../_kit/meta-layer.js',
 ];
 
 self.addEventListener('install', (event) => {
