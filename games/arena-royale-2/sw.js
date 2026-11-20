@@ -21,7 +21,7 @@ const ASSETS = [
   "./js/storm.js",
   "./js/input.js",
   "./js/ui.js",
-  "./js/vendor/three.module.js",
+  "../_vendor/three.module.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"

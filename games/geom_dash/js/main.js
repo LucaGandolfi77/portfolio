@@ -60,6 +60,19 @@ function startRun() {
 function finishRun(won) {
   if (!running) return;
   running = false;
+  Promise.all([
+    import('../../_kit/meta-layer.js'),
+    import('../../_kit/campaign.js')
+  ]).then(([{ createMetaLayer }, { createCampaign }]) => {
+    const meta = createMetaLayer({ key: 'geom_dash.meta.v1', missions: [
+      { id:'runs3', event:'run', goal:3, label:'3 runs', reward:60 },
+      { id:'win1', event:'win', goal:1, label:'First clear', reward:80 }
+    ], achievements: [{ id:'runs25', event:'run', goal:25, label:'25 runs', reward:200 }] });
+    const camp = createCampaign({ key: 'geom_dash.campaign.v1' });
+    const r = camp.result(won ? 'win' : 'loss');
+    meta.record('run'); if (won) meta.record('win');
+    console.info('[GEOM DASH]', r.text);
+  }).catch(() => {});
   const isRecord = score > getBest(mode, chapterIndex);
   recordRun(mode, chapterIndex, { score, won, near: nearCount, flow: player.flow });
   if (isRecord && ghostFrames.length > 2) saveGhost(mode, chapterIndex, ghostFrames);

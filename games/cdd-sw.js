@@ -1,6 +1,7 @@
 const CACHE = 'cdd-v2';
 const ASSETS = [
-  './cdd.html', './cdd/manifest.webmanifest', './cdd/styles.css',
+  './cdd.html', './cdd/manifest.webmanifest',
+  './cdd/icons/icon-192.png', './cdd/icons/icon-512.png', './cdd/icons/icon-maskable.png', './cdd/icons/icon.svg', './cdd/styles.css',
   './cdd/app.js', './cdd/audio.js', './cdd/effects.js', './cdd/input.js',
   './cdd/render.js', './cdd/state.js', './cdd/ui.js', './cdd/world.js',
   './_kit/storage.js', './_kit/progression.js', './_kit/meta-layer.js'

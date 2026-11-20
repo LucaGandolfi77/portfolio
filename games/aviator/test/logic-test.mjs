@@ -27,6 +27,7 @@ run('setup creates a fresh round', () => {
 });
 run('tick grows multiplier', () => {
   const g = fake(); setup(g);
+  g.data.crashAt = 99;
   const m = g.data.multiplier;
   tick(0.5, g);
   ok(g.data.multiplier > m);

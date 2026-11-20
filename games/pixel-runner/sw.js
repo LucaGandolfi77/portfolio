@@ -1,6 +1,7 @@
 const CACHE = 'pixel-runner-v1';
 const ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
+  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable.png', './icons/icon.svg',
   './js/config.js', './js/game.js', './js/main.js',
   '../../top_buttons.js',
   '../_kit/arcade.css', '../_kit/core.js', '../_kit/storage.js', '../_kit/i18n.js',
