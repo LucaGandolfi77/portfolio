@@ -4,6 +4,15 @@
 var D = window.SCALPEL;
 var C = D.COLORS;
 
+/* Ponte verso il layer meta (profilo, missioni, UI moderna). */
+function metaEmit(type, detail){
+  try {
+    var payload = detail || {};
+    payload.type = type;
+    window.dispatchEvent(new CustomEvent('scalpel:event', { detail: payload }));
+  } catch(e){ /* il layer meta e' opzionale */ }
+}
+
 /* ═══════════════ STATE ═══════════════ */
 var STATE = 'title';
 var save = load();
@@ -97,6 +106,14 @@ function init(){
 
   showTitle();
   requestAnimationFrame(loop);
+
+  /* comandi dal layer meta */
+  window.addEventListener('scalpel:meta:command', function(event){
+    var command = event.detail && event.detail.command;
+    if(command === 'showChapters') showChapterSelect();
+    if(command === 'showTitle') showTitle();
+    if(command === 'restartChapter' && currentChapter){ hideOverlay(); beginSurgery(); }
+  });
 }
 
 function resize(){
@@ -720,6 +737,10 @@ function addAccuracy(val){
 }
 
 function onStepComplete(){
+  metaEmit('stepComplete', {
+    type: touchData && touchData.type, tool: currentTool,
+    chapter: currentChapter && currentChapter.id
+  });
   /* speed run mode uses its own step completion */
   if(speedRunActive){
     onStepCompleteSpeedRun();
@@ -772,6 +793,7 @@ function onStepComplete(){
 }
 
 function onTimeUp(){
+  metaEmit('surgeryFailed', { chapter: currentChapter && currentChapter.id });
   showAccuracy('TIME\'S UP!', false);
   combo = 1;
   updateHUD();
@@ -834,6 +856,13 @@ function setupStep(idx){
     timerMax = Math.round(step.time * diff.timeMod);
     timerLeft = timerMax;
   }
+  try {
+    var metaMods = window.SCALPEL_META && window.SCALPEL_META.getModifiers && window.SCALPEL_META.getModifiers();
+    if(metaMods && metaMods.timeScale){
+      timerMax = Math.max(4, Math.round(timerMax * metaMods.timeScale));
+      timerLeft = timerMax;
+    }
+  } catch(e){ /* nessun contratto attivo */ }
   timerRunning = true;
 
   setTimeout(function(){ surgeryActive = true; }, 300);
@@ -1244,6 +1273,14 @@ function showTitle(){
       '<button class="menu-btn" id="btn-journal">📖 MEDICAL JOURNAL</button>' +
     '</div>' +
     '<div class="menu-section">' +
+      '<div class="menu-section-title">🎖️ CAREER & MISSIONS</div>' +
+      '<button class="menu-btn meta-missions-btn" id="btn-missions">🎯 MISSIONS</button>' +
+      '<button class="menu-btn meta-profile-btn" id="btn-profile">👤 SURGEON PROFILE</button>' +
+      '<button class="menu-btn meta-contracts-btn" id="btn-contracts">📋 CONTRACT MODE</button>' +
+      '<button class="menu-btn meta-stats-btn" id="btn-stats">📊 CAREER STATS</button>' +
+      '<button class="menu-btn meta-settings-btn" id="btn-settings">⚙️ SETTINGS</button>' +
+    '</div>' +
+    '<div class="menu-section">' +
       '<div class="menu-section-title">⚡ CHALLENGE MODE</div>' +
       '<button class="menu-btn" id="btn-speed">⚡ SPEED RUN</button>' +
       '<button class="menu-btn" id="btn-bossrush">💀 BOSS RUSH</button>' +
@@ -1408,6 +1445,15 @@ function beginSurgery(){
   $levelLabel.style.color = '';
   updatePowerupBar();
   updateHUD();
+  metaEmit('surgeryStart', { chapter: currentChapter && currentChapter.id });
+  try {
+    var appEl = document.getElementById('app');
+    var activeMods = window.SCALPEL_META && window.SCALPEL_META.getModifiers && window.SCALPEL_META.getModifiers();
+    if(appEl){
+      appEl.classList.toggle('contract-tremor', !!(activeMods && activeMods.tremor));
+      appEl.classList.toggle('contract-lowvision', !!(activeMods && activeMods.lowVision));
+    }
+  } catch(e){ /* ignore */ }
   setupStep(0);
 }
 
@@ -1460,6 +1506,13 @@ function onSurgeryComplete(){
 
   saveGame();
 
+  metaEmit('runComplete', {
+    mode: currentChapter && currentChapter.id === 99 ? 'daily' : 'story',
+    chapter: currentChapter && currentChapter.id,
+    score: chScore, accuracy: acc, grade: grade && grade.grade,
+    steps: D.PROCEDURES['chapter'+currentChapter.id] ? D.PROCEDURES['chapter'+currentChapter.id].length : 0,
+    timeUsed: Math.round(timerMax - timerLeft)
+  });
   showResults(chScore, acc, grade);
 }
 
@@ -2015,6 +2068,7 @@ function saveSpeedRun(chId, time, splits){
 }
 
 function showSpeedResults(totalTime, acc, grade, speedInfo, chScore, splits){
+  metaEmit('runComplete', { mode:'speedrun', score:chScore || 0, accuracy:acc, grade:grade && grade.grade, timeUsed:Math.round(totalTime/1000) });
   STATE = 'results';
   var splitHtml = '';
   for(var i=0;i<splits.length;i++){
@@ -2280,6 +2334,7 @@ function saveBossRush(time, splits){
 }
 
 function showBossRushResults(totalTime, rating, chScore, splits){
+  metaEmit('runComplete', { mode:'bossrush', score:chScore || 0, grade:rating, timeUsed:Math.round(totalTime/1000) });
   STATE = 'results';
   var splitHtml = '';
   for(var i=0;i<splits.length;i++){
@@ -2665,6 +2720,7 @@ function onAlienSurgeryComplete(){
 }
 
 function showAlienResults(totalTime, acc, grade, chScore){
+  metaEmit('runComplete', { mode:'alien', score:chScore || 0, accuracy:acc, grade:grade && grade.grade, timeUsed:Math.round(totalTime/1000) });
   STATE = 'results';
   var toolsHtml = '';
   for(var k in alienToolsUsed){
@@ -2927,6 +2983,7 @@ function onEndlessGameOver(reason){
 }
 
 function showEndlessResults(reason, totalTime){
+  metaEmit('runComplete', { mode:'endless', score:score || 0, timeUsed:Math.round(totalTime/1000) });
   STATE = 'results';
   var reasonText = reason === 'accuracy' ? 'Accuracy too low!' : 'Time\'s up!';
 
@@ -3473,6 +3530,7 @@ function onZombieGameOver(reason){
 }
 
 function showZombieResults(reason, reasonText, totalTime){
+  metaEmit('runComplete', { mode:'zombie', score:score || 0, timeUsed:Math.round(totalTime/1000) });
   STATE = 'results';
 
   showOverlay(
@@ -4219,6 +4277,7 @@ function hidePandemicUI(){
 }
 
 function showPandemicResults(reason){
+  metaEmit('runComplete', { mode:'pandemic', score:score || 0, victory: reason === 'victory' });
   STATE = 'results';
   var totalTime = Date.now() - pandemicStartTime;
   var infectedPct = Math.round((pandemicInfected / pandemicTotalPop) * 100);

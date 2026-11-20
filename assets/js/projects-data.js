@@ -257,7 +257,7 @@ const PROJECTS_DATA = [
   {
     "id": "ar-tracker",
     "title": "AR Tracker",
-    "description": "Real-time camera filters.",
+    "description": "A modern camera PWA with 19 live filters, AI vision, voice subtitles and an offline photo gallery.",
     "href": "projects/tracker.html",
     "emoji": "📷",
     "badge": "AR",
