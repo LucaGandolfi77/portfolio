@@ -1,147 +1,70 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Distance Calculator</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0f1724; color: white; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
-        #info-panel {
-            position: absolute;
-            top: 64px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: rgba(15, 23, 36, 0.9);
-            padding: 15px 25px;
-            border-radius: 12px;
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-            text-align: center;
-            min-width: 300px;
-            backdrop-filter: blur(10px);
-        }
-        h1 { margin: 0 0 10px 0; font-size: 1.2rem; color: #00d4ff; }
-        .distance-display { font-size: 1.5rem; font-weight: bold; margin: 10px 0; }
-        .instructions { font-size: 0.9rem; color: #a0c0e0; margin-bottom: 10px; }
-        .btn {
-            background: #00d4ff;
-            color: #0f1724;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 5px;
-            transition: background 0.2s;
-        }
-        .btn:hover { background: #66e0ff; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>GPS Distance Calculator → Atlas</title>
+  <meta name="description" content="The GPS Distance Calculator has moved to Atlas: pick two points on a map or type coordinates, with distance, bearing and midpoint.">
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/atlas/">
+  <meta name="robots" content="noindex, follow">
+  <meta http-equiv="refresh" content="0; url=./atlas/#measure">
+  <meta name="theme-color" content="#0a0d16">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+      background: radial-gradient(80% 80% at 50% 0%, #2a1130, #070a12 70%);
+      color: #eef3ff;
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main {
+      width: min(100%, 470px);
+      padding: 28px 24px;
+      border: 1px solid rgba(255, 122, 184, 0.26);
+      border-radius: 22px;
+      background: rgba(18, 12, 28, 0.84);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff7ab8; box-shadow: 0 0 16px #ff7ab8; }
+    .kicker { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; color: #ff7ab8; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1.1; letter-spacing: -0.03em; }
+    p { margin: 12px 0 0; color: #b8aabc; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      margin-top: 20px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: #ff7ab8;
+      color: #1c0412;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    a:focus-visible { outline: 2px solid #00e5ff; outline-offset: 3px; }
+    small { display: block; margin-top: 16px; color: #8f8193; font-size: 12px; }
+  </style>
+  <script>
+    (function () {
+      var target = './atlas/' + location.search + '#measure';
+      location.replace(target);
+    })();
+  </script>
 </head>
 <body>
-
-    <div id="info-panel">
-        <h1>GPS Distance Calculator</h1>
-        <div class="instructions" id="instructions">Click on the map to set the first point.</div>
-        <div class="distance-display" id="distance">0.00 km</div>
-        <div style="font-size: 0.9rem; color: #a0c0e0;" id="distance-miles">0.00 miles</div>
-        <button class="btn" onclick="resetMap()">Reset</button>
-    </div>
-
-    <div id="map"></div>
-
-    <script>
-        // Initialize map centered on Italy (or user location if possible)
-        const map = L.map('map').setView([41.8719, 12.5674], 6);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
-
-        // Add Search Control
-        L.Control.geocoder({
-            defaultMarkGeocode: false
-        })
-        .on('markgeocode', function(e) {
-            var bbox = e.geocode.bbox;
-            var poly = L.polygon([
-                bbox.getSouthEast(),
-                bbox.getNorthEast(),
-                bbox.getNorthWest(),
-                bbox.getSouthWest()
-            ]);
-            map.fitBounds(poly.getBounds());
-        })
-        .addTo(map);
-
-        // Try to get user location
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(position => {
-                map.setView([position.coords.latitude, position.coords.longitude], 13);
-            });
-        }
-
-        let markers = [];
-        let polyline = null;
-
-        map.on('click', function(e) {
-            if (markers.length >= 2) {
-                // If we already have 2 points, reset first
-                resetMap();
-                // Then add the new first point
-                addMarker(e.latlng);
-            } else {
-                addMarker(e.latlng);
-            }
-        });
-
-        function addMarker(latlng) {
-            const marker = L.marker(latlng).addTo(map);
-            markers.push(marker);
-
-            if (markers.length === 1) {
-                document.getElementById('instructions').textContent = "Click to set the second point.";
-            } else if (markers.length === 2) {
-                document.getElementById('instructions').textContent = "Distance calculated!";
-                calculateDistance();
-            }
-        }
-
-        function calculateDistance() {
-            if (markers.length !== 2) return;
-
-            const p1 = markers[0].getLatLng();
-            const p2 = markers[1].getLatLng();
-
-            // Draw line
-            polyline = L.polyline([p1, p2], {color: '#00d4ff', weight: 4}).addTo(map);
-            map.fitBounds(polyline.getBounds(), {padding: [50, 50]});
-
-            // Calculate distance
-            const distanceMeters = p1.distanceTo(p2);
-            const distanceKm = (distanceMeters / 1000).toFixed(2);
-            const distanceMiles = (distanceMeters * 0.000621371).toFixed(2);
-
-            document.getElementById('distance').textContent = `${distanceKm} km`;
-            document.getElementById('distance-miles').textContent = `${distanceMiles} miles`;
-        }
-
-        function resetMap() {
-            markers.forEach(m => map.removeLayer(m));
-            if (polyline) map.removeLayer(polyline);
-            markers = [];
-            polyline = null;
-            document.getElementById('distance').textContent = "0.00 km";
-            document.getElementById('distance-miles').textContent = "0.00 miles";
-            document.getElementById('instructions').textContent = "Click on the map to set the first point.";
-        }
-    </script>
+  <main>
+    <p class="kicker"><span class="dot" aria-hidden="true"></span> Moved</p>
+    <h1>GPS Distance Calculator is now Atlas</h1>
+    <p>Pick two points on the map or type their coordinates: distance, bearing and midpoint in one app.</p>
+    <p lang="it">Il calcolatore di distanze GPS è diventato Atlas: due punti sulla mappa o coordinate, con distanza, direzione e punto medio.</p>
+    <a href="./atlas/#measure">Open Atlas →</a>
+    <small>If you are not redirected automatically, use the link above.</small>
+  </main>
 </body>
-<script src="top_buttons.js"></script>
 </html>

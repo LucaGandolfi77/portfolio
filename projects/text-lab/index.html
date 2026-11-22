@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en" data-skin="lab">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d16">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Text Lab — turn pages and photos into editable text with local OCR. Camera, drag & drop, English and Italian, no uploads.">
+  <title>Text Lab — OCR &amp; Scan · Luca Gandolfi</title>
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/text-lab/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Text Lab — OCR &amp; Scan">
+  <meta property="og:description" content="Turn images into editable text with OCR that stays on your device.">
+  <meta property="og:url" content="https://lucagandolfi77.github.io/portfolio/projects/text-lab/">
+  <meta property="og:image" content="https://lucagandolfi77.github.io/portfolio/assets/og-cover.jpg">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Text Lab">
+
+  <link rel="stylesheet" href="../_shared/tokens.css">
+  <link rel="stylesheet" href="../_shared/base.css">
+  <link rel="stylesheet" href="../_shared/shell.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="pf-skip" href="#app" data-i18n="skip">Skip to content</a>
+
+  <header
+    data-project-shell
+    data-title="Text Lab"
+    data-id="text-lab"
+    data-back="../../projects.html"
+    data-home="../../index.html"
+    data-languages="en,it"
+    data-heading="div"></header>
+
+  <main id="app" class="textlab" data-app="text-lab" data-mode="image">
+    <noscript>
+      <div class="pf-card textlab-noscript">
+        <h2>JavaScript is required</h2>
+        <p>Text Lab uses the camera and a local OCR engine. Please enable JavaScript.</p>
+      </div>
+    </noscript>
+
+    <section class="textlab-bar">
+      <div class="textlab-intro">
+        <p class="textlab-kicker">
+          <span class="textlab-kicker__dot" aria-hidden="true"></span>
+          <span data-i18n="kicker">Camera · OCR · Local</span>
+        </p>
+        <h1 class="textlab-title" data-i18n="title">Turn images into text</h1>
+        <p class="textlab-subtitle" data-i18n="subtitle">Scan a page or drop a photo. Tesseract reads it on this device; nothing is uploaded.</p>
+      </div>
+
+      <div class="textlab-toolbar">
+        <div id="modeSwitch" class="pf-seg" role="group" data-i18n-aria="modeLabel" aria-label="Text Lab source">
+          <button type="button" data-mode="camera" aria-pressed="false">
+            <span data-i18n="modeCamera">Camera</span>
+          </button>
+          <button type="button" data-mode="image" aria-pressed="true">
+            <span data-i18n="modeImage">Image</span>
+          </button>
+        </div>
+
+        <button id="cameraToggle" class="pf-btn pf-btn--primary" type="button">
+          <span class="textlab-btn__icon" data-icon="camera" aria-hidden="true"></span>
+          <span id="cameraToggleLabel" class="textlab-btn__label" data-i18n="cameraStart">Start camera</span>
+        </button>
+        <button id="switchCamera" class="pf-btn" type="button" data-i18n-aria="cameraSwitch" aria-label="Switch camera">
+          <span class="textlab-btn__icon" data-icon="switch" aria-hidden="true"></span>
+          <span data-i18n="cameraSwitch">Switch camera</span>
+        </button>
+        <button id="captureBtn" class="pf-btn" type="button" disabled>
+          <span class="textlab-btn__icon" data-icon="capture" aria-hidden="true"></span>
+          <span data-i18n="capture">Capture</span>
+        </button>
+        <button id="chooseImageBtn" class="pf-btn pf-btn--ghost" type="button">
+          <span class="textlab-btn__icon" data-icon="image" aria-hidden="true"></span>
+          <span data-i18n="chooseImage">Choose image</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="textlab-status" aria-label="Status">
+      <span id="cameraStatus" class="pf-badge" data-state="idle" role="status" aria-live="polite" data-i18n="cameraIdle">Camera off</span>
+      <span id="engineStatus" class="pf-badge" data-state="ready" role="status" aria-live="polite" data-i18n="engineReady">OCR ready</span>
+      <span id="imageStatus" class="pf-badge pf-badge--ok" hidden data-i18n="imageReady">Image ready</span>
+    </section>
+
+    <p id="errorBox" class="textlab-error" role="alert" hidden>
+      <span id="errorText"></span>
+      <button id="errorRetry" class="pf-btn pf-btn--sm" type="button" data-i18n="retry">Retry</button>
+    </p>
+
+    <div class="textlab-layout">
+      <section class="textlab-column">
+        <div id="stage" class="textlab-stage is-image" aria-label="Image or camera preview">
+          <video id="video" class="textlab-video" playsinline muted autoplay aria-hidden="true"></video>
+          <canvas id="previewCanvas" class="textlab-preview" data-i18n-aria="previewAlt" aria-label="Image to recognise" hidden></canvas>
+
+          <div id="cameraPlaceholder" class="textlab-placeholder" hidden>
+            <span class="textlab-placeholder__icon" data-icon="camera" aria-hidden="true"></span>
+            <h2 data-i18n="modeCamera">Camera</h2>
+            <p data-i18n="cameraOffHint">Point the camera at a page, then capture. Text stays on this device.</p>
+            <button id="stageStart" class="pf-btn pf-btn--primary" type="button">
+              <span class="textlab-btn__icon" data-icon="camera" aria-hidden="true"></span>
+              <span data-i18n="cameraStart">Start camera</span>
+            </button>
+          </div>
+
+          <div id="dropZone" class="textlab-dropzone">
+            <span class="textlab-placeholder__icon" data-icon="upload" aria-hidden="true"></span>
+            <h2 data-i18n="uploadTitle">Drop an image here</h2>
+            <p data-i18n="uploadHint">PNG, JPEG or WebP · max 25 MB</p>
+            <div class="textlab-dropzone__actions">
+              <button id="chooseImageStage" class="pf-btn pf-btn--primary" type="button">
+                <span class="textlab-btn__icon" data-icon="image" aria-hidden="true"></span>
+                <span data-i18n="chooseImage">Choose image</span>
+              </button>
+              <button id="pasteImageBtn" class="pf-btn" type="button">
+                <span class="textlab-btn__icon" data-icon="paste" aria-hidden="true"></span>
+                <span data-i18n="pasteImage">Paste image</span>
+              </button>
+            </div>
+          </div>
+
+          <input id="imageInput" type="file" accept="image/*" hidden>
+
+          <div id="processingOverlay" class="textlab-processing" hidden>
+            <div class="textlab-processing__card" role="status" aria-live="polite">
+              <span class="textlab-spinner" aria-hidden="true"></span>
+              <strong id="progressStatus" data-i18n="progressRecognize">Recognising text…</strong>
+              <div class="textlab-progress"><i id="progressBar"></i></div>
+              <span id="progressPercent">0%</span>
+              <button id="cancelOcr" class="pf-btn pf-btn--sm pf-btn--ghost" type="button" data-i18n="cancel">Cancel</button>
+            </div>
+          </div>
+
+          <div class="textlab-scanframe" aria-hidden="true"></div>
+        </div>
+
+        <div class="textlab-source-actions">
+          <button id="extractBtn" class="pf-btn pf-btn--primary" type="button" disabled>
+            <span class="textlab-btn__icon" data-icon="scan" aria-hidden="true"></span>
+            <span data-i18n="extract">Extract text</span>
+          </button>
+          <button id="retakeBtn" class="pf-btn" type="button" hidden>
+            <span class="textlab-btn__icon" data-icon="reset" aria-hidden="true"></span>
+            <span class="textlab-btn__label" data-i18n="retake">Retake</span>
+          </button>
+        </div>
+
+        <section class="pf-card textlab-settings">
+          <h2 class="pf-card__title" data-i18n="languageLabel">OCR languages</h2>
+          <div id="languageChips" class="textlab-langs" role="group" data-i18n-aria="languageLabel" aria-label="OCR languages">
+            <button type="button" data-lang="eng" aria-pressed="true">
+              <span class="textlab-lang__code">EN</span>
+              <span data-i18n="langEnglish">English</span>
+            </button>
+            <button type="button" data-lang="ita" aria-pressed="true">
+              <span class="textlab-lang__code">IT</span>
+              <span data-i18n="langItalian">Italian</span>
+            </button>
+          </div>
+          <p class="pf-hint" data-i18n="languageHint">Choose one or both. More languages take longer on the first run.</p>
+
+          <h2 class="pf-card__title textlab-settings__title" data-i18n="preprocessTitle">Image preparation</h2>
+          <div class="textlab-preprocess">
+            <button type="button" data-toggle="grayscale" aria-pressed="false">
+              <span class="textlab-btn__icon" data-icon="contrast" aria-hidden="true"></span>
+              <span data-i18n="grayscale">Grayscale</span>
+            </button>
+            <button type="button" data-toggle="contrast" aria-pressed="false">
+              <span class="textlab-btn__icon" data-icon="brightness" aria-hidden="true"></span>
+              <span data-i18n="contrast">High contrast</span>
+            </button>
+            <button id="rotateLeft" type="button" data-i18n-aria="rotateLeft" aria-label="Rotate left">
+              <span class="textlab-btn__icon" data-icon="rotateLeft" aria-hidden="true"></span>
+            </button>
+            <button id="rotateRight" type="button" data-i18n-aria="rotateRight" aria-label="Rotate right">
+              <span class="textlab-btn__icon" data-icon="rotateRight" aria-hidden="true"></span>
+            </button>
+            <button id="resetImage" type="button" data-i18n-aria="resetImage" aria-label="Reset image">
+              <span class="textlab-btn__icon" data-icon="reset" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="pf-hint textlab-engine-note" data-i18n="engineNotice">The OCR engine and language data are served locally. The first run downloads about 10 MB, then works offline.</p>
+        </section>
+      </section>
+
+      <aside class="textlab-panel">
+        <section id="resultCard" class="pf-card textlab-result" aria-labelledby="resultTitle">
+          <div class="pf-card__head">
+            <h2 id="resultTitle" class="pf-card__title" data-i18n="resultTitle">Text</h2>
+            <span id="confidenceBadge" class="pf-badge" hidden></span>
+          </div>
+
+          <div id="resultEmpty" class="pf-empty textlab-empty">
+            <span class="pf-empty__icon" aria-hidden="true"><span data-icon="scan" aria-hidden="true"></span></span>
+            <h3 data-i18n="resultEmptyTitle">No text yet</h3>
+            <p data-i18n="resultEmptyText">Capture a page or upload an image. The recognised text will appear here, editable.</p>
+          </div>
+
+          <div id="resultContent" hidden>
+            <label class="pf-sr-only" for="resultText" data-i18n="resultTitle">Text</label>
+            <textarea id="resultText" class="pf-textarea textlab-textarea" rows="10" spellcheck="false" data-i18n-placeholder="resultPlaceholder" placeholder="Recognised text…"></textarea>
+
+            <div class="textlab-stats">
+              <div><span data-i18n="statsWords">Words</span><strong id="statWords">0</strong></div>
+              <div><span data-i18n="statsChars">Characters</span><strong id="statChars">0</strong></div>
+              <div><span data-i18n="statsLines">Lines</span><strong id="statLines">0</strong></div>
+              <div><span data-i18n="statsConfidence">Confidence</span><strong id="statConfidence">—</strong></div>
+              <div><span data-i18n="statsReading">Reading</span><strong id="statReading">—</strong></div>
+              <div><span data-i18n="statsTime">Time</span><strong id="statTime">—</strong></div>
+            </div>
+
+            <div class="textlab-actions">
+              <button id="resultCopy" class="pf-btn pf-btn--primary" type="button">
+                <span class="textlab-btn__icon" data-icon="copy" aria-hidden="true"></span>
+                <span data-i18n="copy">Copy</span>
+              </button>
+              <button id="resultDownload" class="pf-btn" type="button">
+                <span class="textlab-btn__icon" data-icon="download" aria-hidden="true"></span>
+                <span data-i18n="download">Download .txt</span>
+              </button>
+              <button id="resultShare" class="pf-btn" type="button">
+                <span class="textlab-btn__icon" data-icon="share" aria-hidden="true"></span>
+                <span data-i18n="share">Share</span>
+              </button>
+              <button id="resultSpeak" class="pf-btn" type="button">
+                <span class="textlab-btn__icon" data-icon="speak" aria-hidden="true"></span>
+                <span class="textlab-btn__label" data-i18n="readAloud">Read aloud</span>
+              </button>
+              <button id="resultClean" class="pf-btn pf-btn--ghost" type="button">
+                <span class="textlab-btn__icon" data-icon="clean" aria-hidden="true"></span>
+                <span data-i18n="clean">Clean text</span>
+              </button>
+              <button id="resultClear" class="pf-btn pf-btn--ghost" type="button">
+                <span class="textlab-btn__icon" data-icon="close" aria-hidden="true"></span>
+                <span data-i18n="clear">Clear</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pf-card textlab-history" aria-labelledby="historyTitle">
+          <div class="pf-card__head">
+            <h2 id="historyTitle" class="pf-card__title" data-i18n="historyTitle">Recent scans</h2>
+            <button id="clearHistoryBtn" class="pf-btn pf-btn--sm pf-btn--danger" type="button" hidden data-i18n="clearHistory">Clear history</button>
+          </div>
+          <p id="historyEmpty" class="pf-hint textlab-history__empty" data-i18n="historyEmpty">No scans yet</p>
+          <p class="pf-hint textlab-history__hint" data-i18n="historyHint">The last 20 results stay on this device.</p>
+          <div id="historyList" class="textlab-history__list"></div>
+        </section>
+
+        <section class="pf-card textlab-privacy">
+          <h2 class="pf-card__title" data-i18n="privacyTitle">Privacy</h2>
+          <p class="pf-hint" data-i18n="privacyText">Tesseract.js runs in a Web Worker in your browser. Images are processed locally, never uploaded. Settings and the last 20 results stay in local storage on this device.</p>
+        </section>
+
+        <footer class="textlab-footer">
+          <p data-i18n="footer">A Project Kit 2026 app · OCR stays on-device</p>
+          <a href="../../projects.html" data-i18n="footerProjects">All projects</a>
+        </footer>
+      </aside>
+    </div>
+  </main>
+
+  <!-- serviceWorker: registrato da js/app.js (scope ./) -->
+  <script src="../_shared/shell.js" defer></script>
+  <script src="js/vendor/tesseract/tesseract.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

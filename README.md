@@ -66,13 +66,15 @@ The repository also contains many standalone applications and experiments, inclu
 
 Representative entry points include:
 
+- [`projects/atlas/`](projects/atlas/): weather map, 7-day forecast and distance calculator
+- [`projects/qr-studio/`](projects/qr-studio/): QR scanner and designer PWA
+- [`projects/vision-lab/`](projects/vision-lab/): face mesh, expressions and smile analysis
+- [`projects/text-lab/`](projects/text-lab/): local OCR from camera and images
 - [`projects/vola-pwa/index.html`](projects/vola-pwa/index.html): camera-controlled 3D flying PWA
 - [`projects/rave/index.html`](projects/rave/index.html): camera shader and visual effects tool
 - [`projects/audio-editor-pwa/index.html`](projects/audio-editor-pwa/index.html): browser audio editor PWA
 - [`projects/fantapanchina/index.html`](projects/fantapanchina/index.html): idle fantacalcio PWA with parody teams and offline earnings
 - [`projects/vite-carrere/index.html`](projects/vite-carrere/index.html): narrative PWA journey through Emmanuel Carrère's life and works
-- [`projects/smile_detection/index.html`](projects/smile_detection/index.html): camera-based smile analysis
-- [`projects/facemesh_camera.html`](projects/facemesh_camera.html): real-time face mesh experiment
 - [`games/echoes-of-the-last-dawn/index.html`](games/echoes-of-the-last-dawn/index.html): Three.js story game
 - [`games/card-games/public/index.html`](games/card-games/public/index.html): card-game collection with optional local server
 - [`pixel-stretch-app/`](pixel-stretch-app/): React and TypeScript pixel editing application
@@ -135,6 +137,7 @@ Representative entry points include:
 - Electron
 - Bash
 - Vitest and Node test runners
+- Playwright (Chromium with fake camera) for browser E2E
 - SEO and link-audit scripts
 
 ### Programming languages represented

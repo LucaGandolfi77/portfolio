@@ -2,6 +2,7 @@
 'use strict';
 
 var D = window.SCALPEL;
+var G = D; /* data.js namespace alias used by the tutorial screens */
 var C = D.COLORS;
 
 /* Ponte verso il layer meta (profilo, missioni, UI moderna). */
@@ -1250,8 +1251,9 @@ function onDialogueTap(e){
 
 /* ═══════════════ OVERLAY SCREENS ═══════════════ */
 function showOverlay(html){
-  $overlay.innerHTML = html;
+  $overlay.innerHTML = '<div class="overlay-inner">' + html + '</div>';
   $overlay.classList.remove('hidden');
+  $overlay.scrollTop = 0;
 }
 
 function hideOverlay(){
@@ -1326,7 +1328,7 @@ function showTitle(){
 
 function showChapterSelect(){
   STATE = 'chapter_select';
-  var html = '<h2 style="margin-bottom:16px;letter-spacing:2px">SELECT CHAPTER</h2><div id="chapter-select">';
+  var html = '<h2 style="margin-bottom:16px;letter-spacing:2px">SELECT CHAPTER</h2><div id="chapter-select" class="select-list">';
   for(var i=0;i<D.CHAPTERS.length;i++){
     var ch = D.CHAPTERS[i];
     /* skip alien chapter in normal loop */
@@ -1550,7 +1552,7 @@ function showResults(chScore, acc, grade){
 function showJournal(){
   STATE = 'journal';
   var html = '<h2 style="margin-bottom:16px;letter-spacing:2px">📖 MEDICAL JOURNAL</h2>';
-  html += '<div id="chapter-select" style="max-height:60vh;overflow-y:auto">';
+  html += '<div id="chapter-select" class="select-list">';
   var keys = Object.keys(D.JOURNAL);
   for(var i=0;i<keys.length;i++){
     var j = D.JOURNAL[keys[i]];
@@ -1698,7 +1700,7 @@ function showDaily(){
   var minsLeft = Math.floor(((midnight - now) % 3600000) / 60000);
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">📅 DAILY SURGERY</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">Same surgery for everyone. New challenge every day.</div>' +
+    '<div class="subtitle">Same surgery for everyone. New challenge every day.</div>' +
     '<div id="results-card" style="text-align:center">' +
       '<div style="font-size:2rem;margin-bottom:8px">🏥</div>' +
       '<div style="font-size:.85rem;color:#3498db;font-weight:700;margin-bottom:12px">Daily Procedure #' + seed + '</div>' +
@@ -1748,7 +1750,7 @@ function showLeaderboard(){
   try { scores = JSON.parse(localStorage.getItem('scalpel_leaderboard_' + seed)) || []; } catch(e){}
 
   var html = '<h2 style="margin-bottom:16px;letter-spacing:2px">🏆 LEADERBOARD</h2>' +
-    '<div id="chapter-select" style="max-height:50vh;overflow-y:auto">';
+    '<div id="chapter-select" class="select-list">';
 
   if(scores.length === 0){
     html += '<div class="ch"><div class="ch-info"><div class="ch-title" style="color:#5a6a80">No scores yet today</div></div></div>';
@@ -1800,8 +1802,8 @@ var sandboxTool = null;
 function showSandbox(){
   STATE = 'sandbox_select';
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🧪 SANDBOX</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">Free play — all instruments unlocked, no timer, no pressure. Practice freely.</div>' +
-    '<div id="chapter-select" style="max-height:55vh;overflow-y:auto">';
+    '<div class="subtitle">Free play — all instruments unlocked, no timer, no pressure. Practice freely.</div>' +
+    '<div id="chapter-select" class="select-list">';
 
   for(var i=0;i<D.SANDBOX_ORGANS.length;i++){
     var organ = D.SANDBOX_ORGANS[i];
@@ -1902,8 +1904,8 @@ var speedChapterId = 0;
 function showSpeedRun(){
   STATE = 'speed_select';
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">⚡ SPEED RUN</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">Race against the clock. Complete operations as fast as possible. No complications. Pure speed.</div>' +
-    '<div id="chapter-select" style="max-height:55vh;overflow-y:auto">';
+    '<div class="subtitle">Race against the clock. Complete operations as fast as possible. No complications. Pure speed.</div>' +
+    '<div id="chapter-select" class="select-list">';
 
   for(var i=0;i<D.CHAPTERS.length;i++){
     var ch = D.CHAPTERS[i];
@@ -2146,7 +2148,7 @@ function showBossRush(){
   bossRushBest = best;
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">💀 BOSS RUSH</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">Face all 3 bosses back-to-back. No breaks. Hard mode. How fast can you save them all?</div>' +
+    '<div class="subtitle">Face all 3 bosses back-to-back. No breaks. Hard mode. How fast can you save them all?</div>' +
     '<div id="results-card" style="text-align:center">' +
       '<div style="font-size:2rem;margin-bottom:8px">💀</div>' +
       '<div style="font-size:.85rem;color:#e74c3c;font-weight:700;margin-bottom:12px">3 Bosses · Hard Mode</div>' +
@@ -2467,7 +2469,7 @@ function showAlienChapter(){
   var patient = D.PATIENTS.xylar;
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">👽 THE ROSWELL FILE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">' + G.ALIEN_SECRET.subtitle + '</div>' +
+    '<div class="subtitle">' + G.ALIEN_SECRET.subtitle + '</div>' +
     '<div id="patient-info">' +
       '<div class="pi-header">' +
         '<div class="pi-avatar" style="border-color:#2ecc71">👽</div>' +
@@ -2776,7 +2778,7 @@ function showEndlessMode(){
   try { endlessBest = JSON.parse(localStorage.getItem('scalpel_endless')); } catch(e){}
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">♾️ ENDLESS MODE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">Patients come forever. How long can you survive? Difficulty increases every 5 patients.</div>' +
+    '<div class="subtitle">Patients come forever. How long can you survive? Difficulty increases every 5 patients.</div>' +
     '<div id="results-card" style="text-align:center">' +
       '<div style="font-size:2rem;margin-bottom:8px">♾️</div>' +
       '<div style="font-size:.85rem;color:#e74c3c;font-weight:700;margin-bottom:12px">Infinite Patients · Rising Difficulty</div>' +
@@ -3117,7 +3119,7 @@ function showZombieMode(){
   try { zombieBest = JSON.parse(localStorage.getItem('scalpel_zombie')); } catch(e){}
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🧟 ZOMBIE OUTBREAK</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:16px">The virus Z has hit Ospedale Miraggio! Patients are turning into zombies. Can you save them before they eat your brains?</div>' +
+    '<div class="subtitle">The virus Z has hit Ospedale Miraggio! Patients are turning into zombies. Can you save them before they eat your brains?</div>' +
     '<div id="results-card" style="text-align:center;border-color:#e74c3c">' +
       '<div style="font-size:2rem;margin-bottom:8px">🧟</div>' +
       '<div style="font-size:.85rem;color:#e74c3c;font-weight:700;margin-bottom:12px">Infection · Overheat · Transformation</div>' +
@@ -3648,7 +3650,7 @@ function showAnatomyViewer(){
   }
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🫀 ANATOMY VIEWER</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Explore the human body. Tap an organ to learn about it.</div>' +
+    '<div class="subtitle">Explore the human body. Tap an organ to learn about it.</div>' +
     '<div id="results-card" style="text-align:center;border-color:#3498db30">' +
       '<div id="anatomy-display" style="min-height:200px;display:flex;align-items:center;justify-content:center;position:relative">' +
         '<div id="anatomy-body" style="font-size:4rem;opacity:.3">🧍</div>' +
@@ -3875,7 +3877,7 @@ function showPandemicMode(){
   try { pandemicBest = JSON.parse(localStorage.getItem('scalpel_pandemic')); } catch(e){}
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🌍 PANDEMIC MODE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">You are the virus. Infect the world. Don\'t get cured.</div>' +
+    '<div class="subtitle">You are the virus. Infect the world. Don\'t get cured.</div>' +
     '<div id="results-card" style="text-align:center;border-color:#e74c3c30">' +
       '<div style="font-size:2rem;margin-bottom:8px">🦠</div>' +
       '<div style="font-size:.85rem;color:#e74c3c;font-weight:700;margin-bottom:12px">Choose Your Difficulty</div>' +
@@ -3906,7 +3908,7 @@ function showCountrySelect(difficulty){
   pandemicDifficulty = G.PANDEMIC.difficulties[difficulty];
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🗺️ SELECT COUNTRY</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Where will your virus originate?</div>' +
+    '<div class="subtitle">Where will your virus originate?</div>' +
     '<div id="results-card" style="text-align:center;border-color:#e74c3c30">' +
       '<div style="font-size:.85rem;color:#e74c3c;font-weight:700;margin-bottom:8px">' + pandemicDifficulty.emoji + ' ' + pandemicDifficulty.label + '</div>' +
       '<div style="font-size:.65rem;color:#8a9bb5">DNA Start: ' + pandemicDifficulty.dnaStart + ' · Cure Speed: x' + pandemicDifficulty.cureSpeed + '</div>' +
@@ -4370,7 +4372,7 @@ function showVeterinaryMode(){
   try { vetBest = JSON.parse(localStorage.getItem('scalpel_veterinary')); } catch(e){}
 
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🐕 VETERINARY MODE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Operate on animals — each species is unique!</div>' +
+    '<div class="subtitle">Operate on animals — each species is unique!</div>' +
     '<div id="results-card" style="text-align:center;border-color:#27ae6030">' +
       '<div style="font-size:2rem;margin-bottom:8px">🐾</div>' +
       '<div style="font-size:.85rem;color:#27ae60;font-weight:700;margin-bottom:8px">Choose Your Patient</div>' +
@@ -4623,7 +4625,7 @@ var tutorialQuizIndex = 0;
 function showTutorial(){
   STATE = 'tutorial';
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🎓 SURGICAL GUIDE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Learn every instrument and when to use it</div>' +
+    '<div class="subtitle">Learn every instrument and when to use it</div>' +
     '<div id="results-card" style="text-align:center;border-color:#f39c1230">' +
       '<div style="font-size:2rem;margin-bottom:8px">🎓</div>' +
       '<div style="font-size:.85rem;color:#f39c12;font-weight:700;margin-bottom:8px">What would you like to learn?</div>' +
@@ -4642,8 +4644,8 @@ function showTutorial(){
 function showInstrumentGuide(){
   STATE = 'tutorial_instruments';
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">🩺 INSTRUMENT GUIDE</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Select an instrument to learn about it</div>' +
-    '<div id="chapter-select" style="max-height:60vh;overflow-y:auto">';
+    '<div class="subtitle">Select an instrument to learn about it</div>' +
+    '<div id="chapter-select" class="select-list">';
   
   var instruments = G.TUTORIAL.instruments;
   var keys = Object.keys(instruments);
@@ -4736,8 +4738,8 @@ function showInstrumentDetail(instrumentId){
 function showStepTypesGuide(){
   STATE = 'tutorial_steptypes';
   var html = '<h2 style="margin-bottom:8px;letter-spacing:2px">📖 STEP TYPES</h2>' +
-    '<div class="subtitle" style="font-size:.7rem;color:#8a9bb5;margin-bottom:12px">Learn the different actions you\'ll perform</div>' +
-    '<div id="chapter-select" style="max-height:60vh;overflow-y:auto">';
+    '<div class="subtitle">Learn the different actions you\'ll perform</div>' +
+    '<div id="chapter-select" class="select-list">';
   
   var stepTypes = G.TUTORIAL.stepTypes;
   var keys = Object.keys(stepTypes);

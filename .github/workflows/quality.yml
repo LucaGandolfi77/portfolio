@@ -1,0 +1,102 @@
+name: Quality gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-unit:
+    name: Static audit + unit/DOM tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax check
+        run: |
+          node --check projects/qr-studio/js/app.js
+          node --check projects/qr-studio/js/forms.js
+          node --check projects/qr-studio/js/i18n.js
+          node --check projects/qr-studio/js/qr-logic.js
+          node --check projects/qr-studio/js/qr-render.js
+          node --check projects/qr-studio/js/scanner.js
+          node --check projects/qr-studio/js/storage.js
+          node --check projects/qr-studio/sw.js
+          node --check projects/atlas/js/app.js
+          node --check projects/atlas/js/api.js
+          node --check projects/atlas/js/geo.js
+          node --check projects/atlas/js/i18n.js
+          node --check projects/atlas/js/storage.js
+          node --check projects/atlas/sw.js
+          node --check projects/vision-lab/js/app.js
+          node --check projects/vision-lab/js/vision.js
+          node --check projects/vision-lab/js/storage.js
+          node --check projects/vision-lab/js/i18n.js
+          node --check projects/vision-lab/sw.js
+          node --check projects/text-lab/js/app.js
+          node --check projects/text-lab/js/text.js
+          node --check projects/text-lab/js/storage.js
+          node --check projects/text-lab/js/i18n.js
+          node --check projects/text-lab/sw.js
+          node --check scripts/audit-projects.mjs
+
+      - name: QR Studio + Atlas tests (logic, raster, DOM, structure)
+        run: node --test projects/qr-studio/tests/*.test.mjs projects/atlas/tests/*.test.mjs projects/vision-lab/tests/*.test.mjs projects/text-lab/tests/*.test.mjs
+
+      - name: Projects audit (no new issues vs baseline)
+        run: node scripts/audit-projects.mjs --baseline=tools/quality/audit-baseline.json
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: projects-health
+          path: reports/projects-health.*
+          retention-days: 7
+
+  browser-e2e:
+    name: Playwright (Chromium, fake camera)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tools/quality/package-lock.json
+
+      - name: Install quality dependencies
+        working-directory: tools/quality
+        run: npm ci
+
+      - name: Install Chromium + system dependencies
+        working-directory: tools/quality
+        run: npx playwright install --with-deps chromium
+
+      - name: Run QR Studio E2E
+        working-directory: tools/quality
+        env:
+          CI: 'true'
+        run: npm test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            tools/quality/playwright-report
+            tools/quality/test-results
+          retention-days: 7

@@ -1,186 +1,70 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Text Recognition AI</title>
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-    <style>
-        body { margin: 0; background: #000; color: white; font-family: system-ui, sans-serif; overflow: hidden; }
-        #camera-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        #ui-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
-        .controls { pointer-events: auto; padding: 20px; display: flex; justify-content: center; gap: 20px; background: linear-gradient(transparent, rgba(0,0,0,0.8)); }
-        .top-bar { pointer-events: auto; padding: 20px; display: flex; justify-content: space-between; background: linear-gradient(rgba(0,0,0,0.8), transparent); }
-        
-        button {
-            background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
-            color: white; padding: 12px 24px; border-radius: 30px; font-size: 1rem;
-            backdrop-filter: blur(10px); cursor: pointer; transition: 0.2s;
-        }
-        button:active { transform: scale(0.95); background: rgba(255,255,255,0.4); }
-        
-        #capture-btn {
-            width: 70px; height: 70px; border-radius: 50%; background: white; border: 4px solid rgba(255,255,255,0.5);
-            padding: 0; box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        }
-        
-        #result-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10;
-            display: none; flex-direction: column; padding: 20px; box-sizing: border-box;
-        }
-        
-        textarea {
-            flex: 1; background: #2a2a2a; border: none; color: white; padding: 15px;
-            border-radius: 10px; font-size: 1.1rem; resize: none; margin: 20px 0;
-        }
-        
-        .loading {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; z-index: 20; display: none;
-            text-align: center;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Text Recognition → Text Lab</title>
+  <meta name="description" content="Text Recognition is now Text Lab: local OCR from camera or image, with editable text and history.">
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/text-lab/">
+  <meta name="robots" content="noindex, follow">
+  <meta http-equiv="refresh" content="0; url=./text-lab/#camera">
+  <meta name="theme-color" content="#0a0d16">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+      background: radial-gradient(80% 80% at 50% 0%, #10263a, #070a12 70%);
+      color: #eef3ff;
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main {
+      width: min(100%, 470px);
+      padding: 28px 24px;
+      border: 1px solid rgba(0, 229, 255, 0.24);
+      border-radius: 22px;
+      background: rgba(12, 18, 32, 0.84);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #00e5ff; box-shadow: 0 0 16px #00e5ff; }
+    .kicker { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; color: #00e5ff; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1.1; letter-spacing: -0.03em; }
+    p { margin: 12px 0 0; color: #aab4c8; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      margin-top: 20px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: #00e5ff;
+      color: #041018;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    a:focus-visible { outline: 2px solid #ff7ab8; outline-offset: 3px; }
+    small { display: block; margin-top: 16px; color: #7f8aa0; font-size: 12px; }
+  </style>
+  <script>
+    (function () {
+      var target = './text-lab/' + location.search + '#camera';
+      location.replace(target);
+    })();
+  </script>
 </head>
 <body>
-
-    <video id="camera-view" autoplay playsinline></video>
-    <canvas id="capture-canvas" style="display:none"></canvas>
-
-    <div id="ui-layer">
-        <div class="top-bar">
-            <a href="../index.html#games" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 12px 24px; border-radius: 30px; font-size: 1rem; backdrop-filter: blur(10px); cursor: pointer; transition: 0.2s; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Exit</a>
-            <button id="switch-cam-btn" onclick="switchCamera()">🔄</button>
-        </div>
-        <div class="controls">
-            <button id="capture-btn" onclick="takePhoto()"></button>
-        </div>
-    </div>
-
-    <div class="loading" id="loading">
-        <div style="font-size: 2rem; margin-bottom: 10px;">🤖</div>
-        <div>Processing Image...</div>
-        <div id="progress">0%</div>
-    </div>
-
-    <div id="result-overlay">
-        <div class="top-bar" style="background:none; padding: 0;">
-            <h2>Text Found</h2>
-            <button onclick="closeResult()">✖</button>
-        </div>
-        <textarea id="text-result" readonly></textarea>
-        <div class="controls" style="background:none; padding: 0;">
-            <button onclick="copyText()" style="background: #00d4ff; border:none; color: black; font-weight: bold; flex: 1;">Copy Text</button>
-            <button onclick="closeResult()" style="flex: 1;">Take Another</button>
-        </div>
-    </div>
-
-    <script>
-        const video = document.getElementById('camera-view');
-        const canvas = document.getElementById('capture-canvas');
-        const loading = document.getElementById('loading');
-        const resultOverlay = document.getElementById('result-overlay');
-        const textResult = document.getElementById('text-result');
-        const progressDiv = document.getElementById('progress');
-
-        let currentStream = null;
-        let facingMode = 'environment'; // Start with back camera
-
-        async function initCamera() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: facingMode }
-                });
-                video.srcObject = stream;
-                currentStream = stream;
-            } catch (err) {
-                console.error("Camera error:", err);
-                alert("Could not access camera. Please allow permissions.");
-            }
-        }
-
-        function switchCamera() {
-            facingMode = facingMode === 'user' ? 'environment' : 'user';
-            initCamera();
-        }
-
-        // Double tap to switch
-        let lastTap = 0;
-        document.body.addEventListener('touchend', (e) => {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                if(e.target.tagName !== 'BUTTON') {
-                    switchCamera();
-                    e.preventDefault();
-                }
-            }
-            lastTap = currentTime;
-        });
-
-        async function takePhoto() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            loading.style.display = 'block';
-            progressDiv.innerText = 'Loading Tesseract...';
-            
-            try {
-                // Prima verifica che Tesseract sia caricato
-                if (typeof Tesseract === 'undefined') {
-                    throw new Error('Tesseract.js non è stato caricato. Ricarica la pagina.');
-                }
-                
-                const worker = await Tesseract.createWorker({
-                    logger: m => {
-                        console.log('Tesseract status:', m);
-                        if (m.status === 'loading') {
-                            progressDiv.innerText = 'Caricamento: ' + Math.round(m.progress * 100) + '%';
-                        } else if (m.status === 'loading tessit') {
-                            progressDiv.innerText = 'Inizializzazione Tesseract...';
-                        } else if (m.status === 'recognizing text') {
-                            progressDiv.innerText = 'Riconoscimento: ' + Math.round(m.progress * 100) + '%';
-                        }
-                    }
-                });
-                
-                progressDiv.innerText = 'Caricamento lingue...';
-                await worker.loadLanguage('eng+ita');
-                await worker.initialize('eng+ita');
-                
-                progressDiv.innerText = 'Riconoscimento in corso...';
-                const { data: { text } } = await worker.recognize(canvas);
-                
-                await worker.terminate();
-                
-                textResult.value = text;
-                loading.style.display = 'none';
-                resultOverlay.style.display = 'flex';
-                
-            } catch (err) {
-                console.error('Tesseract error:', err);
-                loading.style.display = 'none';
-                alert("Errore nel riconoscimento: " + err.message + "\n\nVerifica la console per dettagli.");
-            }
-        }
-
-        function closeResult() {
-            resultOverlay.style.display = 'none';
-            textResult.value = '';
-        }
-
-        function copyText() {
-            textResult.select();
-            document.execCommand('copy');
-            alert("Text copied!");
-        }
-
-        initCamera();
-    </script>
+  <main>
+    <p class="kicker"><span class="dot" aria-hidden="true"></span> Moved</p>
+    <h1>Text Recognition is now Text Lab</h1>
+    <p>Camera, drag &amp; drop, English and Italian OCR, editable results and local history — all on-device.</p>
+    <p lang="it">Text Recognition è diventata Text Lab: fotocamera, trascinamento, OCR inglese e italiano, testo modificabile e cronologia locale.</p>
+    <a href="./text-lab/#camera">Open Text Lab →</a>
+    <small>If you are not redirected automatically, use the link above.</small>
+  </main>
 </body>
-<script src="top_buttons.js"></script>
 </html>

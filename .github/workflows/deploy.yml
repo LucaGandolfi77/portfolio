@@ -15,7 +15,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    name: Quality gate
+    uses: ./.github/workflows/quality.yml
+
   build:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -83,10 +88,16 @@ jobs:
       # Il service worker usava una versione di cache fissa ('portfolio-v9'):
       # finche' nessuno la toccava, i visitatori di ritorno continuavano a
       # eseguire i bundle della volta in cui erano arrivati sul sito.
-      # Sostituiendo il placeholder con il commit SHA, ogni deploy produce una
-      // cache nuova e le vecchie vengono eliminate all'evento 'activate'.
+      # Sostituendo il placeholder con il commit SHA, ogni deploy produce una
+      # cache nuova e le vecchie vengono eliminate all'evento 'activate'.
       - name: Versiona il service worker
         run: sed -i.bak "s/__BUILD_ID__/${GITHUB_SHA}/g" sw.js && rm -f sw.js.bak
+
+      # Il tooling di qualità non fa parte del sito pubblicato: vive in
+      # tools/quality (test, Playwright, baseline audit) e viene rimosso
+      # dalla copia usata per l'artefatto.
+      - name: Rimuove il tooling qualità dall'artefatto
+        run: rm -rf tools
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

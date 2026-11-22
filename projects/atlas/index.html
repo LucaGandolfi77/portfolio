@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en" data-skin="lab">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d16">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Atlas — an interactive weather map with a 7-day forecast, saved places and a great-circle distance calculator. EN/IT, local-first, no tracking.">
+  <title>Atlas — Weather &amp; Distance · Luca Gandolfi</title>
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/atlas/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Atlas — Weather &amp; Distance">
+  <meta property="og:description" content="Search the world, read the next seven days and measure distances on a map.">
+  <meta property="og:url" content="https://lucagandolfi77.github.io/portfolio/projects/atlas/">
+  <meta property="og:image" content="https://lucagandolfi77.github.io/portfolio/assets/og-cover.jpg">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Atlas">
+
+  <link rel="stylesheet" href="../_shared/tokens.css">
+  <link rel="stylesheet" href="../_shared/base.css">
+  <link rel="stylesheet" href="../_shared/shell.css">
+  <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="pf-skip" href="#app" data-i18n="skip">Skip to content</a>
+
+  <header
+    data-project-shell
+    data-title="Atlas"
+    data-id="atlas"
+    data-back="../../projects.html"
+    data-home="../../index.html"
+    data-languages="en,it"
+    data-heading="div"></header>
+
+  <main id="app" class="atlas" data-app="atlas" data-mode="weather">
+    <noscript>
+      <div class="pf-card atlas-noscript">
+        <h2>JavaScript is required</h2>
+        <p>Atlas uses the browser to read the map and weather data. Please enable JavaScript.</p>
+      </div>
+    </noscript>
+
+    <section class="atlas-bar">
+      <div class="atlas-intro">
+        <p class="atlas-kicker">
+          <span class="atlas-kicker__dot" aria-hidden="true"></span>
+          <span data-i18n="kicker">Weather · Distance · Map</span>
+        </p>
+        <h1 class="atlas-title" data-i18n="title">The world, at a glance</h1>
+        <p class="atlas-subtitle" data-i18n="subtitle">Search a place, read the next seven days, or measure the distance between two points.</p>
+      </div>
+
+      <form id="searchForm" class="atlas-search" role="search">
+        <label class="pf-sr-only" for="searchInput" data-i18n="searchLabel">Search a place</label>
+        <div class="atlas-search__field">
+          <span class="atlas-search__icon" data-icon="search" aria-hidden="true"></span>
+          <input
+            id="searchInput"
+            class="pf-input"
+            type="search"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            enterkeyhint="search"
+            data-i18n-placeholder="searchPlaceholder"
+            placeholder="City or address…">
+          <button
+            id="searchClear"
+            class="atlas-search__clear"
+            type="button"
+            hidden
+            data-i18n-aria="clearSearch"
+            aria-label="Clear search">
+            <span data-icon="close" aria-hidden="true"></span>
+          </button>
+        </div>
+        <button id="searchBtn" class="pf-btn pf-btn--primary atlas-search__btn" type="submit">
+          <span id="searchBtnLabel" data-i18n="search">Search</span>
+        </button>
+        <div
+          id="searchResults"
+          class="atlas-results"
+          role="listbox"
+          hidden
+          data-i18n-aria="searchResultsLabel"
+          aria-label="Search results"></div>
+        <p id="searchStatus" class="pf-sr-only" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="atlas-controls">
+        <div id="modeSwitch" class="pf-seg atlas-seg" role="group" data-i18n-aria="modeLabel" aria-label="Atlas mode">
+          <button type="button" data-mode="weather" aria-pressed="true">
+            <span data-i18n="weatherMode">Weather</span>
+          </button>
+          <button type="button" data-mode="measure" aria-pressed="false">
+            <span data-i18n="measureMode">Measure</span>
+          </button>
+        </div>
+
+        <div id="unitsSwitch" class="pf-seg atlas-seg atlas-seg--units" role="group" data-i18n-aria="unitsLabel" aria-label="Temperature units">
+          <button type="button" data-units="metric" aria-pressed="true" aria-label="Celsius">°C</button>
+          <button type="button" data-units="imperial" aria-pressed="false" aria-label="Fahrenheit">°F</button>
+        </div>
+
+        <button id="locateBtn" class="pf-btn pf-btn--ghost atlas-locate" type="button">
+          <span class="atlas-btn__icon" data-icon="locate" aria-hidden="true"></span>
+          <span id="locateLabel" data-i18n="locate">My location</span>
+        </button>
+      </div>
+    </section>
+
+    <p id="offlineBanner" class="atlas-offline" role="status" hidden data-i18n="offlineNotice">
+      You are offline. Cached data is still available.
+    </p>
+
+    <div class="atlas-layout">
+      <section id="mapWrap" class="atlas-map-wrap" aria-labelledby="mapHint">
+        <div id="map" class="atlas-map" role="region" tabindex="0" data-i18n-aria="mapLabel" aria-label="Interactive map"></div>
+        <p id="mapHint" class="atlas-map-hint" data-i18n="mapHintWeather">
+          Tap the map to read the weather, or search a place.
+        </p>
+        <p class="atlas-map-legend">
+          <span data-i18n="mapData">Map data © OpenStreetMap contributors</span>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a>
+        </p>
+      </section>
+
+      <aside id="atlasPanel" class="atlas-panel">
+        <section id="weatherPanel" class="atlas-weather" aria-labelledby="weatherHeading">
+          <header class="atlas-panel__head">
+            <h2 id="weatherHeading" class="pf-card__title" data-i18n="weatherTitle">Weather</h2>
+            <span id="weatherBadge" class="pf-badge" hidden></span>
+          </header>
+
+          <div id="weatherEmpty" class="pf-empty atlas-empty">
+            <span class="pf-empty__icon" aria-hidden="true">
+              <span data-icon="globe" aria-hidden="true"></span>
+            </span>
+            <h3 data-i18n="weatherEmptyTitle">Pick a place on the map</h3>
+            <p data-i18n="weatherEmptyText">Search a city or tap anywhere on the map. Weather data is cached on this device for offline reading.</p>
+          </div>
+
+          <div id="weatherLoading" class="atlas-loading" hidden role="status" aria-live="polite">
+            <span class="atlas-spinner" aria-hidden="true"></span>
+            <span data-i18n="weatherLoading">Reading the sky…</span>
+          </div>
+
+          <div id="weatherError" class="atlas-error" role="alert" hidden>
+            <p id="weatherErrorText"></p>
+            <button id="weatherRetry" class="pf-btn" type="button" data-i18n="retry">Retry</button>
+          </div>
+
+          <div id="weatherContent" hidden>
+            <header class="atlas-current-head">
+              <div class="atlas-current-head__text">
+                <h3 id="placeName" class="atlas-place-name"></h3>
+                <p id="placeDetail" class="atlas-place-detail"></p>
+              </div>
+              <span id="weatherUpdated" class="atlas-updated"></span>
+            </header>
+
+            <p id="weatherOffline" class="atlas-cached" role="status" hidden data-i18n="weatherOffline">
+              Offline — showing the last saved reading.
+            </p>
+
+            <div id="currentBlock" class="atlas-current atlas-current--clouds">
+              <div id="currentIcon" class="atlas-current__icon" aria-hidden="true"></div>
+              <div class="atlas-current__readout">
+                <span id="currentTemp" class="atlas-current__temp">—</span>
+                <span id="currentCondition" class="atlas-current__condition"></span>
+                <span id="currentFeels" class="atlas-current__feels"></span>
+              </div>
+            </div>
+
+            <div class="atlas-metrics">
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="humidity" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="humidity">Humidity</span>
+                <strong id="metricHumidity">—</strong>
+              </div>
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="wind" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="wind">Wind</span>
+                <strong id="metricWind">—</strong>
+              </div>
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="rain" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="precipitation">Precipitation</span>
+                <strong id="metricPrecip">—</strong>
+              </div>
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="cloud" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="highLow">High / low</span>
+                <strong id="metricHighLow">—</strong>
+              </div>
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="sunrise" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="sunrise">Sunrise</span>
+                <strong id="metricSunrise">—</strong>
+              </div>
+              <div class="atlas-metric">
+                <span class="atlas-metric__icon" data-icon="sunset" aria-hidden="true"></span>
+                <span class="atlas-metric__label" data-i18n="sunset">Sunset</span>
+                <strong id="metricSunset">—</strong>
+              </div>
+            </div>
+
+            <div class="atlas-actions">
+              <button id="savePlaceBtn" class="pf-btn pf-btn--primary" type="button"></button>
+              <button id="shareBtn" class="pf-btn" type="button">
+                <span class="atlas-btn__icon" data-icon="share" aria-hidden="true"></span>
+                <span data-i18n="sharePlace">Share</span>
+              </button>
+              <button id="copyCoordsBtn" class="pf-btn" type="button">
+                <span class="atlas-btn__icon" data-icon="copy" aria-hidden="true"></span>
+                <span data-i18n="copyCoords">Copy coordinates</span>
+              </button>
+              <a id="osmLink" class="pf-btn pf-btn--ghost" target="_blank" rel="noopener">
+                <span data-i18n="openOsm">Open in OpenStreetMap</span>
+              </a>
+              <button id="refreshBtn" class="pf-btn pf-btn--ghost" type="button">
+                <span class="atlas-btn__icon" data-icon="refresh" aria-hidden="true"></span>
+                <span data-i18n="refresh">Refresh</span>
+              </button>
+            </div>
+
+            <section class="atlas-block" aria-labelledby="hoursTitle">
+              <h4 id="hoursTitle" class="atlas-block__title" data-i18n="hourlyTitle">Next hours</h4>
+              <div id="hourlyList" class="atlas-hours"></div>
+            </section>
+
+            <section class="atlas-block" aria-labelledby="forecastTitle">
+              <h4 id="forecastTitle" class="atlas-block__title" data-i18n="forecastTitle">7-day forecast</h4>
+              <div id="forecastList" class="atlas-forecast"></div>
+            </section>
+          </div>
+
+          <section class="atlas-places" aria-labelledby="placesTitle">
+            <h3 id="placesTitle" class="atlas-places__title" data-i18n="placesTitle">Saved places</h3>
+            <p id="placesEmpty" class="pf-hint" data-i18n="placesEmpty">No saved places yet. Tap “Save place” when you find one.</p>
+            <div id="placesList" class="atlas-places__list"></div>
+          </section>
+        </section>
+
+        <section id="measurePanel" class="atlas-measure" aria-labelledby="measureHeading" hidden>
+          <header class="atlas-panel__head">
+            <h2 id="measureHeading" class="pf-card__title" data-i18n="measureTitle">Distance</h2>
+          </header>
+          <p class="pf-hint" data-i18n="measureHint">Set two points on the map or type their coordinates. Distance uses the great-circle formula.</p>
+
+          <form id="measureForm" class="atlas-measure__form">
+            <fieldset class="atlas-point">
+              <legend class="atlas-point__legend"><span class="atlas-point__badge">A</span><span data-i18n="pointA">Point A</span></legend>
+              <label class="pf-field">
+                <span class="pf-label" data-i18n="latitude">Latitude</span>
+                <input id="latA" class="pf-input" type="text" inputmode="decimal" autocomplete="off" placeholder="45.4642">
+              </label>
+              <label class="pf-field">
+                <span class="pf-label" data-i18n="longitude">Longitude</span>
+                <input id="lngA" class="pf-input" type="text" inputmode="decimal" autocomplete="off" placeholder="9.1900">
+              </label>
+            </fieldset>
+
+            <fieldset class="atlas-point">
+              <legend class="atlas-point__legend"><span class="atlas-point__badge atlas-point__badge--b">B</span><span data-i18n="pointB">Point B</span></legend>
+              <label class="pf-field">
+                <span class="pf-label" data-i18n="latitude">Latitude</span>
+                <input id="latB" class="pf-input" type="text" inputmode="decimal" autocomplete="off" placeholder="48.8566">
+              </label>
+              <label class="pf-field">
+                <span class="pf-label" data-i18n="longitude">Longitude</span>
+                <input id="lngB" class="pf-input" type="text" inputmode="decimal" autocomplete="off" placeholder="2.3522">
+              </label>
+            </fieldset>
+          </form>
+
+          <div class="atlas-distance">
+            <div class="atlas-distance__main">
+              <span data-i18n="distanceLabel">Distance</span>
+              <strong id="distanceValue">0.00 km</strong>
+            </div>
+            <div>
+              <span data-i18n="bearingLabel">Bearing</span>
+              <strong id="bearingValue">—</strong>
+            </div>
+            <div>
+              <span data-i18n="midpoint">Midpoint</span>
+              <strong id="midpointValue">—</strong>
+            </div>
+          </div>
+
+          <div class="atlas-actions">
+            <button id="swapPoints" class="pf-btn" type="button">
+              <span class="atlas-btn__icon" data-icon="swap" aria-hidden="true"></span>
+              <span data-i18n="swapPoints">Swap</span>
+            </button>
+            <button id="resetMeasure" class="pf-btn pf-btn--ghost" type="button">
+              <span class="atlas-btn__icon" data-icon="reset" aria-hidden="true"></span>
+              <span data-i18n="resetMeasure">Reset</span>
+            </button>
+            <button id="measureWeather" class="pf-btn pf-btn--primary" type="button" disabled>
+              <span data-i18n="weatherAtMidpoint">Weather at midpoint</span>
+            </button>
+          </div>
+          <p id="measureStatus" class="atlas-error atlas-error--inline" role="alert" hidden></p>
+        </section>
+
+        <section class="pf-card atlas-privacy">
+          <h2 class="pf-card__title" data-i18n="privacyTitle">Data &amp; privacy</h2>
+          <p class="pf-hint" data-i18n="privacyText">Weather and place searches use Open-Meteo and OpenStreetMap Nominatim. Map tiles come from OpenStreetMap. Coordinates, saved places and the weather cache stay in this browser; no account, no tracking.</p>
+        </section>
+
+        <footer class="atlas-footer">
+          <p data-i18n="footer">A Project Kit 2026 app · local-first, no tracking</p>
+          <a href="../../projects.html" data-i18n="footerProjects">All projects</a>
+        </footer>
+      </aside>
+    </div>
+  </main>
+
+  <!-- serviceWorker: registrato da js/app.js (scope ./) -->
+  <script src="../_shared/shell.js" defer></script>
+  <script src="js/vendor/leaflet/leaflet.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

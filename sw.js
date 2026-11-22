@@ -87,9 +87,13 @@ self.addEventListener('activate', event => {
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
-                    // Le PWA annidate (es. games/snake, games/slot, projects/nba_simulator, projects/radio) hanno cache proprie.
+                    // Le PWA annidate (es. games/snake, games/slot, projects/nba_simulator,
+                    // projects/radio, projects/qr-studio) hanno cache proprie.
                     const nested = cacheName.indexOf('snake-') === 0 || cacheName.indexOf('slot-') === 0 ||
-                        cacheName.indexOf('nba-') === 0 || cacheName.indexOf('radio-') === 0;
+                        cacheName.indexOf('nba-') === 0 || cacheName.indexOf('radio-') === 0 ||
+                        cacheName.indexOf('pf-qr-studio-') === 0 || cacheName.indexOf('pf-atlas-') === 0 ||
+                        cacheName.indexOf('pf-vision-lab-') === 0 ||
+                        cacheName.indexOf('pf-text-lab-') === 0;
                     if (cacheName !== CACHE_NAME && !nested) {
                         console.log('Eliminazione vecchia cache:', cacheName);
                         return caches.delete(cacheName);

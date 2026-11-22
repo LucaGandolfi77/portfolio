@@ -3,12 +3,12 @@
 
 const PROJECTS_DATA = [
   {
-    "id": "world-weather-map",
-    "title": "World Weather Map",
-    "description": "Interactive world map with real-time weather data for any location.",
-    "href": "projects/world_weather.html",
-    "emoji": "🌍",
-    "badge": "API / Map",
+    "id": "atlas",
+    "title": "Atlas — Weather & Distance",
+    "description": "Interactive weather map, 7-day forecast and GPS distance calculator. EN/IT, local-first.",
+    "href": "projects/atlas/",
+    "emoji": "🧭",
+    "badge": "Data",
     "badgeColor": "#00d4ff"
   },
   {
@@ -111,11 +111,11 @@ const PROJECTS_DATA = [
     "badgeColor": "#00d4ff"
   },
   {
-    "id": "facemesh-camera",
-    "title": "FaceMesh Camera",
-    "description": "Real-time face tracking and mesh visualization.",
-    "href": "projects/facemesh_camera.html",
-    "emoji": "👤",
+    "id": "vision-lab",
+    "title": "Vision Lab — Face & Smile",
+    "description": "Live 478-point face mesh, expression telemetry and a playful on-device smile analysis. EN/IT, no uploads.",
+    "href": "projects/vision-lab/",
+    "emoji": "🪞",
     "badge": "AI / AR",
     "badgeColor": "#00d4ff"
   },
@@ -197,15 +197,6 @@ const PROJECTS_DATA = [
     "description": "Track IQOS sessions.",
     "href": "projects/iqos_timer.html",
     "emoji": "⏱️",
-    "badge": "Tool",
-    "badgeColor": "#00d4ff"
-  },
-  {
-    "id": "gps-distance",
-    "title": "GPS Distance",
-    "description": "Calculate distance between points.",
-    "href": "projects/gps.html",
-    "emoji": "🗺️",
     "badge": "Tool",
     "badgeColor": "#00d4ff"
   },
@@ -318,19 +309,10 @@ const PROJECTS_DATA = [
     "badgeColor": "#00d4ff"
   },
   {
-    "id": "qr-code-reader",
-    "title": "QR Code Reader",
-    "description": "Scan QR codes instantly.",
-    "href": "projects/qrcode.html",
-    "emoji": "📱",
-    "badge": "Utility",
-    "badgeColor": "#00d4ff"
-  },
-  {
-    "id": "qr-code-generator",
-    "title": "QR Code Generator",
-    "description": "Create and download QR codes.",
-    "href": "projects/create_qrcode.html",
+    "id": "qr-studio",
+    "title": "QR Studio — Scan & Create",
+    "description": "Scan and design QR codes for links, Wi-Fi, contacts and events. Offline, local-first.",
+    "href": "projects/qr-studio/",
     "emoji": "🔳",
     "badge": "Utility",
     "badgeColor": "#00d4ff"
@@ -417,11 +399,11 @@ const PROJECTS_DATA = [
     "badgeColor": "#00d4ff"
   },
   {
-    "id": "text-recognition",
-    "title": "Text Recognition",
-    "description": "Extract text from images using AI.",
-    "href": "projects/text_recognition.html",
-    "emoji": "📷",
+    "id": "text-lab",
+    "title": "Text Lab — OCR & Scan",
+    "description": "Extract editable text from pages and photos with local OCR. Camera, drag & drop, EN/IT.",
+    "href": "projects/text-lab/",
+    "emoji": "🔤",
     "badge": "AI",
     "badgeColor": "#00d4ff"
   },

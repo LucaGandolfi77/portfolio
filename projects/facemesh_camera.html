@@ -1,275 +1,70 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FaceMesh Camera</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        .container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-
-        video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            /* Mirroring handled by JS class */
-        }
-
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            /* Mirroring handled by JS class */
-        }
-
-        .mirrored {
-            transform: scaleX(-1);
-        }
-
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #00d4ff;
-            font-family: sans-serif;
-            font-size: 1.2rem;
-            z-index: 10;
-            background: rgba(0,0,0,0.7);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-            display: flex;
-            gap: 20px;
-        }
-
-        .btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-family: sans-serif;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
-        }
-        
-        .info-text {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            color: rgba(255,255,255,0.7);
-            font-family: sans-serif;
-            font-size: 0.9rem;
-            z-index: 20;
-            pointer-events: none;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FaceMesh Camera → Vision Lab</title>
+  <meta name="description" content="FaceMesh Camera is now Vision Lab: live face mesh, expressions and smile analysis, all on-device.">
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/vision-lab/">
+  <meta name="robots" content="noindex, follow">
+  <meta http-equiv="refresh" content="0; url=./vision-lab/#mesh">
+  <meta name="theme-color" content="#0a0d16">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+      background: radial-gradient(80% 80% at 50% 0%, #10263a, #070a12 70%);
+      color: #eef3ff;
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main {
+      width: min(100%, 470px);
+      padding: 28px 24px;
+      border: 1px solid rgba(0, 229, 255, 0.24);
+      border-radius: 22px;
+      background: rgba(12, 18, 32, 0.84);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #00e5ff; box-shadow: 0 0 16px #00e5ff; }
+    .kicker { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; color: #00e5ff; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1.1; letter-spacing: -0.03em; }
+    p { margin: 12px 0 0; color: #aab4c8; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      margin-top: 20px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: #00e5ff;
+      color: #041018;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    a:focus-visible { outline: 2px solid #ff7ab8; outline-offset: 3px; }
+    small { display: block; margin-top: 16px; color: #7f8aa0; font-size: 12px; }
+  </style>
+  <script>
+    (function () {
+      var target = './vision-lab/' + location.search + '#mesh';
+      location.replace(target);
+    })();
+  </script>
 </head>
 <body>
-    <div class="container" id="container">
-        <div id="loading">Loading FaceMesh Model...</div>
-        <div class="info-text">Double tap screen to switch camera</div>
-        <video id="input_video" playsinline webkit-playsinline muted autoplay></video>
-        <canvas id="output_canvas"></canvas>
-        
-        <div class="controls">
-            <a class="btn" href="../index.html#projects" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Exit</a>
-            <button class="btn" id="captureBtn">Capture & Download</button>
-        </div>
-    </div>
-
-    <script>
-        const videoElement = document.getElementById('input_video');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const container = document.getElementById('container');
-        const loading = document.getElementById('loading');
-
-        let faceMesh;
-        let camera;
-        let isFrontCamera = true;
-        let lastTap = 0;
-
-        function onResults(results) {
-            loading.style.display = 'none';
-            
-            // Resize canvas to match video display size
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            // If we are mirroring the video via CSS, we don't need to mirror the canvas context drawing
-            // because the canvas element itself is also mirrored via CSS class.
-            // However, MediaPipe results are normalized.
-            
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            
-            if (results.multiFaceLandmarks) {
-                for (const landmarks of results.multiFaceLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION,
-                                 {color: '#C0C0C070', lineWidth: 1});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, {color: '#FF3030'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYEBROW, {color: '#FF3030'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_IRIS, {color: '#FF3030'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, {color: '#30FF30'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYEBROW, {color: '#30FF30'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_IRIS, {color: '#30FF30'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_FACE_OVAL, {color: '#E0E0E0'});
-                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, {color: '#E0E0E0'});
-                }
-            }
-            canvasCtx.restore();
-        }
-
-        async function setupFaceMesh() {
-            faceMesh = new FaceMesh({locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-            }});
-            
-            faceMesh.setOptions({
-                maxNumFaces: 2,
-                refineLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-            
-            faceMesh.onResults(onResults);
-        }
-
-        function startCamera() {
-            if (camera) {
-                camera.stop();
-            }
-
-            // Update mirroring classes
-            if (isFrontCamera) {
-                videoElement.classList.add('mirrored');
-                canvasElement.classList.add('mirrored');
-            } else {
-                videoElement.classList.remove('mirrored');
-                canvasElement.classList.remove('mirrored');
-            }
-
-            camera = new Camera(videoElement, {
-                onFrame: async () => {
-                    await faceMesh.send({image: videoElement});
-                },
-                width: 1280,
-                height: 720,
-                facingMode: isFrontCamera ? 'user' : 'environment'
-            });
-            
-            camera.start();
-        }
-
-        // Double tap/click handler
-        container.addEventListener('click', (e) => {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 500 && tapLength > 0) {
-                // Double tap detected
-                isFrontCamera = !isFrontCamera;
-                loading.style.display = 'block';
-                loading.textContent = 'Switching Camera...';
-                startCamera();
-                e.preventDefault();
-            }
-            lastTap = currentTime;
-        });
-
-        // Initialize
-        setupFaceMesh().then(() => {
-            startCamera();
-        });
-
-        // Handle resize
-        window.addEventListener('resize', () => {
-            canvasElement.width = window.innerWidth;
-            canvasElement.height = window.innerHeight;
-        });
-
-        // Capture and download as compressed ZIP
-        async function canvasToBlob(canvas, type = 'image/png', quality = 0.92) {
-            return new Promise((resolve) => {
-                canvas.toBlob((b) => resolve(b), type, quality);
-            });
-        }
-
-        async function captureAndDownload() {
-            const btn = document.getElementById('captureBtn');
-            if (!canvasElement || canvasElement.width === 0 || canvasElement.height === 0) {
-                alert('Canvas non pronto per lo scatto. Riprova tra un attimo.');
-                return;
-            }
-            btn.disabled = true;
-            const oldText = btn.textContent;
-            btn.textContent = 'Elaborazione...';
-            try {
-                // get current canvas image as jpeg to reduce size
-                const imgBlob = await canvasToBlob(canvasElement, 'image/jpeg', 0.85);
-                if (!imgBlob) throw new Error('Impossibile ottenere l\'immagine dal canvas');
-
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const imgName = `mesh_camera_${timestamp}.jpeg`;
-
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(imgBlob);
-                a.download = imgName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(a.href);
-            } catch (err) {
-                console.error(err);
-                alert('Error creating snapshot: ' + (err.message || err));
-            } finally {
-                btn.disabled = false;
-                btn.textContent = oldText;
-            }
-        }
-
-        document.getElementById('captureBtn').addEventListener('click', captureAndDownload);
-    </script>
-    <script src="top_buttons.js"></script>
-    </body>
-    </html>
+  <main>
+    <p class="kicker"><span class="dot" aria-hidden="true"></span> Moved</p>
+    <h1>FaceMesh Camera is now Vision Lab</h1>
+    <p>A live face mesh, expression telemetry and a playful smile analysis in one on-device app.</p>
+    <p lang="it">FaceMesh Camera è diventata Vision Lab: mesh facciale, telemetria delle espressioni e analisi del sorriso in un’unica app on-device.</p>
+    <a href="./vision-lab/#mesh">Open Vision Lab →</a>
+    <small>If you are not redirected automatically, use the link above.</small>
+  </main>
+</body>
+</html>

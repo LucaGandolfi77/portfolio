@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en" data-skin="lab">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d16">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Vision Lab — a private face-tracking mirror with a live 478-point mesh, expression telemetry and a playful smile analysis. MediaPipe runs on-device, no uploads.">
+  <title>Vision Lab — Face &amp; Smile · Luca Gandolfi</title>
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/vision-lab/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Vision Lab — Face &amp; Smile">
+  <meta property="og:description" content="A live face mesh, expression telemetry and a playful smile analysis that run entirely on your device.">
+  <meta property="og:url" content="https://lucagandolfi77.github.io/portfolio/projects/vision-lab/">
+  <meta property="og:image" content="https://lucagandolfi77.github.io/portfolio/assets/og-cover.jpg">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vision Lab">
+
+  <link rel="stylesheet" href="../_shared/tokens.css">
+  <link rel="stylesheet" href="../_shared/base.css">
+  <link rel="stylesheet" href="../_shared/shell.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="pf-skip" href="#app" data-i18n="skip">Skip to content</a>
+
+  <header
+    data-project-shell
+    data-title="Vision Lab"
+    data-id="vision-lab"
+    data-back="../../projects.html"
+    data-home="../../index.html"
+    data-languages="en,it"
+    data-heading="div"></header>
+
+  <main id="app" class="vision" data-app="vision-lab" data-mode="mesh">
+    <noscript>
+      <div class="pf-card vision-noscript">
+        <h2>JavaScript is required</h2>
+        <p>Vision Lab uses the camera and a local AI model. Please enable JavaScript.</p>
+      </div>
+    </noscript>
+
+    <section class="vision-topbar">
+      <div class="vision-intro">
+        <p class="vision-kicker">
+          <span class="vision-kicker__dot" aria-hidden="true"></span>
+          <span data-i18n="kicker">Face tracking · Smile lab</span>
+        </p>
+        <h1 class="vision-title" data-i18n="title">Your face, in real time</h1>
+        <p class="vision-subtitle" data-i18n="subtitle">A private computer-vision mirror: live face mesh, expressions and a playful smile analysis. Everything runs on this device.</p>
+      </div>
+
+      <div class="vision-toolbar">
+        <div id="modeSwitch" class="pf-seg" role="group" data-i18n-aria="modeLabel" aria-label="Vision Lab mode">
+          <button type="button" data-mode="mesh" aria-pressed="true">
+            <span data-i18n="meshMode">Mesh</span>
+          </button>
+          <button type="button" data-mode="smile" aria-pressed="false">
+            <span data-i18n="smileMode">Smile</span>
+          </button>
+        </div>
+
+        <button id="cameraToggle" class="pf-btn pf-btn--primary" type="button">
+          <span class="vision-btn__icon" data-icon="camera" aria-hidden="true"></span>
+          <span id="cameraToggleLabel" data-i18n="cameraStart">Start camera</span>
+        </button>
+        <button id="switchCamera" class="pf-btn" type="button" data-i18n-aria="cameraSwitch" aria-label="Switch camera">
+          <span class="vision-btn__icon" data-icon="switch" aria-hidden="true"></span>
+          <span data-i18n="cameraSwitch">Switch camera</span>
+        </button>
+        <button id="mirrorToggle" class="pf-btn" type="button" aria-pressed="true">
+          <span class="vision-btn__icon" data-icon="mirror" aria-hidden="true"></span>
+          <span id="mirrorLabel" data-i18n="mirror">Mirror</span>
+        </button>
+        <button id="snapshotBtn" class="pf-btn" type="button" disabled>
+          <span class="vision-btn__icon" data-icon="snapshot" aria-hidden="true"></span>
+          <span data-i18n="capture">Snapshot</span>
+        </button>
+        <button id="fullscreenBtn" class="pf-btn pf-btn--ghost" type="button" data-i18n-aria="fullscreen" aria-label="Fullscreen">
+          <span class="vision-btn__icon" data-icon="fullscreen" aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="vision-status" aria-label="Status">
+      <span id="cameraStatus" class="pf-badge" data-state="idle" role="status" aria-live="polite" data-i18n="cameraIdle">Camera off</span>
+      <span id="modelStatus" class="pf-badge" data-state="idle" role="status" aria-live="polite" data-i18n="onDevice">On-device</span>
+      <span id="faceStatus" class="pf-badge" data-state="idle" data-i18n="noFace">No face detected</span>
+      <span id="fpsBadge" class="pf-badge" hidden>0 FPS</span>
+    </section>
+
+    <p id="errorBox" class="vision-error" role="alert" hidden>
+      <span id="errorText"></span>
+      <button id="errorRetry" class="pf-btn pf-btn--sm" type="button"></button>
+    </p>
+
+    <div class="vision-layout">
+      <section id="stage" class="vision-stage" aria-label="Camera preview">
+        <video id="video" class="vision-video" playsinline muted autoplay aria-hidden="true"></video>
+        <canvas id="overlay" class="vision-overlay" aria-hidden="true"></canvas>
+
+        <div id="stagePlaceholder" class="vision-placeholder">
+          <span class="vision-placeholder__icon" data-icon="scan" aria-hidden="true"></span>
+          <h2 id="stageTitle" data-i18n="meshTitle">Face mesh</h2>
+          <p data-i18n="cameraOffHint">Start the camera to see the mesh. Nothing leaves this device.</p>
+          <button id="stageStart" class="pf-btn pf-btn--primary" type="button">
+            <span class="vision-btn__icon" data-icon="camera" aria-hidden="true"></span>
+            <span data-i18n="cameraStart">Start camera</span>
+          </button>
+        </div>
+
+        <div id="stageMessage" class="vision-stage__message" role="status" aria-live="polite" hidden></div>
+        <div class="vision-stage__corner" aria-hidden="true"></div>
+        <button id="fullscreenExit" class="vision-exit" type="button" data-i18n-aria="exitFullscreen" aria-label="Exit fullscreen">
+          <span class="vision-btn__icon" data-icon="close" aria-hidden="true"></span>
+        </button>
+      </section>
+
+      <aside class="vision-panel">
+        <section id="meshPanel" class="vision-section" aria-labelledby="meshHeading">
+          <header class="vision-panel__head">
+            <h2 id="meshHeading" class="pf-card__title" data-i18n="meshTitle">Face mesh</h2>
+            <span class="pf-badge pf-badge--accent" data-i18n="onDevice">On-device</span>
+          </header>
+          <p class="pf-hint" data-i18n="meshHint">478 landmarks and 52 blendshapes track your expressions locally.</p>
+
+          <div class="pf-field vision-density">
+            <span class="pf-label" id="meshDensityLabel" data-i18n="meshDensity">Mesh density</span>
+            <div id="meshSwitch" class="pf-seg" role="group" aria-labelledby="meshDensityLabel">
+              <button type="button" data-mesh="off" aria-pressed="false"><span data-i18n="meshOff">Off</span></button>
+              <button type="button" data-mesh="soft" aria-pressed="true"><span data-i18n="meshSoft">Soft</span></button>
+              <button type="button" data-mesh="full" aria-pressed="false"><span data-i18n="meshFull">Full</span></button>
+            </div>
+          </div>
+
+          <div class="vision-stats">
+            <div class="vision-stat">
+              <span data-i18n="faceStatus">Face tracking</span>
+              <strong id="faceCountValue">—</strong>
+            </div>
+            <div class="vision-stat">
+              <span data-i18n="blinkCount">Blinks</span>
+              <strong id="blinkCountValue">0</strong>
+            </div>
+            <div class="vision-stat">
+              <span data-i18n="fps">FPS</span>
+              <strong id="fpsValue">0</strong>
+            </div>
+          </div>
+
+          <div class="vision-bars">
+            <div class="vision-bar-row">
+              <span class="vision-bar-label"><span class="vision-mini-icon" data-icon="eye" aria-hidden="true"></span><span data-i18n="blink">Blink</span></span>
+              <div class="vision-bar"><i id="barBlink"></i></div>
+              <b id="valBlink">0%</b>
+            </div>
+            <div class="vision-bar-row">
+              <span class="vision-bar-label"><span class="vision-mini-icon" data-icon="smile" aria-hidden="true"></span><span data-i18n="smile">Smile</span></span>
+              <div class="vision-bar"><i id="barSmile"></i></div>
+              <b id="valSmile">0%</b>
+            </div>
+            <div class="vision-bar-row">
+              <span class="vision-bar-label"><span class="vision-mini-icon" data-icon="brow" aria-hidden="true"></span><span data-i18n="brow">Brow</span></span>
+              <div class="vision-bar"><i id="barBrow"></i></div>
+              <b id="valBrow">0%</b>
+            </div>
+          </div>
+
+          <div class="vision-pose">
+            <div class="vision-pose__item"><span data-i18n="yaw">Yaw</span><strong id="poseYaw">0°</strong></div>
+            <div class="vision-pose__item"><span data-i18n="pitch">Pitch</span><strong id="posePitch">0°</strong></div>
+            <div class="vision-pose__item"><span data-i18n="roll">Roll</span><strong id="poseRoll">0°</strong></div>
+            <div class="vision-pose__item vision-pose__item--emotion">
+              <span data-i18n="emotion">Emotion</span>
+              <strong><span id="emotionEmoji" aria-hidden="true">😐</span> <span id="emotionValue">Neutral</span></strong>
+            </div>
+          </div>
+
+          <p class="pf-hint" data-i18n="faceHint">Look at the camera, with your face inside the frame.</p>
+        </section>
+
+        <section id="smilePanel" class="vision-section" aria-labelledby="smileHeading" hidden>
+          <header class="vision-panel__head">
+            <h2 id="smileHeading" class="pf-card__title" data-i18n="smileTitle">Smile lab</h2>
+            <span class="pf-badge pf-badge--accent" data-i18n="onDevice">On-device</span>
+          </header>
+          <p class="pf-hint" data-i18n="smileIntro">Smile at the camera. Open your mouth to measure teeth whiteness and alignment.</p>
+
+          <div class="vision-scores">
+            <div class="vision-score">
+              <div class="vision-score__head">
+                <span class="vision-score__label"><span class="vision-mini-icon" data-icon="smile" aria-hidden="true"></span><span data-i18n="scoreSmile">Smile</span></span>
+                <strong id="smileValue">0%</strong>
+              </div>
+              <div class="vision-bar vision-bar--score"><i id="smileBar"></i></div>
+            </div>
+            <div class="vision-score">
+              <div class="vision-score__head">
+                <span class="vision-score__label"><span class="vision-mini-icon" data-icon="sun" aria-hidden="true"></span><span data-i18n="scoreWhiteness">Whiteness</span></span>
+                <strong id="whitenessValue">0%</strong>
+              </div>
+              <div class="vision-bar vision-bar--score"><i id="whitenessBar"></i></div>
+            </div>
+            <div class="vision-score">
+              <div class="vision-score__head">
+                <span class="vision-score__label"><span class="vision-mini-icon" data-icon="align" aria-hidden="true"></span><span data-i18n="scoreAlignment">Alignment</span></span>
+                <strong id="alignmentValue">0%</strong>
+              </div>
+              <div class="vision-bar vision-bar--score"><i id="alignmentBar"></i></div>
+            </div>
+          </div>
+
+          <div class="vision-overall">
+            <div class="vision-overall__score">
+              <span data-i18n="overall">Overall</span>
+              <strong><span id="overallValue">0</span><small>/100</small></strong>
+            </div>
+            <div id="overallStars" class="vision-stars" data-i18n-aria="stars" aria-label="Stars">
+              <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+            </div>
+          </div>
+
+          <div class="vision-best">
+            <div>
+              <span class="vision-best__label" data-i18n="best">Personal best</span>
+              <strong id="bestValue">—</strong>
+              <span id="bestDate" class="vision-best__date"></span>
+            </div>
+            <button id="resetBest" class="pf-btn pf-btn--sm pf-btn--ghost" type="button" data-i18n="resetBest">Reset</button>
+          </div>
+
+          <p id="smileHint" class="pf-hint" data-i18n="teethHint">Whiteness and alignment require an open mouth and good light.</p>
+          <p class="vision-disclaimer" data-i18n="smileDisclaimer">A playful estimate, not a dental diagnosis.</p>
+        </section>
+
+        <section class="pf-card vision-privacy">
+          <h2 class="pf-card__title" data-i18n="privacyTitle">Privacy</h2>
+          <p class="pf-hint" data-i18n="privacyText">The camera feed and the MediaPipe model run entirely in your browser. No frames are uploaded, no account is created and nothing is sent to a server. Settings and your best score stay in local storage.</p>
+          <p class="pf-hint vision-model-note" data-i18n="modelSizeNotice">The face model is about 4 MB and is cached after the first run.</p>
+        </section>
+
+        <footer class="vision-footer">
+          <p data-i18n="footer">A Project Kit 2026 app · camera stays on-device</p>
+          <a href="../../projects.html" data-i18n="footerProjects">All projects</a>
+        </footer>
+      </aside>
+    </div>
+  </main>
+
+  <!-- serviceWorker: registrato da js/app.js (scope ./) -->
+  <script src="../_shared/shell.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
