@@ -50,6 +50,14 @@ run('real OSM buildings exist with footprint rings and heights', () => {
   }
 });
 
+run('world is wide and terrain relief is low', () => {
+  ok(WORLD.maxLon - WORLD.minLon > 15);
+  ok(WORLD.maxLat - WORLD.minLat > 12);
+  ok(WORLD.elevScale <= 0.06 && WORLD.elevScale >= 0.04);
+  const peak = terrainHeight(geoToWorld(10.5, 46.5).x, geoToWorld(10.5, 46.5).z);
+  ok(peak < 260, `peak too high: ${peak}`);
+});
+
 run('lon/lat converts to world coordinates and back', () => {
   for (const a of AIRPORTS) {
     const p = geoToWorld(a.lon, a.lat);

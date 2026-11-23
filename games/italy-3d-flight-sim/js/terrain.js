@@ -23,7 +23,7 @@ function labelSprite(text, color = '#eaf6ff') {
   return sprite;
 }
 
-function terrainColor(h) {
+export function terrainColor(h) {
   if (h > 300) return new THREE.Color('#e8eef2');
   if (h > 230) return new THREE.Color('#8a8f96');
   if (h > 150) return new THREE.Color('#5b6b54');
@@ -51,6 +51,7 @@ function buildTerrain(quality, imageryTexture) {
     for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.userData.satColors = new Float32Array(colors);
   geo.computeVertexNormals();
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.95, metalness: 0,
@@ -99,6 +100,46 @@ function buildWater(vectors, group) {
     group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(120, pts.length * 2), 1.8, 5, false), riverMat));
   }
   return sea;
+}
+
+function buildCoastline(group, vectors) {
+  const shallow = new THREE.MeshBasicMaterial({
+    color: '#54c4d8', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false
+  });
+  const foam = new THREE.LineBasicMaterial({ color: '#d8fbff', transparent: true, opacity: 0.85 });
+  const meshes = [];
+  for (const ring of vectors.coastline) {
+    const pts = worldPolygon(ring);
+    if (pts.length < 3) continue;
+    let cx = 0, cz = 0;
+    for (const p of pts) { cx += p.x; cz += p.z; }
+    cx /= pts.length; cz /= pts.length;
+    const outer = pts.map((p, i) => {
+      const prev = pts[(i - 1 + pts.length) % pts.length];
+      const next = pts[(i + 1) % pts.length];
+      const tx = next.x - prev.x, tz = next.z - prev.z;
+      let nx = -tz, nz = tx;
+      const len = Math.hypot(nx, nz) || 1;
+      nx /= len; nz /= len;
+      if (nx * (p.x - cx) + nz * (p.z - cz) < 0) { nx = -nx; nz = -nz; }
+      return { x: p.x + nx * 16, z: p.z + nz * 16 };
+    });
+    const positions = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const ao = outer[i], bo = outer[(i + 1) % pts.length];
+      positions.push(a.x, 2.4, a.z, ao.x, 2.2, ao.z, b.x, 2.4, b.z);
+      positions.push(b.x, 2.4, b.z, ao.x, 2.2, ao.z, bo.x, 2.2, bo.z);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const mesh = new THREE.Mesh(geo, shallow);
+    group.add(mesh);
+    meshes.push(mesh);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p.x, 3.2, p.z)));
+    group.add(new THREE.LineLoop(lineGeo, foam));
+  }
+  return meshes;
 }
 
 function buildVegetation(group, quality) {
@@ -208,9 +249,10 @@ export function createWorld(scene, quality = 'high', imageryTexture = null) {
   group.add(terrain);
   const vectors = vectorData();
   const sea = buildWater(vectors, group);
+  const coast = buildCoastline(group, vectors);
   buildVegetation(group, quality);
   buildCities(group, vectors, quality);
   const realBuildings = buildRealBuildings(group, quality);
   buildAirports(group);
-  return { group, terrain, sea, realBuildings };
+  return { group, terrain, sea, coast, realBuildings };
 }

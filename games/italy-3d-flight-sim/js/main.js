@@ -15,7 +15,7 @@ import { initBuildingsData } from './buildings.js';
 
 const SAVE_KEY = 'italy3dFlightSim.save.v1';
 const DEFAULTS = {
-  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high', imagery: true,
+  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high', imagery: true, mapMode: false,
   bests: {}, stats: { flights: 0, landings: 0, crashes: 0 }
 };
 const save = load(SAVE_KEY, DEFAULTS);
@@ -85,6 +85,7 @@ function refreshUI() {
   $('qualityVal').textContent = game.quality === 'high' ? t('high') : t('low');
   $('pauseView').textContent = t(game.view);
   $('imageryVal').textContent = save.imagery ? t('on') : t('off');
+  $('mapModeVal').textContent = save.mapMode ? t('on') : t('off');
 }
 refreshUI();
 i18n.onChange(() => { save.lang = i18n.getLang(); persist(); refreshUI(); });
@@ -196,6 +197,10 @@ $('btnViewPause').addEventListener('click', cycleView);
 $('btnImagery').addEventListener('click', () => {
   save.imagery = !save.imagery; persist(); refreshUI();
   if (view3d) view3d.setImagery(save.imagery);
+});
+$('btnMapMode').addEventListener('click', () => {
+  save.mapMode = !save.mapMode; persist(); refreshUI();
+  if (view3d) view3d.setMapMode(save.mapMode);
 });
 $('btnQuality').addEventListener('click', () => {
   game.setQuality(game.quality === 'high' ? 'low' : 'high');
@@ -323,6 +328,7 @@ async function boot() {
     $('loadStatus').textContent = '3D scene';
     view3d = createRenderer(canvas, game.quality, imagery);
     view3d.setImagery(save.imagery);
+    view3d.setMapMode(save.mapMode);
     view3d.setPlane(game.plane);
     view3d.setTraffic(game.traffic);
     window.addEventListener('resize', () => view3d.resize(window.innerWidth, window.innerHeight));

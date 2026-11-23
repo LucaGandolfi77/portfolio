@@ -3,7 +3,7 @@
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
 import { terrainHeight } from './geo.js';
-import { createWorld } from './terrain.js';
+import { createWorld, terrainColor } from './terrain.js';
 import { createPlaneMesh, animatePlane } from './planes.js';
 
 function cloudTexture() {
@@ -56,6 +56,8 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
   let planeMesh = null;
   let trafficMeshes = [];
   let sunTime = 0.3;
+  let mapMode = false;
+  let imageryOn = true;
   const tempV = new THREE.Vector3();
   const tempLook = new THREE.Vector3();
 
@@ -135,11 +137,32 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
   }
 
   function setImagery(enabled) {
+    imageryOn = !!enabled;
     if (!imageryTexture) return;
     const mat = world.terrain.material;
-    mat.map = enabled ? imageryTexture : null;
-    mat.color.set(enabled ? '#ffffff' : '#6f9a78');
+    mat.map = imageryOn && !mapMode ? imageryTexture : null;
+    mat.color.set(imageryOn && !mapMode ? '#ffffff' : '#6f9a78');
     mat.needsUpdate = true;
+  }
+
+  function setMapMode(enabled) {
+    mapMode = !!enabled;
+    const geo = world.terrain.geometry;
+    const colors = geo.attributes.color;
+    const pos = geo.attributes.position;
+    for (let i = 0; i < colors.count; i++) {
+      const c = mapMode ? terrainColor(pos.getY(i)) : null;
+      const src = mapMode ? null : geo.userData.satColors;
+      if (c) colors.setXYZ(i, c.r, c.g, c.b);
+      else if (src) colors.setXYZ(i, src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
+    }
+    colors.needsUpdate = true;
+    const mat = world.terrain.material;
+    mat.map = mapMode || !imageryOn || !imageryTexture ? null : imageryTexture;
+    mat.color.set(imageryOn || mapMode ? '#ffffff' : '#6f9a78');
+    mat.needsUpdate = true;
+    world.sea.material.color.set(mapMode ? '#1a86c9' : '#1b6b93');
+    for (const mesh of world.coast || []) mesh.material.opacity = mapMode ? 0.9 : 0.55;
   }
 
   function resize(w, h) {
@@ -148,7 +171,7 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
     camera.updateProjectionMatrix();
   }
 
-  return { renderer, scene, camera, world, setPlane, setTraffic, setImagery, update, resize };
+  return { renderer, scene, camera, world, setPlane, setTraffic, setImagery, setMapMode, update, resize };
 }
 
 function L_COCKPIT(plane) { return Math.max(2, plane.length * 0.16); }

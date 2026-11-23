@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 
 const OUT = dirname(fileURLToPath(import.meta.url));
-const BBOX = { minLon: 6.4, maxLon: 19.0, minLat: 35.8, maxLat: 47.4 };
+const BBOX = { minLon: 4.5, maxLon: 20.5, minLat: 35.0, maxLat: 48.0 };
 const GRID = 512;
 const ZOOM = 9;
 const NE = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/';

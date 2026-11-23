@@ -13,13 +13,18 @@ export function initGeo(heightBuffer, metaJson, vectorJson) {
   const w = meta.width, h = meta.height;
   const smooth = new Float32Array(w * h);
   const at = (x, y) => heightData.getInt16((Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))) * 2, true);
+  const kernel = [1, 4, 6, 4, 1];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      smooth[y * w + x] = (
-        at(x, y) * 4 +
-        at(x - 1, y) * 2 + at(x + 1, y) * 2 + at(x, y - 1) * 2 + at(x, y + 1) * 2 +
-        at(x - 1, y - 1) + at(x + 1, y - 1) + at(x - 1, y + 1) + at(x + 1, y + 1)
-      ) / 16;
+      let sum = 0, weight = 0;
+      for (let ky = -2; ky <= 2; ky++) {
+        for (let kx = -2; kx <= 2; kx++) {
+          const k = kernel[kx + 2] * kernel[ky + 2];
+          sum += at(x + kx, y + ky) * k;
+          weight += k;
+        }
+      }
+      smooth[y * w + x] = sum / weight;
     }
   }
   smoothed = smooth;
@@ -59,7 +64,8 @@ export function elevationAt(lon, lat) {
 
 export function terrainHeight(x, z) {
   const { lon, lat } = worldToGeo(x, z);
-  return Math.max(0, elevationAt(lon, lat)) * WORLD.elevScale;
+  const e = elevationAt(lon, lat);
+  return e > 0 ? Math.max(1.5, e * WORLD.elevScale) : 0;
 }
 
 export function pointInRing(lon, lat, ring) {

@@ -1,9 +1,9 @@
 /* Italy 3D Flight Sim — aircraft, real airports, missions and bilingual strings */
 
 export const WORLD = {
-  width: 1400, depth: 1200,
-  minLon: 6.4, maxLon: 19.0, minLat: 35.8, maxLat: 47.4,
-  elevScale: 0.12, maxAlt: 3000, grid: 512
+  width: 1760, depth: 1430,
+  minLon: 4.5, maxLon: 20.5, minLat: 35.0, maxLat: 48.0,
+  elevScale: 0.05, maxAlt: 3000, grid: 512
 };
 
 export const loc = (value, lang = 'en') =>
@@ -118,7 +118,7 @@ export const STR = {
     freeHint: 'Pick a plane and a real airport, then explore Italy.',
     difficulty: 'DIFFICULTY', easy: 'EASY', medium: 'MEDIUM', hard: 'HARD',
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'OVERVIEW', traffic: 'TRAFFIC', terrain: 'TERRAIN',
-    starship: 'STARSHIP', aircraft: 'AIRCRAFT', imagery: 'SATELLITE',
+    starship: 'STARSHIP', aircraft: 'AIRCRAFT', imagery: 'SATELLITE', mapMode: 'MAP MODE',
     quality: 'GRAPHICS', low: 'LOW', high: 'HIGH', data: 'REAL DATA', dataHint: 'Natural Earth coast, lakes, rivers, cities and SRTM elevation',
     ground: 'GROUND', sea: 'SEA', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFIC — watch out!'
   },
@@ -143,7 +143,7 @@ export const STR = {
     freeHint: 'Scegli aereo e aeroporto reale, poi esplora l’Italia.',
     difficulty: 'DIFFICOLTÀ', easy: 'FACILE', medium: 'MEDIO', hard: 'DIFFICILE',
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'PANORAMICA', traffic: 'TRAFFICO', terrain: 'TERRENO',
-    starship: 'ASTRONAVE', aircraft: 'AEREO', imagery: 'SATELLITE',
+    starship: 'ASTRONAVE', aircraft: 'AEREO', imagery: 'SATELLITE', mapMode: 'MODO MAPPA',
     quality: 'GRAFICA', low: 'BASSA', high: 'ALTA', data: 'DATI REALI', dataHint: 'Coste, laghi, fiumi, città Natural Earth e altitudini SRTM',
     ground: 'TERRA', sea: 'MARE', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFICO — attenzione!'
   }
