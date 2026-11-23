@@ -1,41 +1,36 @@
-/* NBA Sim — audio WebAudio */
-(function () {
-    'use strict';
+/* Tiny WebAudio synth for buzzer, shots and wins */
 
-    const NBAAudio = {
-        ctx: null,
-        enabled: true,
-        init: function () {
-            if (!this.enabled) return;
-            try {
-                if (!this.ctx) {
-                    const AC = window.AudioContext || window.webkitAudioContext;
-                    if (AC) this.ctx = new AC();
-                }
-                if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-            } catch (e) {}
-        },
-        beep: function (freq, dur, delay, type, vol) {
-            if (!this.enabled) return;
-            this.init();
-            if (!this.ctx) return;
-            try {
-                const t = this.ctx.currentTime + (delay || 0);
-                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
-                o.type = type || 'sine'; o.frequency.value = freq;
-                g.gain.setValueAtTime(0.0001, t);
-                g.gain.exponentialRampToValueAtTime(vol || 0.08, t + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-                o.connect(g); g.connect(this.ctx.destination);
-                o.start(t); o.stop(t + dur + 0.05);
-            } catch (e) {}
-        },
-        three: function () { this.beep(880, .09); this.beep(1175, .12, .08); },
-        dunk: function () { this.beep(180, .12, 0, 'square', .12); this.beep(320, .16, .06, 'square', .1); },
-        buzzer: function () { this.beep(160, .5, 0, 'square', .14); },
-        win: function () { [523, 659, 784, 1047].forEach(function (f, i) { NBAAudio.beep(f, .22, i * .14); }); },
-        click: function () { this.beep(560, .05, 0, 'square', .04); }
-    };
+export class Sfx {
+  constructor() { this.ctx = null; this.muted = false; }
 
-    window.NBAAudio = NBAAudio;
-})();
+  init() {
+    try {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) this.ctx = new AC();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    } catch (e) { /* optional */ }
+  }
+
+  tone(freq, dur, type = 'sine', gain = 0.05, end = null, delay = 0) {
+    if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const amp = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (end) osc.frequency.exponentialRampToValueAtTime(Math.max(1, end), t + dur);
+    amp.gain.setValueAtTime(0.0001, t);
+    amp.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(amp); amp.connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  }
+
+  shot() { this.tone(540, 0.1, 'sine', 0.045, 760); }
+  three() { [0, 1, 2].forEach(i => this.tone(620 + i * 180, 0.13, 'triangle', 0.04, null, i * 0.05)); }
+  buzzer() { this.tone(220, 0.45, 'sawtooth', 0.06, 90); }
+  win() { [0, 1, 2].forEach(i => this.tone(440 + i * 160, 0.2, 'sine', 0.05, null, i * 0.1)); }
+  toggle() { this.muted = !this.muted; return this.muted; }
+}

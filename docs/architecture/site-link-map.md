@@ -5,10 +5,10 @@
 
 ## Summary
 
-- HTML files scanned: 399
+- HTML files scanned: 400
 - HTML-to-HTML edges: 245
 - JavaScript-generated catalog routes: 216
-- Orphan candidates: 259
+- Orphan candidates: 260
 - Broken or inconsistent references: 46
 
 ## Architecture
@@ -542,10 +542,10 @@ portfolio/
 ### `projects/nails/index.html`
 - `index.html`
 
-### `projects/nba_simulator/index.html`
-- `index.html`
-
 ### `projects/nba_simulator/legacy-nba_simulator.html`
+- `projects/nba_simulator/index.html`
+
+### `projects/nba_simulator/offline.html`
 - `projects/nba_simulator/index.html`
 
 ### `projects/neural-style-transfer/offline.html`
@@ -812,7 +812,7 @@ portfolio/
 | `assets/js/projects-data.js` | 324 | `projects/birds/index.html` | `projects/birds/index.html` | valid |
 | `assets/js/projects-data.js` | 333 | `projects/croquet/index.html` | `projects/croquet/index.html` | valid |
 | `assets/js/projects-data.js` | 342 | `projects/lyrics-finder/index.html` | `projects/lyrics-finder/index.html` | valid |
-| `assets/js/projects-data.js` | 351 | `projects/nba_simulator/legacy-nba_simulator.html` | `projects/nba_simulator/legacy-nba_simulator.html` | valid |
+| `assets/js/projects-data.js` | 351 | `projects/nba_simulator/index.html` | `projects/nba_simulator/index.html` | valid |
 | `assets/js/projects-data.js` | 360 | `projects/horse-simulator/index.html` | `projects/horse-simulator/index.html` | valid |
 | `assets/js/projects-data.js` | 369 | `projects/seriea-simulator/index.html` | `projects/seriea-simulator/index.html` | valid |
 | `assets/js/projects-data.js` | 378 | `projects/fantapanchina/index.html` | `projects/fantapanchina/index.html` | valid |
@@ -1155,6 +1155,7 @@ These files have no incoming HTML-to-HTML link in the scanned graph. Some are in
 - `projects/web-linux/index.html`
 - `projects/workout/index.html`
 - `rpg_game/index.html`
+- `tools/quality/playwright-report/index.html`
 
 ## Link Rules
 

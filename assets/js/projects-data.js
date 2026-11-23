@@ -346,9 +346,9 @@ const PROJECTS_DATA = [
   },
   {
     "id": "nba-simulator-2k26",
-    "title": "NBA Simulator 2K26",
-    "description": "Live match text simulation with real stats.",
-    "href": "projects/nba_simulator/legacy-nba_simulator.html",
+    "title": "NBA Broadcast Simulator",
+    "description": "30-team tactics simulator with franchise mode, analytics and offline PWA.",
+    "href": "projects/nba_simulator/index.html",
     "emoji": "🏀",
     "badge": "Sim",
     "badgeColor": "#00d4ff"

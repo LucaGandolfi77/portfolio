@@ -101,7 +101,7 @@
     G('qttt','Quantum Tic Tac Toe','❓','strategia','quantum_tictactoe.html','games',exists(['qttt_save','quantum_tictactoe']),'Giocato',5),
     G('warship','Warship','⚓','strategia','warship.html','games',exists(['warship_save','warship_high']),'Giocato',4),
     G('pocketwild','Pocket Wild','🌿','strategia','../projects/pocket-wild/index.html','projects',num('pocketwild_speedrun_best'),'Record',5),
-    G('nba','NBA Simulator','🏀','strategia','../projects/nba_simulator/legacy-nba_simulator.html','projects',exists(['nba_save','nba.lang']),'Giocato',4),
+    G('nba','NBA Simulator','🏀','strategia','../projects/nba_simulator/index.html','projects',exists(['pf.nba.v2','nba.sim.v1']),'Giocato',4),
     G('seriea','Serie A Simulator','⚽','strategia','../projects/seriea-simulator/index.html','projects',exists(['seriea_save','seriea_sim']),'Giocato',4),
 
     /* ── Avventura / Sim ── */
