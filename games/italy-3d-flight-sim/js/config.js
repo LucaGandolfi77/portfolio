@@ -1,0 +1,150 @@
+/* Italy 3D Flight Sim — aircraft, real airports, missions and bilingual strings */
+
+export const WORLD = {
+  width: 1400, depth: 1200,
+  minLon: 6.4, maxLon: 19.0, minLat: 35.8, maxLat: 47.4,
+  elevScale: 0.12, maxAlt: 3000, grid: 512
+};
+
+export const loc = (value, lang = 'en') =>
+  value && typeof value === 'object' ? (value[lang] ?? value.en ?? '') : String(value ?? '');
+
+export const PLANES = [
+  { id: 'cessna', kind: 'prop', color: '#ffd166', span: 11, length: 8,
+    name: { en: 'Cessna 172', it: 'Cessna 172' },
+    desc: { en: 'Stable trainer. Easy to fly and forgiving on landing.', it: 'Addestratore stabile, facile da volare e atterrare.' },
+    maxSpeed: 82, accel: 30, turn: 1.5, climb: 30, fuel: 100, burn: 1.55, landSpeed: 46, stall: 24, boost: 1.25 },
+  { id: 'stol', kind: 'prop', color: '#8ce99a', span: 10, length: 7,
+    name: { en: 'STOL Bush Plane', it: 'Aereo STOL' },
+    desc: { en: 'Short take-offs, tiny strips, razor-sharp turns.', it: 'Decolli corti, piste minuscole, virate precise.' },
+    maxSpeed: 64, accel: 36, turn: 2.1, climb: 40, fuel: 82, burn: 1.7, landSpeed: 32, stall: 16, boost: 1.25 },
+  { id: 'jet', kind: 'jet', color: '#74c0fc', span: 11, length: 15,
+    name: { en: 'Eurofighter', it: 'Eurofighter' },
+    desc: { en: 'Fast, agile and thirsty. Needs a long final approach.', it: 'Veloce, agile e assetato. Vuole un avvicinamento lungo.' },
+    maxSpeed: 180, accel: 62, turn: 1.0, climb: 56, fuel: 74, burn: 3.5, landSpeed: 88, stall: 46, boost: 1.4 },
+  { id: 'airliner', kind: 'airliner', color: '#e599f7', span: 34, length: 38,
+    name: { en: 'Airbus A320', it: 'Airbus A320' },
+    desc: { en: 'Heavy airliner with wide turns and a steady ride.', it: 'Pesante, curve ampie e volo stabile.' },
+    maxSpeed: 142, accel: 30, turn: 0.68, climb: 32, fuel: 110, burn: 2.5, landSpeed: 76, stall: 50, boost: 1.3 },
+  { id: 'heli', kind: 'heli', color: '#ffa8a8', span: 13, length: 12,
+    name: { en: 'Helicopter', it: 'Elicottero' },
+    desc: { en: 'Hover, climb straight up and land almost anywhere.', it: 'Stai fermo, sali dritto e atterra quasi ovunque.' },
+    maxSpeed: 74, accel: 48, turn: 2.4, climb: 48, fuel: 88, burn: 2.1, landSpeed: 20, stall: 0, boost: 1.2 },
+  { id: 'cub', kind: 'prop', color: '#ffc9c9', span: 10, length: 7,
+    name: { en: 'Piper Cub', it: 'Piper Cub' },
+    desc: { en: 'The slowest way to see the Alps up close.', it: 'Il modo più lento per vedere da vicino le Alpi.' },
+    maxSpeed: 55, accel: 30, turn: 2.3, climb: 34, fuel: 95, burn: 1.4, landSpeed: 28, stall: 14, boost: 1.2 },
+  { id: 'concorde', kind: 'jet', color: '#d0bfff', span: 26, length: 58,
+    name: { en: 'Concorde', it: 'Concorde' },
+    desc: { en: 'Supersonic delta wing. Fast and unforgiving.', it: 'Ala delta supersonica: veloce e severa.' },
+    maxSpeed: 210, accel: 45, turn: 0.7, climb: 40, fuel: 90, burn: 3.2, landSpeed: 95, stall: 55, boost: 1.3 },
+  { id: 'f35', kind: 'jet', color: '#91a7ff', span: 11, length: 16,
+    name: { en: 'F-35 Lightning', it: 'F-35 Lightning' },
+    desc: { en: 'Agile fifth-generation fighter with afterburner.', it: 'Caccia di quinta generazione con postbruciatore.' },
+    maxSpeed: 200, accel: 70, turn: 1.35, climb: 62, fuel: 78, burn: 3.6, landSpeed: 92, stall: 48, boost: 1.5 },
+  { id: 'interceptor', kind: 'starfighter', color: '#66d9e8', span: 12, length: 19, starship: true,
+    name: { en: 'Interceptor', it: 'Intercettore' },
+    desc: { en: 'Twice a jet’s speed over real Alpine peaks.', it: 'Il doppio di un jet sopra le vere vette alpine.' },
+    maxSpeed: 360, accel: 120, turn: 1.5, climb: 90, fuel: 100, burn: 5.5, landSpeed: 150, stall: 70, boost: 1.6 },
+  { id: 'starfighter', kind: 'starfighter', color: '#b197fc', span: 13, length: 20, starship: true,
+    name: { en: 'Starfighter', it: 'Starfighter' },
+    desc: { en: 'The fastest craft in the simulator.', it: 'Il mezzo più veloce del simulatore.' },
+    maxSpeed: 400, accel: 140, turn: 1.8, climb: 100, fuel: 110, burn: 6.2, landSpeed: 160, stall: 80, boost: 1.7 },
+  { id: 'cruiser', kind: 'cruiser', color: '#ff922b', span: 22, length: 30, starship: true,
+    name: { en: 'Warp Cruiser', it: 'Incrociatore Warp' },
+    desc: { en: 'Heavy starship: huge tank, smooth turns, big boost.', it: 'Nave pesante: grande serbatoio, curve morbide, boost potente.' },
+    maxSpeed: 340, accel: 85, turn: 0.9, climb: 70, fuel: 150, burn: 5.0, landSpeed: 140, stall: 60, boost: 1.8 }
+];
+
+// Real airport coordinates (decimal degrees) from public aeronautical data.
+export const AIRPORTS = [
+  { code: 'MXP', lon: 8.724, lat: 45.630, rwy: 35, name: { en: 'Milano Malpensa', it: 'Milano Malpensa' } },
+  { code: 'LIN', lon: 9.276, lat: 45.445, rwy: 90, name: { en: 'Milano Linate', it: 'Milano Linate' } },
+  { code: 'GOA', lon: 8.842, lat: 44.410, rwy: 110, name: { en: 'Genova', it: 'Genova' } },
+  { code: 'VCE', lon: 12.351, lat: 45.505, rwy: 100, name: { en: 'Venezia', it: 'Venezia' } },
+  { code: 'BLQ', lon: 11.287, lat: 44.508, rwy: 120, name: { en: 'Bologna', it: 'Bologna' } },
+  { code: 'FLR', lon: 11.199, lat: 43.810, rwy: 95, name: { en: 'Firenze', it: 'Firenze' } },
+  { code: 'FCO', lon: 12.252, lat: 41.800, rwy: 130, name: { en: 'Roma Fiumicino', it: 'Roma Fiumicino' } },
+  { code: 'CIA', lon: 12.594, lat: 41.799, rwy: 100, name: { en: 'Roma Ciampino', it: 'Roma Ciampino' } },
+  { code: 'NAP', lon: 14.292, lat: 40.886, rwy: 60, name: { en: 'Napoli', it: 'Napoli' } },
+  { code: 'BRI', lon: 16.760, lat: 41.140, rwy: 140, name: { en: 'Bari', it: 'Bari' } },
+  { code: 'BDS', lon: 17.948, lat: 40.658, rwy: 110, name: { en: 'Brindisi', it: 'Brindisi' } },
+  { code: 'PMO', lon: 13.099, lat: 38.176, rwy: 90, name: { en: 'Palermo', it: 'Palermo' } },
+  { code: 'CTA', lon: 15.063, lat: 37.468, rwy: 95, name: { en: 'Catania', it: 'Catania' } },
+  { code: 'CAG', lon: 9.069, lat: 39.251, rwy: 70, name: { en: 'Cagliari', it: 'Cagliari' } },
+  { code: 'OLB', lon: 9.518, lat: 40.896, rwy: 110, name: { en: 'Olbia', it: 'Olbia' } }
+];
+
+export const MISSIONS = [
+  { id: 'primo', diff: 1, stops: ['FCO', 'NAP'],
+    name: { en: 'First Flight', it: 'Primo volo' },
+    desc: { en: 'Rome to Naples over the real Lazio coastline.', it: 'Roma–Napoli sopra la vera costa del Lazio.' } },
+  { id: 'alpi', diff: 3, stops: ['MXP', 'VCE'],
+    name: { en: 'Over the Alps', it: 'Sopra le Alpi' },
+    desc: { en: 'Cross the real Alpine ridge from Milan to Venice.', it: 'Attraversa la vera catena alpina da Milano a Venezia.' } },
+  { id: 'sole', diff: 2, stops: ['NAP', 'FLR', 'LIN'],
+    name: { en: 'Autostrada del Sole', it: 'Autostrada del Sole' },
+    desc: { en: 'Three landings up the peninsula past real cities.', it: 'Tre atterraggi risalendo la penisola tra città reali.' } },
+  { id: 'tacco', diff: 2, stops: ['FCO', 'BRI', 'BDS'],
+    name: { en: 'The Heel', it: 'Il tacco' },
+    desc: { en: 'Follow the Adriatic coast to Puglia.', it: 'Segui la costa adriatica fino in Puglia.' } },
+  { id: 'isole', diff: 4, stops: ['PMO', 'CTA', 'CAG'],
+    name: { en: 'Island Hopper', it: 'Island Hopper' },
+    desc: { en: 'Sicily to Sardinia over open Mediterranean water.', it: 'Dalla Sicilia alla Sardegna sopra il Mediterraneo.' } },
+  { id: 'grand', diff: 5, stops: ['MXP', 'VCE', 'BRI', 'CTA', 'FCO'],
+    name: { en: 'Gran Tour', it: 'Gran Tour' },
+    desc: { en: 'The whole country: five stops, real mountains and sea.', it: 'Tutto il Paese: cinque tappe, montagne e mare veri.' } }
+];
+
+export const STR = {
+  en: {
+    title: 'ITALY 3D FLIGHT SIM', subtitle: 'Real terrain, real cities, real flight',
+    freeFlight: 'FREE FLIGHT', missions: 'MISSIONS', hangar: 'HANGAR', howto: 'HOW TO PLAY', back: 'BACK',
+    play: 'PLAY', select: 'SELECT', selected: 'SELECTED', speed: 'SPEED', agility: 'AGILITY', range: 'RANGE',
+    airspeed: 'IAS', altitude: 'ALT', fuel: 'FUEL', heading: 'HDG', next: 'NEXT', distance: 'DIST', km: 'km',
+    view: 'VIEW', pause: 'PAUSE', throttle: 'THROTTLE', boost: 'BOOST', steer: 'STEER', pitch: 'PITCH',
+    resume: 'RESUME', restart: 'RESTART', changePlane: 'CHANGE PLANE', quit: 'QUIT TO MENU', sound: 'SOUND',
+    on: 'ON', off: 'OFF', stops: 'STOPS', best: 'BEST', time: 'TIME', used: 'FUEL USED', retry: 'RETRY',
+    nextMission: 'NEXT MISSION', missionDone: 'MISSION COMPLETE', step: 'CHECKPOINT',
+    landingOk: 'Perfect landing!', refueled: 'Refuelled at {code}', crash: 'Crash — restarted at {code}',
+    stall: 'STALL — lower the nose', noFuel: 'OUT OF FUEL — glide to a runway',
+    landHere: 'Line up with the runway, slow down and touch down',
+    howto1: 'Steer with A/D or the left stick; W/S or stick up/down controls pitch.',
+    howto2: 'Use +/- on the right or Q/E for throttle. Hold ⚡ or B for boost.',
+    howto3: 'To land: line up with a real runway, get slow and low, then touch down.',
+    howto4: 'Every landing refuels you. Missions ask you to land at each airport in order.',
+    howto5: 'V switches chase/cockpit/overview camera. P pauses. Terrain and cities come from real data.',
+    flightTime: 'FLIGHT TIME', landings: 'LANDINGS', from: 'FROM', freeTitle: 'FREE FLIGHT',
+    freeHint: 'Pick a plane and a real airport, then explore Italy.',
+    difficulty: 'DIFFICULTY', easy: 'EASY', medium: 'MEDIUM', hard: 'HARD',
+    chase: 'CHASE', cockpit: 'COCKPIT', overview: 'OVERVIEW', traffic: 'TRAFFIC', terrain: 'TERRAIN',
+    starship: 'STARSHIP', aircraft: 'AIRCRAFT',
+    quality: 'GRAPHICS', low: 'LOW', high: 'HIGH', data: 'REAL DATA', dataHint: 'Natural Earth coast, lakes, rivers, cities and SRTM elevation',
+    ground: 'GROUND', sea: 'SEA', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFIC — watch out!'
+  },
+  it: {
+    title: 'ITALY 3D FLIGHT SIM', subtitle: 'Terreno reale, città reali, volo reale',
+    freeFlight: 'VOLO LIBERO', missions: 'MISSIONI', hangar: 'HANGAR', howto: 'COME SI GIOCA', back: 'INDIETRO',
+    play: 'GIOCA', select: 'SCEGLI', selected: 'SELEZIONATO', speed: 'VELOCITÀ', agility: 'AGILITÀ', range: 'AUTONOMIA',
+    airspeed: 'VELOCITÀ', altitude: 'QUOTA', fuel: 'CARBURANTE', heading: 'ROTTA', next: 'PROSSIMA', distance: 'DIST', km: 'km',
+    view: 'VEDUTA', pause: 'PAUSA', throttle: 'MANETTA', boost: 'BOOST', steer: 'STERZO', pitch: 'SALITA',
+    resume: 'RIPRENDI', restart: 'RICOMINCIA', changePlane: 'CAMBIA AEREO', quit: 'TORNA AL MENU', sound: 'AUDIO',
+    on: 'SÌ', off: 'NO', stops: 'TAPPE', best: 'RECORD', time: 'TEMPO', used: 'CARBURANTE USATO', retry: 'RIPROVA',
+    nextMission: 'MISSIONE SUCCESSIVA', missionDone: 'MISSIONE COMPLETATA', step: 'CHECKPOINT',
+    landingOk: 'Atterraggio perfetto!', refueled: 'Rifornito a {code}', crash: 'Incidente — ripartito da {code}',
+    stall: 'STALLO — abbassa il muso', noFuel: 'CARBURANTE FINITO — plana verso una pista',
+    landHere: 'Allineati alla pista, vai piano e basso, poi tocca terra',
+    howto1: 'Sterza con A/D o lo stick a sinistra; W/S o stick su/giù controlla il beccheggio.',
+    howto2: 'Usa + e - a destra o Q/E per la manetta. Tieni ⚡ o B per il boost.',
+    howto3: 'Per atterrare: allineati a una vera pista, vai piano e basso, poi tocca terra.',
+    howto4: 'Ogni atterraggio ti rifornisce. Le missioni chiedono di atterrare in ogni aeroporto nell’ordine.',
+    howto5: 'V cambia camera chase/cockpit/ panoramica. P mette in pausa. Terreno e città sono dati reali.',
+    flightTime: 'TEMPO DI VOLO', landings: 'ATTERRAGGI', from: 'DA', freeTitle: 'VOLO LIBERO',
+    freeHint: 'Scegli aereo e aeroporto reale, poi esplora l’Italia.',
+    difficulty: 'DIFFICOLTÀ', easy: 'FACILE', medium: 'MEDIO', hard: 'DIFFICILE',
+    chase: 'CHASE', cockpit: 'COCKPIT', overview: 'PANORAMICA', traffic: 'TRAFFICO', terrain: 'TERRENO',
+    starship: 'ASTRONAVE', aircraft: 'AEREO',
+    quality: 'GRAFICA', low: 'BASSA', high: 'ALTA', data: 'DATI REALI', dataHint: 'Coste, laghi, fiumi, città Natural Earth e altitudini SRTM',
+    ground: 'TERRA', sea: 'MARE', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFICO — attenzione!'
+  }
+};
