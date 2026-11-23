@@ -34,7 +34,7 @@ function makeClouds(scene, quality) {
   return group;
 }
 
-export function createRenderer(canvas, quality = 'high') {
+export function createRenderer(canvas, quality = 'high', imageryTexture = null) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 2 : 1));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -51,7 +51,7 @@ export function createRenderer(canvas, quality = 'high') {
   sun.position.set(400, 800, -300);
   scene.add(sun);
 
-  const world = createWorld(scene, quality);
+  const world = createWorld(scene, quality, imageryTexture);
   const clouds = makeClouds(scene, quality);
   let planeMesh = null;
   let trafficMeshes = [];
@@ -105,6 +105,13 @@ export function createRenderer(canvas, quality = 'high') {
       trafficMeshes[i].rotation.set(0, -t.heading, 0);
     }
 
+    // Real city buildings are only drawn near the aircraft.
+    const range = quality === 'low' ? 480 : 760;
+    for (const mesh of world.realBuildings || []) {
+      const c = mesh.userData.center;
+      mesh.visible = !!c && Math.hypot(s.x - c.x, s.z - c.z) < range;
+    }
+
     const forward = tempV.set(Math.sin(s.heading) * Math.cos(s.pitch), Math.sin(s.pitch), -Math.cos(s.heading) * Math.cos(s.pitch));
     if (game.view === 'overview') {
       camera.fov = 55;
@@ -127,13 +134,21 @@ export function createRenderer(canvas, quality = 'high') {
     renderer.render(scene, camera);
   }
 
+  function setImagery(enabled) {
+    if (!imageryTexture) return;
+    const mat = world.terrain.material;
+    mat.map = enabled ? imageryTexture : null;
+    mat.color.set(enabled ? '#ffffff' : '#6f9a78');
+    mat.needsUpdate = true;
+  }
+
   function resize(w, h) {
     renderer.setSize(w, h);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
 
-  return { renderer, scene, camera, world, setPlane, setTraffic, update, resize };
+  return { renderer, scene, camera, world, setPlane, setTraffic, setImagery, update, resize };
 }
 
 function L_COCKPIT(plane) { return Math.max(2, plane.length * 0.16); }

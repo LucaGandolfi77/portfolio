@@ -118,7 +118,7 @@ export const STR = {
     freeHint: 'Pick a plane and a real airport, then explore Italy.',
     difficulty: 'DIFFICULTY', easy: 'EASY', medium: 'MEDIUM', hard: 'HARD',
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'OVERVIEW', traffic: 'TRAFFIC', terrain: 'TERRAIN',
-    starship: 'STARSHIP', aircraft: 'AIRCRAFT',
+    starship: 'STARSHIP', aircraft: 'AIRCRAFT', imagery: 'SATELLITE',
     quality: 'GRAPHICS', low: 'LOW', high: 'HIGH', data: 'REAL DATA', dataHint: 'Natural Earth coast, lakes, rivers, cities and SRTM elevation',
     ground: 'GROUND', sea: 'SEA', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFIC — watch out!'
   },
@@ -143,7 +143,7 @@ export const STR = {
     freeHint: 'Scegli aereo e aeroporto reale, poi esplora l’Italia.',
     difficulty: 'DIFFICOLTÀ', easy: 'FACILE', medium: 'MEDIO', hard: 'DIFFICILE',
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'PANORAMICA', traffic: 'TRAFFICO', terrain: 'TERRENO',
-    starship: 'ASTRONAVE', aircraft: 'AEREO',
+    starship: 'ASTRONAVE', aircraft: 'AEREO', imagery: 'SATELLITE',
     quality: 'GRAFICA', low: 'BASSA', high: 'ALTA', data: 'DATI REALI', dataHint: 'Coste, laghi, fiumi, città Natural Earth e altitudini SRTM',
     ground: 'TERRA', sea: 'MARE', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFICO — attenzione!'
   }

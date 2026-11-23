@@ -10,7 +10,8 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 
 - **Real terrain**: SRTM-derived elevation grid (512×512, ~0.12 world units per metre) with Alpine and Apennine heights up to ~4600 m, vertex-coloured by altitude with snow caps.
 - **Real water**: Natural Earth coastline, lakes and rivers.
-- **Real places**: 77 urban polygons generate instanced 3D buildings; major cities get labels from Natural Earth populated places.
+- **Real imagery**: EOX Sentinel‑2 cloudless 2016 tiles (CC BY 4.0) are bundled offline and draped over the terrain; toggle SATELLITE on/off in the pause menu.
+- **Real places**: OSM building footprints for 12 major Italian cities are extruded into 3D; other urban areas use instanced buildings from Natural Earth polygons.
 - **Real airports**: 15 Italian airports at their actual coordinates with oriented runways.
 - **Flight simulation**: 6DoF-lite physics with pitch/roll/yaw, speed, stall, fuel, boost, ground collision, chase/cockpit/overview cameras, artificial-horizon HUD, day/night lighting, clouds and AI traffic.
 - **11 craft**, free flight and six missions with landing checkpoints.
@@ -19,8 +20,10 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 
 - Natural Earth 50m vectors — public domain: <https://www.naturalearthdata.com/>
 - Mapzen Terrarium tiles (SRTM elevation) — public domain: <https://registry.opendata.aws/terrain-tiles/>
+- EOxCloudless Sentinel‑2 2016, CC BY 4.0: <https://cloudless.eox.at/> — *EOxCloudless by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)*.
+- OpenStreetMap building footprints, ODbL: <https://www.openstreetmap.org/copyright> — © OpenStreetMap contributors.
 
-Regenerate with `npm run data`. Generated files in `data/` are committed so CI/deploy never need network access.
+Regenerate with `npm run data`, `npm run data:imagery` and `npm run data:buildings`. Generated files in `data/` are committed so CI/deploy never need network access. The full offline cache is roughly 20–30 MB.
 
 ## Build and test
 

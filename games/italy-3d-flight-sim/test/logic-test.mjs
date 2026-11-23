@@ -10,6 +10,8 @@ const base = new URL('../data/', import.meta.url);
 const heightBuf = readFileSync(new URL('italy-height.bin', base));
 const meta = JSON.parse(readFileSync(new URL('italy-meta.json', base), 'utf8'));
 const vectors = JSON.parse(readFileSync(new URL('italy-vector.json', base), 'utf8'));
+const imagery = JSON.parse(readFileSync(new URL('imagery-manifest.json', base), 'utf8'));
+const buildings = JSON.parse(readFileSync(new URL('buildings.json', base), 'utf8'));
 initGeo(new DataView(new Uint8Array(heightBuf).buffer), meta, vectors);
 
 let passed = 0, total = 0;
@@ -27,6 +29,25 @@ run('geodata files have the expected shape', () => {
   ok(vectors.cities.length > 20);
   ok(vectors.urban.length > 20);
   ok(vectors.lakes.length >= 1 && vectors.rivers.length >= 1);
+});
+
+run('satellite imagery manifest covers Italy with attribution', () => {
+  ok(imagery.tiles.length > 300);
+  ok(/EOX/i.test(imagery.attribution) && /CC BY 4.0/.test(imagery.attribution));
+  ok(imagery.tiles.every(t => t.path.startsWith('./data/imagery/') && t.u1 > t.u0 && t.v1 > t.v0));
+  const us = imagery.tiles.flatMap(t => [t.u0, t.u1]);
+  ok(Math.min(...us) < 0.02 && Math.max(...us) > 0.98);
+});
+
+run('real OSM buildings exist with footprint rings and heights', () => {
+  ok(buildings.cities.length >= 10);
+  ok(/OpenStreetMap/i.test(buildings.attribution));
+  const total = buildings.cities.reduce((s, c) => s + c.buildings.length, 0);
+  ok(total > 5000, `expected many buildings, got ${total}`);
+  for (const city of buildings.cities.slice(0, 4)) {
+    ok(city.name && city.buildings.length > 200);
+    ok(city.buildings.every(([ring, h]) => ring.length >= 4 && h > 0 && h < 300));
+  }
 });
 
 run('lon/lat converts to world coordinates and back', () => {

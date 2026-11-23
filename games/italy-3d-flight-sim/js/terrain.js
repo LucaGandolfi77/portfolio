@@ -4,6 +4,7 @@ import * as THREE from '../../_vendor/three.module.js';
 import { AIRPORTS, WORLD } from './config.js';
 import { elevationAt, geoToWorld, terrainHeight, vectorData, worldPolygon, insideItaly } from './geo.js';
 import { seededRandom } from '../../_kit/core.js';
+import { buildRealBuildings, realCityCenters } from './buildings.js';
 
 function labelSprite(text, color = '#eaf6ff') {
   const canvas = document.createElement('canvas');
@@ -30,7 +31,7 @@ function terrainColor(h) {
   return new THREE.Color('#5f8a5a');
 }
 
-function buildTerrain(quality) {
+function buildTerrain(quality, imageryTexture) {
   const seg = quality === 'low' ? 160 : 256;
   const geo = new THREE.PlaneGeometry(WORLD.width, WORLD.depth, seg, seg);
   geo.rotateX(-Math.PI / 2);
@@ -40,12 +41,22 @@ function buildTerrain(quality) {
     const x = pos.getX(i), z = pos.getZ(i);
     const h = terrainHeight(x, z);
     pos.setY(i, h);
-    const c = terrainColor(h);
+    const c = imageryTexture
+      ? new THREE.Color().setRGB(0.9 + Math.min(0.1, h / 6000), 0.92 + Math.min(0.08, h / 8000), 0.9)
+      : terrainColor(h);
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  if (imageryTexture) {
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.95, metalness: 0,
+    map: imageryTexture || null,
+    color: imageryTexture ? '#ffffff' : '#ffffff'
+  });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   return mesh;
@@ -119,7 +130,13 @@ function buildVegetation(group, quality) {
 
 function buildCities(group, vectors, quality) {
   const rng = seededRandom(4242);
-  const urban = vectors.urban.filter(u => u.pop > 30000).slice(0, quality === 'low' ? 30 : 70);
+  const realCenters = realCityCenters();
+  const urban = vectors.urban.filter(u => {
+    if (u.pop <= 30000) return false;
+    const clon = u.ring.reduce((s, p) => s + p[0], 0) / u.ring.length;
+    const clat = u.ring.reduce((s, p) => s + p[1], 0) / u.ring.length;
+    return !realCenters.some(([lon, lat]) => Math.abs(lon - clon) < 0.055 && Math.abs(lat - clat) < 0.055);
+  }).slice(0, quality === 'low' ? 30 : 70);
   const perCity = quality === 'low' ? 12 : 34;
   const geo = new THREE.BoxGeometry(5, 1, 5);
   geo.translate(0, 0.5, 0);
@@ -184,15 +201,16 @@ function buildAirports(group) {
   }
 }
 
-export function createWorld(scene, quality = 'high') {
+export function createWorld(scene, quality = 'high', imageryTexture = null) {
   const group = new THREE.Group();
   scene.add(group);
-  const terrain = buildTerrain(quality);
+  const terrain = buildTerrain(quality, imageryTexture);
   group.add(terrain);
   const vectors = vectorData();
   const sea = buildWater(vectors, group);
   buildVegetation(group, quality);
   buildCities(group, vectors, quality);
+  const realBuildings = buildRealBuildings(group, quality);
   buildAirports(group);
-  return { group, terrain, sea };
+  return { group, terrain, sea, realBuildings };
 }

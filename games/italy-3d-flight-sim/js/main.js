@@ -10,10 +10,12 @@ import { AIRPORTS } from './config.js';
 import { initGeo, vectorData, geoToWorld, worldPolygon, terrainHeight } from './geo.js';
 import { FlightGame } from './game.js';
 import { createRenderer } from './render.js';
+import { loadImagery } from './imagery.js';
+import { initBuildingsData } from './buildings.js';
 
 const SAVE_KEY = 'italy3dFlightSim.save.v1';
 const DEFAULTS = {
-  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high',
+  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high', imagery: true,
   bests: {}, stats: { flights: 0, landings: 0, crashes: 0 }
 };
 const save = load(SAVE_KEY, DEFAULTS);
@@ -82,6 +84,7 @@ function refreshUI() {
   $('resultTitle').textContent = t('missionDone');
   $('qualityVal').textContent = game.quality === 'high' ? t('high') : t('low');
   $('pauseView').textContent = t(game.view);
+  $('imageryVal').textContent = save.imagery ? t('on') : t('off');
 }
 refreshUI();
 i18n.onChange(() => { save.lang = i18n.getLang(); persist(); refreshUI(); });
@@ -190,6 +193,10 @@ $('missionList').addEventListener('click', e => {
 });
 $('btnView').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); cycleView(); });
 $('btnViewPause').addEventListener('click', cycleView);
+$('btnImagery').addEventListener('click', () => {
+  save.imagery = !save.imagery; persist(); refreshUI();
+  if (view3d) view3d.setImagery(save.imagery);
+});
 $('btnQuality').addEventListener('click', () => {
   game.setQuality(game.quality === 'high' ? 'low' : 'high');
   save.quality = game.quality; persist(); refreshUI();
@@ -308,8 +315,14 @@ async function boot() {
       fetch('./data/italy-vector.json').then(r => r.json())
     ]);
     initGeo(new DataView(heightBuf), meta, vectors);
+    $('loadStatus').textContent = 'city buildings';
+    const buildings = await fetch('./data/buildings.json').then(r => r.json()).catch(() => ({ cities: [] }));
+    initBuildingsData(buildings);
+    $('loadStatus').textContent = 'satellite imagery 0%';
+    const imagery = await loadImagery(p => { $('loadStatus').textContent = `satellite imagery ${Math.round(p * 100)}%`; }).catch(() => null);
     $('loadStatus').textContent = '3D scene';
-    view3d = createRenderer(canvas, game.quality);
+    view3d = createRenderer(canvas, game.quality, imagery);
+    view3d.setImagery(save.imagery);
     view3d.setPlane(game.plane);
     view3d.setTraffic(game.traffic);
     window.addEventListener('resize', () => view3d.resize(window.innerWidth, window.innerHeight));
