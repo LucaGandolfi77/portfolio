@@ -101,8 +101,8 @@
     G('qttt','Quantum Tic Tac Toe','❓','strategia','quantum_tictactoe.html','games',exists(['qttt_save','quantum_tictactoe']),'Giocato',5),
     G('warship','Warship','⚓','strategia','warship.html','games',exists(['warship_save','warship_high']),'Giocato',4),
     G('pocketwild','Pocket Wild','🌿','strategia','../projects/pocket-wild/index.html','projects',num('pocketwild_speedrun_best'),'Record',5),
-    G('nba','NBA Simulator','🏀','strategia','../projects/nba_simulator.html','projects',exists(['nba_save','nba.lang']),'Giocato',4),
-    G('seriea','Serie A Simulator','⚽','strategia','../projects/seriea_simulator.html','projects',exists(['seriea_save','seriea_sim']),'Giocato',4),
+    G('nba','NBA Simulator','🏀','strategia','../projects/nba_simulator/legacy-nba_simulator.html','projects',exists(['nba_save','nba.lang']),'Giocato',4),
+    G('seriea','Serie A Simulator','⚽','strategia','../projects/seriea-simulator/index.html','projects',exists(['seriea_save','seriea_sim']),'Giocato',4),
 
     /* ── Avventura / Sim ── */
     G('scalpel','Scalpel — Surgical Stories','🔪','avventura','scalpel/index.html','games',scalpel,'Capi chirurgici',7),
@@ -124,7 +124,7 @@
     G('taboo','Taboo','🚫','party','taboo.html','games',exists(['taboo_muted','taboo_best']),'Giocato',4),
     G('guesswho','Guess Who?','🕵️','party','guess_who.html','games',exists(['gw_save','guesswho_save']),'Giocato',4),
     G('wikipedia','Wikipedia Game','🌐','party','wikipedia_game.html','games',exists(['wg_save','wikipedia_game_save']),'Giocato',4),
-    G('quiz','Quiz Studio','🧠','party','../projects/quiz.html','projects',exists(['quiz_progress','quiz_stats']),'Giocato',4),
+    G('quiz','Quiz Studio','🧠','party','../projects/quiz-lab/index.html','projects',exists(['quiz_progress','quiz_stats']),'Giocato',4),
     G('mathduel','Math Duel','➗','party','math_duel.html','games',exists(['mathduel_best','math_duel_save']),'Giocato',4),
 
     /* ── Scommesse / Fortuna ── */
@@ -139,15 +139,15 @@
     G('uno','UNO','🌈','scommesse','UNO.html','games',exists(['uno_save','uno_scores']),'Giocato',4),
 
     /* ── Creatività ── */
-    G('draw','Draw Studio','🎨','creativita','../projects/draw.html','projects',exists(['draw-save','draw_project','draw_history']),'Giocato',4),
-    G('aiColorizer','AI Colorizer','🖼️','creativita','../projects/ai_colorizer.html','projects',num('aic2_adj'),'Adjust',4),
-    G('geneticart','Genetic Art','🧬','creativita','../projects/genetic-art.html','projects',exists(['genetic_art_save','genetic-art']),'Giocato',4),
-    G('birds','Neural Flock','🐦','creativita','../projects/birds.html','projects',exists(['birds_save','bird_flock_save']),'Giocato',4),
-    G('sierpinski','Sierpinski Lab','🔺','creativita','../projects/sierpinski.html','projects',exists(['fractal_obs_v1']),'Giocato',4),
+    G('draw','Draw Studio','🎨','creativita','../projects/draw/index.html','projects',exists(['draw-save','draw_project','draw_history']),'Giocato',4),
+    G('aiColorizer','AI Colorizer','🖼️','creativita','../projects/ai-colorizer/index.html','projects',num('aic2_adj'),'Adjust',4),
+    G('geneticart','Genetic Art','🧬','creativita','../projects/genetic-art/legacy-genetic-art.html','projects',exists(['genetic_art_save','genetic-art']),'Giocato',4),
+    G('birds','Neural Flock','🐦','creativita','../projects/birds/index.html','projects',exists(['birds_save','bird_flock_save']),'Giocato',4),
+    G('sierpinski','Sierpinski Lab','🔺','creativita','../projects/sierpinski/index.html','projects',exists(['fractal_obs_v1']),'Giocato',4),
     G('facelab','Face Lab','😊','creativita','../projects/face-lab/index.html','projects',exists(['facelab_sketches']),'Sketch',4),
     G('coloringbook','Coloring Book','🖍️','creativita','coloring_book.html','games',exists(['coloring_book_save','coloring-save']),'Giocato',3),
-    G('audioeditor','Audio Editor','🎧','creativita','../projects/audio-editor-pwa.html','projects',exists(['audio_editor_save']),'Giocato',4),
-    G('filemanager','File Manager','📁','creativita','../projects/file_manager.html','projects',exists(['fm_tree_v2']),'Giocato',3),
+    G('audioeditor','Audio Editor','🎧','creativita','../projects/audio-editor-pwa/legacy-audio-editor-pwa.html','projects',exists(['audio_editor_save']),'Giocato',4),
+    G('filemanager','File Manager','📁','creativita','../projects/file-manager/index.html','projects',exists(['fm_tree_v2']),'Giocato',3),
     G('esposta','Esposta','🎭','creativita','esposta/index.html','games',exists(['esposta_state','esposta_agency']),'Giocato',4),
     G('regno','Regno di Moneta','👑','creativita','regno-di-moneta/index.html','games',exists(['rdm_achievements_v1','rdm_onboarding_done']),'Giocato',4),
     G('votopoli','Votopoli','🗳️','creativita','votopoli/index.html','games',exists(['votopoli_monetization']),'Giocato',4),
@@ -157,10 +157,10 @@
     G('quantumtictactoe2','Quantum Lab','⚛️','educazione','quantum-forge/index.html','games',exists(['quantum-forge']),'Giocato',4),
     G('weblinux','Web Linux','💻','educazione','../projects/web-linux/index.html','projects',exists(['web_linux_save']),'Giocato',4),
     G('rsa','RSA Lab','🔐','educazione','RSA.html','projects',exists(['rsa_save']),'Giocato',4),
-    G('solar','Solar System','🪐','educazione','../projects/solar_system_tracker.html','projects',exists(['solar_save']),'Giocato',4),
+    G('solar','Solar System','🪐','educazione','../projects/solar-system-tracker/index.html','projects',exists(['solar_save']),'Giocato',4),
     G('wellness','Hourly Wellness','🧘','educazione','../projects/hourly-wellness-widget/index.html','projects',exists(['hww_stats','hww_settings']),'Giocato',4),
-    G('morse','Morse Trainer','📡','educazione','../projects/morse.html','projects',exists(['morse_best','morse_stats']),'Giocato',4),
-    G('tinyai','Tiny AI','🤖','educazione','../projects/tiny_ai.html','projects',exists(['tiny_ai_save']),'Giocato',4)
+    G('morse','Morse Trainer','📡','educazione','../projects/morse/index.html','projects',exists(['morse_best','morse_stats']),'Giocato',4),
+    G('tinyai','Tiny AI','🤖','educazione','../projects/tiny-ai/index.html','projects',exists(['tiny_ai_save']),'Giocato',4)
   ];
 
     /* ── Nuovi giochi modulari / potenziati ── */

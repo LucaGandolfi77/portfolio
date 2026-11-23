@@ -1,5 +1,5 @@
 const sprites = new Image();
-sprites.src = 'assets/img/pokemon/sprites.png';
+sprites.src = '../../assets/img/pokemon/sprites.png';
 
 const SPRITE_SIZE = 32; // Assuming 32x32 sprites in the sheet
 

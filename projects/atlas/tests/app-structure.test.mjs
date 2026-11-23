@@ -303,8 +303,8 @@ test('catalogo, redirect legacy e service worker root', () => {
   assert.match(read('../../index.html'), /href="projects\/atlas\/"/);
 
   const redirects = [
-    ['../../projects/gps.html', 'measure'],
-    ['../../projects/world_weather.html', 'weather']
+    ['../../projects/atlas/legacy-gps.html', 'measure'],
+    ['../../projects/atlas/legacy-world_weather.html', 'weather']
   ];
   for (const [file, section] of redirects) {
     const source = read(file);

@@ -18,7 +18,7 @@ fonetica fatta a mano. Niente server, niente cloud.
 
 ## Come si usa
 
-1. **Intro** (`phonetic-transcriber.html`): schermata animata con
+1. **Intro** (`projects/phonetic-transcriber/legacy-phonetic-transcriber.html`): schermata animata con
    waveform neon → bottone **APRI** → app.
 2. Scegli un tab nell'app:
    - **🎙 Live / Microfono**: avvia, parla, premi Stop → Whisper trascrive ciò
@@ -68,7 +68,7 @@ consonantici tipici, doppie, consonanti finali dure): non è una lingua
 ## File
 
 ```
-projects/phonetic-transcriber.html        → intro animata (wrapper)
+projects/phonetic-transcriber/legacy-phonetic-transcriber.html        → intro animata (wrapper)
 projects/phonetic-transcriber/index.html  → l'app (tutto in un file)
 projects/phonetic-transcriber/README.md  → questo
 ```

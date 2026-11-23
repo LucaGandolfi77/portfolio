@@ -216,9 +216,16 @@ portfolio/
 ├── index.html                 # Main portfolio homepage
 ├── assets/                    # Shared images, fonts, icons, CSS, and data
 ├── i18n/                      # Translation JSON files
-├── projects/                  # Standalone tools, PWAs, AI, audio, and visual demos
-├── games/                    # Standalone games and game collections
+├── projects/                  # One self-contained directory per project
+│   ├── _shared/               # Shared kit, top bar and project template
+│   ├── <project>/index.html   # Canonical project entry (with manifest.webmanifest + sw.js)
+│   └── <project>/legacy-*.html # Legacy launcher, kept inside the project directory
+├── games/                    # One self-contained directory per game
 │   ├── index.html             # Games directory
+│   ├── _kit/                  # Shared game kit (loop, storage, i18n, PWA, tests)
+│   ├── _vendor/               # Shared vendored libraries
+│   ├── <game>/index.html      # Canonical game entry (with manifest.webmanifest + sw.js)
+│   ├── <game>/legacy-*.html   # Legacy launcher, kept inside the game directory
 │   ├── arcade-lab/            # Fifteen static game prototypes
 │   └── quotesmith/            # Bilingual offline quote quiz
 ├── pages/                    # Main and content pages (books, blog, music, ...)
@@ -280,8 +287,8 @@ Most demos process data locally in the browser.
 
 ## Adding a New Static Project
 
-1. Create a self-contained directory under `projects/` or `games/`.
-2. Use relative asset paths so the page works below `/portfolio/` on GitHub Pages.
+1. Create a self-contained directory under `projects/` or `games/` (for games: `<slug>/index.html`, `manifest.webmanifest`, `sw.js`, with shared helpers in `_kit/` / `_vendor/`).
+2. Use relative asset paths so the page works below `/portfolio/` on GitHub Pages; if an old flat URL must stay live, leave a small redirect stub behind.
 3. Add mobile viewport metadata and a descriptive page title.
 4. Keep permission requests inside an explicit user action.
 5. Add an offline fallback if the page is intended to be a PWA.

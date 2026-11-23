@@ -43,9 +43,56 @@ if (missingPaths.length) {
   console.error('Missing catalog paths:', missingPaths);
 }
 
+const projectsData = readFileSync(join(REPO, 'assets/js/projects-data.js'), 'utf8');
+const projectPaths = [
+  ...[...catalog.matchAll(/'projects\/([^']+)'/g)].map(m => m[1]),
+  ...[...projectsData.matchAll(/"projects\/([^"]+)"/g)].map(m => m[1])
+];
+const missingProjectPaths = projectPaths.filter(p => !existsSync(join(REPO, 'projects', p)));
+if (missingProjectPaths.length) {
+  failed++;
+  console.error('Missing project catalog paths:', missingProjectPaths);
+}
+
+// Ogni legacy-*.html dentro una cartella deve essere uno stub PWA verso index.html.
+let stubsChecked = 0;
+for (const section of ['games', 'projects']) {
+  const dirs = readdirSync(join(REPO, section), { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('_'));
+  for (const dir of dirs) {
+    const gameDir = join(REPO, section, dir.name);
+    for (const name of readdirSync(gameDir).filter(f => /^legacy-.*\.html$/.test(f))) {
+      const html = readFileSync(join(gameDir, name), 'utf8');
+      const suffix = name.replace(/\.html$/, '');
+      const pwaOk = existsSync(join(gameDir, `${suffix}.webmanifest`)) &&
+        existsSync(join(gameDir, `${suffix}-sw.js`)) &&
+        html.includes(`./${suffix}.webmanifest`) && html.includes(`./${suffix}-sw.js`);
+      const targetOk = existsSync(join(gameDir, 'index.html')) && html.includes('./index.html');
+      if (!pwaOk || !targetOk) {
+        failed++;
+        console.error(`Invalid PWA redirect stub: ${section}/${dir.name}/${name}`);
+      } else stubsChecked++;
+    }
+  }
+}
+
+// Stub storici alla radice di games/ (es. watermelon.html) devono puntare a una pagina esistente.
+for (const name of readdirSync(join(REPO, 'games')).filter(f => f.endsWith('.html') && f !== 'index.html')) {
+  const html = readFileSync(join(REPO, 'games', name), 'utf8');
+  const target = html.match(/content="\d+\s*;\s*url=(\.\/[^"']+\.html)"/)?.[1];
+  if (!target || !existsSync(join(REPO, 'games', target))) {
+    failed++;
+    console.error(`Invalid root redirect stub: games/${name}`);
+  } else stubsChecked++;
+}
+
 let swChecked = 0;
-for (const sw of walk(ROOT).filter(p => /-sw\.js$|\/sw\.js$/.test(p))) {
-  const base = sw.endsWith('-sw.js') ? join(REPO, 'games') : join(sw, '..');
+const swFiles = [
+  ...walk(ROOT).filter(p => /-sw\.js$|\/sw\.js$/.test(p)),
+  ...walk(join(REPO, 'projects')).filter(p => /-sw\.js$|\/sw\.js$/.test(p) &&
+    !p.includes('node_modules') && !p.includes('/dist/'))
+];
+for (const sw of swFiles) {
+  const base = join(sw, '..');
   const text = readFileSync(sw, 'utf8');
   const assets = [...text.matchAll(/'(\.\.?\/[^']+)'/g)].map(m => m[1]);
   const missing = assets.filter(a => !existsSync(join(base, a)));
@@ -55,5 +102,5 @@ for (const sw of walk(ROOT).filter(p => /-sw\.js$|\/sw\.js$/.test(p))) {
   } else swChecked++;
 }
 
-console.log(`\n${passed} tests passed across ${suites} suites · ${gamePaths.length} catalog paths · ${swChecked} service workers clean`);
+console.log(`\n${passed} tests passed across ${suites} suites · ${gamePaths.length} game + ${projectPaths.length} project catalog paths · ${stubsChecked} redirect stubs · ${swChecked} service workers clean`);
 if (failed) { console.error(`${failed} failure(s)`); process.exit(1); }

@@ -19,7 +19,7 @@ The network is trained on **synthetic GTZAN-inspired feature distributions**, no
 ## Files
 
 ```
-projects/audio-neural-analysis.html          → intro screen (wrapper)
+projects/audio-neural-analysis/legacy-audio-neural-analysis.html          → intro screen (wrapper)
 projects/audio-neural-analysis/index.html    → the app
 projects/audio-neural-analysis/examples/     → 4 genre example SVGs (real files)
 projects/audio-neural-analysis/README.md     → this file

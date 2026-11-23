@@ -255,7 +255,7 @@ The game is playable end-to-end; these are the planned layers, in priority order
 ## Files
 
 ```
-projects/pocket-wild.html          → intro screen (wrapper)
+projects/pocket-wild/legacy-pocket-wild.html          → intro screen (wrapper)
 projects/pocket-wild/index.html    → HTML shell + CSS + 28 <script src="js/..."> in ordine
 projects/pocket-wild/js/           → the game logic, split by domain (see below)
 projects/pocket-wild/README.md     → this file

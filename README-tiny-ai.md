@@ -1,7 +1,7 @@
 Tiny Local AI Demo
 ==================
 
-This small demo shows how to run a very small text-generation model locally and connect to it from the browser (`tiny_ai.html`). The demo uses `distilgpt2` via Hugging Face Transformers and a tiny Flask server.
+This small demo shows how to run a very small text-generation model locally and connect to it from the browser (`projects/tiny-ai/index.html`). The demo uses `distilgpt2` via Hugging Face Transformers and a tiny Flask server.
 
 Prerequisites
 -------------
@@ -62,7 +62,7 @@ If you prefer to run a WebLLM instance (which serves models via WebSocket and/or
 
 Notes about WebLLM compatibility:
 - Different WebLLM versions expose different WebSocket message formats; the demo includes a best-effort WebSocket client that attempts a generic `{"type":"generate","input":...,"parameters":{...}}` request and looks for common response fields (`result`, `text`, `output`).
-- If your WebLLM server expects a different protocol, you can adapt the `webllmGenerate` function in `tiny_ai.html` to match it.
+- If your WebLLM server expects a different protocol, you can adapt the `webllmGenerate` function in `projects/tiny-ai/index.html` to match it.
 - Running models with WebLLM may require model files to be present locally and may have different hardware requirements.
 
 In-browser models (Transformers.js) — no server, no key

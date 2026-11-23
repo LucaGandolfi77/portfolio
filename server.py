@@ -55,7 +55,7 @@ def generate():
 # Serve the demo page and static assets from the project root. Open http://127.0.0.1:8000/ in the browser.
 @app.route('/', methods=['GET'])
 def index():
-    return app.send_static_file('tiny_ai.html')
+    return app.send_static_file('projects/tiny-ai/index.html')
 
 if __name__ == '__main__':
     print('Starting server on http://127.0.0.1:8000/')

@@ -26,7 +26,7 @@ const ASSETS = [
   '../../assets/js/face_tracker.js',
   '../../assets/js/ai_tracker.js',
   '../../assets/js/hand_tracker.js',
-  '../top_buttons.js'
+  '../_shared/top_buttons.js'
 ];
 
 self.addEventListener('install', event => {
@@ -58,7 +58,7 @@ function isOurAsset(url) {
     url.pathname.indexOf('/assets/js/face_tracker') !== -1 ||
     url.pathname.indexOf('/assets/js/ai_tracker') !== -1 ||
     url.pathname.indexOf('/assets/js/hand_tracker') !== -1 ||
-    url.pathname === '/projects/top_buttons.js';
+    url.pathname === '/projects/_shared/top_buttons.js';
 }
 
 self.addEventListener('fetch', event => {

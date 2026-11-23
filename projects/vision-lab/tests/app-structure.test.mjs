@@ -286,8 +286,8 @@ test('catalogo, redirect legacy e service worker root', () => {
   assert.doesNotMatch(extras, /smile-detection/);
 
   const redirects = [
-    ['../../projects/facemesh_camera.html', './vision-lab/', 'mesh'],
-    ['../../projects/smile_detection.html', './vision-lab/', 'smile'],
+    ['../../projects/vision-lab/legacy-facemesh_camera.html', './vision-lab/', 'mesh'],
+    ['../../projects/vision-lab/legacy-smile_detection.html', './vision-lab/', 'smile'],
     ['../../projects/smile_detection/index.html', '../vision-lab/', 'smile']
   ];
   for (const [file, target, section] of redirects) {

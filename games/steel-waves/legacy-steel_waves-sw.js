@@ -1,0 +1,18 @@
+/* Service Worker — Steel Waves — caricamento… (legacy flat URL) */
+const CACHE = 'steel_waves-legacy-v1';
+const ASSETS = ['./legacy-steel_waves.html', './legacy-steel_waves.webmanifest'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(u => c.add(u)))).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(
+    keys.filter(k => k.startsWith('steel_waves-legacy-') && k !== CACHE).map(k => caches.delete(k))
+  )).then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request)));
+});

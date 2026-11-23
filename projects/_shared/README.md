@@ -11,7 +11,7 @@ token CSS, componenti e una shell JavaScript senza dipendenze.
 | `base.css` | Reset, accessibilità, bottoni, card, form, segmented control, chip, dialog, empty state. |
 | `shell.css` | Barra progetto fissa, menu, toast, dialog di conferma. |
 | `shell.js` | Costruisce la barra, gestisce preferiti, share, tema, lingua, toast e conferme. |
-| `../_template.html` | Scheletro di partenza per una pagina nuova. |
+| `./_template.html` | Scheletro di partenza per una pagina nuova. |
 
 ## Uso minimo
 

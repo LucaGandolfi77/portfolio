@@ -1448,11 +1448,11 @@ const commands = [
     { id: 'theme-dark', title: 'Theme: Dark', desc: 'Switch to dark mode', icon: '🌙', action: () => { applyTheme('dark'); localStorage.setItem('theme', 'dark'); } },
     
     // Games
-    { id: 'game-plane', title: 'Play Sky Ace', desc: 'Side-scrolling shooter game', icon: '✈️', action: () => window.location.href = 'games/plane.html' },
-    { id: 'game-snake', title: 'Play Snake', desc: 'Classic Snake game', icon: '🐍', action: () => window.location.href = 'games/snake.html' },
-    { id: 'game-tetris', title: 'Play Tetris', desc: 'Classic Tetris game', icon: '🧱', action: () => window.location.href = 'games/tetris.html' },
-    { id: 'game-chess', title: 'Play Chess', desc: 'Classic Chess game', icon: '♟️', action: () => window.location.href = 'games/chess.html' },
-    { id: 'game-poker', title: 'Play Poker', desc: "Texas Hold'em", icon: '🃏', action: () => window.location.href = 'games/poker.html' },
+    { id: 'game-plane', title: 'Play Sky Ace', desc: 'Side-scrolling shooter game', icon: '✈️', action: () => window.location.href = 'games/plane/index.html' },
+    { id: 'game-snake', title: 'Play Snake', desc: 'Classic Snake game', icon: '🐍', action: () => window.location.href = 'games/snake/index.html' },
+    { id: 'game-tetris', title: 'Play Tetris', desc: 'Classic Tetris game', icon: '🧱', action: () => window.location.href = 'games/tetris/index.html' },
+    { id: 'game-chess', title: 'Play Chess', desc: 'Classic Chess game', icon: '♟️', action: () => window.location.href = 'games/chess/index.html' },
+    { id: 'game-poker', title: 'Play Poker', desc: "Texas Hold'em", icon: '🃏', action: () => window.location.href = 'games/poker/index.html' },
     
     // Actions
     { id: 'action-email', title: 'Send Email', desc: 'Open default email client', icon: '📧', action: () => window.location.href = 'mailto:luca.gandolfi7@hotmail.com' },

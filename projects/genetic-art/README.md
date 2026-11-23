@@ -68,5 +68,5 @@ La sezione core è verificata con uno smoke test in Node (400+ iterazioni): inva
 
 ## 🔗 Link
 
-- Wrapper: `projects/genetic-art.html`
+- Wrapper: `projects/genetic-art/legacy-genetic-art.html`
 - App: `projects/genetic-art/index.html`

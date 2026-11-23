@@ -85,7 +85,7 @@ numero scritto ──► immagine 28×28 (come MNIST) ──► CNN ──► pr
 ## File
 
 ```
-projects/neural-vision.html        → intro animata (wrapper)
+projects/neural-vision/legacy-neural-vision.html        → intro animata (wrapper)
 projects/neural-vision/index.html → l'app (TF.js + Three.js, tutto in un file)
 projects/neural-vision/README.md → questo
 ```

@@ -1,0 +1,2918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#060a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Play Game Boy Advance games in your browser with turbo, shaders, save states and touch controls.">
+<title>GBA Arcade</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a12;
+    --bg-2: #0a1220;
+    --panel: rgba(12, 19, 33, 0.88);
+    --panel-solid: #0d1626;
+    --line: rgba(255, 255, 255, 0.085);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #e9effb;
+    --muted: #8a9ab3;
+    --faint: #5b6a80;
+    --cyan: #22d3ee;
+    --blue: #3b82f6;
+    --violet: #8b5cf6;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #fb7185;
+    --radius: 16px;
+    --pad-scale: 1;
+    --pad-opacity: 0.85;
+    --brightness: 1;
+    --saturation: 1;
+    --contrast: 1;
+    --screen-y: 0px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  a { color: inherit; }
+  ::selection { background: rgba(34, 211, 238, 0.3); }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  /* ── Stage ─────────────────────────────────────────────────────────── */
+  #stage { position: fixed; inset: 0; background: #000; }
+  #game { position: absolute; inset: 0; overflow: hidden; }
+  #game canvas {
+    /* GBA screens are 3:2. EmulatorJS fills the whole viewport by default,
+       so constrain the canvas box and let the drawing buffer be squeezed
+       back into the correct aspect ratio. */
+    width: min(100vw, calc(100vh * 1.5)) !important;
+    height: min(100vh, calc(100vw / 1.5)) !important;
+    width: min(100vw, calc(100dvh * 1.5)) !important;
+    height: min(100dvh, calc(100vw / 1.5)) !important;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    object-fit: fill;
+    object-position: center;
+    filter: brightness(var(--brightness)) saturate(var(--saturation)) contrast(var(--contrast));
+    transform: translate(-50%, calc(-50% + var(--screen-y)));
+    transition: filter 0.15s linear;
+  }
+  body.fit-fill #game canvas {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    object-fit: fill;
+    transform: translate(-50%, calc(-50% + var(--screen-y)));
+  }
+  body.fit-cover #game canvas {
+    width: max(100vw, calc(100vh * 1.5)) !important;
+    height: max(100vh, calc(100vw / 1.5)) !important;
+    width: max(100vw, calc(100dvh * 1.5)) !important;
+    height: max(100dvh, calc(100vw / 1.5)) !important;
+    object-fit: fill;
+    transform: translate(-50%, calc(-50% + var(--screen-y)));
+  }
+  body.pixelated #game canvas { image-rendering: pixelated; }
+  body:not(.playing) #game { visibility: hidden; }
+
+  #screenFx {
+    position: fixed; inset: 0; z-index: 2;
+    pointer-events: none; opacity: 0; transition: opacity 0.25s ease;
+    background-size: 100% 100%;
+  }
+  body.fx-scanlines #screenFx {
+    opacity: 0.5;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.32) 3px, rgba(0,0,0,0) 4px);
+  }
+  body.fx-crt #screenFx {
+    opacity: 1;
+    background:
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%),
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.28) 3px, rgba(0,0,0,0) 4px);
+    box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
+  }
+  body.fx-vignette #screenFx {
+    opacity: 1;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);
+  }
+
+  /* ── Top bar ───────────────────────────────────────────────────────── */
+  .topbar {
+    position: fixed; z-index: 50;
+    top: 0; left: 0; right: 0;
+    display: none;
+    align-items: center; justify-content: space-between; gap: 10px;
+    padding: calc(8px + var(--safe-top)) calc(12px + var(--safe-right)) 22px calc(12px + var(--safe-left));
+    background: linear-gradient(to bottom, rgba(3, 7, 14, 0.92) 0%, rgba(3, 7, 14, 0.55) 55%, transparent 100%);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    pointer-events: none;
+  }
+  body.playing .topbar { display: flex; }
+  .topbar > * { pointer-events: auto; }
+  body.playing.idle .topbar { opacity: 0; transform: translateY(-14px); pointer-events: none; }
+  body.playing.idle .topbar > * { pointer-events: none; }
+  body.sheet-open .topbar, body.dialog-open .topbar { opacity: 1; transform: none; pointer-events: auto; }
+  body.sheet-open .topbar > *, body.dialog-open .topbar > * { pointer-events: auto; }
+
+  .tb-group { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .tb-right { justify-content: flex-end; }
+
+  .icon-btn {
+    width: 40px; height: 40px; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    color: var(--text);
+    background: rgba(10, 17, 30, 0.66);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+    transition: background 0.18s, border-color 0.18s, transform 0.12s;
+  }
+  .icon-btn:hover { background: rgba(23, 35, 56, 0.9); border-color: var(--line-strong); }
+  .icon-btn:active { transform: scale(0.9); }
+  .icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
+  .icon-btn.active { color: #041018; background: var(--cyan); border-color: var(--cyan); }
+
+  .game-chip {
+    display: flex; align-items: center; gap: 8px;
+    height: 40px; padding: 0 15px 0 12px;
+    border-radius: 12px;
+    background: rgba(10, 17, 30, 0.66);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.2px;
+    max-width: 38vw;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  }
+  .game-chip .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); flex: 0 0 auto;
+    box-shadow: 0 0 8px var(--green);
+  }
+  .game-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .turbo-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 40px; padding: 0 14px;
+    border-radius: 12px;
+    background: rgba(10, 17, 30, 0.66);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    font-size: 0.75rem; font-weight: 800;
+    letter-spacing: 0.4px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+    transition: all 0.18s;
+  }
+  .turbo-chip svg { width: 15px; height: 15px; fill: var(--amber); }
+  .turbo-chip:hover { border-color: rgba(251, 191, 36, 0.4); }
+  .turbo-chip.on, body.turbo-on .turbo-chip {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-color: #fbbf24; color: #1a1200;
+    box-shadow: 0 4px 22px rgba(251, 191, 36, 0.35);
+  }
+  .turbo-chip.on svg, body.turbo-on .turbo-chip svg { fill: #1a1200; }
+  body.turbo-on .turbo-chip { animation: turboPulse 1.4s ease-in-out infinite; }
+  @keyframes turboPulse {
+    0%, 100% { box-shadow: 0 4px 22px rgba(251, 191, 36, 0.3); }
+    50% { box-shadow: 0 4px 30px rgba(251, 191, 36, 0.65); }
+  }
+
+  /* Floating turbo button */
+  .turbo-fab {
+    position: fixed; z-index: 46;
+    right: calc(18px + var(--safe-right));
+    bottom: calc(196px + var(--safe-bottom));
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: rgba(12, 19, 33, 0.72);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: var(--amber);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), inset 0 0 18px rgba(251, 191, 36, 0.08);
+    touch-action: none;
+    transition: transform 0.12s, background 0.18s, opacity 0.28s;
+  }
+  body.playing .turbo-fab { display: flex; }
+  body.turbo-placement-fab .turbo-chip { display: none; }
+  body.turbo-placement-top .turbo-fab { display: none; }
+  body.turbo-placement-none .turbo-fab,
+  body.turbo-placement-none .turbo-chip { display: none; }
+  .turbo-fab svg { width: 23px; height: 23px; fill: currentColor; }
+  .turbo-fab small { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.5px; }
+  .turbo-fab.on, body.turbo-on .turbo-fab {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-color: #fde68a; color: #1a1200;
+    transform: scale(1.06);
+    box-shadow: 0 8px 34px rgba(251, 191, 36, 0.55);
+  }
+  body.playing.idle .turbo-fab { opacity: 0.42; }
+  body.playing.idle .turbo-fab.on { opacity: 0.8; }
+
+  .fps {
+    position: fixed; z-index: 44;
+    top: calc(64px + var(--safe-top)); right: calc(14px + var(--safe-right));
+    padding: 4px 8px; border-radius: 7px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--green);
+    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.6px;
+    font-variant-numeric: tabular-nums;
+    display: none; pointer-events: none;
+  }
+  body.show-fps.playing .fps { display: block; }
+
+  /* ── Home ──────────────────────────────────────────────────────────── */
+  .home {
+    position: fixed; inset: 0; z-index: 70;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
+    transition: opacity 0.35s ease, visibility 0.35s;
+  }
+  .home.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .home-bg {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(900px 520px at 12% -10%, rgba(34, 211, 238, 0.13), transparent 60%),
+      radial-gradient(800px 520px at 92% 8%, rgba(139, 92, 246, 0.16), transparent 62%),
+      radial-gradient(700px 600px at 50% 110%, rgba(59, 130, 246, 0.1), transparent 60%);
+  }
+  .home-bg::after {
+    content: ''; position: absolute; inset: 0; opacity: 0.35;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at 50% 20%, black, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 20%, black, transparent 75%);
+  }
+
+  .home-head {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    max-width: 1180px; margin: 0 auto;
+    padding: calc(20px + var(--safe-top)) calc(24px + var(--safe-right)) 10px calc(24px + var(--safe-left));
+  }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px; border-radius: 10px;
+    color: var(--muted); text-decoration: none;
+    font-size: 0.78rem; font-weight: 600;
+    border: 1px solid transparent;
+    transition: all 0.18s;
+  }
+  .back-link:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); border-color: var(--line); }
+  .brand {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 9px;
+    font-size: 0.72rem; font-weight: 900; letter-spacing: 3.5px;
+    color: var(--text); white-space: nowrap;
+  }
+  .brand-mark {
+    width: 24px; height: 24px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--cyan), var(--blue));
+    color: #041018; font-size: 0.72rem; font-weight: 900; letter-spacing: 0;
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.35);
+  }
+  .brand em { color: var(--cyan); font-style: normal; }
+
+  .home-main {
+    position: relative; z-index: 2;
+    max-width: 1180px; margin: 0 auto;
+    padding: 18px calc(24px + var(--safe-right)) calc(60px + var(--safe-bottom)) calc(24px + var(--safe-left));
+  }
+  .hero {
+    padding: clamp(28px, 4.5vw, 52px) 0 clamp(24px, 3.5vw, 38px);
+    max-width: 820px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 999px;
+    background: rgba(34, 211, 238, 0.08);
+    border: 1px solid rgba(34, 211, 238, 0.18);
+    color: #7dd3fc;
+    font-size: 0.68rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  }
+  .hero-badge::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+  }
+  .hero h1 {
+    margin: 16px 0 14px;
+    font-size: clamp(2.35rem, 5.4vw, 4.6rem);
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+    font-weight: 900;
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(100deg, var(--cyan), var(--violet) 70%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    max-width: 560px;
+    color: var(--muted);
+    font-size: clamp(0.88rem, 1.5vw, 1rem);
+    line-height: 1.7;
+  }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .primary-btn, .ghost-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 13px 20px; border-radius: 12px;
+    font-size: 0.82rem; font-weight: 800; letter-spacing: 0.2px;
+    transition: transform 0.12s, background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  }
+  .primary-btn {
+    background: linear-gradient(135deg, var(--cyan), #0ea5e9);
+    color: #031018;
+    box-shadow: 0 8px 26px rgba(34, 211, 238, 0.24);
+  }
+  .primary-btn:hover { box-shadow: 0 10px 34px rgba(34, 211, 238, 0.36); }
+  .primary-btn.danger { background: linear-gradient(135deg, #fb7185, #ef4444); color: #fff; box-shadow: 0 8px 26px rgba(239, 68, 68, 0.24); }
+  .primary-btn:active, .ghost-btn:active { transform: scale(0.97); }
+  .ghost-btn {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid var(--line);
+    color: var(--text);
+  }
+  .ghost-btn:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--line-strong); }
+  .ghost-btn.danger { color: var(--red); border-color: rgba(251, 113, 133, 0.25); }
+  .ghost-btn.danger:hover { background: rgba(251, 113, 133, 0.1); }
+
+  .hero-stats {
+    display: flex; flex-wrap: wrap; gap: 22px;
+    margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  .hero-stat strong {
+    display: block; font-size: 1.15rem; font-weight: 900; letter-spacing: -0.02em;
+  }
+  .hero-stat span { font-size: 0.66rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
+
+  .section-head {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+    margin-bottom: 16px;
+  }
+  .section-head h2 { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+  .section-head span { font-size: 0.7rem; color: var(--faint); font-weight: 600; }
+
+  .game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 14px;
+  }
+  .game-card {
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: 0; overflow: hidden; text-align: left;
+    border-radius: var(--radius);
+    background: rgba(13, 21, 36, 0.72);
+    border: 1px solid var(--line);
+    transition: transform 0.18s ease, border-color 0.18s, box-shadow 0.18s;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+  .game-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(34, 211, 238, 0.32);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(34, 211, 238, 0.08);
+  }
+  .game-card:active { transform: scale(0.985); }
+  .card-art {
+    position: relative; height: 138px;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(circle at 30% 25%, var(--c1, #22d3ee), transparent 62%),
+      radial-gradient(circle at 75% 80%, var(--c2, #8b5cf6), transparent 65%),
+      #0a1220;
+    overflow: hidden;
+  }
+  .card-art::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: linear-gradient(to bottom, black, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  }
+  .card-art::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(9, 15, 27, 0.94), transparent 70%);
+  }
+  .card-emoji {
+    position: relative; z-index: 1;
+    font-size: 3.1rem;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+    transition: transform 0.22s ease;
+  }
+  .game-card:hover .card-emoji { transform: scale(1.1) rotate(-3deg); }
+  .card-tag {
+    position: absolute; z-index: 2; top: 10px; left: 10px;
+    padding: 4px 8px; border-radius: 6px;
+    background: rgba(4, 10, 18, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    font-size: 0.56rem; font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase;
+    color: #dbeafe;
+  }
+  .card-play {
+    position: absolute; z-index: 2; right: 11px; bottom: 11px;
+    width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-size: 0.72rem;
+    transition: background 0.18s, transform 0.18s;
+  }
+  .game-card:hover .card-play { background: var(--cyan); color: #041018; transform: scale(1.08); }
+  .card-body { padding: 13px 14px 15px; }
+  .card-name {
+    display: block;
+    font-size: 0.9rem; font-weight: 800; letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card-meta { display: block; margin-top: 4px; font-size: 0.67rem; color: var(--faint); font-weight: 600; }
+  .card-del {
+    position: absolute; z-index: 4; top: 9px; right: 9px;
+    width: 26px; height: 26px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: rgba(4, 10, 18, 0.66);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--muted);
+    font-size: 0.72rem;
+    opacity: 0; transition: opacity 0.18s, background 0.18s, color 0.18s;
+  }
+  .game-card:hover .card-del, .game-card:focus-within .card-del { opacity: 1; }
+  .card-del:hover { background: rgba(251, 113, 133, 0.2); color: var(--red); border-color: rgba(251, 113, 133, 0.4); }
+  .upload-card .card-art { background: rgba(255, 255, 255, 0.02); }
+  .upload-card .card-art::after { background: none; }
+  .upload-card .card-art::before { opacity: 0.5; }
+  .upload-card .card-emoji { font-size: 2.2rem; opacity: 0.85; }
+  .upload-card .card-play { display: none; }
+
+  .fineprint {
+    margin-top: 22px; color: var(--faint);
+    font-size: 0.68rem; line-height: 1.7; max-width: 720px;
+  }
+  .fineprint a { color: var(--muted); }
+
+  /* ── Loading ───────────────────────────────────────────────────────── */
+  .loading {
+    position: fixed; inset: 0; z-index: 90;
+    display: grid; place-items: center;
+    padding: 24px;
+    background: rgba(4, 8, 15, 0.94);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    transition: opacity 0.3s ease, visibility 0.3s;
+  }
+  .loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .loader-card {
+    width: min(400px, 100%);
+    text-align: center;
+    padding: 36px 28px 30px;
+    border-radius: 22px;
+    background: rgba(13, 21, 36, 0.9);
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  }
+  .loader-ring {
+    position: relative; width: 62px; height: 62px; margin: 0 auto 22px;
+  }
+  .loader-ring::before, .loader-ring::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 3px solid transparent;
+  }
+  .loader-ring::before { border-top-color: var(--cyan); border-right-color: var(--cyan); animation: spin 1s linear infinite; }
+  .loader-ring::after { inset: 9px; border-bottom-color: var(--violet); border-left-color: var(--violet); animation: spin 1.6s linear infinite reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-title { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; }
+  .loader-sub { margin-top: 7px; font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+  .loader-bar {
+    height: 4px; margin: 24px auto 0; width: 78%;
+    border-radius: 999px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .loader-bar span {
+    display: block; height: 100%; width: 38%; border-radius: inherit;
+    background: linear-gradient(90deg, var(--cyan), var(--violet));
+    animation: loadSlide 1.35s ease-in-out infinite;
+  }
+  @keyframes loadSlide {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(280%); }
+  }
+  .loader-actions { display: none; gap: 8px; justify-content: center; margin-top: 22px; }
+  .loading.error .loader-ring { display: none; }
+  .loading.error .loader-bar { display: none; }
+  .loading.error .loader-actions { display: flex; }
+  .loading.error .loader-title { color: var(--red); }
+
+  /* ── Sheet / settings ──────────────────────────────────────────────── */
+  .sheet-wrap {
+    position: fixed; inset: 0; z-index: 100;
+    visibility: hidden;
+  }
+  .sheet-wrap.open { visibility: visible; }
+  .sheet-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(2, 6, 12, 0.62);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  .sheet-wrap.open .sheet-backdrop { opacity: 1; }
+  .sheet {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: min(420px, 100%);
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, rgba(14, 23, 40, 0.98), rgba(8, 14, 25, 0.99));
+    border-left: 1px solid var(--line);
+    box-shadow: -24px 0 70px rgba(0, 0, 0, 0.5);
+    transform: translateX(102%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .sheet-wrap.open .sheet { transform: translateX(0); }
+  .sheet-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: calc(18px + var(--safe-top)) 18px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-head h2 { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; }
+  .sheet-head p { margin-top: 2px; font-size: 0.65rem; color: var(--faint); font-weight: 600; }
+  .sheet-close {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: grid; place-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    font-size: 1.1rem; line-height: 1; color: var(--muted);
+    transition: all 0.18s;
+  }
+  .sheet-close:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+
+  .tabs {
+    display: flex; gap: 4px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex: 1 0 auto;
+    padding: 9px 12px;
+    border-radius: 9px;
+    font-size: 0.7rem; font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: all 0.16s;
+  }
+  .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+  .tab-btn.active { color: #041018; background: var(--cyan); }
+  .tab-panel { display: none; flex: 1; overflow-y: auto; padding: 16px 18px calc(28px + var(--safe-bottom)); }
+  .tab-panel.active { display: block; }
+  .tab-panel::-webkit-scrollbar { width: 5px; }
+  .tab-panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 99px; }
+
+  .panel-note {
+    margin-bottom: 16px; padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.12);
+    color: #93c5fd;
+    font-size: 0.68rem; line-height: 1.55;
+  }
+  .group { margin-bottom: 20px; }
+  .group:last-child { margin-bottom: 4px; }
+  .group-title {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.62rem; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--faint);
+  }
+  .group-title span { letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--muted); }
+  .field {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px 14px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+  }
+  .field-label { flex: 1 1 130px; min-width: 0; }
+  .field + .field { border-top: 1px solid rgba(255, 255, 255, 0.045); }
+  .field-label strong { display: block; font-size: 0.78rem; font-weight: 700; }
+  .field-label small { display: block; margin-top: 2px; color: var(--faint); font-size: 0.64rem; line-height: 1.4; }
+  .field-control { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  .field-control.wide { flex: 1; max-width: 190px; }
+
+  .switch {
+    position: relative;
+    width: 42px; height: 24px; flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--line);
+    transition: background 0.18s, border-color 0.18s;
+  }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #94a3b8;
+    transition: transform 0.2s cubic-bezier(0.3, 0.7, 0.2, 1), background 0.18s;
+  }
+  .switch.on { background: rgba(34, 211, 238, 0.25); border-color: rgba(34, 211, 238, 0.55); }
+  .switch.on::after { transform: translateX(18px); background: var(--cyan); }
+
+  .seg {
+    display: flex; gap: 2px; padding: 3px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid var(--line);
+  }
+  .seg button {
+    min-width: 30px; padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.64rem; font-weight: 800;
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button.active { background: var(--cyan); color: #041018; box-shadow: 0 2px 10px rgba(34, 211, 238, 0.22); }
+
+  .range-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 20px; background: transparent; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 99px;
+    background: linear-gradient(90deg, var(--cyan) var(--fill, 50%), rgba(255, 255, 255, 0.1) var(--fill, 50%));
+  }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); }
+  input[type="range"]::-moz-range-progress { height: 4px; border-radius: 99px; background: var(--cyan); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; margin-top: -5.5px;
+    border-radius: 50%; background: #fff;
+    border: 3px solid var(--cyan);
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%; background: #fff;
+    border: 3px solid var(--cyan);
+  }
+  .range-out {
+    min-width: 38px; text-align: right;
+    font-size: 0.68rem; font-weight: 800; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  select {
+    padding: 8px 30px 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 0.7rem; font-weight: 600;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a9ab3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    max-width: 190px;
+  }
+  select:focus { border-color: var(--cyan); }
+
+  .action-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .action-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    flex: 1 1 auto;
+    padding: 10px 12px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 0.7rem; font-weight: 700;
+    transition: all 0.16s;
+  }
+  .action-btn:hover { background: rgba(255, 255, 255, 0.09); border-color: var(--line-strong); }
+  .action-btn:active { transform: scale(0.97); }
+  .action-btn.accent { background: rgba(34, 211, 238, 0.12); border-color: rgba(34, 211, 238, 0.25); color: #a5f3fc; }
+  .action-btn.danger { background: rgba(251, 113, 133, 0.08); border-color: rgba(251, 113, 133, 0.22); color: var(--red); }
+  .action-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+  /* Save slots */
+  .slot {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--line);
+    margin-bottom: 8px;
+  }
+  .slot-thumb {
+    width: 68px; height: 48px; flex: 0 0 auto;
+    border-radius: 7px; overflow: hidden;
+    background: #050a12;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid; place-items: center;
+    color: var(--faint); font-size: 0.85rem;
+  }
+  .slot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .slot-info { flex: 1; min-width: 0; }
+  .slot-info strong { display: block; font-size: 0.72rem; font-weight: 800; }
+  .slot-info small { display: block; margin-top: 2px; font-size: 0.6rem; color: var(--faint); }
+  .slot-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+  .slot-actions button {
+    width: 30px; height: 30px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    font-size: 0.7rem;
+    transition: all 0.15s;
+  }
+  .slot-actions button:hover { background: rgba(255, 255, 255, 0.1); }
+  .slot-actions button:disabled { opacity: 0.28; cursor: not-allowed; }
+  .slot-actions .save-btn { color: var(--cyan); }
+  .slot-actions .load-btn { color: var(--green); }
+  .slot-actions .del-btn { color: var(--red); }
+
+  .shortcut-list { display: grid; gap: 6px; }
+  .shortcut {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 10px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+    font-size: 0.68rem; color: var(--muted);
+  }
+  .shortcut kbd {
+    padding: 3px 7px; border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--line);
+    font-family: inherit; font-size: 0.62rem; font-weight: 800; color: var(--text);
+  }
+  .about-copy { font-size: 0.68rem; line-height: 1.7; color: var(--faint); }
+  .about-copy strong { color: var(--muted); }
+  .storage-bar {
+    height: 6px; margin: 8px 0 4px; border-radius: 99px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .storage-bar span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--violet)); transition: width 0.3s; }
+
+  /* ── Dialog ────────────────────────────────────────────────────────── */
+  .dialog {
+    position: fixed; inset: 0; z-index: 120;
+    display: grid; place-items: center;
+    padding: 22px;
+    background: rgba(2, 6, 12, 0.72);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+  .dialog.open { opacity: 1; visibility: visible; }
+  .dialog-card {
+    width: min(380px, 100%);
+    padding: 24px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #111c2f, #0b1422);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.2s;
+  }
+  .dialog.open .dialog-card { transform: none; }
+  .dialog-card h3 { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; }
+  .dialog-card p { margin-top: 8px; font-size: 0.76rem; line-height: 1.6; color: var(--muted); }
+  .dialog-actions { display: flex; gap: 8px; margin-top: 22px; }
+  .dialog-actions button { flex: 1; }
+
+  /* ── Toast ─────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; z-index: 130;
+    left: 50%; bottom: calc(24px + var(--safe-bottom));
+    transform: translate(-50%, 16px);
+    max-width: min(420px, calc(100vw - 32px));
+    padding: 10px 16px;
+    border-radius: 11px;
+    background: rgba(9, 16, 28, 0.94);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    font-size: 0.72rem; font-weight: 600; line-height: 1.4;
+    text-align: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+  .toast.good { border-color: rgba(52, 211, 153, 0.3); color: #a7f3d0; }
+  .toast.bad { border-color: rgba(251, 113, 133, 0.3); color: #fecdd3; }
+
+  /* ── EmulatorJS overrides ──────────────────────────────────────────── */
+  .ejs_menu_bar,
+  .ejs_context_menu,
+  .ejs_settings_parent,
+  .ejs_virtualGamepad_open { display: none !important; }
+
+  .ejs_virtualGamepad_parent {
+    bottom: calc(14px + var(--safe-bottom)) !important;
+    opacity: var(--pad-opacity) !important;
+    z-index: 3 !important;
+    transition: opacity 0.2s;
+  }
+  .ejs_virtualGamepad_left,
+  .ejs_virtualGamepad_right {
+    bottom: calc(12px + var(--safe-bottom)) !important;
+    transform: scale(var(--pad-scale));
+  }
+  .ejs_virtualGamepad_left { left: calc(14px + var(--safe-left)) !important; transform-origin: bottom left; }
+  .ejs_virtualGamepad_right { right: calc(14px + var(--safe-right)) !important; transform-origin: bottom right; }
+  .ejs_virtualGamepad_bottom { bottom: calc(150px * var(--pad-scale) + 8px) !important; }
+  @media (orientation: landscape) {
+    .ejs_virtualGamepad_bottom { bottom: calc(14px + var(--safe-bottom)) !important; }
+  }
+  body.pad-visible .turbo-fab { display: none; }
+  body.pad-left .ejs_virtualGamepad_left {
+    left: auto !important; right: calc(14px + var(--safe-right)) !important;
+    transform-origin: bottom right;
+  }
+  body.pad-left .ejs_virtualGamepad_right {
+    right: auto !important; left: calc(14px + var(--safe-left)) !important;
+    transform-origin: bottom left;
+  }
+  .ejs_virtualGamepad_button {
+    background: rgba(13, 22, 38, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    color: #fff !important;
+    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+    font-family: 'Inter', sans-serif !important;
+  }
+  .ejs_virtualGamepad_button_down {
+    background: rgba(34, 211, 238, 0.55) !important;
+    border-color: var(--cyan) !important;
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.35);
+  }
+  .ejs_dpad_main { opacity: 0.9 !important; }
+  .ejs_dpad_bar { background: rgba(255, 255, 255, 0.26) !important; }
+  .ejs_dpad_horizontal, .ejs_dpad_vertical { background: rgba(13, 22, 38, 0.55); border: 1px solid rgba(255, 255, 255, 0.14); }
+  .ejs_virtualGamepad_top { bottom: calc(205px + var(--safe-bottom)) !important; }
+  .b_speed_fast, .b_speed_slow { display: none !important; }
+
+  .pad-turbo {
+    position: absolute; z-index: 7;
+    left: -14px; top: -92px;
+    width: 46px; height: 46px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    border-radius: 50%;
+    background: rgba(12, 19, 33, 0.74);
+    border: 1px solid rgba(251, 191, 36, 0.48);
+    color: var(--amber);
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem; line-height: 1;
+    backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.4);
+    touch-action: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .pad-turbo small { margin-top: 1px; font-size: 0.48rem; font-weight: 800; letter-spacing: 0.3px; }
+  .pad-turbo.on, body.turbo-on .pad-turbo {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-color: #fde68a; color: #1a1200;
+    transform: scale(1.06);
+    box-shadow: 0 6px 24px rgba(251, 191, 36, 0.55);
+  }
+  body.pad-left .pad-turbo { left: auto; right: -14px; }
+  body.turbo-placement-top .pad-turbo,
+  body.turbo-placement-none .pad-turbo { display: none; }
+
+  /* Native popups (controls / cheats) */
+  .ejs_popup_container {
+    background: rgba(4, 8, 15, 0.94) !important;
+    backdrop-filter: blur(12px);
+    color: var(--text) !important;
+    z-index: 110 !important;
+  }
+  .ejs_popup_container * { color: #c7d2e4 !important; }
+  .ejs_popup_container h4 { color: var(--text) !important; }
+  .ejs_button {
+    background: var(--cyan) !important;
+    color: #041018 !important;
+    border-radius: 8px !important;
+  }
+
+  /* Performance mode */
+  body.perf .topbar,
+  body.perf .icon-btn,
+  body.perf .game-chip,
+  body.perf .turbo-chip,
+  body.perf .turbo-fab,
+  body.perf .sheet,
+  body.perf .loader-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  body.perf #screenFx { display: none; }
+  body.perf .turbo-chip.on, body.perf.turbo-on .turbo-chip { animation: none; }
+  body.perf .game-card, body.perf .card-emoji { transition: none; }
+  body.perf .ejs_virtualGamepad_button,
+  body.perf .pad-turbo { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+
+  /* Mobile layout */
+  @media (max-width: 720px) and (orientation: portrait) {
+    #game canvas { top: 31%; }
+  }
+
+  @media (max-width: 720px) {
+    .home-head { padding: calc(14px + var(--safe-top)) calc(16px + var(--safe-right)) 6px calc(16px + var(--safe-left)); }
+    .brand { display: none; }
+    .home-main { padding: 8px calc(16px + var(--safe-right)) calc(50px + var(--safe-bottom)) calc(16px + var(--safe-left)); }
+    .hero { padding: 34px 0 30px; }
+    .hero h1 { margin: 16px 0 14px; }
+    .hero-stats { gap: 18px; margin-top: 28px; }
+    .game-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .card-art { height: 108px; }
+    .card-emoji { font-size: 2.4rem; }
+    .card-body { padding: 10px 11px 12px; }
+    .card-name { font-size: 0.78rem; }
+    .card-del { opacity: 1; }
+    .game-chip { max-width: 30vw; font-size: 0.7rem; padding: 0 10px; }
+    .icon-btn { width: 37px; height: 37px; border-radius: 10px; }
+    .turbo-chip { height: 37px; padding: 0 10px; }
+    .tb-group { gap: 5px; }
+    .topbar { padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); }
+    .fps { top: calc(58px + var(--safe-top)); }
+
+    .sheet {
+      top: auto; left: 0; right: 0; bottom: 0;
+      width: 100%; height: min(88dvh, 760px);
+      border-left: 0; border-top: 1px solid var(--line);
+      border-radius: 20px 20px 0 0;
+      transform: translateY(102%);
+      box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.55);
+    }
+    .sheet-wrap.open .sheet { transform: translateY(0); }
+    .sheet::before {
+      content: ''; position: absolute; top: 7px; left: 50%;
+      width: 38px; height: 4px; margin-left: -19px;
+      border-radius: 99px; background: rgba(255, 255, 255, 0.18);
+    }
+    .sheet-head { padding-top: 18px; }
+    .tab-panel { padding-bottom: calc(30px + var(--safe-bottom)); }
+    .tab-btn { font-size: 0.66rem; padding: 8px 9px; }
+
+    .turbo-fab {
+      width: 58px; height: 58px;
+      right: calc(14px + var(--safe-right));
+      bottom: calc(190px + var(--safe-bottom));
+    }
+    .ejs_virtualGamepad_button,
+    .pad-turbo {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .toast { bottom: calc(84px + var(--safe-bottom)); }
+  }
+
+  @media (max-width: 380px) {
+    .game-chip { display: none; }
+    .seg button { padding: 6px 6px; min-width: 26px; }
+  }
+
+  @media (min-width: 900px) {
+    .game-grid { grid-template-columns: repeat(3, 1fr); }
+    .game-card:last-child:nth-child(3n + 2) { grid-column: span 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+    <link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+
+<!-- Emulator stage -->
+<div id="stage">
+  <div id="game"></div>
+</div>
+<div id="screenFx" aria-hidden="true"></div>
+
+<!-- In-game top bar -->
+<div class="topbar" id="topbar">
+  <div class="tb-group">
+    <button class="icon-btn" id="backBtn" title="Back to portfolio" aria-label="Back to portfolio">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <button class="icon-btn" id="homeBtn" title="Game library" aria-label="Game library">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z"/></svg>
+    </button>
+    <div class="game-chip"><span class="dot"></span><span id="gameTitle">Game</span></div>
+  </div>
+  <div class="tb-group tb-right">
+    <button class="turbo-chip" id="turboBtn" title="Turbo (T)" aria-label="Toggle turbo">
+      <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z"/></svg>
+      <span id="turboLabel">3×</span>
+    </button>
+    <button class="icon-btn" id="saveQuickBtn" title="Save states" aria-label="Save states">
+      <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H6V5h9v4z"/></svg>
+    </button>
+    <button class="icon-btn" id="pauseBtn" title="Pause" aria-label="Pause">
+      <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
+    </button>
+    <button class="icon-btn" id="fsBtn" title="Fullscreen" aria-label="Fullscreen">
+      <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+    </button>
+    <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<button class="turbo-fab" id="turboFab" title="Turbo (T)" aria-label="Toggle turbo">
+  <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z"/></svg>
+  <small id="turboFabLabel">3×</small>
+</button>
+<div class="fps" id="fps">60 FPS</div>
+
+<!-- Home / library -->
+<div class="home" id="home">
+  <div class="home-bg" aria-hidden="true"></div>
+  <header class="home-head">
+    <a class="back-link" href="../../index.html#projects">← Portfolio</a>
+    <div class="brand"><span class="brand-mark">G</span>GBA <em>ARCADE</em></div>
+    <button class="ghost-btn" id="homeSettingsBtn" style="padding:9px 14px;font-size:0.74rem;">⚙ Settings</button>
+  </header>
+  <main class="home-main">
+    <section class="hero">
+      <div class="hero-badge">Game Boy Advance · no install</div>
+      <h1>Pick a game.<br><em>Press start.</em></h1>
+      <p>Four hand-picked titles plus your own ROMs. Turbo fast-forward, CRT shaders, five save slots, and touch controls tuned for mobile.</p>
+      <div class="hero-actions">
+        <button class="primary-btn" id="heroUpload">📂 Upload a ROM</button>
+        <button class="ghost-btn" id="heroBrowse">Browse library ↓</button>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><strong>4</strong><span>built-in games</span></div>
+        <div class="hero-stat"><strong>8×</strong><span>turbo multiplier</span></div>
+        <div class="hero-stat"><strong>15</strong><span>shader presets</span></div>
+        <div class="hero-stat"><strong>5</strong><span>save slots</span></div>
+      </div>
+    </section>
+    <section id="librarySection">
+      <div class="section-head">
+        <h2>Game library</h2>
+        <span id="libCount">4 games</span>
+      </div>
+      <div class="game-grid" id="gameGrid"></div>
+      <p class="fineprint">Uploaded ROMs and save states stay in this browser only (IndexedDB) — nothing is uploaded to a server. Supported formats: .gba, .agb, .zip, .7z, .rar. Use games you own.</p>
+    </section>
+  </main>
+</div>
+
+<!-- Loading -->
+<div class="loading hidden" id="loading">
+  <div class="loader-card">
+    <div class="loader-ring"></div>
+    <div class="loader-title" id="loadTitle">Loading game…</div>
+    <div class="loader-sub" id="loadSub">Fetching the emulator core. The first load can take a moment.</div>
+    <div class="loader-bar"><span></span></div>
+    <div class="loader-actions">
+      <button class="ghost-btn" id="loadBackBtn">Back to library</button>
+      <button class="primary-btn" id="loadRetryBtn">Retry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-wrap" id="sheetWrap">
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Emulator settings">
+    <div class="sheet-head">
+      <div>
+        <h2>Emulator settings</h2>
+        <p>Changes save automatically</p>
+      </div>
+      <button class="sheet-close" id="sheetClose" aria-label="Close settings">✕</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="play" role="tab">⚡ Play</button>
+      <button class="tab-btn" data-tab="graphics" role="tab">✨ Graphics</button>
+      <button class="tab-btn" data-tab="saves" role="tab">💾 Saves</button>
+      <button class="tab-btn" data-tab="controls" role="tab">🎮 Controls</button>
+      <button class="tab-btn" data-tab="about" role="tab">ℹ About</button>
+    </div>
+
+    <div class="tab-panel active" data-panel="play">
+      <div class="panel-note" id="playNote">Start a game to unlock save states and live emulator actions.</div>
+
+      <div class="group">
+        <div class="group-title">Turbo fast-forward <span id="turboState">Off</span></div>
+        <div class="field">
+          <div class="field-label"><strong>Speed</strong><small>How fast the game runs while turbo is on</small></div>
+          <div class="seg" data-setting="turboSpeed">
+            <button data-value="2">2×</button>
+            <button data-value="3">3×</button>
+            <button data-value="4">4×</button>
+            <button data-value="6">6×</button>
+            <button data-value="8">8×</button>
+            <button data-value="max">Max</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Activation</strong><small>Toggle: tap once. Hold: press and keep holding</small></div>
+          <div class="seg" data-setting="turboMode">
+            <button data-value="toggle">Toggle</button>
+            <button data-value="hold">Hold</button>
+          </div>
+        </div>
+        <div class="action-row" style="margin-top:10px;">
+          <button class="action-btn accent" id="turboNowBtn">⚡ Turbo now</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Sound</div>
+        <div class="field">
+          <div class="field-label"><strong>Volume</strong><small id="volOut">80%</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="0" max="100" step="5" value="80" data-setting="volume" aria-label="Volume">
+              <span class="range-out" data-out="volume">80%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Mute</strong><small>Silence the emulator</small></div>
+          <button class="switch" data-setting="muted" role="switch" aria-label="Mute"></button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Quick actions</div>
+        <div class="action-row">
+          <button class="action-btn" id="pauseAction">⏸ Pause</button>
+          <button class="action-btn" id="resetAction">🔄 Reset game</button>
+          <button class="action-btn" id="shotAction">📸 Screenshot</button>
+          <button class="action-btn" id="controlsAction">🎮 Remap buttons</button>
+          <button class="action-btn" id="cheatsAction">🧪 Cheats</button>
+          <button class="action-btn" id="fullscreenAction">⛶ Fullscreen</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Auto-save</div>
+        <div class="field">
+          <div class="field-label"><strong>Resume auto-save</strong><small>Load the latest auto-save when a game starts</small></div>
+          <button class="switch" data-setting="autoResume" role="switch" aria-label="Resume auto-save"></button>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Save every</strong><small>Also saves when you switch games or hide the tab</small></div>
+          <select data-setting="autoSaveInterval">
+            <option value="0">Off</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Pause when hidden</strong><small>Pause emulation when you switch tabs</small></div>
+          <button class="switch" data-setting="pauseHidden" role="switch" aria-label="Pause when hidden"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="graphics">
+      <div class="group">
+        <div class="group-title">Shader</div>
+        <div class="field">
+          <div class="field-label"><strong>Video shader</strong><small>GPU filters applied by the emulator</small></div>
+          <select data-setting="shader" aria-label="Video shader">
+            <option value="disabled">Disabled</option>
+            <option value="bicubic">Bicubic (smooth)</option>
+            <option value="2xScaleHQ.glslp">2× Scale HQ</option>
+            <option value="4xScaleHQ.glslp">4× Scale HQ</option>
+            <option value="sabr">SABR</option>
+            <option value="crt-aperture.glslp">CRT — Aperture</option>
+            <option value="crt-easymode.glslp">CRT — Easymode</option>
+            <option value="crt-geom.glslp">CRT — Geom</option>
+            <option value="crt-mattias.glslp">CRT — Mattias</option>
+            <option value="crt-beam">CRT — Beam</option>
+            <option value="crt-caligari">CRT — Caligari</option>
+            <option value="crt-lottes">CRT — Lottes</option>
+            <option value="crt-zfast">CRT — Zfast</option>
+            <option value="crt-yeetron">CRT — Yeetron</option>
+            <option value="mix-frames">Mix frames</option>
+          </select>
+        </div>
+        <div class="panel-note" style="margin:12px 0 0;">CRT shaders look best in fullscreen. If performance drops on mobile, use Performance mode or disable the shader.</div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Screen</div>
+        <div class="field">
+          <div class="field-label"><strong>Overlay filter</strong><small>Lightweight CSS effect, no GPU shader needed</small></div>
+          <div class="seg" data-setting="filter">
+            <button data-value="none">Off</button>
+            <button data-value="scanlines">Scan</button>
+            <button data-value="crt">CRT</button>
+            <button data-value="vignette">Vign</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Fit</strong><small>How the GBA image fills the screen</small></div>
+          <div class="seg" data-setting="fit">
+            <button data-value="contain">Fit</button>
+            <button data-value="fill">Stretch</button>
+            <button data-value="cover">Zoom</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Brightness</strong><small>60–140%</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="60" max="140" step="5" value="100" data-setting="brightness" aria-label="Brightness">
+              <span class="range-out" data-out="brightness">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Saturation</strong><small>0–160%</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="0" max="160" step="5" value="100" data-setting="saturation" aria-label="Saturation">
+              <span class="range-out" data-out="saturation">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Contrast</strong><small>80–130%</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="80" max="130" step="5" value="100" data-setting="contrast" aria-label="Contrast">
+              <span class="range-out" data-out="contrast">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Screen offset</strong><small>Nudge the image up or down</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="-40" max="40" step="2" value="0" data-setting="screenY" aria-label="Screen vertical offset">
+              <span class="range-out" data-out="screenY">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Pixel-perfect</strong><small>Nearest-neighbour scaling for crisp pixels</small></div>
+          <button class="switch" data-setting="pixelated" role="switch" aria-label="Pixel-perfect scaling"></button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Performance</div>
+        <div class="field">
+          <div class="field-label"><strong>FPS counter</strong><small>Display refresh rate overlay</small></div>
+          <button class="switch" data-setting="fps" role="switch" aria-label="FPS counter"></button>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Performance mode</strong><small>Disables blur, animations and overlays. Best on older phones.</small></div>
+          <button class="switch" data-setting="perf" role="switch" aria-label="Performance mode"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="saves">
+      <div class="panel-note">Save states are stored in this browser. Auto-save runs when you switch games, hide the tab, or on your chosen interval.</div>
+      <div id="saveSlots"></div>
+    </div>
+
+    <div class="tab-panel" data-panel="controls">
+      <div class="group">
+        <div class="group-title">On-screen buttons</div>
+        <div class="field">
+          <div class="field-label"><strong>Show touch gamepad</strong><small>Auto-enabled on phones and tablets</small></div>
+          <button class="switch" data-setting="gamepad" role="switch" aria-label="Show touch gamepad"></button>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Size</strong><small>Scale the D-pad and A/B cluster</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="70" max="140" step="5" value="100" data-setting="padSize" aria-label="Gamepad size">
+              <span class="range-out" data-out="padSize">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Opacity</strong><small>Lower it to see more of the game</small></div>
+          <div class="field-control wide">
+            <div class="range-row">
+              <input type="range" min="30" max="100" step="5" value="85" data-setting="padOpacity" aria-label="Gamepad opacity">
+              <span class="range-out" data-out="padOpacity">85%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Left-handed</strong><small>Swap D-pad and action buttons</small></div>
+          <button class="switch" data-setting="leftHanded" role="switch" aria-label="Left-handed layout"></button>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Haptics</strong><small>Vibrate lightly on button presses</small></div>
+          <button class="switch" data-setting="haptics" role="switch" aria-label="Haptics"></button>
+        </div>
+        <div class="field">
+          <div class="field-label"><strong>Turbo button</strong><small>Where the on-screen turbo control lives</small></div>
+          <div class="seg" data-setting="turboPlacement">
+            <button data-value="fab">Floating</button>
+            <button data-value="top">Top bar</button>
+            <button data-value="none">Hidden</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Interface</div>
+        <div class="field">
+          <div class="field-label"><strong>Auto-hide top bar</strong><small>Fades after a few seconds of inactivity</small></div>
+          <button class="switch" data-setting="autoHide" role="switch" aria-label="Auto-hide top bar"></button>
+        </div>
+        <div class="action-row">
+          <button class="action-btn" id="padResetBtn">Reset touch layout</button>
+          <button class="action-btn" id="padPreviewBtn">Preview gamepad</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="about">
+      <div class="group">
+        <div class="group-title">Keyboard</div>
+        <div class="shortcut-list">
+          <div class="shortcut"><span>Toggle turbo</span><kbd>T</kbd></div>
+          <div class="shortcut"><span>Hold turbo</span><kbd>Shift</kbd></div>
+          <div class="shortcut"><span>Pause / resume</span><kbd>P</kbd></div>
+          <div class="shortcut"><span>Fullscreen</span><kbd>F</kbd></div>
+          <div class="shortcut"><span>Open menu</span><kbd>Esc</kbd></div>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">Storage</div>
+        <div class="storage-bar"><span id="storageBar"></span></div>
+        <div class="about-copy" id="storageText">Calculating…</div>
+      </div>
+      <div class="group">
+        <div class="group-title">About</div>
+        <p class="about-copy">
+          <strong>GBA Arcade</strong> is a single-page emulator powered by <a href="https://emulatorjs.org" target="_blank" rel="noopener" style="color:var(--cyan);">EmulatorJS</a> and the mGBA core.
+          ROMs, save states and uploaded files are stored locally in your browser. No accounts, no uploads.
+        </p>
+      </div>
+      <div class="group">
+        <div class="group-title">Danger zone</div>
+        <div class="action-row">
+          <button class="action-btn danger" id="clearDataBtn">Delete saves &amp; uploaded ROMs</button>
+        </div>
+      </div>
+      <p class="about-copy" style="margin-top:14px;">EmulatorJS 4.2.3 · GBA Arcade v2</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Confirm dialog -->
+<div class="dialog" id="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle">
+  <div class="dialog-card">
+    <h3 id="dialogTitle">Are you sure?</h3>
+    <p id="dialogText"></p>
+    <div class="dialog-actions">
+      <button class="ghost-btn" id="dialogCancel">Cancel</button>
+      <button class="primary-btn" id="dialogConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="fileInput" accept=".gba,.agb,.zip,.7z,.rar" multiple hidden>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Constants ─────────────────────────────────────────────────────── */
+  var EJS_VERSION = '4.2.3';
+  var EJS_DATA = 'https://cdn.emulatorjs.org/' + EJS_VERSION + '/data/';
+  var DB_NAME = 'gba-arcade';
+  var DB_VERSION = 1;
+  var SETTINGS_KEY = 'gba-arcade.settings.v1';
+  var IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+  var MAX_UPLOAD = 128 * 1024 * 1024;
+
+  var BUILTINS = [
+    { key: '1', ejsId: 1, name: 'Pocket Walker', meta: 'Homebrew · 15 KB', icon: '🚶', tag: 'Homebrew', rom: '../../assets/games/pocket-walker.gba', c1: '#22d3ee', c2: '#3b82f6' },
+    { key: '2', ejsId: 2, name: 'juanmv94 Demo', meta: 'Demo · 5.1 MB', icon: '🕹️', tag: 'Demo', rom: '../../assets/games/juanmv94demo.gba', c1: '#8b5cf6', c2: '#ec4899' },
+    { key: '3', ejsId: 3, name: 'Defender of the Crown', meta: 'Classic · 4.0 MB', icon: '🏰', tag: 'Classic', rom: '../../assets/games/Defender of the Crown (USA).gba', c1: '#f59e0b', c2: '#ef4444' },
+    { key: '4', ejsId: 4, name: 'Skyland', meta: 'Adventure · 24 MB', icon: '🗺️', tag: 'Adventure', rom: '../../assets/games/Skyland.gba', c1: '#34d399', c2: '#0ea5e9' }
+  ];
+
+  var UPLOAD_PALETTE = [
+    ['#22d3ee', '#6366f1'], ['#f59e0b', '#ec4899'], ['#34d399', '#0ea5e9'],
+    ['#a78bfa', '#f43f5e'], ['#fbbf24', '#84cc16'], ['#38bdf8', '#8b5cf6']
+  ];
+
+  /* ── Settings ──────────────────────────────────────────────────────── */
+  var DEFAULTS = {
+    turboSpeed: '3',
+    turboMode: 'toggle',
+    turboPlacement: 'fab',
+    shader: 'disabled',
+    filter: 'none',
+    brightness: 100,
+    saturation: 100,
+    contrast: 100,
+    screenY: 0,
+    fit: 'contain',
+    pixelated: false,
+    fps: false,
+    perf: false,
+    volume: 80,
+    muted: false,
+    gamepad: IS_TOUCH,
+    padSize: 100,
+    padOpacity: 85,
+    leftHanded: false,
+    haptics: true,
+    autoHide: true,
+    autoResume: true,
+    autoSaveInterval: 0,
+    pauseHidden: true
+  };
+
+  function loadSettings() {
+    var out = {};
+    for (var k in DEFAULTS) out[k] = DEFAULTS[k];
+    try {
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        for (var key in DEFAULTS) {
+          if (saved && Object.prototype.hasOwnProperty.call(saved, key) && saved[key] !== null && saved[key] !== undefined) {
+            out[key] = saved[key];
+          }
+        }
+      }
+    } catch (err) { /* ignore corrupt storage */ }
+    return out;
+  }
+
+  var settings = loadSettings();
+  var settingsSaveTimer = null;
+  function saveSettings() {
+    clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = setTimeout(function () {
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (err) {}
+    }, 120);
+  }
+
+  /* ── DOM ───────────────────────────────────────────────────────────── */
+  var $ = function (id) { return document.getElementById(id); };
+  var dom = {
+    body: document.body,
+    home: $('home'), homeSettingsBtn: $('homeSettingsBtn'), heroUpload: $('heroUpload'), heroBrowse: $('heroBrowse'),
+    gameGrid: $('gameGrid'), libCount: $('libCount'), fileInput: $('fileInput'),
+    loading: $('loading'), loadTitle: $('loadTitle'), loadSub: $('loadSub'), loadBackBtn: $('loadBackBtn'), loadRetryBtn: $('loadRetryBtn'),
+    topbar: $('topbar'), backBtn: $('backBtn'), homeBtn: $('homeBtn'), gameTitle: $('gameTitle'),
+    turboBtn: $('turboBtn'), turboLabel: $('turboLabel'), turboFab: $('turboFab'), turboFabLabel: $('turboFabLabel'), turboState: $('turboState'),
+    saveQuickBtn: $('saveQuickBtn'), pauseBtn: $('pauseBtn'), fsBtn: $('fsBtn'), menuBtn: $('menuBtn'),
+    fps: $('fps'), toast: $('toast'),
+    sheetWrap: $('sheetWrap'), sheetBackdrop: $('sheetBackdrop'), sheetClose: $('sheetClose'), sheet: $('sheet'),
+    playNote: $('playNote'), saveSlots: $('saveSlots'),
+    dialog: $('dialog'), dialogTitle: $('dialogTitle'), dialogText: $('dialogText'), dialogCancel: $('dialogCancel'), dialogConfirm: $('dialogConfirm'),
+    turboNowBtn: $('turboNowBtn'), pauseAction: $('pauseAction'), resetAction: $('resetAction'), shotAction: $('shotAction'),
+    controlsAction: $('controlsAction'), cheatsAction: $('cheatsAction'), fullscreenAction: $('fullscreenAction'),
+    padResetBtn: $('padResetBtn'), padPreviewBtn: $('padPreviewBtn'), clearDataBtn: $('clearDataBtn'),
+    storageBar: $('storageBar'), storageText: $('storageText')
+  };
+
+  /* ── Runtime state ─────────────────────────────────────────────────── */
+  var current = null;
+  var ready = false;
+  var starting = false;
+  var failed = false;
+  var ejs = null;
+  var paused = false;
+  var autoPaused = false;
+  var turboActive = false;
+  var holdTurbo = false;
+  var shiftTurbo = false;
+  var loaderInjected = false;
+  var pollTimer = null;
+  var loadTimeout = null;
+  var idleTimer = null;
+  var autoSaveTimer = null;
+  var fpsTimer = null;
+  var fpsLastFrame = 0;
+  var fpsLastTime = 0;
+  var toastTimer = null;
+  var dialogResolve = null;
+  var uploadedGames = [];
+  var activeTab = 'play';
+
+  /* ── Small utilities ───────────────────────────────────────────────── */
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes && bytes !== 0) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(bytes < 10240 ? 1 : 0) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch (err) { return new Date(ts).toLocaleDateString(); }
+  }
+
+  function stripExt(name) {
+    return String(name || 'Game').replace(/\.(gba|agb|zip|7z|rar)$/i, '');
+  }
+
+  function hashId(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) % 2000000000 + 100;
+  }
+
+  function toast(message, tone, duration) {
+    dom.toast.textContent = message;
+    dom.toast.className = 'toast visible' + (tone ? ' ' + tone : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      dom.toast.classList.remove('visible');
+    }, duration || 2600);
+  }
+
+  function confirmDialog(opts) {
+    opts = opts || {};
+    if (dialogResolve) {
+      dialogResolve(false);
+      dialogResolve = null;
+    }
+    dom.dialogTitle.textContent = opts.title || 'Are you sure?';
+    dom.dialogText.textContent = opts.text || '';
+    dom.dialogConfirm.textContent = opts.confirm || 'Confirm';
+    dom.dialogConfirm.className = 'primary-btn' + (opts.danger ? ' danger' : '');
+    dom.dialog.classList.add('open');
+    dom.body.classList.add('dialog-open');
+    setTimeout(function () { try { dom.dialogConfirm.focus(); } catch (err) {} }, 30);
+    return new Promise(function (resolve) {
+      dialogResolve = resolve;
+    });
+  }
+
+  function closeDialog(result) {
+    if (!dialogResolve) return;
+    var resolve = dialogResolve;
+    dialogResolve = null;
+    dom.dialog.classList.remove('open');
+    dom.body.classList.remove('dialog-open');
+    resolve(!!result);
+  }
+
+  /* ── IndexedDB ─────────────────────────────────────────────────────── */
+  var dbPromise = null;
+  function openDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains('states')) db.createObjectStore('states', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('roms')) db.createObjectStore('roms', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('romFiles')) db.createObjectStore('romFiles', { keyPath: 'id' });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('Could not open storage')); };
+    });
+    return dbPromise;
+  }
+
+  function idbRequest(store, mode, fn) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(store, mode);
+        var os = tx.objectStore(store);
+        var req;
+        try { req = fn(os); } catch (err) { reject(err); return; }
+        tx.oncomplete = function () { resolve(req ? req.result : undefined); };
+        tx.onerror = function () { reject(tx.error || new Error('Storage error')); };
+        tx.onabort = function () { reject(tx.error || new Error('Storage aborted')); };
+      });
+    });
+  }
+
+  function idbGet(store, key) { return idbRequest(store, 'readonly', function (os) { return os.get(key); }); }
+  function idbAll(store) { return idbRequest(store, 'readonly', function (os) { return os.getAll(); }); }
+  function idbPut(store, value) { return idbRequest(store, 'readwrite', function (os) { return os.put(value); }); }
+  function idbDelete(store, key) { return idbRequest(store, 'readwrite', function (os) { return os.delete(key); }); }
+
+  /* ── Library ───────────────────────────────────────────────────────── */
+  function uploadedToGame(meta) {
+    var pair = UPLOAD_PALETTE[hashId(meta.id) % UPLOAD_PALETTE.length];
+    var ext = (meta.ext || (meta.fileName || '').split('.').pop() || 'gba').toUpperCase();
+    return {
+      key: meta.id,
+      ejsId: hashId(meta.id),
+      name: meta.name,
+      meta: formatBytes(meta.size) + ' · ' + ext,
+      icon: '📁',
+      tag: 'Your ROM',
+      uploaded: true,
+      fileName: meta.fileName,
+      size: meta.size,
+      time: meta.time,
+      c1: pair[0],
+      c2: pair[1]
+    };
+  }
+
+  function cardHTML(game) {
+    return '<button class="game-card" data-key="' + esc(game.key) + '" style="--c1:' + game.c1 + ';--c2:' + game.c2 + '">' +
+      '<span class="card-art">' +
+        '<span class="card-tag">' + esc(game.tag) + '</span>' +
+        '<span class="card-emoji">' + game.icon + '</span>' +
+        '<span class="card-play">▶</span>' +
+      '</span>' +
+      '<span class="card-body">' +
+        '<span class="card-name">' + esc(game.name) + '</span>' +
+        '<span class="card-meta">' + esc(game.meta) + '</span>' +
+      '</span>' +
+      (game.uploaded ? '<span class="card-del" data-del="' + esc(game.key) + '" title="Delete ROM" role="button" aria-label="Delete ROM">✕</span>' : '') +
+    '</button>';
+  }
+
+  var UPLOAD_TILE = '<div class="game-card upload-card" id="uploadTile" role="button" tabindex="0" aria-label="Upload a ROM">' +
+    '<span class="card-art"><span class="card-emoji">📂</span></span>' +
+    '<span class="card-body"><span class="card-name">Upload your own</span><span class="card-meta">.gba, .agb, .zip, .7z, .rar</span></span>' +
+  '</div>';
+
+  async function renderLibrary() {
+    try {
+      var metas = await idbAll('roms');
+      metas.sort(function (a, b) { return (b.time || 0) - (a.time || 0); });
+      uploadedGames = metas.map(uploadedToGame);
+      dom.gameGrid.innerHTML = BUILTINS.map(cardHTML).join('') + uploadedGames.map(cardHTML).join('') + UPLOAD_TILE;
+      dom.libCount.textContent = (BUILTINS.length + uploadedGames.length) + ' game' + (BUILTINS.length + uploadedGames.length === 1 ? '' : 's');
+    } catch (err) {
+      uploadedGames = [];
+      dom.gameGrid.innerHTML = BUILTINS.map(cardHTML).join('') + UPLOAD_TILE;
+      dom.libCount.textContent = BUILTINS.length + ' games';
+    }
+  }
+
+  async function resolveGame(key) {
+    var builtin = BUILTINS.find(function (g) { return g.key === key; });
+    if (builtin) return builtin;
+    try {
+      var meta = await idbGet('roms', key);
+      var file = await idbGet('romFiles', key);
+      if (!meta || !file || !file.data) return null;
+      var game = uploadedToGame(meta);
+      var blob = new Blob([file.data], { type: 'application/octet-stream' });
+      game.rom = URL.createObjectURL(blob);
+      game.blobUrl = game.rom;
+      return game;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function showHome() {
+    ready = false;
+    starting = false;
+    current = null;
+    document.title = 'GBA Arcade';
+    dom.body.classList.remove('playing', 'idle', 'turbo-on', 'pad-visible', 'started', 'sheet-open');
+    dom.sheetWrap.classList.remove('open');
+    dom.home.classList.remove('hidden');
+    dom.loading.classList.add('hidden');
+    stopFps();
+    stopAutoSaveTimer();
+    try { history.replaceState(null, '', location.pathname); } catch (err) {}
+  }
+
+  async function deleteUploaded(key) {
+    var game = uploadedGames.find(function (g) { return g.key === key; });
+    if (!game) return;
+    var ok = await confirmDialog({
+      title: 'Delete “' + game.name + '”?',
+      text: 'The ROM and all of its save states will be removed from this browser. This cannot be undone.',
+      confirm: 'Delete ROM',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await idbDelete('roms', key);
+      await idbDelete('romFiles', key);
+      var states = await idbAll('states');
+      await Promise.all(states.filter(function (s) { return s.gameId === key; }).map(function (s) { return idbDelete('states', s.key); }));
+      await renderLibrary();
+      toast('ROM deleted', 'good');
+    } catch (err) {
+      toast('Could not delete ROM', 'bad');
+    }
+  }
+
+  async function handleFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    var firstKey = null;
+    var added = 0;
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      if (!/\.(gba|agb|zip|7z|rar)$/i.test(file.name)) {
+        toast('Skipped “' + file.name + '” — unsupported format', 'bad', 3400);
+        continue;
+      }
+      if (file.size > MAX_UPLOAD) {
+        toast('“' + file.name + '” is larger than 128 MB', 'bad', 3400);
+        continue;
+      }
+      try {
+        var buffer = await file.arrayBuffer();
+        var key = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        var meta = {
+          id: key,
+          name: stripExt(file.name),
+          fileName: file.name,
+          size: file.size,
+          ext: (file.name.split('.').pop() || 'gba').toLowerCase(),
+          time: Date.now()
+        };
+        await idbPut('roms', meta);
+        await idbPut('romFiles', { id: key, data: buffer });
+        if (!firstKey) firstKey = key;
+        added++;
+      } catch (err) {
+        toast('Could not store “' + file.name + '”', 'bad', 3400);
+      }
+    }
+    dom.fileInput.value = '';
+    if (added) {
+      await renderLibrary();
+      toast(added === 1 ? 'ROM added to your library' : added + ' ROMs added', 'good');
+    }
+    if (firstKey) launch(firstKey);
+  }
+
+  async function launch(key) {
+    if (current && current.key === key && (ready || starting)) {
+      if (ready) closeSheet();
+      return;
+    }
+    if (ready || starting) {
+      await autoSaveState(true);
+      var url = new URL(location.href);
+      url.searchParams.set('game', key);
+      location.href = url.toString();
+      return;
+    }
+    var game = await resolveGame(key);
+    if (!game) {
+      toast('That game could not be found', 'bad');
+      return;
+    }
+    try { history.replaceState(null, '', '?game=' + encodeURIComponent(key)); } catch (err) {}
+    startGame(game);
+  }
+
+  /* ── Emulator boot ─────────────────────────────────────────────────── */
+  function startGame(game) {
+    current = game;
+    starting = true;
+    ready = false;
+    failed = false;
+    paused = false;
+    autoPaused = false;
+    turboActive = false;
+    holdTurbo = false;
+    shiftTurbo = false;
+    dom.body.classList.remove('idle', 'turbo-on', 'started');
+    dom.body.classList.add('playing');
+    dom.home.classList.add('hidden');
+    dom.gameTitle.textContent = game.name;
+    document.title = game.name + ' · GBA Arcade';
+    dom.loading.classList.remove('hidden', 'error');
+    dom.loadTitle.textContent = 'Loading ' + game.name + '…';
+    dom.loadSub.textContent = 'Fetching the emulator core. The first load can take a moment.';
+    dom.loadRetryBtn.style.display = '';
+    dom.loadBackBtn.textContent = 'Back to library';
+    dom.fps.textContent = '— FPS';
+
+    configureEJS(game);
+    startLoadPolling();
+
+    if (!loaderInjected) {
+      loaderInjected = true;
+      var script = document.createElement('script');
+      script.src = EJS_DATA + '../loader.js';
+      script.async = true;
+      script.onload = function () {
+        dom.loadSub.textContent = 'Starting emulator…';
+      };
+      script.onerror = function () {
+        loadFailed('The emulator could not be downloaded. Check your connection and try again.');
+      };
+      document.body.appendChild(script);
+    }
+  }
+
+  function configureEJS(game) {
+    window.EJS_player = '#game';
+    window.EJS_core = 'gba';
+    window.EJS_pathtodata = EJS_DATA;
+    window.EJS_startOnLoaded = true;
+    window.EJS_DEBUG_XX = false;
+    window.EJS_language = 'en-US';
+    window.EJS_color = '#060a12';
+    window.EJS_volume = settings.muted ? 0 : settings.volume / 100;
+    window.EJS_gamepadShadows = true;
+    window.EJS_gameUrl = game.rom;
+    window.EJS_gameID = game.ejsId;
+    window.EJS_gameName = game.fileName || (game.name + '.gba');
+    window.EJS_Buttons = {
+      playPause: false, play: false, pause: false, restart: false,
+      mute: false, unmute: false, settings: false,
+      fullscreen: false, enterFullscreen: false, exitFullscreen: false,
+      saveState: false, loadState: false, screenRecord: false,
+      gamepad: false, cheat: false, volumeSlider: false,
+      saveSavFiles: false, loadSavFiles: false, quickSave: false, quickLoad: false,
+      screenshot: false, cacheManager: false, exitEmulation: false,
+      netplay: false, diskButton: false, contextMenu: false
+    };
+    window.EJS_onGameStart = onGameStart;
+    window.EJS_onGameStartError = function (message) {
+      loadFailed(message || 'The emulator could not start this ROM.');
+    };
+  }
+
+  function startLoadPolling() {
+    clearInterval(pollTimer);
+    clearTimeout(loadTimeout);
+    var ticks = 0;
+    pollTimer = setInterval(function () {
+      ticks++;
+      if (ready) { clearInterval(pollTimer); return; }
+      if (window.EJS_emulator && window.EJS_emulator.failedToStart) {
+        loadFailed('This ROM could not be started. It may be corrupt or unsupported.');
+        return;
+      }
+      if (window.EJS_emulator && window.EJS_emulator.started && !ready) {
+        onGameStart();
+        return;
+      }
+      if (ticks === 20) dom.loadSub.textContent = 'Still loading — larger ROMs take longer on mobile.';
+      if (ticks === 60) dom.loadSub.textContent = 'Almost there. The core is still initializing…';
+    }, 500);
+    loadTimeout = setTimeout(function () {
+      if (!ready) loadFailed('Loading timed out. Try again — the first load can be slow on a mobile connection.');
+    }, 120000);
+  }
+
+  function onGameStart() {
+    if (ready) return;
+    ready = true;
+    starting = false;
+    failed = false;
+    clearInterval(pollTimer);
+    clearTimeout(loadTimeout);
+    ejs = window.EJS_emulator || null;
+    dom.loading.classList.add('hidden');
+    dom.body.classList.add('started');
+    dom.playNote.textContent = 'Changes apply live. Save states are stored in this browser.';
+    applyAllSettings();
+    startFpsIfNeeded();
+    restartAutoSaveTimer();
+    maybeResumeAuto();
+    scheduleIdle();
+    setTimeout(function () { applyGamepad(); ensurePadTurbo(); }, 400);
+    setTimeout(ensurePadTurbo, 1500);
+  }
+
+  function loadFailed(message) {
+    if (ready) return;
+    failed = true;
+    starting = false;
+    clearInterval(pollTimer);
+    clearTimeout(loadTimeout);
+    dom.loading.classList.remove('hidden');
+    dom.loading.classList.add('error');
+    dom.loadTitle.textContent = 'Could not start the game';
+    dom.loadSub.textContent = message || 'Something went wrong while loading the emulator.';
+    dom.loadRetryBtn.style.display = '';
+  }
+
+  function retryLoad() {
+    var url = new URL(location.href);
+    if (current) url.searchParams.set('game', current.key);
+    location.href = url.toString();
+  }
+
+  /* ── Settings application ──────────────────────────────────────────── */
+  function applyAllSettings() {
+    applyVisualSettings();
+    applyShader();
+    applyVolume();
+    applyGamepad();
+    updateTurboLabels();
+    restartAutoSaveTimer();
+    syncUI();
+  }
+
+  function applyVisualSettings() {
+    var b = dom.body;
+    b.style.setProperty('--brightness', settings.brightness / 100);
+    b.style.setProperty('--saturation', settings.saturation / 100);
+    b.style.setProperty('--contrast', settings.contrast / 100);
+    b.style.setProperty('--screen-y', settings.screenY + 'px');
+    b.style.setProperty('--pad-scale', settings.padSize / 100);
+    b.style.setProperty('--pad-opacity', settings.padOpacity / 100);
+    b.classList.toggle('fit-fill', settings.fit === 'fill');
+    b.classList.toggle('fit-cover', settings.fit === 'cover');
+    b.classList.toggle('pixelated', !!settings.pixelated);
+    b.classList.toggle('pad-left', !!settings.leftHanded);
+    b.classList.toggle('show-fps', !!settings.fps);
+    b.classList.toggle('perf', !!settings.perf);
+    b.classList.toggle('fx-scanlines', settings.filter === 'scanlines');
+    b.classList.toggle('fx-crt', settings.filter === 'crt');
+    b.classList.toggle('fx-vignette', settings.filter === 'vignette');
+    b.classList.toggle('turbo-placement-fab', settings.turboPlacement === 'fab');
+    b.classList.toggle('turbo-placement-top', settings.turboPlacement === 'top');
+    b.classList.toggle('turbo-placement-none', settings.turboPlacement === 'none');
+    updateRangeFills();
+    if (settings.fps) startFpsIfNeeded(); else stopFps();
+  }
+
+  function applyShader() {
+    if (!ready || !ejs) return;
+    var shader = settings.shader || 'disabled';
+    try {
+      if (typeof ejs.changeSettingOption === 'function') ejs.changeSettingOption('shader', shader);
+      if (typeof ejs.menuOptionChanged === 'function') ejs.menuOptionChanged('shader', shader);
+    } catch (err) { /* shader unavailable on this device */ }
+  }
+
+  function applyVolume() {
+    if (!ejs) return;
+    var value = settings.muted ? 0 : Math.max(0, Math.min(1, settings.volume / 100));
+    try {
+      ejs.volume = value;
+      if (typeof ejs.setVolume === 'function') ejs.setVolume(value);
+    } catch (err) {}
+  }
+
+  function ensurePadTurbo() {
+    var right = document.querySelector('.ejs_virtualGamepad_right');
+    if (!right || right.querySelector('.pad-turbo')) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pad-turbo';
+    button.id = 'padTurbo';
+    button.setAttribute('aria-label', 'Turbo fast-forward');
+    button.innerHTML = '<span>⚡</span><small>3×</small>';
+    bindTurboControl(button);
+    right.appendChild(button);
+    updateTurboLabels();
+  }
+
+  function applyGamepad() {
+    if (!ejs) return;
+    try {
+      if (typeof ejs.toggleVirtualGamepad === 'function') ejs.toggleVirtualGamepad(!!settings.gamepad);
+    } catch (err) {}
+    var pad = document.querySelector('.ejs_virtualGamepad_parent');
+    var visible = !!settings.gamepad && !!pad && getComputedStyle(pad).display !== 'none';
+    dom.body.classList.toggle('pad-visible', visible);
+    ensurePadTurbo();
+  }
+
+  /* ── Turbo ─────────────────────────────────────────────────────────── */
+  function turboRatio() {
+    return settings.turboSpeed === 'max' ? 0 : (parseFloat(settings.turboSpeed) || 3);
+  }
+
+  function turboSpeedLabel() {
+    return settings.turboSpeed === 'max' ? 'MAX' : settings.turboSpeed + '×';
+  }
+
+  function updateTurboLabels() {
+    var label = turboSpeedLabel();
+    dom.turboLabel.textContent = label;
+    dom.turboFabLabel.textContent = label;
+    dom.turboState.textContent = turboActive ? 'On · ' + label : 'Off';
+    dom.turboNowBtn.textContent = turboActive ? '⚡ Turbo off' : '⚡ Turbo now';
+    dom.turboBtn.classList.toggle('on', turboActive);
+    dom.turboFab.classList.toggle('on', turboActive);
+    var padLabel = document.querySelector('#padTurbo small');
+    if (padLabel) padLabel.textContent = label;
+    dom.body.classList.toggle('turbo-on', turboActive);
+  }
+
+  function setTurbo(on) {
+    if (!ready || !ejs || !ejs.gameManager) {
+      if (on) toast('The game is still loading');
+      return;
+    }
+    if (on && paused) {
+      toast('Resume the game before using turbo', 'bad');
+      return;
+    }
+    turboActive = !!on;
+    try {
+      ejs.gameManager.setFastForwardRatio(turboRatio());
+      ejs.gameManager.toggleFastForward(turboActive ? 1 : 0);
+      ejs.isFastForward = turboActive;
+    } catch (err) {}
+    updateTurboLabels();
+    if (turboActive && settings.turboMode !== 'hold') toast('Turbo ' + turboSpeedLabel() + ' — hold Shift or press T to stop', null, 1800);
+  }
+
+  function turboPressStart() {
+    if (settings.turboMode !== 'hold') return;
+    holdTurbo = true;
+    setTurbo(true);
+  }
+
+  function turboPressEnd() {
+    if (!holdTurbo) return;
+    holdTurbo = false;
+    if (!shiftStartedTurbo) setTurbo(false);
+  }
+
+  function toggleTurbo() {
+    setTurbo(!turboActive);
+  }
+
+  function bindTurboControl(el) {
+    el.addEventListener('pointerdown', function (event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      turboPressStart();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (evt) {
+      el.addEventListener(evt, turboPressEnd);
+    });
+    el.addEventListener('click', function (event) {
+      event.preventDefault();
+      if (settings.turboMode === 'toggle') toggleTurbo();
+    });
+    el.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+  }
+
+  /* ── Pause / reset / fullscreen ────────────────────────────────────── */
+  var PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
+  var PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5z"/></svg>';
+
+  function setPaused(value, silent) {
+    if (!ready || !ejs) {
+      if (!silent) toast('Start a game first');
+      return;
+    }
+    try {
+      if (value) ejs.pause(); else ejs.play();
+    } catch (err) {}
+    paused = !!value;
+    dom.pauseBtn.innerHTML = paused ? PLAY_ICON : PAUSE_ICON;
+    dom.pauseBtn.title = paused ? 'Resume' : 'Pause';
+    dom.pauseBtn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+    dom.pauseAction.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    dom.body.classList.toggle('paused', paused);
+    if (paused && turboActive) setTurbo(false);
+  }
+
+  function togglePause() { setPaused(!paused); }
+
+  async function resetGame() {
+    if (!ready || !ejs) { toast('Start a game first'); return; }
+    var ok = await confirmDialog({
+      title: 'Reset the game?',
+      text: 'The console will reboot and any progress since your last manual save will be lost. The auto-save for this game is cleared so a reload starts fresh.',
+      confirm: 'Reset',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      if (current) await idbDelete('states', current.key + ':auto');
+    } catch (err) {}
+    try { ejs.restart(); } catch (err) {}
+    paused = false;
+    dom.pauseBtn.innerHTML = PAUSE_ICON;
+    dom.pauseAction.textContent = '⏸ Pause';
+    dom.body.classList.remove('paused');
+    closeSheet();
+    toast('Game reset', 'good');
+  }
+
+  function toggleFullscreen() {
+    var doc = document;
+    var el = doc.documentElement;
+    try {
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+      } else if (el.requestFullscreen) {
+        var p = el.requestFullscreen();
+        if (p && p.catch) p.catch(function () { toast('Fullscreen was blocked', 'bad'); });
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
+    } catch (err) {
+      toast('Fullscreen is not available', 'bad');
+    }
+  }
+
+  function updateFullscreenButton() {
+    var active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    dom.fsBtn.classList.toggle('active', active);
+    dom.fsBtn.title = active ? 'Exit fullscreen' : 'Fullscreen';
+  }
+
+  /* ── Screenshot / native menus ─────────────────────────────────────── */
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  function takeScreenshot() {
+    if (!ready || !ejs) { toast('Start a game first'); return; }
+    try {
+      ejs.screenshot(function (blob) {
+        if (blob instanceof Blob) {
+          downloadBlob(blob, (current ? current.name : 'gba') + '-' + Date.now() + '.png');
+          toast('Screenshot saved', 'good');
+        } else {
+          toast('Screenshot is not available', 'bad');
+        }
+      }, 'canvas', 'png', 2);
+    } catch (err) {
+      toast('Screenshot is not available', 'bad');
+    }
+  }
+
+  function openNativeMenu(which) {
+    if (!ready || !ejs) { toast('Start a game first'); return; }
+    closeSheet();
+    setTimeout(function () {
+      var menu = which === 'cheats' ? ejs.cheatMenu : ejs.controlMenu;
+      if (menu) {
+        menu.style.display = '';
+        menu.style.zIndex = '110';
+      } else {
+        toast('That menu is not available for this core', 'bad');
+      }
+    }, 60);
+  }
+
+  /* ── FPS counter ───────────────────────────────────────────────────── */
+  function startFpsIfNeeded() {
+    if (!settings.fps || fpsTimer) return;
+    if (!ejs || !ejs.gameManager) {
+      dom.fps.textContent = '— FPS';
+      return;
+    }
+    fpsLastFrame = Number(ejs.gameManager.getFrameNum()) || 0;
+    fpsLastTime = performance.now();
+    fpsTimer = setInterval(function () {
+      if (!ejs || !ejs.gameManager) return;
+      var now = performance.now();
+      var frame = Number(ejs.gameManager.getFrameNum()) || 0;
+      var elapsed = now - fpsLastTime;
+      if (elapsed <= 0) return;
+      var value = Math.round(((frame - fpsLastFrame) * 1000) / elapsed);
+      dom.fps.textContent = Math.max(0, value) + ' FPS';
+      fpsLastFrame = frame;
+      fpsLastTime = now;
+    }, 500);
+  }
+
+  function stopFps() {
+    clearInterval(fpsTimer);
+    fpsTimer = null;
+  }
+
+  /* ── Auto-save timer ───────────────────────────────────────────────── */
+  function restartAutoSaveTimer() {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+    var minutes = parseInt(settings.autoSaveInterval, 10) || 0;
+    if (minutes > 0) {
+      autoSaveTimer = setInterval(function () {
+        if (ready) autoSaveState(false);
+      }, minutes * 60000);
+    }
+  }
+
+  function stopAutoSaveTimer() {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+
+  /* ── Save states ───────────────────────────────────────────────────── */
+  var MANUAL_SLOTS = [1, 2, 3, 4];
+
+  function stateKey(slot) {
+    return (current ? current.key : 'unknown') + ':' + slot;
+  }
+
+  function captureThumb() {
+    return new Promise(function (resolve) {
+      if (!ready || !ejs || typeof ejs.screenshot !== 'function') { resolve(null); return; }
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (!settled) { settled = true; resolve(null); }
+      }, 1200);
+      try {
+        ejs.screenshot(function (blob) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (blob instanceof Blob) {
+            var reader = new FileReader();
+            reader.onload = function () {
+              var result = typeof reader.result === 'string' ? reader.result : null;
+              shrinkThumb(result).then(resolve);
+            };
+            reader.onerror = function () { resolve(null); };
+            reader.readAsDataURL(blob);
+          } else if (typeof blob === 'string') {
+            shrinkThumb(blob).then(resolve);
+          } else {
+            resolve(null);
+          }
+        }, 'canvas', 'png', 1);
+      } catch (err) {
+        if (!settled) { settled = true; clearTimeout(timer); resolve(null); }
+      }
+    });
+  }
+
+  function shrinkThumb(dataUrl) {
+    return new Promise(function (resolve) {
+      if (!dataUrl) { resolve(null); return; }
+      var image = new Image();
+      image.onload = function () {
+        try {
+          var scale = Math.min(320 / image.width, 214 / image.height, 1);
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          var context = canvas.getContext('2d');
+          context.imageSmoothingEnabled = true;
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.78));
+        } catch (err) {
+          resolve(dataUrl);
+        }
+      };
+      image.onerror = function () { resolve(dataUrl); };
+      image.src = dataUrl;
+    });
+  }
+
+  async function saveSlot(slot) {
+    if (!ready || !ejs || !ejs.gameManager || !current) {
+      toast('Start a game before saving');
+      return;
+    }
+    var gameKey = current.key;
+    var gameName = current.name;
+    try {
+      var state = ejs.gameManager.getState();
+      if (!state || !(state.length || state.byteLength)) throw new Error('Empty state');
+      var thumb = await captureThumb();
+      var record = {
+        key: gameKey + ':' + slot,
+        gameId: gameKey,
+        gameName: gameName,
+        slot: slot,
+        time: Date.now(),
+        size: state.byteLength || state.length,
+        thumb: thumb,
+        data: state
+      };
+      await idbPut('states', record);
+      await renderSaves();
+      updateStorageInfo();
+      toast(slot === 'auto' ? 'Auto-save updated' : 'Saved to slot ' + slot, 'good');
+    } catch (err) {
+      toast('Could not save this state', 'bad');
+    }
+  }
+
+  async function loadSlot(slot) {
+    if (!ready || !ejs || !ejs.gameManager || !current) {
+      toast('Start a game first');
+      return;
+    }
+    try {
+      var record = await idbGet('states', stateKey(slot));
+      if (!record) { toast('That slot is empty'); return; }
+      ejs.gameManager.loadState(new Uint8Array(record.data));
+      setPaused(false, true);
+      toast('Loaded ' + (slot === 'auto' ? 'auto-save' : 'slot ' + slot) + ' · ' + formatDate(record.time), 'good');
+    } catch (err) {
+      toast('Could not load this state', 'bad');
+    }
+  }
+
+  async function deleteSlot(slot) {
+    if (!current) return;
+    var label = slot === 'auto' ? 'auto-save' : 'slot ' + slot;
+    var ok = await confirmDialog({
+      title: 'Delete ' + label + '?',
+      text: 'This save state will be removed from this browser. Other slots are not affected.',
+      confirm: 'Delete',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await idbDelete('states', stateKey(slot));
+      await renderSaves();
+      updateStorageInfo();
+      toast('Save deleted', 'good');
+    } catch (err) {
+      toast('Could not delete the save', 'bad');
+    }
+  }
+
+  async function autoSaveState(showFeedback) {
+    if (!ready || !ejs || !ejs.gameManager || !current) return;
+    var gameKey = current.key;
+    var gameName = current.name;
+    try {
+      var state = ejs.gameManager.getState();
+      if (!state || !(state.length || state.byteLength)) return;
+      await idbPut('states', {
+        key: gameKey + ':auto',
+        gameId: gameKey,
+        gameName: gameName,
+        slot: 'auto',
+        time: Date.now(),
+        size: state.byteLength || state.length,
+        thumb: null,
+        data: state
+      });
+      updateStorageInfo();
+      if (showFeedback) toast('Auto-saved', 'good', 1600);
+    } catch (err) { /* saving on pagehide is best-effort */ }
+  }
+
+  async function maybeResumeAuto() {
+    if (!settings.autoResume || !current) return;
+    var gameKey = current.key;
+    try {
+      var record = await idbGet('states', gameKey + ':auto');
+      if (!record || !ready || !ejs || !ejs.gameManager) return;
+      await new Promise(function (resolve) { setTimeout(resolve, 350); });
+      if (!ready || !current || current.key !== gameKey) return;
+      ejs.gameManager.loadState(new Uint8Array(record.data));
+      setPaused(false, true);
+      toast('Resumed from auto-save · ' + formatDate(record.time), 'good', 3200);
+    } catch (err) { /* ignore missing / invalid auto-save */ }
+  }
+
+  function slotHTML(slot, record, isAuto) {
+    var label = isAuto ? 'Auto-save' : 'Slot ' + slot;
+    var meta = record
+      ? formatDate(record.time) + ' · ' + formatBytes(record.size)
+      : (isAuto ? 'No auto-save yet' : 'Empty — save your progress here');
+    var thumb = record && record.thumb
+      ? '<img src="' + esc(record.thumb) + '" alt="Save preview">'
+      : (record ? '💾' : '—');
+    var saveButton = isAuto ? '' :
+      '<button class="save-btn" data-save="' + slot + '" title="Save to ' + label + '" aria-label="Save to ' + label + '">💾</button>';
+    return '<div class="slot">' +
+      '<div class="slot-thumb">' + thumb + '</div>' +
+      '<div class="slot-info"><strong>' + label + (isAuto ? ' <span style="color:var(--cyan);font-size:0.55rem;letter-spacing:0.8px;">AUTO</span>' : '') + '</strong><small>' + esc(meta) + '</small></div>' +
+      '<div class="slot-actions">' +
+        saveButton +
+        '<button class="load-btn" data-load="' + slot + '" title="Load ' + label + '" aria-label="Load ' + label + '"' + (record ? '' : ' disabled') + '>▶</button>' +
+        '<button class="del-btn" data-delete="' + slot + '" title="Delete ' + label + '" aria-label="Delete ' + label + '"' + (record ? '' : ' disabled') + '>✕</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  async function renderSaves() {
+    if (!dom.saveSlots) return;
+    if (!current) {
+      dom.saveSlots.innerHTML = '<div class="panel-note">Start a game to use save states.</div>';
+      return;
+    }
+    var map = {};
+    try {
+      var all = await idbAll('states');
+      all.forEach(function (record) {
+        if (record.gameId === current.key) map[record.slot] = record;
+      });
+    } catch (err) {}
+    var html = slotHTML('auto', map.auto, true);
+    MANUAL_SLOTS.forEach(function (slot) { html += slotHTML(slot, map[slot], false); });
+    dom.saveSlots.innerHTML = html;
+  }
+
+  /* ── Storage info / clear data ─────────────────────────────────────── */
+  async function updateStorageInfo() {
+    if (!dom.storageText) return;
+    if (!navigator.storage || !navigator.storage.estimate) {
+      dom.storageText.textContent = 'Storage information is not available in this browser.';
+      return;
+    }
+    try {
+      var estimate = await navigator.storage.estimate();
+      var used = estimate.usage || 0;
+      var quota = estimate.quota || 0;
+      var percent = quota ? Math.min(100, (used / quota) * 100) : 0;
+      dom.storageBar.style.width = percent.toFixed(1) + '%';
+      dom.storageText.textContent = formatBytes(used) + ' used of ' + formatBytes(quota) + ' available in this browser.';
+    } catch (err) {
+      dom.storageText.textContent = 'Could not read storage usage.';
+    }
+  }
+
+  async function clearAllData() {
+    var ok = await confirmDialog({
+      title: 'Delete all local data?',
+      text: 'Every save state, uploaded ROM and setting stored by GBA Arcade will be erased. This cannot be undone.',
+      confirm: 'Delete everything',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      if (dbPromise) {
+        var db = await dbPromise;
+        try { db.close(); } catch (err) {}
+        dbPromise = null;
+      }
+      await new Promise(function (resolve) {
+        var request = indexedDB.deleteDatabase(DB_NAME);
+        request.onsuccess = request.onerror = request.onblocked = function () { resolve(); };
+      });
+      try {
+        localStorage.removeItem(SETTINGS_KEY);
+        Object.keys(localStorage).forEach(function (key) {
+          if (key.indexOf('ejs-') === 0) localStorage.removeItem(key);
+        });
+      } catch (err) {}
+      location.reload();
+    } catch (err) {
+      toast('Could not clear storage', 'bad');
+    }
+  }
+
+  /* ── Settings UI ───────────────────────────────────────────────────── */
+  function updateRangeFills() {
+    document.querySelectorAll('input[type="range"]').forEach(function (input) {
+      var min = parseFloat(input.min) || 0;
+      var max = parseFloat(input.max) || 100;
+      var value = parseFloat(input.value) || 0;
+      var percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+      input.style.setProperty('--fill', percent.toFixed(1) + '%');
+      var field = input.closest('.field');
+      var out = field ? field.querySelector('[data-out="' + input.getAttribute('data-setting') + '"]') : null;
+      if (out) out.textContent = input.getAttribute('data-setting') === 'screenY' ? String(value) : value + '%';
+    });
+  }
+
+  function syncUI() {
+    document.querySelectorAll('[data-setting]').forEach(function (el) {
+      var key = el.getAttribute('data-setting');
+      if (!Object.prototype.hasOwnProperty.call(settings, key)) return;
+      var value = settings[key];
+      if (el.tagName === 'SELECT') {
+        el.value = String(value);
+      } else if (el.matches('input[type="range"]')) {
+        el.value = value;
+      } else if (el.classList.contains('switch')) {
+        var on = !!value;
+        el.classList.toggle('on', on);
+        el.setAttribute('aria-checked', on ? 'true' : 'false');
+      } else if (el.classList.contains('seg')) {
+        el.querySelectorAll('button[data-value]').forEach(function (button) {
+          button.classList.toggle('active', String(button.getAttribute('data-value')) === String(value));
+        });
+      }
+    });
+    var volOut = document.getElementById('volOut');
+    if (volOut) volOut.textContent = settings.volume + '%';
+    updateRangeFills();
+    updateTurboLabels();
+  }
+
+  function applySetting(key) {
+    applyVisualSettings();
+    if (key === 'shader') applyShader();
+    if (key === 'volume' || key === 'muted') applyVolume();
+    if (key === 'gamepad') applyGamepad();
+    if (key === 'autoSaveInterval') restartAutoSaveTimer();
+    if (key === 'autoHide') {
+      if (!settings.autoHide) {
+        clearTimeout(idleTimer);
+        dom.body.classList.remove('idle');
+      } else {
+        scheduleIdle();
+      }
+    }
+    if (key === 'turboSpeed' && turboActive) setTurbo(true);
+    if (key === 'turboMode' && settings.turboMode === 'toggle' && holdTurbo) {
+      holdTurbo = false;
+      if (!shiftTurbo) setTurbo(false);
+    }
+  }
+
+  function setSetting(key, value) {
+    if (!Object.prototype.hasOwnProperty.call(settings, key)) return;
+    settings[key] = value;
+    saveSettings();
+    syncUI();
+    applySetting(key);
+  }
+
+  function openSheet(tab) {
+    dom.sheetWrap.classList.add('open');
+    dom.body.classList.add('sheet-open');
+    if (tab) selectTab(tab);
+    syncUI();
+    renderSaves();
+    updateStorageInfo();
+    scheduleIdle();
+  }
+
+  function closeSheet() {
+    dom.sheetWrap.classList.remove('open');
+    dom.body.classList.remove('sheet-open');
+    scheduleIdle();
+  }
+
+  function selectTab(name) {
+    activeTab = name;
+    document.querySelectorAll('.tab-btn').forEach(function (button) {
+      var on = button.getAttribute('data-tab') === name;
+      button.classList.toggle('active', on);
+      button.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.tab-panel').forEach(function (panel) {
+      panel.classList.toggle('active', panel.getAttribute('data-panel') === name);
+    });
+    if (name === 'saves') renderSaves();
+    if (name === 'about') updateStorageInfo();
+  }
+
+  /* ── Idle UI ───────────────────────────────────────────────────────── */
+  function scheduleIdle() {
+    clearTimeout(idleTimer);
+    dom.body.classList.remove('idle');
+    if (!settings.autoHide || !ready) return;
+    idleTimer = setTimeout(function () {
+      if (dom.sheetWrap.classList.contains('open')) return;
+      if (dom.dialog.classList.contains('open')) return;
+      if (paused) return;
+      dom.body.classList.add('idle');
+    }, 3800);
+  }
+
+  function wakeUi() {
+    if (!ready) return;
+    dom.body.classList.remove('idle');
+    scheduleIdle();
+  }
+
+  /* ── Exit / switch ─────────────────────────────────────────────────── */
+  async function exitToPortfolio() {
+    if (ready || starting) {
+      var ok = await confirmDialog({
+        title: 'Leave the emulator?',
+        text: 'Your game will be auto-saved to this browser, then you will return to the portfolio.',
+        confirm: 'Leave game'
+      });
+      if (!ok) return;
+      await autoSaveState(false);
+    }
+    location.href = '../../index.html#projects';
+  }
+
+  async function goToLibrary() {
+    if (ready || starting) {
+      var ok = await confirmDialog({
+        title: 'Close this game?',
+        text: 'Your game will be auto-saved, then the emulator will close and return to the library.',
+        confirm: 'Close game'
+      });
+      if (!ok) return;
+      await autoSaveState(false);
+    }
+    location.href = location.pathname;
+  }
+
+  /* ── Event wiring ──────────────────────────────────────────────────── */
+  function bindEvents() {
+    /* Settings controls */
+    document.addEventListener('input', function (event) {
+      var input = event.target.closest('input[type="range"][data-setting]');
+      if (!input) return;
+      setSetting(input.getAttribute('data-setting'), Number(input.value));
+    });
+
+    document.addEventListener('change', function (event) {
+      var select = event.target.closest('select[data-setting]');
+      if (!select) return;
+      setSetting(select.getAttribute('data-setting'), select.value);
+    });
+
+    document.addEventListener('click', function (event) {
+      var segButton = event.target.closest('.seg[data-setting] button[data-value]');
+      if (segButton) {
+        var group = segButton.closest('.seg');
+        setSetting(group.getAttribute('data-setting'), segButton.getAttribute('data-value'));
+        return;
+      }
+      var switchEl = event.target.closest('.switch[data-setting]');
+      if (switchEl) {
+        var key = switchEl.getAttribute('data-setting');
+        setSetting(key, !settings[key]);
+      }
+    });
+
+    /* Tabs */
+    document.querySelectorAll('.tab-btn').forEach(function (button) {
+      button.addEventListener('click', function () {
+        selectTab(button.getAttribute('data-tab'));
+      });
+    });
+
+    /* Library */
+    dom.gameGrid.addEventListener('click', function (event) {
+      var del = event.target.closest('[data-del]');
+      if (del) {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteUploaded(del.getAttribute('data-del'));
+        return;
+      }
+      var card = event.target.closest('[data-key]');
+      if (card) {
+        launch(card.getAttribute('data-key'));
+        return;
+      }
+      if (event.target.closest('#uploadTile')) dom.fileInput.click();
+    });
+
+    dom.gameGrid.addEventListener('keydown', function (event) {
+      if ((event.key === 'Enter' || event.key === ' ') && event.target.id === 'uploadTile') {
+        event.preventDefault();
+        dom.fileInput.click();
+      }
+    });
+
+    dom.heroUpload.addEventListener('click', function () { dom.fileInput.click(); });
+    dom.heroBrowse.addEventListener('click', function () {
+      var section = document.getElementById('librarySection');
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    dom.homeSettingsBtn.addEventListener('click', function () { openSheet('graphics'); });
+    dom.fileInput.addEventListener('change', function (event) { handleFiles(event.target.files); });
+
+    /* In-game bar */
+    dom.backBtn.addEventListener('click', exitToPortfolio);
+    dom.homeBtn.addEventListener('click', goToLibrary);
+    dom.menuBtn.addEventListener('click', function () { openSheet(activeTab || 'play'); });
+    dom.saveQuickBtn.addEventListener('click', function () { openSheet('saves'); });
+    dom.pauseBtn.addEventListener('click', togglePause);
+    dom.fsBtn.addEventListener('click', toggleFullscreen);
+    bindTurboControl(dom.turboBtn);
+    bindTurboControl(dom.turboFab);
+
+    /* Sheet */
+    dom.sheetClose.addEventListener('click', closeSheet);
+    dom.sheetBackdrop.addEventListener('click', closeSheet);
+
+    /* Dialog */
+    dom.dialogCancel.addEventListener('click', function () { closeDialog(false); });
+    dom.dialogConfirm.addEventListener('click', function () { closeDialog(true); });
+    dom.dialog.addEventListener('click', function (event) {
+      if (event.target === dom.dialog) closeDialog(false);
+    });
+
+    /* Loading */
+    dom.loadRetryBtn.addEventListener('click', retryLoad);
+    dom.loadBackBtn.addEventListener('click', function () { location.href = location.pathname; });
+
+    /* Play actions */
+    dom.turboNowBtn.addEventListener('click', toggleTurbo);
+    dom.pauseAction.addEventListener('click', togglePause);
+    dom.resetAction.addEventListener('click', resetGame);
+    dom.shotAction.addEventListener('click', takeScreenshot);
+    dom.controlsAction.addEventListener('click', function () { openNativeMenu('controls'); });
+    dom.cheatsAction.addEventListener('click', function () { openNativeMenu('cheats'); });
+    dom.fullscreenAction.addEventListener('click', toggleFullscreen);
+
+    /* Controls panel actions */
+    dom.padResetBtn.addEventListener('click', function () {
+      settings.padSize = 100;
+      settings.padOpacity = 85;
+      settings.leftHanded = false;
+      settings.turboPlacement = 'fab';
+      saveSettings();
+      syncUI();
+      applyVisualSettings();
+      toast('Touch layout reset', 'good');
+    });
+    dom.padPreviewBtn.addEventListener('click', function () {
+      settings.gamepad = true;
+      saveSettings();
+      syncUI();
+      applyGamepad();
+      ensurePadTurbo();
+      toast(ready ? 'Touch gamepad shown' : 'The gamepad will appear when a game starts', 'good');
+    });
+
+    /* Save slot delegation */
+    dom.saveSlots.addEventListener('click', function (event) {
+      var save = event.target.closest('[data-save]');
+      if (save) { saveSlot(save.getAttribute('data-save')); return; }
+      var load = event.target.closest('[data-load]');
+      if (load) { loadSlot(load.getAttribute('data-load')); return; }
+      var del = event.target.closest('[data-delete]');
+      if (del) deleteSlot(del.getAttribute('data-delete'));
+    });
+
+    /* About */
+    dom.clearDataBtn.addEventListener('click', clearAllData);
+
+    /* Idle / wake */
+    ['pointerdown', 'pointermove', 'touchstart', 'keydown'].forEach(function (evt) {
+      document.addEventListener(evt, wakeUi, { passive: evt !== 'keydown' });
+    });
+
+    /* Haptics on the emulator's touch controls */
+    document.addEventListener('pointerdown', function (event) {
+      if (!settings.haptics || !navigator.vibrate) return;
+      if (!event.target.closest('.ejs_virtualGamepad_button, .ejs_dpad_main, .ejs_virtualGamepad_bottom')) return;
+      try { navigator.vibrate(8); } catch (err) {}
+    }, { passive: true });
+
+    /* Keyboard */
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        if (dom.dialog.classList.contains('open')) { event.preventDefault(); closeDialog(false); return; }
+        if (dom.sheetWrap.classList.contains('open')) { event.preventDefault(); closeSheet(); return; }
+        var popups = Array.prototype.filter.call(document.querySelectorAll('.ejs_popup_container'), function (el) {
+          return el.offsetParent !== null && getComputedStyle(el).display !== 'none';
+        });
+        if (popups.length) {
+          event.preventDefault();
+          popups.forEach(function (el) { el.style.display = 'none'; });
+          return;
+        }
+        if (ready) { event.preventDefault(); openSheet('play'); }
+        return;
+      }
+      if (event.target && event.target.matches && event.target.matches('input, select, textarea')) return;
+      if (event.key === 'Shift' && ready) {
+        if (!shiftTurbo) {
+          shiftTurbo = true;
+          if (!turboActive) {
+            shiftStartedTurbo = true;
+            setTurbo(true);
+          }
+        }
+        return;
+      }
+      if (!ready) return;
+      var key = event.key.toLowerCase();
+      if (key === 't') { event.preventDefault(); toggleTurbo(); }
+      else if (key === 'p') { event.preventDefault(); togglePause(); }
+      else if (key === 'f') { event.preventDefault(); toggleFullscreen(); }
+    });
+
+    document.addEventListener('keyup', function (event) {
+      if (event.key !== 'Shift' || !shiftTurbo) return;
+      shiftTurbo = false;
+      if (shiftStartedTurbo) {
+        shiftStartedTurbo = false;
+        if (!holdTurbo) setTurbo(false);
+      }
+    });
+
+    /* Fullscreen state */
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+    /* Lifecycle */
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        if (ready) {
+          autoSaveState(false);
+          if (settings.pauseHidden && !paused) {
+            autoPaused = true;
+            setPaused(true, true);
+          }
+        }
+      } else {
+        wakeUi();
+        if (autoPaused) {
+          autoPaused = false;
+          setPaused(false, true);
+        }
+      }
+    });
+    window.addEventListener('pagehide', function () {
+      if (ready) autoSaveState(false);
+    });
+    window.addEventListener('blur', function () {
+      if (shiftTurbo) {
+        shiftTurbo = false;
+        if (shiftStartedTurbo) {
+          shiftStartedTurbo = false;
+          if (!holdTurbo) setTurbo(false);
+        }
+      }
+    });
+  }
+
+  var shiftStartedTurbo = false;
+
+  /* ── Init ──────────────────────────────────────────────────────────── */
+  async function init() {
+    bindEvents();
+    applyVisualSettings();
+    syncUI();
+    updateStorageInfo();
+    await renderLibrary();
+
+    var params = new URLSearchParams(location.search);
+    var key = params.get('game');
+    if (key) {
+      dom.home.classList.add('hidden');
+      dom.loading.classList.remove('hidden', 'error');
+      dom.loadTitle.textContent = 'Loading game…';
+      dom.loadSub.textContent = 'Preparing the emulator…';
+      var game = await resolveGame(key);
+      if (game) {
+        startGame(game);
+      } else {
+        showHome();
+        toast('That game is not in this browser', 'bad');
+      }
+    } else {
+      showHome();
+    }
+  }
+
+  init();
+})();
+</script>
+    <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{})</script>
+</body>
+</html>

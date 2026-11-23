@@ -113,7 +113,7 @@
             desc: 'Projects',
             run: () => [
                 '52+ projects on the portfolio. Highlights:',
-                '<cyan>AI Chat Assistant</cyan> — Pollinations-powered chat (projects/ai_chat.html)',
+                '<cyan>AI Chat Assistant</cyan> — Pollinations-powered chat (projects/ai-chat/index.html)',
                 '<cyan>E-Commerce Platform</cyan> — vanilla JS cart & checkout',
                 '<cyan>Sky Ace / Neon Kart / Battleship Commander</cyan> — games',
                 '<cyan>Tiny Local AI Demo</cyan> — distilgpt2 in-browser',

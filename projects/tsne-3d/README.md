@@ -45,5 +45,5 @@
 
 ## 🔗 Link
 
-- Wrapper: `projects/tsne-3d.html`
+- Wrapper: `projects/tsne-3d/legacy-tsne-3d.html`
 - App: `projects/tsne-3d/index.html`

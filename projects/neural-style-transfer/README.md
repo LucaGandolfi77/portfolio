@@ -35,7 +35,7 @@ The original Gatys et al. algorithm optimizes a generated image against VGG-19 c
 ## Files
 
 ```
-projects/neural-style-transfer.html          → intro screen (wrapper)
+projects/neural-style-transfer/legacy-neural-style-transfer.html          → intro screen (wrapper)
 projects/neural-style-transfer/index.html    → the app (engine + example pickers)
 projects/neural-style-transfer/examples/     → 5 style + 3 content example SVGs (real files)
 projects/neural-style-transfer/README.md     → this file

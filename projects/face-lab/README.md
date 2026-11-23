@@ -56,5 +56,5 @@
 
 ## 🔗 Links
 
-- Wrapper: `projects/face-lab.html`
+- Wrapper: `projects/face-lab/legacy-face-lab.html`
 - App: `projects/face-lab/index.html`

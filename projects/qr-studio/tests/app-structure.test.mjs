@@ -424,8 +424,8 @@ test('catalogo e redirect: una sola voce QR Studio, nessun doppione legacy', () 
   assert.doesNotMatch(catalog, /qrcode\.html|create_qrcode\.html/);
 
   const redirects = [
-    ['../../projects/qrcode.html', 'scan'],
-    ['../../projects/create_qrcode.html', 'create']
+    ['../../projects/qr-studio/legacy-qrcode.html', 'scan'],
+    ['../../projects/qr-studio/legacy-create_qrcode.html', 'create']
   ];
   for (const [file, section] of redirects) {
     const source = read(file);

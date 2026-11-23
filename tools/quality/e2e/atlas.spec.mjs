@@ -141,11 +141,11 @@ test.describe('Atlas', () => {
   });
 
   test('legacy GPS and weather URLs redirect to the right mode', async ({ page }) => {
-    await page.goto('/projects/gps.html');
+    await page.goto('/projects/atlas/legacy-gps.html');
     await expect(page).toHaveURL(/\/projects\/atlas\/#measure$/);
     await expect(page.locator('#measurePanel')).toBeVisible();
 
-    await page.goto('/projects/world_weather.html');
+    await page.goto('/projects/atlas/legacy-world_weather.html');
     await expect(page).toHaveURL(/\/projects\/atlas\/#weather$/);
     await expect(page.locator('#weatherPanel')).toBeVisible();
   });

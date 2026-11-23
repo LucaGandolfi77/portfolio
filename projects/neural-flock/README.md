@@ -42,5 +42,5 @@ Spatial-hash grid + cheap shader rendering keep it smooth up to 2000 boids; trai
 
 ## 🔗 Links
 
-- Wrapper: `projects/neural-flock.html`
+- Wrapper: `projects/neural-flock/legacy-neural-flock.html`
 - App: `projects/neural-flock/index.html`

@@ -102,11 +102,11 @@ test.describe('Vision Lab', () => {
   });
 
   test('legacy FaceMesh and Smile URLs redirect to the right mode', async ({ page }) => {
-    await page.goto('/projects/facemesh_camera.html');
+    await page.goto('/projects/vision-lab/legacy-facemesh_camera.html');
     await expect(page).toHaveURL(/\/projects\/vision-lab\/#mesh$/);
     await expect(page.locator('#meshPanel')).toBeVisible();
 
-    await page.goto('/projects/smile_detection.html');
+    await page.goto('/projects/vision-lab/legacy-smile_detection.html');
     await expect(page).toHaveURL(/\/projects\/vision-lab\/#smile$/);
     await expect(page.locator('#smilePanel')).toBeVisible();
 

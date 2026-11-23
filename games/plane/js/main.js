@@ -223,7 +223,7 @@ function boot() {
   AUDIO.setSound(state.sound);
   ui.showOverlay('menuOverlay');
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./plane-sw.js', { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
   }
   requestAnimationFrame(frame);
 }
