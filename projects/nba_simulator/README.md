@@ -18,6 +18,8 @@ A fully on-device basketball simulator with 30 franchises, tactics, franchise mo
 - **Playoffs**: 16-team field, best-of-7 series, home court, conference finals and NBA Finals.
 - **Career**: roster editing, contracts, trades, free agency, draft, multi-year progression, XP, levels and badges.
 - **Analytics**: box score, TS%, eFG%, EFF, leaders, shot zones, quick batch simulations.
+- **Player cards**: click any box score, roster or leader row to open a card with real season averages for star players, advanced metrics, verified quotes or factual trivia, and a procedural 3D avatar.
+- **3D avatar**: Three.js r160 (vendored), no external models — jersey/team color, number, height/weight scaling, hair color/style, face shape and skin tone. Drag or use "Rotate" to spin it; a Canvas2D fallback is used if WebGL is unavailable.
 - **Social**: bilingual play-by-play, highlight replay, Web Share and local history.
 
 ## Mobile
@@ -31,4 +33,4 @@ node --test projects/nba_simulator/test/logic-test.mjs
 node games/_kit/test/run-all.mjs
 ```
 
-11 tests cover determinism, rosters, season, playoffs, advanced stats and franchise actions.
+15 tests cover determinism, rosters, season, playoffs, advanced stats, franchise actions, real season averages, avatar attributes, trivia and storage migration.

@@ -1,15 +1,17 @@
-/* Versioned, crash-proof storage with migration from the legacy key */
+/* Versioned, crash-proof storage with migration from legacy NBA keys */
 
-const KEY = 'pf.nba.v2';
+const KEY = 'pf.nba.v3';
+const PREVIOUS = 'pf.nba.v2';
 const LEGACY = 'nba.sim.v1';
 
 export function defaults() {
   return {
-    version: 2,
+    version: 3,
     settings: { lang: 'en', sound: true, quality: 'high', reducedFx: false },
     league: null,
     playoffs: null,
     history: [],
+    playerStats: {},
     predictions: { total: 0, correct: 0, points: 0 },
     customTeams: [],
     matchup: { home: 'BOS', away: 'LAL', prediction: 'home' },
@@ -18,30 +20,35 @@ export function defaults() {
   };
 }
 
-function legacyMigrate(raw) {
+function migrate(raw, version) {
+  const d = defaults();
   try {
     const old = JSON.parse(raw);
-    if (!old || old.version !== 1) return defaults();
-    const d = defaults();
-    d.settings.lang = old.settings && old.settings.lang === 'it' ? 'it' : 'en';
-    d.settings.sound = old.settings ? !!old.settings.sound : true;
-    d.predictions = old.predictions || d.predictions;
-    d.customTeams = old.customTeams || [];
-    d.history = (old.history || []).slice(0, 20);
-    return d;
-  } catch (e) { return defaults(); }
+    if (!old || typeof old !== 'object') return d;
+    const merged = { ...d, ...old, version: 3 };
+    merged.settings = { ...d.settings, ...(old.settings || {}) };
+    merged.matchup = { ...d.matchup, ...(old.matchup || {}) };
+    merged.career = { ...d.career, ...(old.career || {}) };
+    merged.predictions = { ...d.predictions, ...(old.predictions || {}) };
+    merged.playerStats = version === 1 ? {} : (old.playerStats || {});
+    merged.history = (old.history || []).slice(0, version === 1 ? 20 : 40);
+    if (version === 1) {
+      merged.settings.lang = old.settings && old.settings.lang === 'it' ? 'it' : 'en';
+    }
+    return merged;
+  } catch (e) { return d; }
 }
 
 export function load() {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === 2) return { ...defaults(), ...parsed };
-    }
-    const legacy = localStorage.getItem(LEGACY);
-    if (legacy) {
-      const migrated = legacyMigrate(legacy);
+    for (const [key, version] of [[KEY, 3], [PREVIOUS, 2], [LEGACY, 1]]) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      if (version === 3) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.version === 3) return { ...defaults(), ...parsed };
+      }
+      const migrated = migrate(raw, version);
       save(migrated);
       return migrated;
     }
@@ -73,4 +80,20 @@ export function grantXP(state, amount, reason) {
   state.career.xp += amount;
   state.career.level = 1 + Math.floor(Math.sqrt(state.career.xp / 120));
   return reason;
+}
+
+const TOTALS = ['pts', 'reb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'to', 'pf', 'minutes'];
+
+export function recordPlayerStats(state, players) {
+  const store = state.playerStats || (state.playerStats = {});
+  for (const p of players || []) {
+    if (!p.id) continue;
+    const row = store[p.id] || (store[p.id] = { games: 0 });
+    row.games += 1;
+    for (const key of TOTALS) {
+      const value = key === 'reb' ? (p.orb || 0) + (p.drb || 0) : (p[key] || 0);
+      row[key] = Math.round(((row[key] || 0) + value) * 10) / 10;
+    }
+  }
+  return store;
 }

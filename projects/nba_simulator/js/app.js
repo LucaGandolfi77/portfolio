@@ -11,7 +11,12 @@ import { freeAgents, signPlayer, trade, draftClass, progressRoster } from './sim
 import { leaders, efficiency, trueShooting, effectiveFG, zoneCounts, teamTotals } from './sim/stats.js';
 import { createCourtGL } from './render/court-gl.js';
 import { createCourt2D } from './render/court-2d.js';
+import { createAvatar } from './render/avatar.js';
 import { Sfx } from './audio.js';
+import { enrichTeams, playerProfile } from './data/player-profile.js';
+import { seasonAverage, advancedProjection } from './data/player-stats.js';
+import { playerNotes } from './data/player-notes.js';
+import { recordPlayerStats } from './core/storage.js';
 
 const $ = id => document.getElementById(id);
 const i18n = new I18n();
@@ -20,7 +25,7 @@ const persistence = load();
 
 const state = {
   data: persistence,
-  teams: TEAMS.map(t => JSON.parse(JSON.stringify(t))).concat(persistence.customTeams || []),
+  teams: enrichTeams(TEAMS.map(t => JSON.parse(JSON.stringify(t))).concat(persistence.customTeams || [])),
   teamMap: {},
   sim: null,
   renderer: null,
@@ -32,7 +37,11 @@ const state = {
   lastSummary: null,
   rng: Math.random,
   free: [],
-  worker: null
+  worker: null,
+  avatar: null,
+  avatarFrame: 0,
+  openPlayer: null,
+  openTeam: null
 };
 
 function teamByCode(code) {
@@ -139,7 +148,7 @@ function renderMatch() {
 function renderBox(sim) {
   const heads = ['pts', 'reb', 'ast', 'stl', 'blk', 'to', 'fgm', 'fga', 'tpm', 'ts', 'efg', 'eff'];
   const rows = Object.values(sim.players).filter(p => p.minutes > 0).sort((a, b) => b.pts - a.pts);
-  const body = rows.map(p => `<tr><td>${p.name}</td>` + heads.map(k => {
+  const body = rows.map(p => `<tr data-player-id="${p.id}"><td>${p.name}</td>` + heads.map(k => {
     const v = k === 'ts' || k === 'efg' ? (k === 'ts' ? trueShooting(p) : effectiveFG(p)) : k === 'eff' ? efficiency(p) : (p.reb = p.orb + p.drb, p[k]);
     return `<td>${typeof v === 'number' && k !== 'fgm' && k !== 'fga' && k !== 'tpm' ? v.toFixed(2) : (v || 0)}</td>`;
   }).join('') + '</tr>').join('');
@@ -182,6 +191,7 @@ function finalizeMatch() {
     summary: { quarters: summary.quarters, leadChanges: summary.leadChanges }
   });
   grantXP(state.data, correct ? 30 : 10, 'match');
+  recordPlayerStats(state.data, summary.players);
   state.data.matchup = { home: summary.home, away: summary.away, prediction: pick };
   save(state.data);
   $('finalText').textContent = `${summary.home} ${summary.score.home} – ${summary.score.away} ${summary.away}`;
@@ -234,7 +244,7 @@ function renderStats() {
   const source = sim ? Object.values(sim.players) : state.teams.flatMap(t => t.players);
   const top = leaders(source, 'pts', 8);
   $('statLeaders').innerHTML = `<table><thead><tr><th>Player</th><th>PTS</th><th>TS%</th><th>eFG%</th><th>EFF</th></tr></thead><tbody>` +
-    top.map(p => `<tr><td>${p.name}</td><td>${p.pts || 0}</td><td>${trueShooting(p).toFixed(3)}</td><td>${effectiveFG(p).toFixed(3)}</td><td>${efficiency(p)}</td></tr>`).join('') + '</tbody></table>';
+    top.map(p => `<tr data-player-id="${p.id || ''}"><td>${p.name}</td><td>${p.pts || 0}</td><td>${trueShooting(p).toFixed(3)}</td><td>${effectiveFG(p).toFixed(3)}</td><td>${efficiency(p)}</td></tr>`).join('') + '</tbody></table>';
   const canvas = $('chartPoints');
   const ctx = canvas.getContext('2d');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -276,8 +286,91 @@ function quickSim() {
   state.worker.postMessage({ id: Date.now(), home: $('selHome').value, away: $('selAway').value, count: 12, seed: dailySeed() });
 }
 
+function findPlayer(id) {
+  for (const team of state.teams) {
+    const p = team.players.find(x => x.id === id);
+    if (p) return { player: p, team };
+  }
+  if (state.sim && state.sim.players[id]) return { player: state.sim.players[id], team: teamByCode($('selHome').value) };
+  return null;
+}
+
+function openPlayerCard(id) {
+  const found = findPlayer(id);
+  if (!found) return;
+  const { player, team } = found;
+  state.openPlayer = player;
+  state.openTeam = team;
+  const avg = seasonAverage(player);
+  const adv = advancedProjection(player);
+  const notes = playerNotes(player, i18n.lang, team.name);
+  $('playerName').textContent = player.name;
+  $('playerTeam').textContent = `${team.name} · ${player.pos}`;
+  $('playerPhotoInfo').innerHTML = [
+    ['height', `${player.heightCm || 200} cm`], ['weight', `${player.weightKg || 100} kg`],
+    ['hair', (player.hairStyle || 'short')], ['face', (player.faceShape || 'oval')],
+    ['jersey', String(player.jersey == null ? 1 : player.jersey)]
+  ].map(([k, v]) => `<span>${i18n.t(k)}: <b>${v}</b></span>`).join('');
+  $('playerAverages').innerHTML = [
+    ['PTS', avg.pts], ['REB', avg.reb], ['AST', avg.ast], ['STL', avg.stl], ['BLK', avg.blk],
+    ['FG%', avg.fg.toFixed(3)], ['3P%', avg.tp.toFixed(3)], ['FT%', avg.ft.toFixed(3)],
+    ['MPG', avg.mpg], ['GP', avg.gp]
+  ].map(([k, v]) => `<span class="stat-chip">${k}: <b>${v}</b></span>`).join('');
+  $('playerAdvanced').innerHTML = [
+    ['PER', adv.per], ['TS%', adv.ts], ['eFG%', adv.efg], ['OVR', player.ovr], ['OFF', player.off], ['DEF', player.def], ['POT', player.pot]
+  ].map(([k, v]) => `<span class="stat-chip">${k}: <b>${v}</b></span>`).join('');
+  $('playerTrivia').textContent = notes.trivia;
+  $('playerQuote').textContent = notes.quote || '';
+  $('playerModal').hidden = false;
+
+  const canvas = $('avatarCanvas');
+  if (!state.avatar) state.avatar = createAvatar(canvas);
+  if (state.avatar) {
+    state.avatar.autoSpin(true);
+    state.avatar.setPlayer(player, team);
+    const av = state.avatar;
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    av.resize(canvas.clientWidth, canvas.clientHeight, dpr);
+    const loop = now => {
+      if ($('playerModal').hidden || !state.avatar) return;
+      av.render(now);
+      state.avatarFrame = requestAnimationFrame(loop);
+    };
+    state.avatarFrame = requestAnimationFrame(loop);
+  }
+}
+
+function closePlayerCard() {
+  $('playerModal').hidden = true;
+  cancelAnimationFrame(state.avatarFrame);
+  state.openPlayer = null;
+  state.openTeam = null;
+}
+
 function bind() {
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+  const openFromRow = id => { if (id) openPlayerCard(id); };
+  ['boxBody', 'rosterBody', 'statLeaders'].forEach(container => {
+    const el = $(container);
+    if (!el) return;
+    el.addEventListener('click', e => {
+      const row = e.target.closest('tr[data-player-id]');
+      if (row) openFromRow(row.dataset.playerId);
+    });
+  });
+  $('btnPlayerClose').addEventListener('click', closePlayerCard);
+  $('playerModal').addEventListener('click', e => { if (e.target === $('playerModal')) closePlayerCard(); });
+  $('btnRotate').addEventListener('click', () => { if (state.avatar) state.avatar.rotate(140); });
+  const av = $('avatarCanvas');
+  let dragging = false, lastX = 0;
+  av.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; av.setPointerCapture(e.pointerId); if (state.avatar) state.avatar.startDrag(); });
+  av.addEventListener('pointermove', e => {
+    if (!dragging || !state.avatar) return;
+    state.avatar.rotate((e.clientX - lastX) * 2);
+    lastX = e.clientX;
+  });
+  av.addEventListener('pointerup', () => { dragging = false; if (state.avatar) state.avatar.endDrag(); });
+  av.addEventListener('pointercancel', () => { dragging = false; if (state.avatar) state.avatar.endDrag(); });
   $('btnTipoff').addEventListener('click', startMatch);
   $('btnRandom').addEventListener('click', () => {
     const a = state.teams[Math.floor(Math.random() * state.teams.length)];
@@ -362,7 +455,10 @@ function bind() {
     const team = {
       code, name: 'Custom Team ' + state.teams.length, color: '#00d4ff', conference: 'East', division: 'Atlantic', custom: true,
       strategy: { pace: 50, threeRate: 50, defense: 50, rotation: 50, style: 'balanced' },
-      players: Array.from({ length: 8 }, (_, i) => ({ id: `${code}-${i + 1}`, name: `Player ${i + 1}`, pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], age: 25, ovr: 72, off: 73, def: 71, pot: 78, salary: 3, injury: null, morale: 75 }))
+      players: Array.from({ length: 8 }, (_, i) => {
+        const p = { id: `${code}-${i + 1}`, name: `Player ${i + 1}`, pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], age: 25, ovr: 72, off: 73, def: 71, pot: 78, salary: 3, injury: null, morale: 75 };
+        return { ...p, ...playerProfile(p) };
+      })
     };
     state.teams.push(team);
     state.data.customTeams.push(JSON.parse(JSON.stringify(team)));
@@ -382,6 +478,7 @@ function bind() {
     const signed = signPlayer(team, picks[0]);
     if (!signed.ok) { toast(signed.reason); return; }
     Object.assign(team, signed.team);
+    team.players = team.players.map(pl => pl.heightCm ? pl : { ...pl, ...playerProfile(pl) });
     if (team.custom) { state.data.customTeams = state.teams.filter(t => t.custom).map(t => JSON.parse(JSON.stringify(t))); save(state.data); }
     toast(picks[0].name); renderTeams();
   });
@@ -392,6 +489,7 @@ function bind() {
     const signed = signPlayer(team, state.free[Number(i)]);
     if (!signed.ok) { toast(signed.reason); return; }
     Object.assign(team, signed.team);
+    team.players = team.players.map(pl => pl.heightCm ? pl : { ...pl, ...playerProfile(pl) });
     state.free.splice(Number(i), 1);
     if (team.custom) { state.data.customTeams = state.teams.filter(t => t.custom).map(t => JSON.parse(JSON.stringify(t))); save(state.data); }
     renderTeams();
@@ -413,6 +511,11 @@ function bind() {
     i18n.setLang(e.detail && e.detail.lang);
     i18n.apply();
     renderMatch(); renderSeason(); renderTeams(); renderCareer();
+    if (!$('playerModal').hidden && state.openPlayer) {
+      const id = state.openPlayer.id;
+      closePlayerCard();
+      openPlayerCard(id);
+    }
   });
   window.addEventListener('beforeunload', () => save(state.data));
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.sim && !state.sim.finished) state.paused = true; });

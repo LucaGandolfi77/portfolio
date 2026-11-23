@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+
+const store = new Map();
+globalThis.localStorage = {
+  getItem: k => (store.has(k) ? store.get(k) : null),
+  setItem: (k, v) => store.set(k, String(v)),
+  removeItem: k => store.delete(k)
+};
 import { TEAMS, TEAM_BY_CODE, CONFERENCES } from '../js/data/teams.js';
 import { seededRandom, dailySeed, dailyKey } from '../js/core/rng.js';
 import { Sim, simulateGame, winProbability, Q_LEN } from '../js/sim/engine.js';
@@ -8,6 +15,10 @@ import { newSeason, playAll, standingsSorted } from '../js/sim/season.js';
 import { createBracket, playAllRounds } from '../js/sim/playoffs.js';
 import { efficiency, trueShooting, effectiveFG, zoneCounts, leaders } from '../js/sim/stats.js';
 import { signPlayer, trade, draftClass, freeAgents } from '../js/sim/career.js';
+import { seasonAverage, advancedProjection, STAR_NAMES } from '../js/data/player-stats.js';
+import { playerProfile, enrichTeams } from '../js/data/player-profile.js';
+import { playerNotes } from '../js/data/player-notes.js';
+import { defaults, save, load, recordPlayerStats } from '../js/core/storage.js';
 
 test('30 NBA teams with 10 players and two conferences', () => {
   assert.equal(TEAMS.length, 30);
@@ -96,4 +107,53 @@ test('franchise actions validate roster rules', () => {
   assert.equal(draftClass(3, seededRandom(2)).length, 3);
 });
 
-console.log('11/11 tests passed');
+test('star season averages are curated and realistic', () => {
+  assert.equal(STAR_NAMES.length, 30);
+  const a = seasonAverage(TEAM_BY_CODE.LAL.players[0]);
+  assert.equal(a.curated, true);
+  assert.ok(a.pts > 20 && a.fg > 0.4 && a.ft > 0.6);
+  const b = seasonAverage(TEAM_BY_CODE.BOS.players[9]);
+  assert.equal(b.curated, false);
+  assert.ok(b.pts > 0 && b.reb >= 0);
+  const adv = advancedProjection(TEAM_BY_CODE.LAL.players[0]);
+  assert.ok(adv.per > 0 && adv.ts > 0.3 && adv.ts < 0.9);
+});
+
+test('all players have physical attributes for the 3D avatar', () => {
+  const enriched = enrichTeams(TEAMS);
+  assert.equal(enriched.length, 30);
+  assert.ok(enriched.every(t => t.players.every(p =>
+    p.heightCm > 170 && p.weightKg > 60 && p.hairColor.startsWith('#') &&
+    ['oval', 'round', 'square', 'long'].includes(p.faceShape) && p.jersey >= 0)));
+  const bron = playerProfile(TEAM_BY_CODE.LAL.players[0]);
+  assert.equal(bron.curated, true);
+  assert.equal(bron.jersey, 23);
+});
+
+test('player notes contain verified quote and factual trivia', () => {
+  const notes = playerNotes(TEAM_BY_CODE.LAL.players[0], 'en', 'Los Angeles Lakers');
+  assert.ok(notes.quote && notes.quote.includes('criticism'));
+  assert.ok(notes.trivia.includes('2003'));
+  const other = playerNotes(TEAM_BY_CODE.BOS.players[9], 'it', 'Boston Celtics');
+  assert.equal(other.quote, null);
+  assert.ok(other.trivia.includes('Boston Celtics'));
+});
+
+test('storage v3 accumulates per-player totals and migrates v2', () => {
+  store.clear();
+  const state = defaults();
+  recordPlayerStats(state, [{ id: 'BOS-1', pts: 20, orb: 3, drb: 5, fgm: 8, fga: 15 }]);
+  recordPlayerStats(state, [{ id: 'BOS-1', pts: 10, orb: 1, drb: 4, fgm: 4, fga: 9 }]);
+  assert.equal(state.playerStats['BOS-1'].games, 2);
+  assert.equal(state.playerStats['BOS-1'].pts, 30);
+  assert.equal(state.playerStats['BOS-1'].reb, 13);
+  save(state);
+  store.delete('pf.nba.v3');
+  store.set('pf.nba.v2', JSON.stringify({ version: 2, history: [1, 2], settings: { lang: 'it' } }));
+  const migrated = load();
+  assert.equal(migrated.version, 3);
+  assert.equal(migrated.settings.lang, 'it');
+  assert.equal(migrated.history.length, 2);
+});
+
+console.log('15/15 tests passed');

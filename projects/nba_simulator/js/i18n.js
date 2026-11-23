@@ -20,7 +20,9 @@ const EN = {
   player: 'Player', pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK',
   ts: 'TS%', efg: 'eFG%', eff: 'EFF', contracts: 'Contracts', salary: 'Salary',
   chemistry: 'Chemistry', morale: 'Morale', injury: 'Injury', progress: 'Progress',
-  close: 'Close', year: 'Year', howTitle: 'How it works',
+  close: 'Close', year: 'Year', rotate: 'Rotate', seasonAvg: 'Season averages', trivia: 'Trivia',
+  height: 'Height', weight: 'Weight', hair: 'Hair', face: 'Face shape', jersey: 'Jersey',
+  howTitle: 'How it works',
   howText: 'Every possession is simulated locally with deterministic randomness, tactics, fatigue and injuries. Use the tabs to run games, manage your franchise and explore analytics. Nothing is uploaded.'
 };
 
@@ -44,7 +46,9 @@ const IT = {
   player: 'Giocatore', pts: 'PTS', reb: 'RIM', ast: 'AST', stl: 'REC', blk: 'STP',
   ts: 'TS%', efg: 'eFG%', eff: 'EFF', contracts: 'Contratti', salary: 'Stipendio',
   chemistry: 'Chimica', morale: 'Morale', injury: 'Infortunio', progress: 'Progresso',
-  close: 'Chiudi', year: 'Anno', howTitle: 'Come funziona',
+  close: 'Chiudi', year: 'Anno', rotate: 'Ruota', seasonAvg: 'Medie stagionali', trivia: 'Curiosità',
+  height: 'Altezza', weight: 'Peso', hair: 'Capelli', face: 'Forma viso', jersey: 'Numero',
+  howTitle: 'Come funziona',
   howText: 'Ogni possesso è simulato localmente con RNG deterministico, tattiche, stanchezza e infortuni. Usa le schede per giocare, gestire la franchigia e esplorare le statistiche. Nessun dato viene caricato.'
 };
 

@@ -347,7 +347,7 @@ const PROJECTS_DATA = [
   {
     "id": "nba-simulator-2k26",
     "title": "NBA Broadcast Simulator",
-    "description": "30-team tactics simulator with franchise mode, analytics and offline PWA.",
+    "description": "30-team tactics simulator with real player stats, 3D player cards, franchise mode and offline PWA.",
     "href": "projects/nba_simulator/index.html",
     "emoji": "🏀",
     "badge": "Sim",

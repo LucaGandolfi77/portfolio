@@ -3,11 +3,23 @@
 import { PLAYBOOKS, DEFENSES, choosePlay, counterDefense, adjustments } from './ai.js';
 import { pair } from './commentary.js';
 import { effectiveFG, trueShooting } from './stats.js';
+import { seasonAverage } from '../data/player-stats.js';
 
 export const Q_LEN = 720;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length) % arr.length];
+
+function weightedPick(arr, weight, rng) {
+  if (!arr.length) return null;
+  const total = arr.reduce((a, p) => a + Math.max(0.1, weight(p)), 0);
+  let t = rng() * total;
+  for (const p of arr) {
+    t -= Math.max(0.1, weight(p));
+    if (t <= 0) return p;
+  }
+  return arr[arr.length - 1];
+}
 
 function makePlayer(p) {
   return {
@@ -125,9 +137,10 @@ export class Sim {
     const def = DEFENSES[defense];
     const shooter = pick(this.onCourtPlayers(side), this.rng);
     const defender = pick(this.onCourtPlayers(this.opponent), this.rng);
-    const threeRate = clamp((team.strategy.threeRate + book.three * 100 + def.three * 100) / 100, 0.08, 0.65);
+    const threeRate = clamp((team.strategy.threeRate - 8 + book.three * 100 + def.three * 100) / 100, 0.08, 0.65);
     const three = this.rng() < threeRate;
-    const base = three ? 0.32 : 0.47;
+    const avg = seasonAverage(shooter);
+    const base = (three ? avg.tp : avg.fg) * 0.95;
     let chance = base
       + 0.0062 * (shooter.off + book.assist * 40 - 80)
       - 0.0026 * (defender.def - 80)
@@ -143,18 +156,18 @@ export class Sim {
   step() {
     if (this.finished) return false;
     const team = this.teams[this.possession];
-    const stepTime = clamp((12 + this.rng() * 11) * (1 - (team.strategy.pace - 50) / 300), 4, 26);
+    const stepTime = clamp((9 + this.rng() * 8) * (1 - (team.strategy.pace - 50) / 300), 3, 18);
     this.clock -= stepTime;
     this.possessions += 1;
     this.momentum = clamp(this.momentum + (this.rng() - 0.5) * 8, -100, 100);
 
     for (const side of ['home', 'away']) {
       for (const p of this.onCourtPlayers(side)) {
-        p.stamina = clamp(p.stamina - 0.55, 0, 100);
+        p.stamina = clamp(p.stamina - 0.25, 0, 100);
         p.minutes += stepTime / 60;
       }
       for (const p of this.teams[side].players) {
-        if (!this.onCourt[side].includes(p.id)) p.stamina = clamp(p.stamina + 0.7, 0, 100);
+        if (!this.onCourt[side].includes(p.id)) p.stamina = clamp(p.stamina + 0.5, 0, 100);
       }
     }
 
@@ -196,19 +209,25 @@ export class Sim {
         shot.shooter.fgm += 1;
         if (shot.three) shot.shooter.tpm += 1;
         const dunk = !shot.three && this.rng() < 0.17;
-        const assist = !dunk && this.rng() < (0.3 + shot.book.assist);
+        const assistRate = clamp(0.18 + seasonAverage(shot.shooter).ast / 18 + shot.book.assist, 0.1, 0.6);
+        const assist = !dunk && this.rng() < assistRate;
         const assister = assist ? pick(this.onCourtPlayers(this.possession).filter(p => p !== shot.shooter), this.rng) : null;
         this.addPoints(this.possession, value, shot.shooter, assister);
         this.log(dunk ? 'dunk' : shot.three ? 'shot3' : 'shot2', { p: shot.shooter.name });
         this.momentum += 5;
         if (shot.shooter.pts === 20 || shot.shooter.pts === 30) this.log('milestone', { p: shot.shooter.name });
+        this.possession = this.opponent;
       } else {
         if (this.rng() < 0.12) {
           const b = pick(this.onCourtPlayers(this.opponent), this.rng);
           b.blk += 1;
           this.log('block', { p: b.name });
         } else {
-          const r = pick(this.onCourtPlayers(this.rng() < 0.14 ? this.possession : this.opponent), this.rng);
+          const r = weightedPick(
+            this.onCourtPlayers(this.rng() < 0.14 ? this.possession : this.opponent),
+            p => seasonAverage(p).reb,
+            this.rng
+          );
           if (this.onCourt[this.possession].includes(r.id)) r.orb += 1; else r.drb += 1;
           if (this.rng() >= 0.14) this.possession = this.opponent;
         }
