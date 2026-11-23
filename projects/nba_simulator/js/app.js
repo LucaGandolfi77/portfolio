@@ -96,16 +96,30 @@ function initSelects() {
   if (teamFilter) teamFilter.innerHTML = `<option value="">${i18n.t('allTeams')}</option>` + options;
 }
 
+const VIEW_GROUPS = {
+  match: ['match'],
+  league: ['season', 'playoffs'],
+  franchise: ['teams', 'career'],
+  stats: ['stats'],
+  players: ['players']
+};
+
 function switchView(view) {
+  const group = VIEW_GROUPS[view] || VIEW_GROUPS.match;
   state.view = view;
-  document.querySelectorAll('.view').forEach(el => { el.hidden = el.id !== 'view-' + view; });
+  const visible = group.map(name => 'view-' + name);
+  document.querySelectorAll('.view').forEach(el => { el.hidden = !visible.includes(el.id); });
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  const sub = $('franchiseSubnav');
+  if (sub) sub.hidden = view !== 'franchise';
+  const leagueSub = $('leagueSubnav');
+  if (leagueSub) leagueSub.hidden = view !== 'league';
   if (view === 'match' && state.renderer) resizeCourt();
-  if (view === 'season') renderSeason();
-  if (view === 'playoffs') renderPlayoffs();
-  if (view === 'teams') renderTeams();
+  if (group.includes('season')) renderSeason();
+  if (group.includes('playoffs')) renderPlayoffs();
+  if (group.includes('teams')) renderTeams();
+  if (group.includes('career')) renderCareer();
   if (view === 'stats') renderStats();
-  if (view === 'career') renderCareer();
   if (view === 'players') renderPlayers();
 }
 
@@ -687,6 +701,17 @@ async function exportReplay() {
 
 function bind() {
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+  document.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => {
+    const sub = b.dataset.sub;
+    document.querySelectorAll('[data-sub]').forEach(x => x.classList.toggle('active', x === b));
+    if (['teams', 'career'].includes(sub)) {
+      ['teams', 'career'].forEach(name => { $('view-' + name).hidden = name !== sub; });
+      if (sub === 'teams') renderTeams(); else renderCareer();
+    } else if (['season', 'playoffs'].includes(sub)) {
+      ['season', 'playoffs'].forEach(name => { $('view-' + name).hidden = name !== sub; });
+      if (sub === 'season') renderSeason(); else renderPlayoffs();
+    }
+  }));
   const openFromRow = id => { if (id) openPlayerCard(id); };
   ['boxBody', 'rosterBody', 'statLeaders'].forEach(container => {
     const el = $(container);
@@ -695,6 +720,11 @@ function bind() {
       const row = e.target.closest('[data-player-id]');
       if (row) openFromRow(row.dataset.playerId);
     });
+  });
+  $('btnMoreControls').addEventListener('click', () => {
+    const extra = $('extraControls');
+    extra.hidden = !extra.hidden;
+    $('btnMoreControls').textContent = extra.hidden ? '•••' : '×';
   });
   $('btnCamera').addEventListener('click', () => {
     const modes = ['broadcast', 'overhead', 'baseline'];
@@ -974,7 +1004,7 @@ function init() {
   state.renderer = makeRenderer();
   resizeCourt();
   const requested = new URLSearchParams(location.search).get('view');
-  switchView(['match', 'season', 'playoffs', 'teams', 'stats', 'career', 'players'].includes(requested) ? requested : 'match');
+  switchView(['match', 'league', 'franchise', 'stats', 'players'].includes(requested) ? requested : 'match');
   requestAnimationFrame(animate);
 }
 
