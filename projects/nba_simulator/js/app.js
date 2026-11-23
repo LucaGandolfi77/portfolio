@@ -4,14 +4,23 @@ import { TEAMS, TEAM_BY_CODE } from './data/teams.js';
 import { I18n } from './i18n.js';
 import { load, save, appendHistory, recordPrediction, grantXP } from './core/storage.js';
 import { seededRandom, dailySeed } from './core/rng.js';
-import { Sim, winProbability } from './sim/engine.js';
+import { Sim, simulateGame, winProbability } from './sim/engine.js';
+import { RARITIES, rarityFor, chestTier, chestReward, applyGuess } from './sim/career-mode.js';
 import { newSeason, playWeek, playAll, standingsSorted } from './sim/season.js';
 import { createBracket, playRound } from './sim/playoffs.js';
 import { freeAgents, signPlayer, trade, draftClass, progressRoster } from './sim/career.js';
 import { leaders, efficiency, trueShooting, effectiveFG, zoneCounts, teamTotals } from './sim/stats.js';
 import { createCourtGL } from './render/court-gl.js';
 import { createCourt2D } from './render/court-2d.js';
+import { createArena } from './render/arena.js';
+import { createReplayPlayer } from './ui/replay.js';
+import { captureReplay, trimReplays, detectHighlights } from './sim/replay.js';
+import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAvailable, claimDailyChest, setProgress, cardPower, pullOdds, pityPull, craftCost, craftPlayer, setBonus } from './sim/cards.js';
+import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from './sim/betting.js';
+import { aiOffer, sellDuplicate } from './sim/market.js';
 import { createAvatar } from './render/avatar.js';
+import { miniAvatarUrl } from './render/mini-avatar.js';
+import { applyTeamTheme, rarityColor, teamGradient, shade } from './core/theme.js';
 import { Sfx } from './audio.js';
 import { enrichTeams, playerProfile } from './data/player-profile.js';
 import { seasonAverage, advancedProjection } from './data/player-stats.js';
@@ -41,7 +50,15 @@ const state = {
   avatar: null,
   avatarFrame: 0,
   openPlayer: null,
-  openTeam: null
+  openTeam: null,
+  playerLimit: 60,
+  playerViewMode: 'grid',
+  cameraMode: 'broadcast',
+  replayPlayer: null,
+  replayData: null,
+  betType: 'winner',
+  stake: 10,
+  parlayGames: []
 };
 
 function teamByCode(code) {
@@ -72,6 +89,10 @@ function initSelects() {
   $('selHome').value = state.data.matchup.home || 'BOS';
   $('selAway').value = state.data.matchup.away || 'LAL';
   $('selPred').value = state.data.matchup.prediction || 'home';
+  const options = state.teams.map(t => `<option value="${t.code}">${t.name}</option>`).join('');
+  ['guessHome', 'guessAway'].forEach(id => { const el = $(id); if (el) el.innerHTML = options; });
+  const teamFilter = $('playerTeam');
+  if (teamFilter) teamFilter.innerHTML = `<option value="">${i18n.t('allTeams')}</option>` + options;
 }
 
 function switchView(view) {
@@ -84,6 +105,7 @@ function switchView(view) {
   if (view === 'teams') renderTeams();
   if (view === 'stats') renderStats();
   if (view === 'career') renderCareer();
+  if (view === 'players') renderPlayers();
 }
 
 function resizeCourt() {
@@ -114,7 +136,7 @@ function courtState() {
   for (const side of ['home', 'away']) {
     sim.onCourt[side].forEach(id => {
       const p = sim.players[id];
-      if (p) players.push({ side, pos: p.pos, name: p.name });
+      if (p) players.push({ ...p, side });
     });
   }
   const shot = sim.shots[sim.shots.length - 1];
@@ -122,8 +144,29 @@ function courtState() {
     players,
     homeColor: sim.teams.home.color,
     awayColor: sim.teams.away.color,
-    ball: shot ? { x: shot.x / 500, y: shot.y / 500 } : { x: 0.5, y: 0.5 }
+    ball: shot ? { x: shot.x / 500, y: shot.y / 500 } : { x: 0.5, y: 0.5 },
+    lastShot: shot ? { key: String(sim.shots.length), player: shot.player, side: shot.side, made: shot.made } : null
   };
+}
+
+function makeRenderer() {
+  const canvas = $('court');
+  if ((state.data.settings.quality || 'high') === 'high') {
+    const arena = createArena(canvas);
+    if (arena) return arena;
+  }
+  return createCourtGL(canvas) || createCourt2D(canvas);
+}
+
+function drawCourt(now) {
+  if (!state.renderer) return;
+  const s = courtState();
+  if (state.renderer.kind === 'arena') {
+    state.renderer.setState(s, now);
+    state.renderer.render(now);
+  } else {
+    state.renderer.draw(s, now);
+  }
 }
 
 function renderMatch() {
@@ -142,7 +185,7 @@ function renderMatch() {
   const recent = sim.events.slice(-40).reverse();
   feed.innerHTML = recent.map(e => `<div><span>${fmtClock(e.clock)}</span>${e[i18n.lang === 'en' ? 'en' : 'it']}</div>`).join('');
   renderBox(sim);
-  if (state.renderer) state.renderer.draw(courtState(), performance.now());
+  drawCourt(performance.now());
 }
 
 function renderBox(sim) {
@@ -169,10 +212,7 @@ function startMatch() {
   state.accumulator = 0;
   $('resultCard').hidden = true;
   sfx.init();
-  if (!state.renderer) {
-    const canvas = $('court');
-    state.renderer = createCourtGL(canvas) || createCourt2D(canvas);
-  }
+  if (!state.renderer) state.renderer = makeRenderer();
   resizeCourt();
   renderMatch();
 }
@@ -192,6 +232,8 @@ function finalizeMatch() {
   });
   grantXP(state.data, correct ? 30 : 10, 'match');
   recordPlayerStats(state.data, summary.players);
+  state.data.replays = trimReplays([...(state.data.replays || []), captureReplay(sim)], 5);
+  state.data.career.fragments = (state.data.career.fragments || 0) + (correct ? 3 : 1);
   state.data.matchup = { home: summary.home, away: summary.away, prediction: pick };
   save(state.data);
   $('finalText').textContent = `${summary.home} ${summary.score.home} – ${summary.score.away} ${summary.away}`;
@@ -267,15 +309,6 @@ function renderStats() {
   $('chartWin').getContext('2d').clearRect(0, 0, 300, 160);
 }
 
-function renderCareer() {
-  const c = state.data.career;
-  $('careerYear').textContent = c.year;
-  $('careerLevel').textContent = c.level;
-  $('careerXp').textContent = c.xp;
-  $('careerBadges').textContent = (c.badges || []).join(' · ') || '—';
-  $('dailyText').textContent = `${i18n.t('daily')} · ${new Date().toDateString()}`;
-}
-
 function quickSim() {
   if (!state.worker) {
     state.worker = new Worker(new URL('./worker/sim.worker.js', import.meta.url), { type: 'module' });
@@ -284,6 +317,217 @@ function quickSim() {
     };
   }
   state.worker.postMessage({ id: Date.now(), home: $('selHome').value, away: $('selAway').value, count: 12, seed: dailySeed() });
+}
+
+function filteredPlayers() {
+  const query = ($('playerSearch').value || '').toLowerCase().trim();
+  const team = $('playerTeam').value;
+  const pos = $('playerPos').value;
+  const rarity = $('playerRarity').value;
+  const sort = $('playerSort').value;
+  let list = state.teams.flatMap(t => t.players.map(p => ({ ...p, teamCode: t.code, teamName: t.name, teamColor: t.color, rarity: rarityFor(p.ovr) })));
+  list = list.filter(p =>
+    (!query || p.name.toLowerCase().includes(query)) &&
+    (!team || p.teamCode === team) &&
+    (!pos || p.pos === pos) &&
+    (!rarity || p.rarity === rarity));
+  list.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'age' ? a.age - b.age : b.ovr - a.ovr);
+  return list;
+}
+
+function renderPlayers() {
+  const list = filteredPlayers();
+  const shown = list.slice(0, state.playerLimit);
+  const grid = $('playerGrid');
+  const table = $('playerList');
+  grid.hidden = state.playerViewMode !== 'grid';
+  table.hidden = state.playerViewMode !== 'table';
+  $('btnGridView').classList.toggle('active', state.playerViewMode === 'grid');
+  $('btnTableView').classList.toggle('active', state.playerViewMode === 'table');
+  $('btnMorePlayers').hidden = shown.length >= list.length;
+
+  grid.innerHTML = shown.map(p => `<article class="player-tile" data-player-id="${p.id}" style="--team-color:${p.teamColor}">
+    <img src="${miniAvatarUrl(p, { color: p.teamColor })}" alt="${p.name}" loading="lazy">
+    <span class="ovr">${p.ovr}</span>
+    <span class="name">${p.name}</span>
+    <span class="meta"><span>${p.teamCode} · ${p.pos}</span><span class="rarity ${p.rarity}">${i18n.t(p.rarity)}</span></span>
+  </article>`).join('');
+
+  table.innerHTML = `<table><thead><tr><th>Player</th><th>Team</th><th>POS</th><th>AGE</th><th>OVR</th><th>Rarity</th></tr></thead><tbody>` +
+    shown.map(p => `<tr data-player-id="${p.id}"><td>${p.name}</td><td>${p.teamCode}</td><td>${p.pos}</td><td>${p.age}</td><td>${p.ovr}</td><td><span class="rarity ${p.rarity}">${i18n.t(p.rarity)}</span></td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+function renderCareer() {
+  const c = state.data.career;
+  $('careerYear').textContent = c.year;
+  $('careerLevel').textContent = c.level;
+  $('careerXp').textContent = c.xp;
+  $('careerBadges').textContent = (c.badges || []).join(' · ') || '—';
+  $('dailyText').textContent = `${i18n.t('daily')} · ${new Date().toDateString()}`;
+  const ids = c.collection || [];
+  $('collectionInfo').textContent = `${ids.length} ${i18n.t('players')} · ${c.chests || 0} ${i18n.t('chests')} · ${c.streak || 0} ${i18n.t('streak')}`;
+  $('fragmentCount').textContent = c.fragments || 0;
+  $('btnDailyChest').disabled = !isDailyChestAvailable(c);
+  const odds = pullOdds(c.pity || 0);
+  $('pullOdds').innerHTML = Object.entries(odds).map(([k, v]) => `<span class="odd">${i18n.t(k)}<b>${v}%</b></span>`).join('');
+  $('pityFill').style.width = Math.min(100, ((c.pity || 0) / 40) * 100) + '%';
+  $('pityText').textContent = `${i18n.t('pity')} ${c.pity || 0}/40`;
+  $('pullHistory').innerHTML = (c.pullHistory || []).map(p => `<span class="rarity ${p.tier}" title="${p.guaranteed ? 'PITY' : ''}">${i18n.t(p.tier)}</span>`).join('');
+  const craft = $('craftTarget');
+  craft.innerHTML = state.teams.flatMap(t => t.players.map(p => `<option value="${p.id}">${p.name} · ${p.ovr}</option>`)).join('');
+  $('setProgress').innerHTML = Object.keys(SETS).map(key => {
+    const p = setProgress(c, state.teams, key);
+    return `<div class="set-row"><span>${SETS[key].name}</span><i><b style="width:${Math.round(p.ratio * 100)}%"></b></i><span>${p.owned}/${p.total}</span></div>`;
+  }).join('');
+  $('collectionList').innerHTML = ids.map(id => {
+    const found = findPlayer(id);
+    if (!found) return '';
+    const p = found.player;
+    const rarity = rarityFor(p.ovr);
+    const level = (c.upgrades || {})[id] || 0;
+    return `<div class="card3d" data-player-id="${id}">
+      <div class="card3d-inner">
+        <div class="card3d-face">
+          <img src="${miniAvatarUrl(p, found.team)}" alt="${p.name}" loading="lazy">
+          <span class="name">${p.name}</span>
+          <span class="rarity ${rarity}">${i18n.t(rarity)} · ${SETS[cardSet(p)].name}</span>
+          <span class="meta">${cardPower(p, level)} ${level ? '+' + level : ''}</span>
+          <div class="card-actions">
+            <button class="btn up" data-upgrade="${id}">${level >= 5 ? i18n.t('maxed') : `${i18n.t('upgrade')} · ${upgradeCost(level)}`}</button>
+            ${(c.duplicates || {})[id] ? `<button class="btn up" data-sell="${id}">${i18n.t('share')} · ${aiOffer(p, Math.random, Date.now() / 86400000)}</button>` : ''}
+          </div>
+        </div>
+        <div class="card3d-face card3d-back">
+          <b>${p.name}</b><p>${p.pos} · ${found.team.name} · ${p.age}</p>
+          <p>${playerNotes(p, i18n.lang, found.team.name).trivia}</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('') || i18n.t('noGames');
+}
+
+function totalSetBonus() {
+  return Object.keys(SETS).reduce((a, key) => a + setBonus(state.data.career, state.teams, key), 0);
+}
+
+function updatePropOptions() {
+  const type = $('propType').value;
+  const options = type === 'total'
+    ? [['over', i18n.t('overUnder') + ' · Over'], ['under', i18n.t('overUnder') + ' · Under']]
+    : type === 'margin'
+      ? [['close', '1–5'], ['mid', '6–10'], ['blowout', '11+']]
+      : [0, 1, 2, 3].map(i => [String(i), 'Q' + (i + 1)]);
+  $('propPick').innerHTML = options.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+}
+
+function renderBetPanel() {
+  const c = state.data.career;
+  $('creditBalance').textContent = Math.round(c.credits || 0);
+  $('betStreak').textContent = c.streak || 0;
+  const home = teamByCode($('guessHome').value);
+  const away = teamByCode($('guessAway').value);
+  const bonus = streakBonus(c.streak || 0) + totalSetBonus();
+  let html = '';
+  if (state.betType === 'winner' && home && away) {
+    const odds = winOdds(home, away, null, null, bonus);
+    html = ['home', 'away', 'tie'].map(k => `<span class="odd">${k.toUpperCase()}<b>${odds.odds[k].toFixed(2)}</b></span>`).join('');
+  } else if (state.betType === 'prop') {
+    const pick = $('propPick').value;
+    html = `<span class="odd">${i18n.t('odds')}<b>${propOdds($('propType').value, pick).toFixed(2)}</b></span>`;
+  } else {
+    const odds = state.parlayGames.map(g => g.odds || 1.9);
+    html = `<span class="odd">${i18n.t('parlay')}<b>${parlayOdds(odds).toFixed(2)}</b></span>`;
+  }
+  $('betOdds').innerHTML = html;
+}
+
+function generateParlay() {
+  const pool = state.teams.slice().sort(() => Math.random() - 0.5).slice(0, 6);
+  state.parlayGames = [0, 1, 2].map(i => {
+    const home = pool[i * 2], away = pool[i * 2 + 1];
+    const odds = winOdds(home, away).odds.home;
+    return { home: home.code, away: away.code, odds };
+  });
+  $('parlayGames').innerHTML = state.parlayGames.map((g, i) => `<div class="parlay-row"><span>${g.home} – ${g.away}</span>
+    <select data-parlay="${i}"><option value="home">${g.home}</option><option value="away">${g.away}</option></select></div>`).join('');
+  renderBetPanel();
+}
+
+function placeBet() {
+  const c = state.data.career;
+  claimDailyCredits(c);
+  if ((c.credits || 0) < state.stake) { toast(i18n.t('balance')); return; }
+  const bonus = streakBonus(c.streak || 0) + totalSetBonus();
+  const seed = (Date.now() ^ (c.bets || []).length * 7919) >>> 0;
+  const rng = seededRandom(seed);
+  let won = false;
+  let delta = 0;
+  let text = '';
+  let summary = null;
+
+  if (state.betType === 'winner') {
+    const home = teamByCode($('guessHome').value), away = teamByCode($('guessAway').value);
+    if (!home || !away || home.code === away.code) { toast(i18n.t('selectTwo')); return; }
+    const odds = winOdds(home, away, null, null, bonus);
+    const pick = $('guessPred').value;
+    summary = simulateGame(home, away, { rng }).summary();
+    const result = applyBet(c, { type: 'winner', pick, stake: state.stake, home: home.code, away: away.code }, summary.winner, odds.odds, bonus);
+    won = result.won; delta = result.delta;
+    text = `${home.code} ${summary.score.home}–${summary.score.away} ${away.code}`;
+  } else if (state.betType === 'prop') {
+    const home = teamByCode($('guessHome').value), away = teamByCode($('guessAway').value);
+    summary = simulateGame(home, away, { rng }).summary();
+    const type = $('propType').value, pick = $('propPick').value;
+    const market = propMarket(summary);
+    const odd = propOdds(type, pick) + bonus;
+    const result = applyBet(c, { type: 'prop', prop: type, pick, stake: state.stake }, 'win', { win: odd }, 0);
+    won = resolveProp(type, market, pick);
+    delta = won ? Math.round(state.stake * odd * 100) / 100 : -state.stake;
+    c.credits = Math.max(0, Math.round((c.credits || 0) * 100 + (delta - result.delta) * 100) / 100);
+    c.streak = won ? (c.streak || 0) + 1 : 0;
+    text = `${type}: ${pick} · ${summary.score.home}–${summary.score.away}`;
+  } else {
+    if (!state.parlayGames.length) generateParlay();
+    const picks = [];
+    for (const g of state.parlayGames) {
+      const home = teamByCode(g.home), away = teamByCode(g.away);
+      const s = simulateGame(home, away, { rng }).summary();
+      const sel = document.querySelector(`[data-parlay="${picks.length}"]`);
+      const pick = sel ? sel.value : 'home';
+      picks.push({ won: (pick === 'home' && s.winner === 'home') || (pick === 'away' && s.winner === 'away') });
+      text += `${g.home}/${pick} `;
+    }
+    won = resolveParlay(picks);
+    const odd = parlayOdds(state.parlayGames.map(g => g.odds)) + bonus;
+    const result = applyBet(c, { type: 'parlay', stake: state.stake, games: state.parlayGames.length }, 'win', { win: odd }, 0);
+    delta = won ? Math.round(state.stake * odd * 100) / 100 : -state.stake;
+    c.credits = Math.max(0, Math.round((c.credits || 0) * 100 + (delta - result.delta) * 100) / 100);
+    c.streak = won ? (c.streak || 0) + 1 : 0;
+  }
+
+  let chestText = '';
+  if (won) {
+    const pull = pityPull(c, rng);
+    const reward = chestReward(pull.tier, state.teams, c.collection || [], rng);
+    if (reward.player) {
+      if (reward.duplicate) {
+        c.duplicates = c.duplicates || {};
+        c.duplicates[reward.player.id] = (c.duplicates[reward.player.id] || 0) + 1;
+        c.fragments = (c.fragments || 0) + fragmentsFor(pull.tier);
+      } else if (!c.collection.includes(reward.player.id)) c.collection.push(reward.player.id);
+      chestText = `${i18n.t(RARITIES[pull.tier].label.toLowerCase())} · ${reward.duplicate ? i18n.t('duplicate') : `${i18n.t('unlocked')}: ${reward.player.name}`}`;
+    }
+    c.chests = (c.chests || 0) + 1;
+    c.guesses = (c.guesses || 0) + 1;
+  } else { c.guesses = (c.guesses || 0) + 1; }
+
+  save(state.data);
+  const el = $('guessResult');
+  el.className = 'guess-result ' + (won ? 'good' : 'bad');
+  el.textContent = `${won ? i18n.t('correct') : i18n.t('wrong')} · ${text} · ${delta > 0 ? '+' : ''}${delta} ${chestText}`;
+  renderBetPanel();
+  renderCareer();
 }
 
 function findPlayer(id) {
@@ -304,8 +548,18 @@ function openPlayerCard(id) {
   const avg = seasonAverage(player);
   const adv = advancedProjection(player);
   const notes = playerNotes(player, i18n.lang, team.name);
+  const rarity = rarityFor(player.ovr);
+  const card = $('playerModal').querySelector('.player-card');
+  card.style.setProperty('--team', team.color || '#00d4ff');
+  card.style.setProperty('--team-2', shade(team.color || '#00d4ff', 0.35));
+  card.style.setProperty('--team-glow', shade(team.color || '#00d4ff', 0.5));
+  $('playerNumber').textContent = player.jersey == null ? 1 : player.jersey;
+  const badge = $('playerCardRarity');
+  badge.className = 'rarity ' + rarity;
+  badge.textContent = i18n.t(rarity);
+  badge.style.color = rarityColor(rarity);
   $('playerName').textContent = player.name;
-  $('playerTeam').textContent = `${team.name} · ${player.pos}`;
+  $('playerCardTeam').textContent = `${team.name} · ${player.pos}`;
   $('playerPhotoInfo').innerHTML = [
     ['height', `${player.heightCm || 200} cm`], ['weight', `${player.weightKg || 100} kg`],
     ['hair', (player.hairStyle || 'short')], ['face', (player.faceShape || 'oval')],
@@ -316,9 +570,10 @@ function openPlayerCard(id) {
     ['FG%', avg.fg.toFixed(3)], ['3P%', avg.tp.toFixed(3)], ['FT%', avg.ft.toFixed(3)],
     ['MPG', avg.mpg], ['GP', avg.gp]
   ].map(([k, v]) => `<span class="stat-chip">${k}: <b>${v}</b></span>`).join('');
-  $('playerAdvanced').innerHTML = [
-    ['PER', adv.per], ['TS%', adv.ts], ['eFG%', adv.efg], ['OVR', player.ovr], ['OFF', player.off], ['DEF', player.def], ['POT', player.pot]
-  ].map(([k, v]) => `<span class="stat-chip">${k}: <b>${v}</b></span>`).join('');
+  const ring = (label, value) => `<div class="ring"><svg viewBox="0 0 80 80" pathLength="100"><circle class="track" cx="40" cy="40" r="32" pathLength="100"/><circle class="value" cx="40" cy="40" r="32" pathLength="100" stroke-dasharray="${Math.round(value * 100)} 100"/></svg><b>${Math.round(value * 100)}%</b><small>${label}</small></div>`;
+  $('playerRings').innerHTML = ring('TS', adv.ts) + ring('eFG', adv.efg);
+  $('playerBars').innerHTML = [['OVR', player.ovr], ['OFF', player.off], ['DEF', player.def], ['POT', player.pot]]
+    .map(([label, value]) => `<div class="attr"><span>${label}</span><i><b style="width:${Math.max(0, Math.min(100, value))}%"></b></i><span>${value}</span></div>`).join('');
   $('playerTrivia').textContent = notes.trivia;
   $('playerQuote').textContent = notes.quote || '';
   $('playerModal').hidden = false;
@@ -340,11 +595,85 @@ function openPlayerCard(id) {
   }
 }
 
+async function sharePlayerCard() {
+  if (!state.openPlayer || !state.openTeam) return;
+  const p = state.openPlayer;
+  const team = state.openTeam;
+  const c = document.createElement('canvas');
+  c.width = 720; c.height = 900;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 720, 900);
+  grad.addColorStop(0, shade(team.color || '#00d4ff', -0.6));
+  grad.addColorStop(1, '#060b18');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 720, 900);
+  const avatar = $('avatarCanvas');
+  if (avatar && avatar.width && avatar.height) ctx.drawImage(avatar, 40, 30, 640, 560);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 60px Inter, sans-serif';
+  ctx.fillText(p.name, 40, 690);
+  ctx.font = '700 28px Inter, sans-serif';
+  ctx.fillStyle = '#93aac9';
+  ctx.fillText(`${team.name} · ${p.pos} · #${p.jersey == null ? 1 : p.jersey}`, 40, 735);
+  const avg = seasonAverage(p);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 36px Inter, sans-serif';
+  ctx.fillText(`OVR ${p.ovr}   PTS ${avg.pts}   REB ${avg.reb}   AST ${avg.ast}`, 40, 805);
+  ctx.fillStyle = rarityColor(rarityFor(p.ovr));
+  ctx.font = '900 24px Inter, sans-serif';
+  ctx.fillText(i18n.t(rarityFor(p.ovr)).toUpperCase(), 40, 855);
+
+  const blob = await new Promise(resolve => c.toBlob(resolve, 'image/png'));
+  if (!blob) return;
+  try {
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], 'player.png', { type: 'image/png' })] })) {
+      await navigator.share({ title: i18n.t('title'), files: [new File([blob], 'player.png', { type: 'image/png' })] });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${p.name.replace(/\s+/g, '-')}.png`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } catch (e) { /* cancelled */ }
+}
+
 function closePlayerCard() {
   $('playerModal').hidden = true;
   cancelAnimationFrame(state.avatarFrame);
   state.openPlayer = null;
   state.openTeam = null;
+}
+
+function openReplay(data) {
+  if (!data) { toast(i18n.t('noGames')); return; }
+  state.replayData = data;
+  $('replayInfo').textContent = `${detectHighlights(data).length} highlights · ${data.home} ${data.score.home}–${data.score.away} ${data.away}`;
+  $('replayModal').hidden = false;
+  const canvas = $('replayCanvas');
+  state.replayPlayer = createReplayPlayer(canvas, data, frame => {
+    $('replayInfo').textContent = (i18n.lang === 'en' ? frame.event.en : frame.event.it) || '';
+  });
+  if (state.replayPlayer) {
+    state.replayPlayer.resize(canvas.clientWidth, canvas.clientHeight, Math.min(2, window.devicePixelRatio || 1));
+    state.replayPlayer.draw(0);
+  }
+}
+
+function closeReplay() {
+  if (state.replayPlayer) state.replayPlayer.pause();
+  $('replayModal').hidden = true;
+}
+
+async function exportReplay() {
+  if (!state.replayPlayer) return;
+  const blob = await state.replayPlayer.exportWebM(6);
+  if (!blob) { toast(i18n.t('statusError')); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nba-replay-${Date.now()}.webm`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function bind() {
@@ -354,11 +683,35 @@ function bind() {
     const el = $(container);
     if (!el) return;
     el.addEventListener('click', e => {
-      const row = e.target.closest('tr[data-player-id]');
+      const row = e.target.closest('[data-player-id]');
       if (row) openFromRow(row.dataset.playerId);
     });
   });
+  $('btnCamera').addEventListener('click', () => {
+    const modes = ['broadcast', 'overhead', 'baseline'];
+    state.cameraMode = modes[(modes.indexOf(state.cameraMode) + 1) % modes.length];
+    if (state.renderer && state.renderer.setCamera) state.renderer.setCamera(state.cameraMode);
+    $('btnCamera').textContent = 'CAM · ' + i18n.t(state.cameraMode === 'baseline' ? 'away' : state.cameraMode);
+    if (state.renderer && state.renderer.kind !== 'arena') toast(i18n.t('camera'));
+  });
+  $('btnReplayGame').addEventListener('click', () => {
+    const data = state.lastSummary ? state.data.replays[state.data.replays.length - 1] : null;
+    openReplay(data);
+  });
+  $('btnReplayClose').addEventListener('click', closeReplay);
+  $('replayModal').addEventListener('click', e => { if (e.target === $('replayModal')) closeReplay(); });
+  $('btnReplayPlay').addEventListener('click', () => {
+    if (!state.replayPlayer) return;
+    if (state.replayPlayer.playing) { state.replayPlayer.pause(); $('btnReplayPlay').textContent = i18n.t('play'); }
+    else { state.replayPlayer.play(); $('btnReplayPlay').textContent = i18n.t('pause'); }
+  });
+  $('replayScrub').addEventListener('input', e => { if (state.replayPlayer) state.replayPlayer.seek(Number(e.target.value) / 100); });
+  $('btnReplayExport').addEventListener('click', exportReplay);
   $('btnPlayerClose').addEventListener('click', closePlayerCard);
+  $('btnShareCard').addEventListener('click', sharePlayerCard);
+  $('btnGridView').addEventListener('click', () => { state.playerViewMode = 'grid'; renderPlayers(); });
+  $('btnTableView').addEventListener('click', () => { state.playerViewMode = 'table'; renderPlayers(); });
+  $('btnMorePlayers').addEventListener('click', () => { state.playerLimit += 60; renderPlayers(); });
   $('playerModal').addEventListener('click', e => { if (e.target === $('playerModal')) closePlayerCard(); });
   $('btnRotate').addEventListener('click', () => { if (state.avatar) state.avatar.rotate(140); });
   const av = $('avatarCanvas');
@@ -379,8 +732,8 @@ function bind() {
     $('selHome').value = a.code; $('selAway').value = b.code;
     startMatch();
   });
-  $('selHome').addEventListener('change', () => { state.data.matchup.home = $('selHome').value; save(state.data); });
-  $('selAway').addEventListener('change', () => { state.data.matchup.away = $('selAway').value; save(state.data); });
+  $('selHome').addEventListener('change', () => { state.data.matchup.home = $('selHome').value; applyTeamTheme(teamByCode($('selHome').value), teamByCode($('selAway').value)); save(state.data); });
+  $('selAway').addEventListener('change', () => { state.data.matchup.away = $('selAway').value; applyTeamTheme(teamByCode($('selHome').value), teamByCode($('selAway').value)); save(state.data); });
   $('selPred').addEventListener('change', () => { state.data.matchup.prediction = $('selPred').value; save(state.data); });
   $('btnPause').addEventListener('click', () => { state.paused = !state.paused; $('btnPause').textContent = i18n.t(state.paused ? 'resume' : 'pause'); });
   $('btnSpeed').addEventListener('click', () => {
@@ -494,6 +847,79 @@ function bind() {
     if (team.custom) { state.data.customTeams = state.teams.filter(t => t.custom).map(t => JSON.parse(JSON.stringify(t))); save(state.data); }
     renderTeams();
   });
+  ['playerSearch', 'playerTeam', 'playerPos', 'playerRarity', 'playerSort'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', renderPlayers);
+  });
+  $('collectionList').addEventListener('click', e => {
+    const sell = e.target.closest('[data-sell]');
+    if (sell) {
+      const found = findPlayer(sell.dataset.sell);
+      if (found) {
+        const offer = aiOffer(found.player, Math.random, Date.now() / 86400000);
+        const result = sellDuplicate(state.data.career, found.player, offer);
+        save(state.data);
+        renderCareer();
+        toast(result.ok ? `+${offer}` : i18n.t('statusError'));
+      }
+      return;
+    }
+    const up = e.target.closest('[data-upgrade]');
+    if (up) {
+      const result = applyUpgrade(state.data.career, up.dataset.upgrade);
+      save(state.data);
+      renderCareer();
+      toast(result.ok ? i18n.t('saved') : i18n.t('fragments'));
+      return;
+    }
+    const card = e.target.closest('.card3d');
+    if (card) {
+      if (e.target.closest('.up')) return;
+      card.classList.toggle('flipped');
+      return;
+    }
+    const item = e.target.closest('[data-player-id]');
+    if (item) openPlayerCard(item.dataset.playerId);
+  });
+  $('btnDailyChest').addEventListener('click', () => {
+    const c = state.data.career;
+    if (!claimDailyChest(c)) return;
+    const tier = chestTier(0, seededRandom(Date.now() >>> 0));
+    const reward = chestReward(tier, state.teams, c.collection || [], seededRandom((Date.now() ^ 0x1234) >>> 0));
+    if (reward.player && !c.collection.includes(reward.player.id)) c.collection.push(reward.player.id);
+    c.fragments = (c.fragments || 0) + (reward.duplicate ? fragmentsFor(tier) : 1);
+    c.chests = (c.chests || 0) + 1;
+    c.xp += RARITIES[tier].xp;
+    save(state.data);
+    renderCareer();
+    toast(reward.player ? `${i18n.t('unlocked')}: ${reward.player.name}` : i18n.t('duplicate'));
+  });
+  document.querySelectorAll('[data-bet]').forEach(b => b.addEventListener('click', () => {
+    state.betType = b.dataset.bet;
+    document.querySelectorAll('[data-bet]').forEach(x => x.classList.toggle('active', x === b));
+    $('propPanel').hidden = state.betType !== 'prop';
+    $('parlayPanel').hidden = state.betType !== 'parlay';
+    if (state.betType === 'prop') updatePropOptions();
+    renderBetPanel();
+  }));
+  document.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => {
+    state.stake = Number(b.dataset.stake);
+    document.querySelectorAll('[data-stake]').forEach(x => x.classList.toggle('active', x === b));
+  }));
+  $('propType').addEventListener('change', () => { updatePropOptions(); renderBetPanel(); });
+  $('propPick').addEventListener('change', renderBetPanel);
+  $('btnParlayGames').addEventListener('click', generateParlay);
+  $('parlayGames').addEventListener('change', renderBetPanel);
+  $('btnGuess').addEventListener('click', placeBet);
+  $('btnCraft').addEventListener('click', () => {
+    const p = findPlayer($('craftTarget').value);
+    if (!p) return;
+    const result = craftPlayer(state.data.career, p.player);
+    save(state.data);
+    renderCareer();
+    toast(result.ok ? `${i18n.t('unlocked')}: ${p.player.name}` : i18n.t('fragments'));
+  });
   $('btnQuickSim').addEventListener('click', quickSim);
   $('btnAdvance').addEventListener('click', () => {
     state.data.career.year += 1;
@@ -510,7 +936,7 @@ function bind() {
   window.addEventListener('project:langchange', e => {
     i18n.setLang(e.detail && e.detail.lang);
     i18n.apply();
-    renderMatch(); renderSeason(); renderTeams(); renderCareer();
+    renderMatch(); renderSeason(); renderTeams(); renderCareer(); renderPlayers();
     if (!$('playerModal').hidden && state.openPlayer) {
       const id = state.openPlayer.id;
       closePlayerCard();
@@ -525,11 +951,17 @@ function init() {
   rebuildMap();
   i18n.apply();
   initSelects();
+  applyTeamTheme(teamByCode($('selHome').value), teamByCode($('selAway').value));
   bind();
+  claimDailyCredits(state.data.career);
+  updatePropOptions();
+  renderBetPanel();
+  save(state.data);
   $('quality').value = state.data.settings.quality || 'high';
-  state.renderer = createCourtGL($('court')) || createCourt2D($('court'));
+  state.renderer = makeRenderer();
   resizeCourt();
-  switchView('match');
+  const requested = new URLSearchParams(location.search).get('view');
+  switchView(['match', 'season', 'playoffs', 'teams', 'stats', 'career', 'players'].includes(requested) ? requested : 'match');
   requestAnimationFrame(animate);
 }
 

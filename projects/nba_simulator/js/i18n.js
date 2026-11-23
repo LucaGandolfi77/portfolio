@@ -20,6 +20,16 @@ const EN = {
   player: 'Player', pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK',
   ts: 'TS%', efg: 'eFG%', eff: 'EFF', contracts: 'Contracts', salary: 'Salary',
   chemistry: 'Chemistry', morale: 'Morale', injury: 'Injury', progress: 'Progress',
+  players: 'Players', search: 'Search players', allTeams: 'All teams', all: 'All',
+  gridView: 'Grid', tableView: 'Table', showMore: 'Show more',
+  watchReplay: 'Watch replay', export: 'Export WebM', play: 'Play',
+  fragments: 'Fragments', dailyChest: 'Daily chest', upgrade: 'Upgrade',
+  maxed: 'MAX', camera: 'Camera', broadcast: 'Broadcast', overhead: 'Overhead', baseline: 'Baseline', balance: 'Balance', winnerBet: 'Winner', propBets: 'Props', parlay: 'Combo', overUnder: 'Over / Under', margin: 'Win margin', topQuarter: 'Top quarter', generateGames: 'Generate 3 games', stake: 'Stake', placeBet: 'Place bet', craft: 'Craft player', odds: 'Odds', pity: 'Pity',
+  sortByRating: 'Sort by rating', sortByName: 'Sort by name', sortByAge: 'Sort by age',
+  chestChallenge: 'Chest challenge', chestHint: 'Simulate a game, guess the winner and open a chest. Better streaks drop rarer players.',
+  simulateAndGuess: 'Simulate & guess', collection: 'Collection', common: 'Common', rare: 'Rare',
+  epic: 'Epic', legendary: 'Legendary', correct: 'Correct!', wrong: 'Wrong pick',
+  unlocked: 'Unlocked', duplicate: 'Duplicate → XP', chests: 'Chests opened', streak: 'Streak',
   close: 'Close', year: 'Year', rotate: 'Rotate', seasonAvg: 'Season averages', trivia: 'Trivia',
   height: 'Height', weight: 'Weight', hair: 'Hair', face: 'Face shape', jersey: 'Jersey',
   howTitle: 'How it works',
@@ -46,6 +56,16 @@ const IT = {
   player: 'Giocatore', pts: 'PTS', reb: 'RIM', ast: 'AST', stl: 'REC', blk: 'STP',
   ts: 'TS%', efg: 'eFG%', eff: 'EFF', contracts: 'Contratti', salary: 'Stipendio',
   chemistry: 'Chimica', morale: 'Morale', injury: 'Infortunio', progress: 'Progresso',
+  players: 'Giocatori', search: 'Cerca giocatori', allTeams: 'Tutte le squadre', all: 'Tutti',
+  gridView: 'Griglia', tableView: 'Tabella', showMore: 'Mostra altri',
+  watchReplay: 'Guarda replay', export: 'Esporta WebM', play: 'Riproduci',
+  fragments: 'Frammenti', dailyChest: 'Baule giornaliero', upgrade: 'Potenzia',
+  maxed: 'MAX', camera: 'Fotocamera', broadcast: 'Trasmissione', overhead: 'Alto', baseline: 'Fondo campo', balance: 'Saldo', winnerBet: 'Vincente', propBets: 'Scommesse extra', parlay: 'Combo', overUnder: 'Over / Under', margin: 'Margine vittoria', topQuarter: 'Quarto migliore', generateGames: 'Genera 3 partite', stake: 'Posta', placeBet: 'Punta', craft: 'Crea giocatore', odds: 'Quote', pity: 'Pity',
+  sortByRating: 'Ordina per forza', sortByName: 'Ordina per nome', sortByAge: 'Ordina per età',
+  chestChallenge: 'Sfida dei bauli', chestHint: 'Simula una partita, indovina il risultato e apri un baule: più vinci, più sono rari i giocatori.',
+  simulateAndGuess: 'Simula e indovina', collection: 'Collezione', common: 'Comune', rare: 'Raro',
+  epic: 'Epico', legendary: 'Leggendario', correct: 'Esatto!', wrong: 'Pronostico sbagliato',
+  unlocked: 'Sbloccato', duplicate: 'Duplicato → XP', chests: 'Bauli aperti', streak: 'Serie',
   close: 'Chiudi', year: 'Anno', rotate: 'Ruota', seasonAvg: 'Medie stagionali', trivia: 'Curiosità',
   height: 'Altezza', weight: 'Peso', hair: 'Capelli', face: 'Forma viso', jersey: 'Numero',
   howTitle: 'Come funziona',
@@ -68,6 +88,7 @@ export class I18n {
 
   apply(root = document) {
     root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = this.t(el.dataset.i18n); });
+    root.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = this.t(el.dataset.i18nPlaceholder); });
     document.documentElement.lang = this.lang;
   }
 

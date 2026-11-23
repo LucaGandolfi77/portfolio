@@ -19,6 +19,12 @@ import { seasonAverage, advancedProjection, STAR_NAMES } from '../js/data/player
 import { playerProfile, enrichTeams } from '../js/data/player-profile.js';
 import { playerNotes } from '../js/data/player-notes.js';
 import { defaults, save, load, recordPlayerStats } from '../js/core/storage.js';
+import { RARITIES, rarityFor, chestTier, chestReward, applyGuess } from '../js/sim/career-mode.js';
+import { hexToRgb, mix, shade, rarityColor, teamGradient } from '../js/core/theme.js';
+import { captureReplay, detectHighlights, frameAt, trimReplays } from '../js/sim/replay.js';
+import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAvailable, claimDailyChest, setProgress, pullOdds, pityPull, craftCost, craftPlayer, setBonus, PITY_LIMIT } from '../js/sim/cards.js';
+import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from '../js/sim/betting.js';
+import { aiOffer, canSell, sellDuplicate } from '../js/sim/market.js';
 
 test('30 NBA teams with 10 players and two conferences', () => {
   assert.equal(TEAMS.length, 30);
@@ -156,4 +162,140 @@ test('storage v3 accumulates per-player totals and migrates v2', () => {
   assert.equal(migrated.history.length, 2);
 });
 
-console.log('15/15 tests passed');
+test('rarity tiers follow player strength', () => {
+  assert.equal(rarityFor(96), 'legendary');
+  assert.equal(rarityFor(90), 'epic');
+  assert.equal(rarityFor(83), 'rare');
+  assert.equal(rarityFor(70), 'common');
+  assert.ok(Object.keys(RARITIES).length === 4);
+});
+
+test('chest tier improves with streak and rewards an unowned player', () => {
+  const low = chestTier(0, () => 0.99);
+  const high = chestTier(6, () => 0.99);
+  assert.ok(['common', 'rare', 'epic', 'legendary'].includes(low));
+  assert.ok(['epic', 'legendary'].includes(high));
+  const reward = chestReward('legendary', TEAMS, [], seededRandom(3));
+  assert.ok(reward.player && reward.player.ovr >= 95);
+  assert.equal(reward.duplicate, false);
+});
+
+test('career guesses update streak, collection and XP', () => {
+  const career = { collection: [], xp: 0, level: 1 };
+  const reward = { player: TEAM_BY_CODE.BOS.players[0], xp: 100, duplicate: false };
+  const win = applyGuess(career, 'home', 'home', reward);
+  assert.equal(win.correct, true);
+  assert.equal(career.streak, 1);
+  assert.equal(career.collection.length, 1);
+  assert.ok(career.xp >= 100);
+  const loss = applyGuess(career, 'home', 'away', null);
+  assert.equal(loss.correct, false);
+  assert.equal(career.streak, 0);
+});
+
+test('storage v3 merges new career fields from older saves', () => {
+  store.clear();
+  store.set('pf.nba.v3', JSON.stringify({ version: 3, career: { year: 2027, xp: 500 } }));
+  const loaded = load();
+  assert.equal(loaded.career.year, 2027);
+  assert.deepEqual(loaded.career.collection, []);
+  assert.equal(loaded.career.streak, 0);
+});
+
+test('theme helpers produce valid team colors and gradients', () => {
+  assert.deepEqual(hexToRgb('#00d4ff'), [0, 212, 255]);
+  assert.equal(mix('#000000', '#ffffff', 0.5), '#808080');
+  assert.equal(shade('#ffffff', -1), '#000000');
+  assert.equal(rarityColor('legendary'), RARITIES.legendary.color);
+  const g = teamGradient(TEAM_BY_CODE.BOS, TEAM_BY_CODE.LAL);
+  assert.ok(g.includes('linear-gradient') && g.includes('#'));
+});
+
+test('replay log records events, highlights and frames', () => {
+  const sim = new Sim(TEAM_BY_CODE.BOS, TEAM_BY_CODE.LAL, { rng: seededRandom(11) });
+  for (let i = 0; i < 80; i++) sim.step();
+  const replay = captureReplay(sim);
+  assert.ok(replay.events.length > 0);
+  assert.ok(Array.isArray(detectHighlights(replay)));
+  const frame = frameAt(replay, 0.5);
+  assert.ok(frame && frame.event && frame.score);
+  assert.equal(trimReplays([1, 2, 3, 4, 5, 6], 3).length, 3);
+});
+
+test('card sets, upgrades and daily chests follow the rules', () => {
+  const p = { ...TEAM_BY_CODE.LAL.players[0], age: 30, ovr: 96 };
+  assert.equal(cardSet(p), 'legends');
+  assert.equal(cardSet({ ovr: 70, age: 27 }), 'base');
+  assert.equal(Object.keys(SETS).length, 5);
+  assert.ok(fragmentsFor('legendary') > fragmentsFor('common'));
+  const career = { fragments: 100, upgrades: {}, dailyChest: null, collection: [p.id] };
+  const up = applyUpgrade(career, p.id);
+  assert.equal(up.ok, true);
+  assert.equal(up.level, 1);
+  assert.ok(career.fragments < 100);
+  assert.equal(upgradeCost(1) > upgradeCost(0), true);
+  assert.equal(isDailyChestAvailable(career), true);
+  assert.equal(claimDailyChest(career), true);
+  assert.equal(isDailyChestAvailable(career), false);
+  const progress = setProgress(career, [TEAM_BY_CODE.LAL], 'legends');
+  assert.ok(progress.total >= 0 && progress.ratio >= 0);
+});
+
+test('betting odds, payouts and credits follow the rules', () => {
+  const strong = { players: Array.from({ length: 5 }, (_, i) => ({ ovr: 95 - i })) };
+  const weak = { players: Array.from({ length: 5 }, (_, i) => ({ ovr: 72 - i })) };
+  const odds = winOdds(strong, weak);
+  assert.ok(odds.odds.home < odds.odds.away);
+  assert.equal(payout(10, 2, true), 20);
+  assert.equal(payout(10, 2, false), -10);
+  const career = { credits: 100, streak: 0, bets: [] };
+  const win = applyBet(career, { pick: 'home', stake: 10 }, 'home', odds.odds, 0);
+  assert.equal(win.won, true);
+  assert.ok(career.credits > 100);
+  assert.equal(claimDailyCredits(career), 250);
+  assert.equal(claimDailyCredits(career), 0);
+  assert.ok(streakBonus(4) > streakBonus(0));
+});
+
+test('prop bets and parlays resolve from a game summary', () => {
+  const summary = { score: { home: 110, away: 100 }, quarters: [{ home: 30, away: 20 }, { home: 25, away: 25 }, { home: 30, away: 25 }, { home: 25, away: 30 }] };
+  const market = propMarket(summary);
+  assert.ok(market.totalLine >= 100 && market.totalLine <= 115);
+  assert.equal(resolveProp('total', market, market.over), true);
+  assert.equal(resolveProp('margin', market, market.margin), true);
+  assert.equal(resolveProp('quarter', market, 2), true);
+  assert.ok(propOdds('margin', 'blowout') > propOdds('margin', 'close'));
+  assert.ok(parlayOdds([2, 2, 2]) > 7);
+  assert.equal(resolveParlay([{ won: true }, { won: false }]), false);
+});
+
+test('pity guarantees a legendary and odds stay normalized', () => {
+  const odds = pullOdds(0);
+  assert.ok(Math.abs(odds.common + odds.rare + odds.epic + odds.legendary - 100) < 0.5);
+  const career = { pity: PITY_LIMIT - 1, pullHistory: [] };
+  const pull = pityPull(career, () => 0.99);
+  assert.equal(pull.guaranteed, true);
+  assert.equal(pull.tier, 'legendary');
+  assert.equal(career.pity, 0);
+  assert.equal(career.pullHistory.length, 1);
+});
+
+test('crafting and AI market use fragments and duplicates', () => {
+  const p = { ...TEAM_BY_CODE.BOS.players[0], age: 30, ovr: 96 };
+  const career = { fragments: 1000, collection: [], duplicates: {}, credits: 0 };
+  assert.ok(craftCost(p) > 0);
+  const crafted = craftPlayer(career, p);
+  assert.equal(crafted.ok, true);
+  assert.ok(career.collection.includes(p.id));
+  career.duplicates[p.id] = 1;
+  assert.equal(canSell(career, p), true);
+  const offer = aiOffer(p, () => 0.5, 0);
+  assert.ok(offer > 0);
+  const sold = sellDuplicate(career, p, offer);
+  assert.equal(sold.ok, true);
+  assert.equal(career.credits, offer);
+  const set = setProgress(career, [TEAM_BY_CODE.BOS], 'legends');
+  assert.ok(set.total >= 0);
+});
+
+console.log('26/26 tests passed');
