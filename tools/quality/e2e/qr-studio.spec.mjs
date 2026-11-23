@@ -69,12 +69,12 @@ test.describe('QR Studio', () => {
 
   test('legacy QR URLs redirect to the matching section', async ({ page }) => {
     await page.goto('/projects/qr-studio/legacy-qrcode.html');
-    await expect(page).toHaveURL(/\/projects\/qr-studio\/#scan$/);
+    await expect(page).toHaveURL(/\/projects\/qr-studio\/index\.html#scan$/);
     await expect(page.locator('#tab-scan')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#panel-scan')).toBeVisible();
 
     await page.goto('/projects/qr-studio/legacy-create_qrcode.html');
-    await expect(page).toHaveURL(/\/projects\/qr-studio\/#create$/);
+    await expect(page).toHaveURL(/\/projects\/qr-studio\/index\.html#create$/);
     await expect(page.locator('#tab-create')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#panel-create')).toBeVisible();
   });

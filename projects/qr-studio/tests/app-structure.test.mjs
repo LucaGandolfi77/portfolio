@@ -430,9 +430,9 @@ test('catalogo e redirect: una sola voce QR Studio, nessun doppione legacy', () 
   for (const [file, section] of redirects) {
     const source = read(file);
     assert.match(source, /<link rel="canonical" href="https:\/\/lucagandolfi77\.github\.io\/portfolio\/projects\/qr-studio\/">/);
-    assert.match(source, new RegExp(`http-equiv="refresh" content="0; url=\\./qr-studio/#${section}"`));
-    assert.match(source, new RegExp(`href="\\./qr-studio/#${section}"`));
-    assert.match(source, new RegExp(`var target = '\\./qr-studio/' \\+ location\\.search \\+ '#${section}';`));
+    assert.match(source, new RegExp(`http-equiv="refresh" content="0; url=\\./index\\.html#${section}"`));
+    assert.match(source, new RegExp(`href="\\./index\\.html#${section}"`));
+    assert.match(source, new RegExp(`var target = '\\./index\\.html' \\+ location\\.search \\+ '#${section}';`));
     assert.match(source, /location\.replace\(target\)/);
     assert.match(source, /name="robots" content="noindex, follow"/);
     assert.doesNotMatch(source, /https?:\/\/(?:unpkg|cdn|cdnjs)/);

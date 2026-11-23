@@ -148,7 +148,7 @@ test.describe('Text Lab', () => {
 
   test('legacy Text Recognition URL opens camera mode', async ({ page }) => {
     await page.goto('/projects/text-lab/legacy-text_recognition.html');
-    await expect(page).toHaveURL(/\/projects\/text-lab\/#camera$/);
+    await expect(page).toHaveURL(/\/projects\/text-lab\/index\.html#camera$/);
     await expect(page.locator('#modeSwitch [data-mode="camera"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#cameraPlaceholder')).toBeVisible();
   });

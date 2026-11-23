@@ -309,8 +309,8 @@ test('catalogo, redirect legacy e service worker root', () => {
   for (const [file, section] of redirects) {
     const source = read(file);
     assert.match(source, /<link rel="canonical" href="https:\/\/lucagandolfi77\.github\.io\/portfolio\/projects\/atlas\/">/);
-    assert.match(source, new RegExp(`http-equiv="refresh" content="0; url=\\./atlas/#${section}"`));
-    assert.match(source, new RegExp(`var target = '\\./atlas/' \\+ location\\.search \\+ '#${section}';`));
+    assert.match(source, new RegExp(`http-equiv="refresh" content="0; url=\\./index\\.html#${section}"`));
+    assert.match(source, new RegExp(`var target = '\\./index\\.html' \\+ location\\.search \\+ '#${section}';`));
     assert.match(source, /location\.replace\(target\)/);
     assert.match(source, /name="robots" content="noindex, follow"/);
     assert.doesNotMatch(source, /https?:\/\/(?:unpkg|cdn|cdnjs)/);

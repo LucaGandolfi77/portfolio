@@ -289,8 +289,8 @@ test('catalogo, redirect legacy e service worker root', () => {
 
   const redirect = read('../../projects/text-lab/legacy-text_recognition.html');
   assert.match(redirect, /<link rel="canonical" href="https:\/\/lucagandolfi77\.github\.io\/portfolio\/projects\/text-lab\/">/);
-  assert.match(redirect, /http-equiv="refresh" content="0; url=\.\/text-lab\/#camera"/);
-  assert.match(redirect, /var target = '\.\/text-lab\/' \+ location\.search \+ '#camera';/);
+  assert.match(redirect, /http-equiv="refresh" content="0; url=\.\/index\.html#camera"/);
+  assert.match(redirect, /var target = '\.\/index\.html' \+ location\.search \+ '#camera';/);
   assert.match(redirect, /location\.replace\(target\)/);
   assert.match(redirect, /name="robots" content="noindex, follow"/);
   assert.doesNotMatch(redirect, /https?:\/\/(?:unpkg|cdn|cdnjs)/);
