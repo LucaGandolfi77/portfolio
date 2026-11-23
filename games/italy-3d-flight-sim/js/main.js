@@ -5,8 +5,9 @@ import { load, store } from '../../_kit/storage.js';
 import { createI18n } from '../../_kit/i18n.js';
 import * as AUDIO from '../../_kit/audio.js';
 import { registerSW } from '../../_kit/pwa.js';
-import { PLANES, MISSIONS, STR, loc, WORLD } from './config.js';
+import { PLANES, MISSIONS, TOURS, STR, loc, WORLD } from './config.js';
 import { AIRPORTS } from './config.js';
+import { initLandmarks, landmarksData } from './landmarks.js';
 import { initGeo, vectorData, geoToWorld, worldPolygon, terrainHeight } from './geo.js';
 import { FlightGame } from './game.js';
 import { createRenderer } from './render.js';
@@ -16,7 +17,7 @@ import { initBuildingsData } from './buildings.js';
 const SAVE_KEY = 'italy3dFlightSim.save.v1';
 const DEFAULTS = {
   plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high',
-  imagery: true, mapMode: false, visual: 'happy',
+  imagery: true, mapMode: false, visual: 'happy', timeMode: 'cycle', weather: 'clear',
   bests: {}, stats: { flights: 0, landings: 0, crashes: 0 }
 };
 const save = load(SAVE_KEY, DEFAULTS);
@@ -35,6 +36,7 @@ const mctx = minimap.getContext('2d');
 const hud = $('hud');
 const toast = $('toast');
 let view3d = null;
+let imageryTexture = null;
 
 registerSW('./sw.js');
 
@@ -59,16 +61,24 @@ function buildHangar() {
 
 function buildMissions() {
   const lang = i18n.getLang();
-  $('missionList').innerHTML = MISSIONS.map(m => {
+  const cards = (items, isTour) => items.map(m => {
     const best = save.bests[`${m.id}:${game.plane.id}`];
-    return `<button class="mission-card" data-mission="${m.id}" type="button">
-      <span class="mission-top"><b>${loc(m.name, lang)}</b><small>${'◆'.repeat(m.diff)}${'◇'.repeat(5 - m.diff)}</small></span>
+    const attr = isTour ? `data-tour="${m.id}"` : `data-mission="${m.id}"`;
+    const stops = isTour ? m.stops.map(id => {
+      const d = landmarksData()?.landmarks.find(l => l.id === id);
+      return d ? loc(d.name, lang) : id;
+    }).join(' → ') : m.stops.join(' → ');
+    return `<button class="mission-card" ${attr} type="button">
+      <span class="mission-top"><b>${isTour ? '🗺️ ' : ''}${loc(m.name, lang)}</b><small>${'◆'.repeat(m.diff)}${'◇'.repeat(5 - m.diff)}</small></span>
       <small class="mission-desc">${loc(m.desc, lang)}</small>
-      <span class="mission-stops">${m.stops.join(' → ')}</span>
+      <span class="mission-stops">${stops}</span>
       <span class="mission-best">${t('best')}: ${best ? fmt(best) : '—'}</span>
-      <span class="mission-go">${t('play')} →</span>
+      <span class="mission-go">${isTour ? t('tour') : t('play')} →</span>
     </button>`;
   }).join('');
+  $('missionList').innerHTML =
+    `<div class="group-label">${t('missions')}</div>${cards(MISSIONS, false)}` +
+    `<div class="group-label">${t('tours')}</div>${cards(TOURS, true)}`;
 }
 
 function buildAirports() {
@@ -88,6 +98,8 @@ function refreshUI() {
   const happy = save.visual === 'happy';
   $('imageryVal').textContent = !happy && save.imagery ? t('on') : t('off');
   $('mapModeVal').textContent = !happy && save.mapMode ? t('on') : t('off');
+  $('timeVal').textContent = t(save.timeMode === 'cycle' ? 'cycle' : save.timeMode === 'day' ? 'day' : save.timeMode === 'dusk' ? 'dusk' : 'night');
+  $('weatherVal').textContent = t(save.weather === 'fog' ? 'fog' : save.weather === 'cloudy' ? 'cloudy' : 'clear');
 }
 refreshUI();
 i18n.onChange(() => { save.lang = i18n.getLang(); persist(); refreshUI(); });
@@ -190,9 +202,10 @@ $('hangarList').addEventListener('click', e => {
   if (view3d) view3d.setPlane(game.plane);
 });
 $('missionList').addEventListener('click', e => {
+  const tour = e.target.closest('[data-tour]');
+  if (tour) { game.startTour(tour.dataset.tour); beginFlying(); return; }
   const card = e.target.closest('[data-mission]');
-  if (!card) return;
-  game.startMission(card.dataset.mission); beginFlying();
+  if (card) { game.startMission(card.dataset.mission); beginFlying(); }
 });
 $('btnView').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); cycleView(); });
 $('btnViewPause').addEventListener('click', cycleView);
@@ -201,17 +214,41 @@ $('btnHappy').addEventListener('click', () => {
   if (view3d) view3d.setHappy(true);
   game.say(t('happyHint'), 'good', 3200);
 });
-$('btnImagery').addEventListener('click', () => {
+$('btnImagery').addEventListener('click', async () => {
   save.imagery = !save.imagery;
   if (save.imagery) { save.visual = 'satellite'; save.mapMode = false; }
   persist(); refreshUI();
-  if (view3d) { if (save.imagery) view3d.setHappy(false); view3d.setImagery(save.imagery); view3d.setMapMode(false); }
+  if (!view3d) return;
+  if (save.imagery) {
+    view3d.setHappy(false);
+    if (!imageryTexture) {
+      $('loadStatus').textContent = 'satellite imagery 0%';
+      $('loading').classList.remove('hidden');
+      imageryTexture = await loadImagery(p => { $('loadStatus').textContent = `satellite imagery ${Math.round(p * 100)}%`; }).catch(() => null);
+      $('loading').classList.add('hidden');
+      view3d.setImageryTexture(imageryTexture);
+    }
+    view3d.setImagery(true);
+    view3d.setMapMode(false);
+  } else view3d.setImagery(false);
 });
 $('btnMapMode').addEventListener('click', () => {
   save.mapMode = !save.mapMode;
   if (save.mapMode) { save.visual = 'map'; save.imagery = false; }
   persist(); refreshUI();
   if (view3d) { if (save.mapMode) view3d.setHappy(false); view3d.setMapMode(save.mapMode); view3d.setImagery(false); }
+});
+$('btnTime').addEventListener('click', () => {
+  const modes = ['cycle', 'day', 'dusk', 'night'];
+  save.timeMode = modes[(modes.indexOf(save.timeMode) + 1) % modes.length];
+  persist(); refreshUI();
+  if (view3d) view3d.setTimeMode(save.timeMode);
+});
+$('btnWeather').addEventListener('click', () => {
+  const presets = ['clear', 'cloudy', 'fog'];
+  save.weather = presets[(presets.indexOf(save.weather) + 1) % presets.length];
+  persist(); refreshUI();
+  if (view3d) view3d.setWeather(save.weather);
 });
 $('btnQuality').addEventListener('click', () => {
   game.setQuality(game.quality === 'high' ? 'low' : 'high');
@@ -227,12 +264,21 @@ $('btnSound').addEventListener('click', () => {
   save.sound = !save.sound; persist();
   AUDIO.init(save.sound); AUDIO.setSound(save.sound); refreshUI();
 });
-$('btnRetry').addEventListener('click', () => { game.startMission(game.mission.id); beginFlying(); });
+function replayMission() {
+  if (game.mission?.kind === 'tour') game.startTour(game.mission.id);
+  else game.startMission(game.mission.id);
+  beginFlying();
+}
+$('btnRetry').addEventListener('click', replayMission);
 $('btnNext').addEventListener('click', () => {
-  const i = MISSIONS.findIndex(m => m.id === game.mission.id);
-  const next = MISSIONS[i + 1];
-  if (next) { game.startMission(next.id); beginFlying(); }
-  else { game.quit(); showScreen('missions'); refreshUI(); lastMode = game.mode; }
+  const list = game.mission?.kind === 'tour' ? TOURS : MISSIONS;
+  const i = list.findIndex(m => m.id === game.mission.id);
+  const next = list[i + 1];
+  if (next) {
+    if (game.mission?.kind === 'tour') game.startTour(next.id);
+    else game.startMission(next.id);
+    beginFlying();
+  } else { game.quit(); showScreen('missions'); refreshUI(); lastMode = game.mode; }
 });
 $('btnResultMenu').addEventListener('click', () => { game.quit(); showScreen('menu'); refreshUI(); lastMode = game.mode; });
 
@@ -289,7 +335,9 @@ function update(dt) {
       $('resultTime').textContent = fmt(r.time);
       $('resultUsed').textContent = `${r.used}%`;
       $('resultBest').textContent = `${fmt(r.best)}${r.isNew ? ' ★' : ''}`;
-      $('btnNext').classList.toggle('hidden', MISSIONS.findIndex(m => m.id === game.mission.id) >= MISSIONS.length - 1);
+      const nextList = game.mission?.kind === 'tour' ? TOURS : MISSIONS;
+      $('btnNext').classList.toggle('hidden', nextList.findIndex(m => m.id === game.mission.id) >= nextList.length - 1);
+      $('resultTitle').textContent = game.mission?.kind === 'tour' ? `${t('tour')}: ${loc(game.mission.name, i18n.getLang())}` : t('missionDone');
     }
   }
 }
@@ -331,13 +379,24 @@ async function boot() {
       fetch('./data/italy-vector.json').then(r => r.json())
     ]);
     initGeo(new DataView(heightBuf), meta, vectors);
+    $('loadStatus').textContent = 'landmarks';
+    const landmarks = await fetch('./data/landmarks.json').then(r => r.json()).catch(() => ({ landmarks: [] }));
+    initLandmarks(landmarks);
+    refreshUI();
     $('loadStatus').textContent = 'city buildings';
     const buildings = await fetch('./data/buildings.json').then(r => r.json()).catch(() => ({ cities: [] }));
     initBuildingsData(buildings);
-    $('loadStatus').textContent = 'satellite imagery 0%';
-    const imagery = await loadImagery(p => { $('loadStatus').textContent = `satellite imagery ${Math.round(p * 100)}%`; }).catch(() => null);
+    const lowEnd = (navigator.hardwareConcurrency || 8) <= 4;
+    if (lowEnd && save.quality === 'high') { game.setQuality('low'); save.quality = 'low'; }
+    if (save.visual === 'satellite') {
+      $('loadStatus').textContent = 'satellite imagery 0%';
+      imageryTexture = await loadImagery(p => { $('loadStatus').textContent = `satellite imagery ${Math.round(p * 100)}%`; }).catch(() => null);
+    }
     $('loadStatus').textContent = '3D scene';
-    view3d = createRenderer(canvas, game.quality, imagery, save.visual);
+    view3d = createRenderer(canvas, game.quality, imageryTexture, save.visual);
+    view3d.addLandmarks();
+    view3d.setTimeMode(save.timeMode);
+    view3d.setWeather(save.weather);
     view3d.setHappy(save.visual === 'happy');
     if (save.visual !== 'happy') {
       view3d.setImagery(save.visual === 'satellite' && save.imagery);

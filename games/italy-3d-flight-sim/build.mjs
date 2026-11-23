@@ -38,7 +38,7 @@ await writeFile(htmlPath, (await readFile(htmlPath, 'utf8')).replaceAll('../../t
 
 const swPath = join(DIST, 'sw.js');
 let sw = await readFile(swPath, 'utf8');
-sw = sw.replace('italy-3d-flight-sim-v2', `italy-3d-flight-sim-${BUILD_ID}`)
+sw = sw.replace('italy-3d-flight-sim-v3', `italy-3d-flight-sim-${BUILD_ID}`)
   .replaceAll("'../_vendor/three.module.js'", "'./_vendor/three.module.js'")
   .replaceAll("'../../top_buttons.js'", "'./top_buttons.js'")
   .replaceAll("'../_kit/", "'./_kit/");

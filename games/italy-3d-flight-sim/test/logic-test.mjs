@@ -1,6 +1,7 @@
 import { test, eq, ok, near, summary } from '../../_kit/test-harness.js';
 import { readFileSync } from 'node:fs';
-import { AIRPORTS, MISSIONS, PLANES, STR, WORLD } from '../js/config.js';
+import { AIRPORTS, MISSIONS, PLANES, STR, TOURS, WORLD } from '../js/config.js';
+import { initLandmarks, landmarksData } from '../js/landmarks.js';
 import { geoToWorld, worldToGeo, elevationAt, terrainHeight, initGeo, insideItaly } from '../js/geo.js';
 import { createFlight, headingDegrees, landingCheck, stepFlight, runwayDirection } from '../js/flight.js';
 import { createTraffic, stepTraffic } from '../js/traffic.js';
@@ -12,6 +13,8 @@ const meta = JSON.parse(readFileSync(new URL('italy-meta.json', base), 'utf8'));
 const vectors = JSON.parse(readFileSync(new URL('italy-vector.json', base), 'utf8'));
 const imagery = JSON.parse(readFileSync(new URL('imagery-manifest.json', base), 'utf8'));
 const buildings = JSON.parse(readFileSync(new URL('buildings.json', base), 'utf8'));
+const landmarks = JSON.parse(readFileSync(new URL('landmarks.json', base), 'utf8'));
+initLandmarks(landmarks);
 initGeo(new DataView(new Uint8Array(heightBuf).buffer), meta, vectors);
 
 let passed = 0, total = 0;
@@ -56,6 +59,33 @@ run('world is wide and terrain relief is low', () => {
   ok(WORLD.elevScale <= 0.06 && WORLD.elevScale >= 0.04);
   const peak = terrainHeight(geoToWorld(10.5, 46.5).x, geoToWorld(10.5, 46.5).z);
   ok(peak < 260, `peak too high: ${peak}`);
+});
+
+run('real landmarks cover Italy and tours reference them', () => {
+  eq(landmarks.landmarks.length, 12);
+  const ids = new Set(landmarks.landmarks.map(l => l.id));
+  eq(ids.size, 12);
+  ok(landmarks.landmarks.every(l => l.lon > WORLD.minLon && l.lon < WORLD.maxLon && l.lat > WORLD.minLat && l.lat < WORLD.maxLat));
+  ok(TOURS.length >= 4);
+  for (const tour of TOURS) ok(tour.stops.every(id => ids.has(id)), `bad stop in ${tour.id}`);
+  eq(landmarksData().landmarks[0].code, 'COL');
+});
+
+run('landmark tour advances on flyover and completes', () => {
+  const save = { plane: 'cessna', lang: 'en', bests: {}, freeAirport: 'FCO', stats: {}, quality: 'high', visual: 'happy' };
+  const game = new FlightGame(save, () => {});
+  game.startTour('roma');
+  eq(game.targetIndex, 0);
+  eq(game.targetLandmark().id, 'colosseo');
+  for (const lm of landmarks.landmarks.slice(0, 2)) {
+    const p = geoToWorld(lm.lon, lm.lat);
+    game.state.x = p.x; game.state.z = p.z;
+    game.state.y = terrainHeight(p.x, p.z) + 120;
+    game.landCooldown = 0;
+    game.update(1 / 60, { turn: 0, pitch: 0, throttle: 0.4 });
+  }
+  eq(game.mode, 'result');
+  ok(save.bests['roma:cessna'] >= 0);
 });
 
 run('lon/lat converts to world coordinates and back', () => {

@@ -15,7 +15,8 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 - **Real places**: OSM building footprints for 12 major Italian cities are extruded into 3D; other urban areas use instanced buildings from Natural Earth polygons.
 - **Real airports**: 15 Italian airports at their actual coordinates with oriented runways.
 - **Flight simulation**: 6DoF-lite physics with pitch/roll/yaw, speed, stall, fuel, boost, ground collision, chase/cockpit/overview cameras, artificial-horizon HUD, day/night lighting, clouds and AI traffic.
-- **11 craft**, free flight and six missions with landing checkpoints.
+- **11 craft**, free flight, six airport missions and five landmark tours over 12 real Italian monuments (Colosseum, Duomi, Leaning Tower, Vesuvius, Etna…).
+- **Atmosphere**: day/dusk/night cycle with city lights after dark, and clear/cloudy/foggy weather presets. Satellite tiles are loaded lazily only when you switch to satellite mode.
 
 ## Data sources
 

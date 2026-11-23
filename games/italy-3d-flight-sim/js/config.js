@@ -96,6 +96,25 @@ export const MISSIONS = [
     desc: { en: 'The whole country: five stops, real mountains and sea.', it: 'Tutto il Paese: cinque tappe, montagne e mare veri.' } }
 ];
 
+// Sightseeing tours: stops reference landmarks.json ids.
+export const TOURS = [
+  { id: 'roma', diff: 2, stops: ['colosseo', 'sanpietro'],
+    name: { en: 'Eternal City Tour', it: 'Tour della Città Eterna' },
+    desc: { en: 'Fly over the Colosseum and St Peter’s dome.', it: 'Sorvola il Colosseo e la cupola di San Pietro.' } },
+  { id: 'nord', diff: 3, stops: ['duomomi', 'sanmarco', 'arena'],
+    name: { en: 'Northern Wonders', it: 'Meraviglie del Nord' },
+    desc: { en: 'Milan Cathedral, Venice and Verona Arena.', it: 'Duomo di Milano, Venezia e Arena di Verona.' } },
+  { id: 'rinascimento', diff: 3, stops: ['pisa', 'duomofi', 'duomofr'],
+    name: { en: 'Renaissance Skyline', it: 'Cieli del Rinascimento' },
+    desc: { en: 'Pisa, Florence and Siena from the air.', it: 'Pisa, Firenze e Siena dal cielo.' } },
+  { id: 'vulcani', diff: 5, stops: ['vesuvio', 'etna'],
+    name: { en: 'Volcano Flyby', it: 'Sorvolo dei Vulcani' },
+    desc: { en: 'Circle Vesuvius and Etna, Italy’s giants.', it: 'Gira intorno a Vesuvio ed Etna, i giganti d’Italia.' } },
+  { id: 'grandtour', diff: 5, stops: ['colosseo', 'duomomi', 'sanmarco', 'pisa', 'etna'],
+    name: { en: 'Grand Landmark Tour', it: 'Gran Tour dei Monumenti' },
+    desc: { en: 'Five real Italian icons in one flight.', it: 'Cinque veri simboli d’Italia in un solo volo.' } }
+];
+
 export const STR = {
   en: {
     title: 'ITALY 3D FLIGHT SIM', subtitle: 'Real terrain, real cities, real flight',
@@ -120,6 +139,9 @@ export const STR = {
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'OVERVIEW', traffic: 'TRAFFIC', terrain: 'TERRAIN',
     starship: 'STARSHIP', aircraft: 'AIRCRAFT', imagery: 'SATELLITE', mapMode: 'MAP MODE',
     happy: 'HAPPY MODE', happyHint: 'Che bella giornata! Vola, esplora e divertiti 🌈',
+    tours: 'LANDMARK TOURS', tour: 'TOUR', photo: 'PHOTO', photoDone: '📸 Photo taken: {name}',
+    landmark: 'LANDMARK', timeOfDay: 'TIME OF DAY', weather: 'WEATHER', clear: 'CLEAR', cloudy: 'CLOUDY',
+    fog: 'FOGGY', day: 'DAY', night: 'NIGHT', dusk: 'DUSK', cycle: 'CYCLE',
     quality: 'GRAPHICS', low: 'LOW', high: 'HIGH', data: 'REAL DATA', dataHint: 'Natural Earth coast, lakes, rivers, cities and SRTM elevation',
     ground: 'GROUND', sea: 'SEA', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFIC — watch out!'
   },
@@ -146,6 +168,9 @@ export const STR = {
     chase: 'CHASE', cockpit: 'COCKPIT', overview: 'PANORAMICA', traffic: 'TRAFFICO', terrain: 'TERRENO',
     starship: 'ASTRONAVE', aircraft: 'AEREO', imagery: 'SATELLITE', mapMode: 'MODO MAPPA',
     happy: 'MODALITÀ FELICE', happyHint: 'Che bella giornata! Vola, esplora e divertiti 🌈',
+    tours: 'TOUR AI MONUMENTI', tour: 'TOUR', photo: 'FOTO', photoDone: '📸 Foto scattata: {name}',
+    landmark: 'MONUMENTO', timeOfDay: 'ORA DEL GIORNO', weather: 'METEO', clear: 'SERENO', cloudy: 'NUVOLOSO',
+    fog: 'NEBBIA', day: 'GIORNO', night: 'NOTTE', dusk: 'TRAMONTO', cycle: 'CICLO',
     quality: 'GRAFICA', low: 'BASSA', high: 'ALTA', data: 'DATI REALI', dataHint: 'Coste, laghi, fiumi, città Natural Earth e altitudini SRTM',
     ground: 'TERRA', sea: 'MARE', speedUnit: 'km/h', altUnit: 'm', vsUnit: 'm/s', trafficWarn: 'TRAFFICO — attenzione!'
   }

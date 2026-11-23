@@ -14,6 +14,31 @@ export function realCityCenters() {
   return data ? data.cities.map(c => [c.lon, c.lat]) : [];
 }
 
+export function buildCityLights(group) {
+  if (!data) return null;
+  const positions = [];
+  for (const city of data.cities) {
+    for (let i = 0; i < city.buildings.length; i += 2) {
+      const ring = city.buildings[i][0];
+      if (!ring || ring.length < 4) continue;
+      let lon = 0, lat = 0;
+      for (const p of ring) { lon += p[0]; lat += p[1]; }
+      lon /= ring.length; lat /= ring.length;
+      const p = geoToWorld(lon, lat);
+      positions.push(p.x, terrainHeight(p.x, p.z) + 4, p.z);
+    }
+  }
+  if (!positions.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const points = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: '#ffd88a', size: 3.2, transparent: true, opacity: 0.9, depthWrite: false
+  }));
+  points.visible = false;
+  group.add(points);
+  return points;
+}
+
 export function buildRealBuildings(group, quality = 'high') {
   if (!data) return null;
   const maxCities = quality === 'low' ? 6 : 12;

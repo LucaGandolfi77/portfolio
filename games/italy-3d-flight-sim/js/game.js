@@ -1,8 +1,9 @@
 /* Italy 3D Flight Sim — mission state, progress and simulation orchestration */
 
 import { sfx } from '../../_kit/audio.js';
-import { MISSIONS, PLANES, STR } from './config.js';
+import { MISSIONS, PLANES, STR, TOURS, loc } from './config.js';
 import { AIRPORTS } from './config.js';
+import { landmarksData } from './landmarks.js';
 import { distanceToAirport, createFlight, headingDegrees, stepFlight, toKm, checkLanding } from './flight.js';
 import { geoToWorld, terrainHeight } from './geo.js';
 import { createTraffic, stepTraffic } from './traffic.js';
@@ -58,6 +59,18 @@ export class FlightGame {
     this._begin(AIRPORTS.find(a => a.code === mission.stops[0]));
   }
 
+  startTour(id) {
+    const tour = TOURS.find(m => m.id === id);
+    if (!tour || tour.stops.length < 2) return;
+    this.mission = { ...tour, kind: 'tour' };
+    this.targetIndex = 0;
+    const first = this.targetLandmark();
+    const airport = AIRPORTS.reduce((best, a) =>
+      distanceToAirport({ x: geoToWorld(first.lon, first.lat).x, z: geoToWorld(first.lon, first.lat).z }, a) < distanceToAirport({ x: geoToWorld(best.lon, best.lat).x, z: geoToWorld(best.lon, best.lat).z }, a) ? a : best, AIRPORTS[0]);
+    this._begin(airport);
+    this.targetIndex = 0;
+  }
+
   _begin(airport) {
     this.state = createFlight(this.plane, airport);
     this.fuelStart = this.state.fuel;
@@ -69,7 +82,8 @@ export class FlightGame {
   }
 
   restart() {
-    if (this.mission) this.startMission(this.mission.id);
+    if (this.mission?.kind === 'tour') this.startTour(this.mission.id);
+    else if (this.mission) this.startMission(this.mission.id);
     else this.startFree(this.freeAirport);
   }
 
@@ -79,10 +93,18 @@ export class FlightGame {
   }
 
   targetAirport() {
+    if (this.mission?.kind === 'tour') return null;
     return this.mission ? AIRPORTS.find(a => a.code === this.mission.stops[this.targetIndex]) : null;
   }
 
+  targetLandmark() {
+    if (this.mission?.kind !== 'tour') return null;
+    const data = landmarksData();
+    return data ? data.landmarks.find(l => l.id === this.mission.stops[this.targetIndex]) : null;
+  }
+
   destination() {
+    if (this.targetLandmark()) return this.targetLandmark();
     if (this.targetAirport()) return this.targetAirport();
     let best = AIRPORTS[0], bestD = Infinity;
     for (const a of AIRPORTS) {
@@ -105,7 +127,16 @@ export class FlightGame {
     this.trafficWarn = this.traffic.some(t => Math.hypot(t.x - this.state.x, t.z - this.state.z) < 70 && Math.abs(t.y - this.state.y) < 35);
 
     if (this.state.status === 'crashed') { this._respawn(); return; }
-    if (this.landCooldown <= 0) {
+    if (this.mission?.kind === 'tour' && this.landCooldown <= 0) {
+      const lm = this.targetLandmark();
+      if (lm) {
+        const p = geoToWorld(lm.lon, lm.lat);
+        const dist = Math.hypot(this.state.x - p.x, this.state.z - p.z);
+        const agl = this.state.y - terrainHeight(p.x, p.z);
+        if (dist < 85 && agl < 420 && agl > 15) this._reachLandmark(lm);
+      }
+    }
+    if (this.mission?.kind !== 'tour' && this.landCooldown <= 0) {
       const landing = checkLanding(this.state, this.plane, AIRPORTS);
       if (landing.result === 'ok') this._onLanding(landing.airport);
     }
@@ -121,6 +152,14 @@ export class FlightGame {
     let text = dict[key] || EN[key] || key;
     if (vars) for (const [k, v] of Object.entries(vars)) text = String(text).replace(`{${k}}`, v);
     return text;
+  }
+
+  _reachLandmark(lm) {
+    this.landCooldown = 1.8;
+    this.say(this._str('photoDone', { name: loc(lm.name, this.save.lang) }), 'good', 2600);
+    sfx.coin();
+    this.targetIndex++;
+    if (this.targetIndex >= this.mission.stops.length) this._completeMission();
   }
 
   _respawn() {

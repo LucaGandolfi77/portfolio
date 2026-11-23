@@ -4,7 +4,7 @@ import * as THREE from '../../_vendor/three.module.js';
 import { AIRPORTS, WORLD } from './config.js';
 import { elevationAt, geoToWorld, terrainHeight, vectorData, worldPolygon, insideItaly } from './geo.js';
 import { seededRandom } from '../../_kit/core.js';
-import { buildRealBuildings, realCityCenters } from './buildings.js';
+import { buildRealBuildings, buildCityLights, realCityCenters } from './buildings.js';
 
 function labelSprite(text, color = '#eaf6ff') {
   const canvas = document.createElement('canvas');
@@ -373,6 +373,7 @@ export function createWorld(scene, quality = 'high', imageryTexture = null, visu
   const happy = visual === 'happy' ? buildHappyDetails(group, quality) : null;
   buildCities(group, vectors, quality);
   const realBuildings = buildRealBuildings(group, quality);
+  const cityLights = buildCityLights(group);
   buildAirports(group);
-  return { group, terrain, sea, coast, happy, realBuildings };
+  return { group, terrain, sea, coast, happy, realBuildings, cityLights };
 }

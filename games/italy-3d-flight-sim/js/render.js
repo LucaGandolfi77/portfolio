@@ -5,6 +5,7 @@ import { WORLD } from './config.js';
 import { terrainHeight } from './geo.js';
 import { createWorld, terrainColor, happyColor } from './terrain.js';
 import { createPlaneMesh, animatePlane } from './planes.js';
+import { createLandmarks } from './landmarks.js';
 
 function cloudTexture() {
   const canvas = document.createElement('canvas');
@@ -34,7 +35,8 @@ function makeClouds(scene, quality, happy) {
   return group;
 }
 
-export function createRenderer(canvas, quality = 'high', imageryTexture = null, visual = 'happy') {
+export function createRenderer(canvas, quality = 'high', initialTexture = null, visual = 'happy') {
+  let imageryTexture = initialTexture;
   let happyMode = visual === 'happy';
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 2 : 1));
@@ -59,6 +61,8 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null, 
   let sunTime = 0.3;
   let mapMode = false;
   let imageryOn = true;
+  let timeMode = 'cycle';
+  let weather = 'clear';
   const tempV = new THREE.Vector3();
   const tempLook = new THREE.Vector3();
 
@@ -103,12 +107,17 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null, 
 
   function update(game, dt, time) {
     const s = game.state;
-    sunTime = (sunTime + dt * 0.004) % 1;
+    if (timeMode === 'cycle') sunTime = (sunTime + dt * 0.004) % 1;
     const day = 0.5 + 0.5 * Math.sin(sunTime * Math.PI * 2 - Math.PI / 2);
-    sun.intensity = happyMode ? 1.5 + day * 0.7 : 0.5 + day * 1.6;
-    hemi.intensity = happyMode ? 1.1 + day * 0.45 : 0.35 + day * 0.9;
-    if (!happyMode) {
-      scene.background.setHSL(0.57, 0.55, 0.16 + day * 0.45);
+    sun.intensity = happyMode ? 0.4 + day * 1.8 : 0.25 + day * 1.9;
+    hemi.intensity = happyMode ? 0.5 + day * 1.0 : 0.2 + day * 1.2;
+    if (world.cityLights) world.cityLights.visible = day < 0.38;
+    if (happyMode) {
+      if (day < 0.25) scene.background.set(weather === 'fog' ? '#2a3d5c' : '#162b4d');
+      else scene.background.set(weather === 'fog' ? '#a9c5cf' : '#8fdcf5');
+      scene.fog.color.copy(scene.background);
+    } else {
+      scene.background.setHSL(0.57, 0.55, 0.14 + day * 0.46);
       scene.fog.color.copy(scene.background);
     }
     sun.position.set(Math.cos(sunTime * Math.PI * 2) * 700, 200 + day * 800, -400);
@@ -233,13 +242,33 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null, 
     applyVisual();
   }
 
+  function setTimeMode(mode) {
+    timeMode = ['cycle', 'day', 'dusk', 'night'].includes(mode) ? mode : 'cycle';
+    if (timeMode === 'day') sunTime = 0.5;
+    if (timeMode === 'dusk') sunTime = 0.25;
+    if (timeMode === 'night') sunTime = 0;
+  }
+
+  function setWeather(preset) {
+    weather = ['clear', 'cloudy', 'fog'].includes(preset) ? preset : 'clear';
+    scene.fog.density = weather === 'fog' ? 0.0024 : weather === 'cloudy' ? 0.0012 : 0.00075;
+    for (const cloud of clouds.children) cloud.material.opacity = weather === 'fog' ? 0.25 : weather === 'cloudy' ? 0.9 : happyMode ? 0.95 : 0.75;
+  }
+
+  function addLandmarks() { return createLandmarks(world.group); }
+
+  function setImageryTexture(tex) {
+    imageryTexture = tex;
+    applyVisual();
+  }
+
   function resize(w, h) {
     renderer.setSize(w, h);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
 
-  return { renderer, scene, camera, world, setPlane, setTraffic, setHappy, setImagery, setMapMode, update, resize };
+  return { renderer, scene, camera, world, setPlane, setTraffic, addLandmarks, setHappy, setImagery, setImageryTexture, setMapMode, setTimeMode, setWeather, update, resize };
 }
 
 function L_COCKPIT(plane) { return Math.max(2, plane.length * 0.16); }
