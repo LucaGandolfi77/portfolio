@@ -28,6 +28,11 @@ import { aiOffer, canSell, sellDuplicate } from '../js/sim/market.js';
 import { RARITY_FX, fxFor, phaseDurations, nextPhase, totalDuration, confettiCount, PHASES } from '../js/data/chest-fx.js';
 import { CHEST_TYPES, buyChest, activeChest, isReady, speedUpCost, speedUpChest, openChest, enforceMinTier, formatTime, QUEUE_LIMIT } from '../js/sim/chest-shop.js';
 import { addCopies, copiesNeeded, creditsNeeded, upgradeWithCopies } from '../js/sim/cards.js';
+import { normalizeDeck, deckSynergy, DECK_SIZE } from '../js/sim/deck.js';
+import { normalizeSquad, squadRating, chemistry, squadReady, TEMPLATES } from '../js/sim/squad.js';
+import { newClubLeague, playClubGame, clubStandings, promote, TIERS } from '../js/sim/club-league.js';
+import { createCup, playCupRound } from '../js/sim/cup.js';
+import { grantWildcard, useWildcard, checkChallenges } from '../js/sim/wildcards.js';
 
 test('30 NBA teams with 10 players and two conferences', () => {
   assert.equal(TEAMS.length, 30);
@@ -351,4 +356,42 @@ test('card upgrades need copies and credits', () => {
   assert.equal(fail.reason, 'resources');
 });
 
-console.log('29/29 tests passed');
+test('deck synergy rewards full and balanced decks', () => {
+  const cards = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`p${i}`, { id: `p${i}`, ovr: 80 + i, pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], set: 'base', level: 1 }]));
+  const deck = normalizeDeck(['p0', 'p0', ...Object.keys(cards).slice(1, 8)]);
+  assert.equal(deck.length, DECK_SIZE);
+  const syn = deckSynergy(cards, deck);
+  assert.ok(syn.odds > 0 && syn.xp > 0);
+  assert.ok(syn.labels.includes('Full deck'));
+});
+
+test('basketball squad validates 5 starters and bonuses', () => {
+  const cards = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`p${i}`, { id: `p${i}`, ovr: 80 + i, pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], team: 'BOS', set: 'base', level: 2 }]));
+  const squad = normalizeSquad({ template: 'balanced', starters: Object.keys(cards).slice(0, 5), bench: Object.keys(cards).slice(5, 12) });
+  assert.equal(squadReady(cards, squad), true);
+  assert.ok(squadRating(cards, squad) > 80);
+  assert.ok(chemistry(cards, squad) > 0);
+  assert.equal(Object.keys(TEMPLATES).length, 3);
+});
+
+test('club league and cup progress with promotions and wildcards', () => {
+  const league = newClubLeague('Bronze', seededRandom(1));
+  assert.equal(league.games.length, 30);
+  const result = playClubGame(league, 88, 10, seededRandom(2));
+  assert.ok(result && league.week === 1);
+  assert.ok(clubStandings(league).length === 31);
+  const cup = createCup(seededRandom(3));
+  assert.equal(cup.rounds[0].matchups.length, 8);
+  playCupRound(cup, 88, 10, seededRandom(4));
+  assert.equal(cup.round, 1);
+  const career = { wildcards: {}, copies: {}, cards: {}, collection: ['p1'], challengesDone: [] };
+  grantWildcard(career, 'rare', 1);
+  const used = useWildcard(career, { id: 'p1', ovr: 82 });
+  assert.equal(used.ok, true);
+  assert.equal(career.copies.p1, 1);
+  const earned = checkChallenges(career, { cupRound: 2 });
+  assert.ok(Array.isArray(earned));
+  assert.equal(TIERS.length, 4);
+});
+
+console.log('32/32 tests passed');

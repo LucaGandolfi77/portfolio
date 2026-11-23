@@ -21,7 +21,9 @@ export function defaults() {
       collection: [], chests: 0, streak: 0, wins: 0, guesses: 0, lastChest: null,
       fragments: 0, upgrades: {}, dailyChest: null,
       credits: 1000, bets: [], pity: 0, pullHistory: [], duplicates: {}, dailyCredits: null,
-      chestQueue: [], copies: {}, cards: {}
+      chestQueue: [], copies: {}, cards: {},
+      deck: [], squad: { template: 'balanced', starters: [], bench: [] },
+      clubLeague: null, clubCup: null, wildcards: {}, cardStats: {}, challengesDone: []
     },
     daily: { last: '', wins: 0 }
   };

@@ -21,6 +21,11 @@ import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, 
 import { aiOffer, sellDuplicate } from './sim/market.js';
 import { CHEST_TYPES, buyChest, activeChest, isReady, speedUpChest, openChest, speedUpCost, timeLeft, formatTime, enforceMinTier } from './sim/chest-shop.js';
 import { addCopies, copiesNeeded, creditsNeeded, upgradeWithCopies } from './sim/cards.js';
+import { normalizeDeck, deckSynergy, DECK_SIZE } from './sim/deck.js';
+import { normalizeSquad, squadRating, chemistry, squadReady, TEMPLATES, STARTERS, BENCH } from './sim/squad.js';
+import { newClubLeague, playClubGame, clubStandings, promote, TIERS, CLUB_CODE } from './sim/club-league.js';
+import { createCup, playCupRound } from './sim/cup.js';
+import { grantWildcard, useWildcard, checkChallenges, WILDCARDS } from './sim/wildcards.js';
 import { createAvatar } from './render/avatar.js';
 import { miniAvatarUrl } from './render/mini-avatar.js';
 import { applyTeamTheme, rarityColor, teamGradient, shade } from './core/theme.js';
@@ -60,6 +65,7 @@ const state = {
   replayPlayer: null,
   replayData: null,
   betType: 'winner',
+  clubPane: 'deck',
   stake: 10,
   parlayGames: []
 };
@@ -103,7 +109,8 @@ const VIEW_GROUPS = {
   league: ['season', 'playoffs'],
   franchise: ['teams', 'career'],
   stats: ['stats'],
-  players: ['players']
+  players: ['players'],
+  club: ['club']
 };
 
 function switchView(view) {
@@ -123,6 +130,7 @@ function switchView(view) {
   if (group.includes('career')) { renderCareer(); renderChestShop(); }
   if (view === 'stats') renderStats();
   if (view === 'players') renderPlayers();
+  if (view === 'club') renderClub();
 }
 
 function resizeCourt() {
@@ -375,6 +383,76 @@ function renderPlayers() {
     '</tbody></table>';
 }
 
+function ownedCards() {
+  const c = state.data.career;
+  return (c.collection || []).map(id => {
+    const found = findPlayer(id);
+    if (!found) return null;
+    const level = Math.max(1, (c.cards || {})[id] || 1);
+    return {
+      ...found.player, team: found.team.code, teamName: found.team.name,
+      set: cardSet(found.player), level, copies: (c.copies || {})[id] || 0
+    };
+  }).filter(Boolean);
+}
+
+function renderClub() {
+  const c = state.data.career;
+  const cards = ownedCards();
+  const cardMap = Object.fromEntries(cards.map(p => [p.id, p]));
+  c.deck = normalizeDeck(c.deck || []);
+  c.squad = normalizeSquad(c.squad || {});
+  $('clubPicker').innerHTML = cards.map(p => `<option value="${p.id}">${p.name} · ${p.ovr} · Lv${p.level}</option>`).join('');
+  const rating = squadRating(cardMap, c.squad);
+  const chem = chemistry(cardMap, c.squad);
+  $('clubRating').textContent = rating || '—';
+  $('clubChem').textContent = '+' + chem;
+
+  ['deck', 'squad', 'league', 'cup', 'rewards'].forEach(name => {
+    $('clubPane' + name[0].toUpperCase() + name.slice(1)).hidden = name !== state.clubPane;
+  });
+  document.querySelectorAll('[data-club]').forEach(b => b.classList.toggle('active', b.dataset.club === state.clubPane));
+
+  if (state.clubPane === 'deck') {
+    const slot = (id, i) => {
+      const p = cardMap[id];
+      return `<button class="slot ${p ? 'filled' : ''}" data-remove-deck="${i}">${p ? `<b>${p.name}</b><small>Lv${p.level} · ${p.ovr}</small>` : `<b>+</b><small>${i18n.t('deck')} ${i + 1}</small>`}</button>`;
+    };
+    $('clubDeck').innerHTML = Array.from({ length: DECK_SIZE }, (_, i) => slot(c.deck[i], i)).join('');
+    const syn = deckSynergy(cardMap, c.deck);
+    $('clubDeckSynergy').innerHTML = `<span>${i18n.t('rating')} ${syn.power}</span>` +
+      syn.labels.map(l => `<span>${l}</span>`).join('') +
+      `<span>XP +${Math.round(syn.xp * 100)}%</span><span>${i18n.t('odds')} +${Math.round(syn.odds * 100)}%</span>`;
+  } else if (state.clubPane === 'squad') {
+    $('clubTemplate').value = c.squad.template;
+    const slot = (id, kind, i) => {
+      const p = cardMap[id];
+      return `<button class="slot ${p ? 'filled' : ''}" data-remove-squad="${kind}:${i}">${p ? `<b>${p.name}</b><small>${p.pos} · Lv${p.level}</small>` : `<b>+</b><small>${i + 1}</small>`}</button>`;
+    };
+    $('clubStarters').innerHTML = Array.from({ length: STARTERS }, (_, i) => slot(c.squad.starters[i], 'starters', i)).join('');
+    $('clubBench').innerHTML = Array.from({ length: BENCH }, (_, i) => slot(c.squad.bench[i], 'bench', i)).join('');
+  } else if (state.clubPane === 'league') {
+    if (!c.clubLeague) c.clubLeague = newClubLeague();
+    const l = c.clubLeague;
+    $('clubTier').textContent = l.tier;
+    $('clubWeek').textContent = `${l.week}/${l.games.length}`;
+    $('clubStandings').innerHTML = `<table><thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>DIFF</th></tr></thead><tbody>` +
+      clubStandings(l).slice(0, 10).map((t, i) => `<tr${t.code === CLUB_CODE ? ' style="color:#4de8ff"' : ''}><td>${i + 1}</td><td>${t.code}</td><td>${t.w}</td><td>${t.l}</td><td>${t.pf - t.pa}</td></tr>`).join('') + '</tbody></table>';
+  } else if (state.clubPane === 'cup') {
+    if (!c.clubCup) c.clubCup = createCup();
+    const cup = c.clubCup;
+    $('clubCup').innerHTML = cup.rounds.filter(r => r.matchups.length).map(r => `<h3>${r.name}</h3>` +
+      r.matchups.map(m => `<div class="series"><span>${m.a} vs ${m.b}</span><b>${m.winner || '—'}</b></div>`).join('')).join('') +
+      (cup.champion ? `<p>🏆 ${cup.champion}</p>` : '');
+    $('clubWeek').textContent = cup.complete ? i18n.t('final') : `R${cup.round + 1}`;
+  } else {
+    $('clubWildcards').innerHTML = WILDCARDS.map(k => `<span class="odd">${i18n.t(k)}<b>${(c.wildcards || {})[k] || 0}</b></span>`).join('');
+    $('clubChallenges').innerHTML = (c.challengesDone || []).map(id => `<span class="stat-chip">✓ ${id}</span>`).join('') || '—';
+    $('clubWildcardTarget').innerHTML = cards.map(p => `<option value="${p.id}">${p.name} · ${i18n.t(rarityFor(p.ovr))}</option>`).join('');
+  }
+  save(state.data);
+}
+
 function renderHUD() {
   const c = state.data.career;
   $('topCredits').textContent = Math.round(c.credits || 0);
@@ -457,7 +535,10 @@ function renderCareer() {
 }
 
 function totalSetBonus() {
-  return Object.keys(SETS).reduce((a, key) => a + setBonus(state.data.career, state.teams, key), 0);
+  const set = Object.keys(SETS).reduce((a, key) => a + setBonus(state.data.career, state.teams, key), 0);
+  const cards = ownedCards();
+  const deck = deckSynergy(Object.fromEntries(cards.map(p => [p.id, p])), state.data.career.deck || []);
+  return set + deck.odds;
 }
 
 function updatePropOptions() {
@@ -573,6 +654,7 @@ function placeBet() {
       chestText = `${i18n.t(RARITIES[pull.tier].label.toLowerCase())} · ${reward.duplicate ? i18n.t('duplicate') : `${i18n.t('unlocked')}: ${reward.player.name}`}`;
     }
     c.chests = (c.chests || 0) + 1;
+    grantXP(state.data, 20, 'deck');
     c.guesses = (c.guesses || 0) + 1;
   } else { c.guesses = (c.guesses || 0) + 1; }
 
@@ -736,6 +818,104 @@ async function exportReplay() {
 
 function bind() {
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+  document.querySelectorAll('[data-club]').forEach(b => b.addEventListener('click', () => {
+    state.clubPane = b.dataset.club;
+    renderClub();
+  }));
+  $('btnAddCard').addEventListener('click', () => {
+    const id = $('clubPicker').value;
+    const c = state.data.career;
+    if (!id) return;
+    if (state.clubPane === 'deck') {
+      const deck = normalizeDeck(c.deck || []);
+      if (!deck.includes(id)) deck.push(id);
+      c.deck = normalizeDeck(deck);
+    } else if (state.clubPane === 'squad') {
+      c.squad = normalizeSquad(c.squad || {});
+      if (!c.squad.starters.includes(id) && c.squad.starters.length < STARTERS) c.squad.starters.push(id);
+      else if (!c.squad.bench.includes(id) && c.squad.bench.length < BENCH) c.squad.bench.push(id);
+    } else { toast(i18n.t('deck')); return; }
+    save(state.data); renderClub();
+  });
+  $('clubDeck').addEventListener('click', e => {
+    const b = e.target.closest('[data-remove-deck]');
+    if (!b) return;
+    state.data.career.deck.splice(Number(b.dataset.removeDeck), 1);
+    save(state.data); renderClub();
+  });
+  $('clubStarters').addEventListener('click', e => {
+    const b = e.target.closest('[data-remove-squad]'); if (!b) return;
+    const [kind, i] = b.dataset.removeSquad.split(':');
+    state.data.career.squad[kind].splice(Number(i), 1);
+    save(state.data); renderClub();
+  });
+  $('clubBench').addEventListener('click', e => {
+    const b = e.target.closest('[data-remove-squad]'); if (!b) return;
+    const [kind, i] = b.dataset.removeSquad.split(':');
+    state.data.career.squad[kind].splice(Number(i), 1);
+    save(state.data); renderClub();
+  });
+  $('clubTemplate').addEventListener('change', e => {
+    state.data.career.squad.template = e.target.value;
+    save(state.data); renderClub();
+  });
+  $('clubAutoFill').addEventListener('click', () => {
+    const c = state.data.career;
+    const cards = ownedCards().sort((a, b) => b.ovr - a.ovr);
+    c.squad = normalizeSquad({ template: $('clubTemplate').value, starters: cards.slice(0, 5).map(p => p.id), bench: cards.slice(5, 12).map(p => p.id) });
+    c.deck = normalizeDeck(cards.slice(0, 8).map(p => p.id));
+    save(state.data); renderClub();
+  });
+  $('btnClubWeek').addEventListener('click', () => {
+    const c = state.data.career;
+    if (!c.clubLeague) c.clubLeague = newClubLeague();
+    const cards = Object.fromEntries(ownedCards().map(p => [p.id, p]));
+    const rating = squadRating(cards, c.squad), chem = chemistry(cards, c.squad);
+    const result = playClubGame(c.clubLeague, rating, chem, seededRandom(Date.now() >>> 0));
+    c.wildcards = c.wildcards || {};
+    c.credits = (c.credits || 0) + (result && result.won ? 120 : 40);
+    c.xp += result && result.won ? 40 : 10;
+    c.level = 1 + Math.floor(Math.sqrt(c.xp / 120));
+    checkChallenges(c, { clubWins: (c.clubLeague.results || []).filter(r => r.won).length, legendaryIds: ownedCards().filter(p => p.ovr >= 95).map(p => p.id) });
+    save(state.data); renderClub(); renderHUD();
+    toast(result ? `${result.opponent} ${result.hs}–${result.as}` : i18n.t('noGames'));
+  });
+  $('btnClubSeason').addEventListener('click', () => {
+    const c = state.data.career;
+    if (!c.clubLeague) c.clubLeague = newClubLeague();
+    const cards = Object.fromEntries(ownedCards().map(p => [p.id, p]));
+    const rating = squadRating(cards, c.squad), chem = chemistry(cards, c.squad);
+    let guard = 0;
+    while (!c.clubLeague.complete && guard < 40) { playClubGame(c.clubLeague, rating, chem, seededRandom(Date.now() + guard)); guard += 1; }
+    promote(c.clubLeague);
+    c.credits = (c.credits || 0) + 500;
+    save(state.data); renderClub(); renderHUD();
+  });
+  $('btnClubNew').addEventListener('click', () => {
+    state.data.career.clubLeague = newClubLeague(state.data.career.clubLeague ? state.data.career.clubLeague.tier : 'Bronze');
+    save(state.data); renderClub();
+  });
+  $('btnCupNew').addEventListener('click', () => {
+    state.data.career.clubCup = createCup();
+    save(state.data); renderClub();
+  });
+  $('btnCupRound').addEventListener('click', () => {
+    const c = state.data.career;
+    if (!c.clubCup) c.clubCup = createCup();
+    const cards = Object.fromEntries(ownedCards().map(p => [p.id, p]));
+    playCupRound(c.clubCup, squadRating(cards, c.squad), chemistry(cards, c.squad), seededRandom(Date.now() >>> 0));
+    checkChallenges(c, { cupRound: c.clubCup.round, legendaryIds: ownedCards().filter(p => p.ovr >= 95).map(p => p.id) });
+    c.credits = (c.credits || 0) + 80;
+    save(state.data); renderClub(); renderHUD();
+  });
+  $('btnUseWildcard').addEventListener('click', () => {
+    const c = state.data.career;
+    const found = findPlayer($('clubWildcardTarget').value);
+    if (!found) return;
+    const result = useWildcard(c, found.player);
+    save(state.data); renderClub(); renderHUD();
+    toast(result.ok ? `${i18n.t('copies')} +1` : i18n.t('needCredits'));
+  });
   document.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => {
     const sub = b.dataset.sub;
     document.querySelectorAll('[data-sub]').forEach(x => x.classList.toggle('active', x === b));
@@ -1082,7 +1262,7 @@ function init() {
   state.renderer = makeRenderer();
   resizeCourt();
   const requested = new URLSearchParams(location.search).get('view');
-  switchView(['match', 'league', 'franchise', 'stats', 'players'].includes(requested) ? requested : 'match');
+  switchView(['match', 'league', 'franchise', 'stats', 'players', 'club'].includes(requested) ? requested : 'match');
   requestAnimationFrame(animate);
 }
 

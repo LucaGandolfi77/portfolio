@@ -9,7 +9,7 @@
 ### Panoramica
 Simulatore di basket NBA interamente **on-device**: 30 franchigie, 300 giocatori, tattiche, stagione, playoff, carriera, carte collezionabili e scommesse con crediti virtuali. Nessun dato personale viene inviato a un server; solo i moduli statici e il Three.js vendored vengono scaricati dal sito.
 
-### Interfaccia (5 schede)
+### Interfaccia (6 schede)
 
 Una barra sticky in alto mostra sempre **crediti, livello e stato del baule** con countdown e pulsante Apri.
 | Scheda | Cosa contiene |
@@ -19,6 +19,7 @@ Una barra sticky in alto mostra sempre **crediti, livello e stato del baule** co
 | **Franchise** | Sotto-schede `Teams` e `Career`: roster, strategia, trade, draft, free agent; crediti, XP, livello, scommesse, collezione, crafting e baule giornaliero. |
 | **Stats** | Box score avanzato, leader, grafici a barre e mappe tiri, simulazioni rapide in Web Worker. |
 | **Players** | Griglia di 300 card con ricerca, filtri squadra/posizione/rarità, ordinamento e paginazione; cliccare una card apre la scheda giocatore. |
+| **My Club** | Mazzo da 8 carte, rosa da 5 titolari + 7 panchinari, lega con promozioni, coppa, wildcard e sfide. |
 
 ### Funzionalità
 
@@ -38,9 +39,11 @@ Una barra sticky in alto mostra sempre **crediti, livello e stato del baule** co
 
 **Grafica** — Arena 3D Three.js r160 con telecamere Broadcast/Overhead/Baseline, folla animata, LED, luci squadra, giocatori e pallone animati; fallback Canvas2D/WebGL2. Avatar 3D rifinito con maglia, numero, corporatura, capelli e viso parametrizzati. Player card con anelli TS%/eFG%, barre attributi e immagine condivisibile.
 
+**My Club** — Mazzo Clash-Royale da 8 carte con bonus XP/quote, rosa basket da 5 titolari e 7 panchinari con chimica e template, **Legend League** contro 30 squadre reali con divisioni Bronze→Silver→Gold→Legend e promozioni, **Coppa** a eliminazione, wildcard universali e sfide giocatore con premi.
+
 **Replay** — Log eventi, rilevamento highlight, replay scrubbabile con cambio camera ed export WebM via MediaRecorder (fallback PNG).
 
-**PWA** — Manifest con icone e scorciatoie, service worker versionato (`nba-v8`), offline.html, precache di tutti i moduli e del Three.js vendored.
+**PWA** — Manifest con icone e scorciatoie, service worker versionato (`nba-v10`), offline.html, precache di tutti i moduli e del Three.js vendored.
 
 ### Tasti e gesture
 `Spazio` pausa · `R` riavvia · `M` audio · trascina sul campo per ruotare la camera/avatar · tocca una riga giocatore per aprire la card · `•••` per i controlli secondari.
@@ -49,14 +52,14 @@ Una barra sticky in alto mostra sempre **crediti, livello e stato del baule** co
 Roster e statistiche sono approssimativi (non collegati ad API esterne); alcune citazioni sono verificate, le curiosità sono fattuali; WebM non è supportato ovunque; il primo avvio richiede rete per i moduli CDN; i crediti sono virtuali e non hanno valore reale.
 
 ### Salvataggio
-Chiave `pf.nba.v3`, versione 3, con migrazione automatica da `pf.nba.v2` e `nba.sim.v1`. Contiene impostazioni, lega, playoff, cronologia, statistiche giocatore, replay, previsioni, carriera, collezione, crediti, pity, duplicati, copie, livelli carta, coda bauli e scommesse.
+Chiave `pf.nba.v3`, versione 3, con migrazione automatica da `pf.nba.v2` e `nba.sim.v1`. Contiene impostazioni, lega, playoff, cronologia, statistiche giocatore, replay, previsioni, carriera, collezione, crediti, pity, duplicati, copie, livelli carta, coda bauli, scommesse, mazzo, rosa, lega, coppa e wildcard.
 
 ### Test
 ```bash
 node --test projects/nba_simulator/test/logic-test.mjs
 node games/_kit/test/run-all.mjs
 ```
-29 test coprono determinismo, roster, stagione, playoff, statistiche, carriera, medie reali, avatar, citazioni, storage, rarity, tema, replay, carte, quote, prop/parlay, pity, mercato AI, effetti bauli, negozio a tempo e potenziamento con copie+crediti.
+32 test coprono determinismo, roster, stagione, playoff, statistiche, carriera, medie reali, avatar, citazioni, storage, rarity, tema, replay, carte, quote, prop/parlay, pity, mercato AI, effetti bauli, negozio a tempo, potenziamento con copie+crediti, mazzo, rosa, lega, coppa e wildcard.
 
 ---
 
@@ -65,7 +68,7 @@ node games/_kit/test/run-all.mjs
 ### Overview
 A fully **on-device** NBA basketball simulator: 30 franchises, 300 players, tactics, season, playoffs, franchise mode, collectible cards and virtual-credit betting. No personal data leaves the device; only static modules and the vendored Three.js are downloaded from the site.
 
-### Interface (5 tabs)
+### Interface (6 tabs)
 
 A sticky top bar always shows **credits, level and chest status** with a countdown and Open button.
 | Tab | Contents |
@@ -75,6 +78,7 @@ A sticky top bar always shows **credits, level and chest status** with a countdo
 | **Franchise** | `Teams` / `Career` sub-tabs: roster, strategy, trades, draft, free agency; credits, XP, level, betting, collection, crafting, daily chest. |
 | **Stats** | Advanced box score, leaders, bar charts and shot zones, quick Web Worker simulations. |
 | **Players** | Grid of 300 cards with search, team/position/rarity filters, sorting and paging; clicking a card opens the player sheet. |
+| **My Club** | 8-card deck, 5 starters + 7 bench squad, league with promotions, cup, wildcards and challenges. |
 
 ### Features
 
@@ -94,9 +98,11 @@ A sticky top bar always shows **credits, level and chest status** with a countdo
 
 **Graphics** — Three.js r160 arena with Broadcast/Overhead/Baseline cameras, animated crowd, LED ribbon, team-colored lights, animated players and ball; Canvas2D/WebGL2 fallback. Refined 3D avatar with jersey, number, body type, hair and face parameters. Player card with TS%/eFG% rings, attribute bars and shareable image.
 
+**My Club** — Clash-Royale-style 8-card deck with XP/odds bonuses, basketball squad with 5 starters + 7 bench, chemistry and templates, **Legend League** against 30 real teams with Bronze→Silver→Gold→Legend divisions and promotions, knockout **Cup**, universal wildcards and player challenges.
+
 **Replay** — Event log, highlight detection, scrubbable replay with camera switching and WebM export via MediaRecorder (PNG fallback).
 
-**PWA** — Manifest with icons and shortcuts, versioned service worker (`nba-v8`), offline page, precache of every module and the vendored Three.js.
+**PWA** — Manifest with icons and shortcuts, versioned service worker (`nba-v10`), offline page, precache of every module and the vendored Three.js.
 
 ### Controls
 `Space` pause · `R` restart · `M` sound · drag on the court/avatar to rotate · tap a player row to open the card · `•••` for secondary controls.
@@ -105,13 +111,13 @@ A sticky top bar always shows **credits, level and chest status** with a countdo
 Rosters and stats are approximate (no external APIs); a few quotes are verified and trivia is factual; WebM is not universally supported; first launch needs network access for CDN modules; credits are virtual with no real-world value.
 
 ### Storage
-Key `pf.nba.v3`, version 3, with automatic migration from `pf.nba.v2` and `nba.sim.v1`. Holds settings, league, playoffs, history, player stats, replays, predictions, career, collection, credits, pity, duplicates, copies, card levels, chest queue and bets.
+Key `pf.nba.v3`, version 3, with automatic migration from `pf.nba.v2` and `nba.sim.v1`. Holds settings, league, playoffs, history, player stats, replays, predictions, career, collection, credits, pity, duplicates, copies, card levels, chest queue, bets, deck, squad, club league, cup and wildcards.
 
 ### Tests
 ```bash
 node --test projects/nba_simulator/test/logic-test.mjs
 node games/_kit/test/run-all.mjs
 ```
-29 tests cover determinism, rosters, season, playoffs, stats, career, real averages, avatars, trivia, storage, rarity, theme, replays, cards, odds, props/parlays, pity, AI market, chest effects, timed shop and copy/credit upgrades.
+32 tests cover determinism, rosters, season, playoffs, stats, career, real averages, avatars, trivia, storage, rarity, theme, replays, cards, odds, props/parlays, pity, AI market, chest effects, timed shop, copy/credit upgrades, deck, squad, league, cup and wildcards.
 
 > Legacy top-level JS files (`data.js`, `engine.js`, `ui.js`, …) are kept from the earlier build for compatibility; they are not loaded by the current `index.html`.
