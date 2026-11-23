@@ -15,7 +15,8 @@ import { initBuildingsData } from './buildings.js';
 
 const SAVE_KEY = 'italy3dFlightSim.save.v1';
 const DEFAULTS = {
-  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high', imagery: true, mapMode: false,
+  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high',
+  imagery: true, mapMode: false, visual: 'happy',
   bests: {}, stats: { flights: 0, landings: 0, crashes: 0 }
 };
 const save = load(SAVE_KEY, DEFAULTS);
@@ -84,8 +85,9 @@ function refreshUI() {
   $('resultTitle').textContent = t('missionDone');
   $('qualityVal').textContent = game.quality === 'high' ? t('high') : t('low');
   $('pauseView').textContent = t(game.view);
-  $('imageryVal').textContent = save.imagery ? t('on') : t('off');
-  $('mapModeVal').textContent = save.mapMode ? t('on') : t('off');
+  const happy = save.visual === 'happy';
+  $('imageryVal').textContent = !happy && save.imagery ? t('on') : t('off');
+  $('mapModeVal').textContent = !happy && save.mapMode ? t('on') : t('off');
 }
 refreshUI();
 i18n.onChange(() => { save.lang = i18n.getLang(); persist(); refreshUI(); });
@@ -167,7 +169,7 @@ function beginFlying() {
   AUDIO.init(save.sound); AUDIO.resume();
   throttle = 0.72;
   showScreen(null);
-  game.say(t('howto1'), '', 5000);
+  game.say(save.visual === 'happy' ? t('happyHint') : t('howto1'), '', 5000);
   if (view3d) view3d.setPlane(game.plane);
   lastMode = game.mode;
 }
@@ -194,13 +196,22 @@ $('missionList').addEventListener('click', e => {
 });
 $('btnView').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); cycleView(); });
 $('btnViewPause').addEventListener('click', cycleView);
+$('btnHappy').addEventListener('click', () => {
+  save.visual = 'happy'; save.mapMode = false; persist(); refreshUI();
+  if (view3d) view3d.setHappy(true);
+  game.say(t('happyHint'), 'good', 3200);
+});
 $('btnImagery').addEventListener('click', () => {
-  save.imagery = !save.imagery; persist(); refreshUI();
-  if (view3d) view3d.setImagery(save.imagery);
+  save.imagery = !save.imagery;
+  if (save.imagery) { save.visual = 'satellite'; save.mapMode = false; }
+  persist(); refreshUI();
+  if (view3d) { if (save.imagery) view3d.setHappy(false); view3d.setImagery(save.imagery); view3d.setMapMode(false); }
 });
 $('btnMapMode').addEventListener('click', () => {
-  save.mapMode = !save.mapMode; persist(); refreshUI();
-  if (view3d) view3d.setMapMode(save.mapMode);
+  save.mapMode = !save.mapMode;
+  if (save.mapMode) { save.visual = 'map'; save.imagery = false; }
+  persist(); refreshUI();
+  if (view3d) { if (save.mapMode) view3d.setHappy(false); view3d.setMapMode(save.mapMode); view3d.setImagery(false); }
 });
 $('btnQuality').addEventListener('click', () => {
   game.setQuality(game.quality === 'high' ? 'low' : 'high');
@@ -326,9 +337,12 @@ async function boot() {
     $('loadStatus').textContent = 'satellite imagery 0%';
     const imagery = await loadImagery(p => { $('loadStatus').textContent = `satellite imagery ${Math.round(p * 100)}%`; }).catch(() => null);
     $('loadStatus').textContent = '3D scene';
-    view3d = createRenderer(canvas, game.quality, imagery);
-    view3d.setImagery(save.imagery);
-    view3d.setMapMode(save.mapMode);
+    view3d = createRenderer(canvas, game.quality, imagery, save.visual);
+    view3d.setHappy(save.visual === 'happy');
+    if (save.visual !== 'happy') {
+      view3d.setImagery(save.visual === 'satellite' && save.imagery);
+      view3d.setMapMode(save.visual === 'map');
+    }
     view3d.setPlane(game.plane);
     view3d.setTraffic(game.traffic);
     window.addEventListener('resize', () => view3d.resize(window.innerWidth, window.innerHeight));

@@ -3,7 +3,7 @@
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
 import { terrainHeight } from './geo.js';
-import { createWorld, terrainColor } from './terrain.js';
+import { createWorld, terrainColor, happyColor } from './terrain.js';
 import { createPlaneMesh, animatePlane } from './planes.js';
 
 function cloudTexture() {
@@ -18,10 +18,10 @@ function cloudTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-function makeClouds(scene, quality) {
-  const count = quality === 'low' ? 24 : 60;
+function makeClouds(scene, quality, happy) {
+  const count = quality === 'low' ? 24 : 70;
   const tex = cloudTexture();
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.75 });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: happy ? 0.95 : 0.75 });
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const s = new THREE.Sprite(mat);
@@ -34,25 +34,26 @@ function makeClouds(scene, quality) {
   return group;
 }
 
-export function createRenderer(canvas, quality = 'high', imageryTexture = null) {
+export function createRenderer(canvas, quality = 'high', imageryTexture = null, visual = 'happy') {
+  let happyMode = visual === 'happy';
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 2 : 1));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#8cc3e8');
-  scene.fog = new THREE.FogExp2('#a9c9dc', 0.00085);
+  scene.background = new THREE.Color(happyMode ? '#8fdcf5' : '#8cc3e8');
+  scene.fog = new THREE.FogExp2(happyMode ? '#c4ecf7' : '#a9c9dc', 0.00075);
 
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 1, 7000);
-  const hemi = new THREE.HemisphereLight('#cfe9ff', '#4c6b50', 1.1);
+  const hemi = new THREE.HemisphereLight('#e6f8ff', happyMode ? '#7fc46a' : '#4c6b50', happyMode ? 1.5 : 1.1);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight('#fff2d5', 1.8);
+  const sun = new THREE.DirectionalLight('#fff6d8', happyMode ? 2.1 : 1.8);
   sun.position.set(400, 800, -300);
   scene.add(sun);
 
-  const world = createWorld(scene, quality, imageryTexture);
-  const clouds = makeClouds(scene, quality);
+  const world = createWorld(scene, quality, imageryTexture, visual);
+  const clouds = makeClouds(scene, quality, happyMode);
   let planeMesh = null;
   let trafficMeshes = [];
   let sunTime = 0.3;
@@ -60,6 +61,24 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
   let imageryOn = true;
   const tempV = new THREE.Vector3();
   const tempLook = new THREE.Vector3();
+
+  // Cheerful boost confetti.
+  const confettiCount = quality === 'low' ? 60 : 160;
+  const confettiGeo = new THREE.BufferGeometry();
+  const confettiPos = new Float32Array(confettiCount * 3);
+  const confettiColors = new Float32Array(confettiCount * 3);
+  const confettiPalette = ['#ff6b8a', '#ffd166', '#69db7c', '#4dabf7', '#b197fc', '#ffffff'];
+  for (let i = 0; i < confettiCount; i++) {
+    const c = new THREE.Color(confettiPalette[i % confettiPalette.length]);
+    confettiColors[i * 3] = c.r; confettiColors[i * 3 + 1] = c.g; confettiColors[i * 3 + 2] = c.b;
+  }
+  confettiGeo.setAttribute('position', new THREE.BufferAttribute(confettiPos, 3));
+  confettiGeo.setAttribute('color', new THREE.BufferAttribute(confettiColors, 3));
+  const confetti = new THREE.Points(confettiGeo, new THREE.PointsMaterial({
+    size: 4, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false
+  }));
+  confetti.visible = false;
+  scene.add(confetti);
 
   function setPlane(plane) {
     if (planeMesh) scene.remove(planeMesh);
@@ -86,10 +105,12 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
     const s = game.state;
     sunTime = (sunTime + dt * 0.004) % 1;
     const day = 0.5 + 0.5 * Math.sin(sunTime * Math.PI * 2 - Math.PI / 2);
-    sun.intensity = 0.5 + day * 1.6;
-    hemi.intensity = 0.35 + day * 0.9;
-    scene.background.setHSL(0.57, 0.55, 0.16 + day * 0.45);
-    scene.fog.color.copy(scene.background);
+    sun.intensity = happyMode ? 1.5 + day * 0.7 : 0.5 + day * 1.6;
+    hemi.intensity = happyMode ? 1.1 + day * 0.45 : 0.35 + day * 0.9;
+    if (!happyMode) {
+      scene.background.setHSL(0.57, 0.55, 0.16 + day * 0.45);
+      scene.fog.color.copy(scene.background);
+    }
     sun.position.set(Math.cos(sunTime * Math.PI * 2) * 700, 200 + day * 800, -400);
 
     clouds.rotation.y += dt * 0.002;
@@ -99,6 +120,28 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
     planeMesh.position.set(s.x, s.y, s.z);
     planeMesh.rotation.set(s.pitch, -s.heading, -s.roll);
     animatePlane(planeMesh, time, s.boosting);
+
+    if (happyMode) {
+      const shimmer = world.sea.userData.shimmer;
+      if (shimmer) { shimmer.offset.x = time * 0.01; shimmer.offset.y = Math.sin(time * 0.2) * 0.02; }
+      for (const bird of world.happy?.userData.birds?.children || []) {
+        bird.position.x += bird.userData.speed * dt;
+        if (bird.position.x > WORLD.width / 2) bird.position.x = -WORLD.width / 2;
+        bird.rotation.z = Math.sin(time * 4 + bird.position.z) * 0.2;
+      }
+      confetti.visible = !!s.boosting;
+      if (confetti.visible) {
+        for (let i = 0; i < confettiCount; i++) {
+          const t = ((time * 1.6 + i * 0.037) % 1);
+          const spread = 6 + t * 24;
+          const a = i * 2.399;
+          confettiPos[i * 3] = s.x - Math.sin(s.heading) * t * 40 + Math.cos(a) * spread;
+          confettiPos[i * 3 + 1] = s.y + Math.sin(a) * spread * 0.5 + t * 8;
+          confettiPos[i * 3 + 2] = s.z + Math.cos(s.heading) * t * 40 + Math.sin(a) * spread;
+        }
+        confettiGeo.attributes.position.needsUpdate = true;
+      }
+    } else confetti.visible = false;
 
     for (let i = 0; i < trafficMeshes.length; i++) {
       const t = game.traffic[i];
@@ -136,33 +179,58 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
     renderer.render(scene, camera);
   }
 
+  function applyVisual() {
+    const geo = world.terrain.geometry;
+    const colors = geo.attributes.color;
+    const pos = geo.attributes.position;
+    const source = happyMode ? geo.userData.happyColors : geo.userData.satColors;
+    for (let i = 0; i < colors.count; i++) {
+      if (mapMode && !happyMode) {
+        const c = terrainColor(pos.getY(i));
+        colors.setXYZ(i, c.r, c.g, c.b);
+      } else if (source) {
+        colors.setXYZ(i, source[i * 3], source[i * 3 + 1], source[i * 3 + 2]);
+      }
+    }
+    colors.needsUpdate = true;
+    const mat = world.terrain.material;
+    mat.map = !happyMode && !mapMode && imageryOn ? imageryTexture : null;
+    mat.color.set('#ffffff');
+    mat.needsUpdate = true;
+
+    world.sea.material.color.set(happyMode ? '#3fc3d6' : mapMode ? '#1a86c9' : '#1b6b93');
+    world.sea.material.map = happyMode ? world.sea.userData.shimmer : null;
+    world.sea.material.opacity = 1;
+    world.sea.material.needsUpdate = true;
+    scene.background.set(happyMode ? '#8fdcf5' : '#8cc3e8');
+    scene.fog.color.set(happyMode ? '#c4ecf7' : '#a9c9dc');
+    hemi.groundColor.set(happyMode ? '#7fc46a' : '#4c6b50');
+    hemi.intensity = happyMode ? 1.5 : 1.1;
+    sun.intensity = happyMode ? 2.1 : 1.8;
+    if (world.happy) world.happy.visible = happyMode;
+    for (const mesh of world.coast || []) {
+      mesh.material.color.set(happyMode ? '#9ce8d8' : '#54c4d8');
+      mesh.material.opacity = happyMode ? 0.75 : mapMode ? 0.9 : 0.55;
+    }
+    for (const cloud of clouds.children) cloud.material.opacity = happyMode ? 0.95 : 0.75;
+  }
+
+  function setHappy(enabled) {
+    happyMode = !!enabled;
+    if (happyMode) { mapMode = false; imageryOn = false; }
+    applyVisual();
+  }
+
   function setImagery(enabled) {
     imageryOn = !!enabled;
-    if (!imageryTexture) return;
-    const mat = world.terrain.material;
-    mat.map = imageryOn && !mapMode ? imageryTexture : null;
-    mat.color.set(imageryOn && !mapMode ? '#ffffff' : '#6f9a78');
-    mat.needsUpdate = true;
+    if (imageryOn) happyMode = false;
+    applyVisual();
   }
 
   function setMapMode(enabled) {
     mapMode = !!enabled;
-    const geo = world.terrain.geometry;
-    const colors = geo.attributes.color;
-    const pos = geo.attributes.position;
-    for (let i = 0; i < colors.count; i++) {
-      const c = mapMode ? terrainColor(pos.getY(i)) : null;
-      const src = mapMode ? null : geo.userData.satColors;
-      if (c) colors.setXYZ(i, c.r, c.g, c.b);
-      else if (src) colors.setXYZ(i, src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
-    }
-    colors.needsUpdate = true;
-    const mat = world.terrain.material;
-    mat.map = mapMode || !imageryOn || !imageryTexture ? null : imageryTexture;
-    mat.color.set(imageryOn || mapMode ? '#ffffff' : '#6f9a78');
-    mat.needsUpdate = true;
-    world.sea.material.color.set(mapMode ? '#1a86c9' : '#1b6b93');
-    for (const mesh of world.coast || []) mesh.material.opacity = mapMode ? 0.9 : 0.55;
+    if (mapMode) happyMode = false;
+    applyVisual();
   }
 
   function resize(w, h) {
@@ -171,7 +239,7 @@ export function createRenderer(canvas, quality = 'high', imageryTexture = null) 
     camera.updateProjectionMatrix();
   }
 
-  return { renderer, scene, camera, world, setPlane, setTraffic, setImagery, setMapMode, update, resize };
+  return { renderer, scene, camera, world, setPlane, setTraffic, setHappy, setImagery, setMapMode, update, resize };
 }
 
 function L_COCKPIT(plane) { return Math.max(2, plane.length * 0.16); }

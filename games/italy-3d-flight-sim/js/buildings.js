@@ -36,7 +36,8 @@ export function buildRealBuildings(group, quality = 'high') {
       const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
       let faces = [];
       try { faces = THREE.ShapeUtils.triangulateShape(contour, []); } catch (e) { continue; }
-      shade.setHSL(0.09 + (b % 5) * 0.008, 0.08, 0.48 + (b % 7) * 0.035);
+      const roofColors = ['#ff9e80', '#9be7c4', '#ffe082', '#b3d9ff', '#f8bbd0', '#d0bfff'];
+      shade.set(roofColors[(b + city.name.length) % roofColors.length]);
       for (const face of faces) {
         for (const idx of face) {
           const p = pts[idx];

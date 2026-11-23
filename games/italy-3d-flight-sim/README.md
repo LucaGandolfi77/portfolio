@@ -10,7 +10,8 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 
 - **Real terrain**: SRTM-derived elevation grid (512×512, ~0.12 world units per metre) with Alpine and Apennine heights up to ~4600 m, vertex-coloured by altitude with snow caps.
 - **Real water**: Natural Earth coastline, lakes and rivers.
-- **Real imagery**: EOX Sentinel‑2 cloudless 2016 tiles (CC BY 4.0) are bundled offline and draped over the terrain; toggle SATELLITE on/off in the pause menu.
+- **Happy mode by default**: sunny semi-real look with vivid green terrain, flower meadows, more trees, cheerful pastel buildings, turquoise water, animated ripples, birds, rainbows and boost confetti. Switch to SATELLITE or MAP MODE in the pause menu at any time.
+- **Real imagery**: EOX Sentinel‑2 cloudless 2016 tiles (CC BY 4.0) are bundled offline and draped over the terrain.
 - **Real places**: OSM building footprints for 12 major Italian cities are extruded into 3D; other urban areas use instanced buildings from Natural Earth polygons.
 - **Real airports**: 15 Italian airports at their actual coordinates with oriented runways.
 - **Flight simulation**: 6DoF-lite physics with pitch/roll/yaw, speed, stall, fuel, boost, ground collision, chase/cockpit/overview cameras, artificial-horizon HUD, day/night lighting, clouds and AI traffic.
