@@ -22,6 +22,7 @@ A fully on-device basketball simulator with 30 franchises, tactics, franchise mo
 - **Replay & highlights**: automatic event log with highlight detection, scrubbable replay and WebM export via MediaRecorder (PNG snapshot fallback where unsupported).
 - **Advanced collection**: card sets, fragments from duplicates, upgrades, transparent pity counter (legendary guaranteed at 40 pulls), daily chest, targeted crafting with fragments, AI offers for duplicates and flip cards with career info on the back.
 - **Virtual betting**: credits with daily allowance, stake selector (10/25/50), odds derived from team strength, underdog payouts, streak bonuses, prop bets (over/under, margin, top quarter), 3-game parlays and set-completion odds bonuses. No real money involved.
+- **Chest reveal**: animated 3D chest with shake → lid spring → rarity beam → holo card flip → confetti, rarity-specific colors/particles/sounds/haptics, skip button and reduced-motion fallback.
 - **Analytics**: box score, TS%, eFG%, EFF, leaders, shot zones, quick batch simulations.
 - **Player cards**: click any box score, roster or leader row to open a card with real season averages for star players, advanced metrics, verified quotes or factual trivia, and a procedural 3D avatar.
 - **3D avatar**: Three.js r160 (vendored), no external models — jersey/team color, number, height/weight scaling, hair color/style, face shape and skin tone. Drag or use "Rotate" to spin it; a Canvas2D fallback is used if WebGL is unavailable.

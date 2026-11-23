@@ -14,6 +14,7 @@ import { createCourtGL } from './render/court-gl.js';
 import { createCourt2D } from './render/court-2d.js';
 import { createArena } from './render/arena.js';
 import { createReplayPlayer } from './ui/replay.js';
+import { revealChest } from './ui/chest-reveal.js';
 import { captureReplay, trimReplays, detectHighlights } from './sim/replay.js';
 import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAvailable, claimDailyChest, setProgress, cardPower, pullOdds, pityPull, craftCost, craftPlayer, setBonus } from './sim/cards.js';
 import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from './sim/betting.js';
@@ -465,6 +466,8 @@ function placeBet() {
   let delta = 0;
   let text = '';
   let summary = null;
+  let chestPull = null;
+  let chestRewardData = null;
 
   if (state.betType === 'winner') {
     const home = teamByCode($('guessHome').value), away = teamByCode($('guessAway').value);
@@ -510,6 +513,8 @@ function placeBet() {
   if (won) {
     const pull = pityPull(c, rng);
     const reward = chestReward(pull.tier, state.teams, c.collection || [], rng);
+    chestPull = pull;
+    chestRewardData = reward;
     if (reward.player) {
       if (reward.duplicate) {
         c.duplicates = c.duplicates || {};
@@ -528,6 +533,10 @@ function placeBet() {
   el.textContent = `${won ? i18n.t('correct') : i18n.t('wrong')} · ${text} · ${delta > 0 ? '+' : ''}${delta} ${chestText}`;
   renderBetPanel();
   renderCareer();
+  if (chestPull) {
+    const found = chestRewardData && chestRewardData.player ? findPlayer(chestRewardData.player.id) : null;
+    revealChest(chestPull, chestRewardData, { sfx, i18n, team: found ? found.team : null });
+  }
 }
 
 function findPlayer(id) {
@@ -885,15 +894,19 @@ function bind() {
   $('btnDailyChest').addEventListener('click', () => {
     const c = state.data.career;
     if (!claimDailyChest(c)) return;
-    const tier = chestTier(0, seededRandom(Date.now() >>> 0));
-    const reward = chestReward(tier, state.teams, c.collection || [], seededRandom((Date.now() ^ 0x1234) >>> 0));
-    if (reward.player && !c.collection.includes(reward.player.id)) c.collection.push(reward.player.id);
-    c.fragments = (c.fragments || 0) + (reward.duplicate ? fragmentsFor(tier) : 1);
+    const pull = pityPull(c, seededRandom(Date.now() >>> 0));
+    const reward = chestReward(pull.tier, state.teams, c.collection || [], seededRandom((Date.now() ^ 0x1234) >>> 0));
+    if (reward.player && reward.duplicate) {
+      c.duplicates = c.duplicates || {};
+      c.duplicates[reward.player.id] = (c.duplicates[reward.player.id] || 0) + 1;
+    } else if (reward.player && !c.collection.includes(reward.player.id)) c.collection.push(reward.player.id);
+    c.fragments = (c.fragments || 0) + (reward.duplicate ? fragmentsFor(pull.tier) : 1);
     c.chests = (c.chests || 0) + 1;
-    c.xp += RARITIES[tier].xp;
+    c.xp += RARITIES[pull.tier].xp;
     save(state.data);
     renderCareer();
-    toast(reward.player ? `${i18n.t('unlocked')}: ${reward.player.name}` : i18n.t('duplicate'));
+    const found = reward.player ? findPlayer(reward.player.id) : null;
+    revealChest(pull, reward, { sfx, i18n, team: found ? found.team : null });
   });
   document.querySelectorAll('[data-bet]').forEach(b => b.addEventListener('click', () => {
     state.betType = b.dataset.bet;

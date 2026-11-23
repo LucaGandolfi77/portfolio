@@ -25,6 +25,7 @@ import { captureReplay, detectHighlights, frameAt, trimReplays } from '../js/sim
 import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAvailable, claimDailyChest, setProgress, pullOdds, pityPull, craftCost, craftPlayer, setBonus, PITY_LIMIT } from '../js/sim/cards.js';
 import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from '../js/sim/betting.js';
 import { aiOffer, canSell, sellDuplicate } from '../js/sim/market.js';
+import { RARITY_FX, fxFor, phaseDurations, nextPhase, totalDuration, confettiCount, PHASES } from '../js/data/chest-fx.js';
 
 test('30 NBA teams with 10 players and two conferences', () => {
   assert.equal(TEAMS.length, 30);
@@ -298,4 +299,20 @@ test('crafting and AI market use fragments and duplicates', () => {
   assert.ok(set.total >= 0);
 });
 
-console.log('26/26 tests passed');
+test('chest effects scale with rarity and honor reduced motion', () => {
+  assert.equal(Object.keys(RARITY_FX).length, 4);
+  const common = fxFor('common');
+  const legend = fxFor('legendary');
+  assert.ok(legend.particles > common.particles);
+  assert.ok(legend.flash > common.flash);
+  assert.equal(confettiCount('legendary'), 90);
+  assert.equal(confettiCount('common'), 0);
+  assert.equal(nextPhase('shake'), 'open');
+  assert.equal(nextPhase(PHASES[PHASES.length - 1]), 'done');
+  assert.ok(totalDuration('legendary') > totalDuration('common'));
+  const reduced = phaseDurations('legendary', true);
+  assert.equal(reduced.shake, 0);
+  assert.equal(confettiCount('legendary', true), 0);
+});
+
+console.log('27/27 tests passed');
