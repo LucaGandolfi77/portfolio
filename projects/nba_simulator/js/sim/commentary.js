@@ -18,7 +18,8 @@ const T = {
   overtime: ['Overtime!', 'Si va ai tempi supplementari', 'Tempo extra'],
   end: ['Fine partita', 'Partita terminata', 'Triplice fischio'],
   milestone: ['{p} raggiunge un traguardo', '{p} fa segnare il tabellino', 'Traguardo personale di {p}'],
-  clutch: ['Clutch time!', 'Finale Pointa', 'Partita Pointa']
+  clutch: ['Clutch time!', 'Finale Pointa', 'Partita Pointa'],
+  tipoff: ['Palla a due! {t} parte con il possesso', 'Si comincia: {t} in attacco', 'Tip-off, palla a {t}']
 };
 
 const EN = {
@@ -39,7 +40,8 @@ const EN = {
   overtime: ['Overtime!', 'We are going to overtime', 'Extra period'],
   end: ['Final buzzer', 'Game over', 'That will do it'],
   milestone: ['{p} reaches a milestone', '{p} makes history', 'Milestone for {p}'],
-  clutch: ['Clutch time!', 'Down to the wire', 'This is getting tight']
+  clutch: ['Clutch time!', 'Down to the wire', 'This is getting tight'],
+  tipoff: ['Tip-off! {t} starts with the ball', 'We are underway: {t} on offense', 'Tip-off goes to {t}']
 };
 
 function pick(list, rng) { return list[Math.floor((rng ? rng() : Math.random()) * list.length) % list.length]; }

@@ -7,7 +7,7 @@ const LEGACY = 'nba.sim.v1';
 export function defaults() {
   return {
     version: 3,
-    settings: { lang: 'en', sound: true, quality: 'high', reducedFx: false },
+    settings: { lang: 'en', sound: true, quality: 'high', reducedFx: false, onboarded: false },
     league: null,
     playoffs: null,
     history: [],
@@ -25,7 +25,7 @@ export function defaults() {
       deck: [], squad: { template: 'balanced', starters: [], bench: [] },
       clubLeague: null, clubCup: null, wildcards: {}, cardStats: {}, challengesDone: []
     },
-    daily: { last: '', wins: 0 }
+    daily: { last: '', wins: 0, games: 0, correct: 0 }
   };
 }
 
