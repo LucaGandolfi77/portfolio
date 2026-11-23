@@ -20,7 +20,8 @@ export function defaults() {
       year: 2026, xp: 0, level: 1, badges: [], role: 'GM', record: { w: 0, l: 0 },
       collection: [], chests: 0, streak: 0, wins: 0, guesses: 0, lastChest: null,
       fragments: 0, upgrades: {}, dailyChest: null,
-      credits: 1000, bets: [], pity: 0, pullHistory: [], duplicates: {}, dailyCredits: null
+      credits: 1000, bets: [], pity: 0, pullHistory: [], duplicates: {}, dailyCredits: null,
+      chestQueue: [], copies: {}, cards: {}
     },
     daily: { last: '', wins: 0 }
   };

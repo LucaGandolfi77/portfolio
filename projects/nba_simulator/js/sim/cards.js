@@ -105,6 +105,40 @@ export function craftPlayer(career, player) {
   return { ok: true, cost, player };
 }
 
+/* Clash-Royale-style upgrades: copies + credits */
+export const COPY_COSTS = [2, 4, 8, 16];
+export const CREDIT_COSTS = [100, 250, 500, 1000];
+
+export function copiesNeeded(level) {
+  return COPY_COSTS[Math.max(0, Math.min(COPY_COSTS.length - 1, level - 1))];
+}
+
+export function creditsNeeded(level) {
+  return CREDIT_COSTS[Math.max(0, Math.min(CREDIT_COSTS.length - 1, level - 1))];
+}
+
+export function addCopies(career, playerId, amount = 1) {
+  career.copies = career.copies || {};
+  career.copies[playerId] = (career.copies[playerId] || 0) + amount;
+  return career.copies[playerId];
+}
+
+export function upgradeWithCopies(career, playerId) {
+  const level = ((career.cards || {})[playerId] || 1);
+  if (level >= 5) return { ok: false, reason: 'max' };
+  const copies = (career.copies || {})[playerId] || 0;
+  const needCopies = copiesNeeded(level);
+  const needCredits = creditsNeeded(level);
+  if (copies < needCopies || (career.credits || 0) < needCredits) {
+    return { ok: false, reason: 'resources', needCopies, needCredits };
+  }
+  career.copies[playerId] = copies - needCopies;
+  career.credits -= needCredits;
+  career.cards = career.cards || {};
+  career.cards[playerId] = level + 1;
+  return { ok: true, level: level + 1, needCopies, needCredits };
+}
+
 export function setBonus(career, teams, key) {
   const p = setProgress(career, teams, key);
   if (!p.total || p.ratio < 1) return 0;

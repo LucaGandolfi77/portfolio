@@ -26,6 +26,8 @@ import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAva
 import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from '../js/sim/betting.js';
 import { aiOffer, canSell, sellDuplicate } from '../js/sim/market.js';
 import { RARITY_FX, fxFor, phaseDurations, nextPhase, totalDuration, confettiCount, PHASES } from '../js/data/chest-fx.js';
+import { CHEST_TYPES, buyChest, activeChest, isReady, speedUpCost, speedUpChest, openChest, enforceMinTier, formatTime, QUEUE_LIMIT } from '../js/sim/chest-shop.js';
+import { addCopies, copiesNeeded, creditsNeeded, upgradeWithCopies } from '../js/sim/cards.js';
 
 test('30 NBA teams with 10 players and two conferences', () => {
   assert.equal(TEAMS.length, 30);
@@ -315,4 +317,38 @@ test('chest effects scale with rarity and honor reduced motion', () => {
   assert.equal(confettiCount('legendary', true), 0);
 });
 
-console.log('27/27 tests passed');
+test('timed chest shop buys, queues, speeds up and opens', () => {
+  const now = 1000000;
+  const career = { credits: 5000, chestQueue: [], collection: [] };
+  const bought = buyChest(career, 'silver', now);
+  assert.equal(bought.ok, true);
+  assert.equal(career.credits, 5000 - CHEST_TYPES.silver.price);
+  assert.equal(activeChest(career, now).type, 'silver');
+  assert.equal(isReady(activeChest(career, now), now), false);
+  assert.ok(speedUpCost(activeChest(career, now), now) > 0);
+  const fast = speedUpChest(career, now);
+  assert.equal(fast.ok, true);
+  assert.equal(isReady(activeChest(career, now), now), true);
+  const opened = openChest(career, now);
+  assert.equal(opened.ok, true);
+  assert.equal(career.chestQueue.length, 0);
+  assert.equal(enforceMinTier('common', 'epic'), 'epic');
+  assert.equal(formatTime(65000), '1:05');
+  assert.equal(QUEUE_LIMIT, 4);
+});
+
+test('card upgrades need copies and credits', () => {
+  const career = { credits: 5000, copies: {}, cards: {} };
+  addCopies(career, 'BOS-1', 2);
+  assert.equal(copiesNeeded(1), 2);
+  assert.ok(creditsNeeded(1) > 0);
+  const up = upgradeWithCopies(career, 'BOS-1');
+  assert.equal(up.ok, true);
+  assert.equal(career.cards['BOS-1'], 2);
+  assert.equal(career.copies['BOS-1'], 0);
+  const fail = upgradeWithCopies(career, 'BOS-1');
+  assert.equal(fail.ok, false);
+  assert.equal(fail.reason, 'resources');
+});
+
+console.log('29/29 tests passed');

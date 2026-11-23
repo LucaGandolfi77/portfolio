@@ -19,6 +19,8 @@ import { captureReplay, trimReplays, detectHighlights } from './sim/replay.js';
 import { SETS, cardSet, fragmentsFor, upgradeCost, applyUpgrade, isDailyChestAvailable, claimDailyChest, setProgress, cardPower, pullOdds, pityPull, craftCost, craftPlayer, setBonus } from './sim/cards.js';
 import { winOdds, payout, applyBet, claimDailyCredits, streakBonus, propMarket, propOdds, resolveProp, parlayOdds, resolveParlay } from './sim/betting.js';
 import { aiOffer, sellDuplicate } from './sim/market.js';
+import { CHEST_TYPES, buyChest, activeChest, isReady, speedUpChest, openChest, speedUpCost, timeLeft, formatTime, enforceMinTier } from './sim/chest-shop.js';
+import { addCopies, copiesNeeded, creditsNeeded, upgradeWithCopies } from './sim/cards.js';
 import { createAvatar } from './render/avatar.js';
 import { miniAvatarUrl } from './render/mini-avatar.js';
 import { applyTeamTheme, rarityColor, teamGradient, shade } from './core/theme.js';
@@ -118,7 +120,7 @@ function switchView(view) {
   if (group.includes('season')) renderSeason();
   if (group.includes('playoffs')) renderPlayoffs();
   if (group.includes('teams')) renderTeams();
-  if (group.includes('career')) renderCareer();
+  if (group.includes('career')) { renderCareer(); renderChestShop(); }
   if (view === 'stats') renderStats();
   if (view === 'players') renderPlayers();
 }
@@ -373,6 +375,36 @@ function renderPlayers() {
     '</tbody></table>';
 }
 
+function renderHUD() {
+  const c = state.data.career;
+  $('topCredits').textContent = Math.round(c.credits || 0);
+  $('topLevel').textContent = c.level || 1;
+  const chest = activeChest(c);
+  if (!chest) {
+    $('topChestLabel').textContent = i18n.t('noChest');
+    $('topChestTimer').textContent = '—';
+    $('btnOpenChest').hidden = true;
+    $('btnSpeedChest').hidden = true;
+    return;
+  }
+  const ready = isReady(chest);
+  $('topChestLabel').textContent = CHEST_TYPES[chest.type].name;
+  $('topChestTimer').textContent = ready ? i18n.t('openChest') : formatTime(timeLeft(chest));
+  $('btnOpenChest').hidden = !ready;
+  $('btnSpeedChest').hidden = ready;
+  if (!ready) $('btnSpeedChest').textContent = `${i18n.t('speedUp')} · ${speedUpCost(chest)}`;
+}
+
+function renderChestShop() {
+  const c = state.data.career;
+  $('chestShopOptions').innerHTML = Object.values(CHEST_TYPES).map(def =>
+    `<button class="btn" data-buy="${def.key}" style="border-color:${def.color}">${def.name} · ${def.price}</button>`).join('');
+  $('chestQueue').innerHTML = (c.chestQueue || []).map((chest, i) => {
+    const def = CHEST_TYPES[chest.type];
+    return `<div class="queue-item"><span>${i === 0 ? '▶ ' : ''}${def.name}</span><span>${isReady(chest) ? i18n.t('openChest') : formatTime(timeLeft(chest))}</span></div>`;
+  }).join('') || i18n.t('noChest');
+}
+
 function renderCareer() {
   const c = state.data.career;
   $('careerYear').textContent = c.year;
@@ -400,16 +432,18 @@ function renderCareer() {
     if (!found) return '';
     const p = found.player;
     const rarity = rarityFor(p.ovr);
-    const level = (c.upgrades || {})[id] || 0;
+    const level = Math.max(1, (c.cards || {})[id] || ((c.upgrades || {})[id] || 0) + 1);
     return `<div class="card3d" data-player-id="${id}">
       <div class="card3d-inner">
         <div class="card3d-face">
           <img src="${miniAvatarUrl(p, found.team)}" alt="${p.name}" loading="lazy">
           <span class="name">${p.name}</span>
           <span class="rarity ${rarity}">${i18n.t(rarity)} · ${SETS[cardSet(p)].name}</span>
-          <span class="meta">${cardPower(p, level)} ${level ? '+' + level : ''}</span>
+          <span class="meta">${i18n.t('level')} ${level} · ${cardPower(p, level - 1)}</span>
+          <div class="copy-bar"><b style="width:${Math.min(100, (((c.copies || {})[id] || 0) / Math.max(1, copiesNeeded(level))) * 100)}%"></b></div>
+          <span class="meta">${i18n.t('copies')} ${(c.copies || {})[id] || 0}/${level >= 5 ? '—' : copiesNeeded(level)}</span>
           <div class="card-actions">
-            <button class="btn up" data-upgrade="${id}">${level >= 5 ? i18n.t('maxed') : `${i18n.t('upgrade')} · ${upgradeCost(level)}`}</button>
+            <button class="btn up" data-upgrade="${id}">${level >= 5 ? i18n.t('maxed') : `${i18n.t('upgrade')} · ${copiesNeeded(level)} + ${creditsNeeded(level)}`}</button>
             ${(c.duplicates || {})[id] ? `<button class="btn up" data-sell="${id}">${i18n.t('share')} · ${aiOffer(p, Math.random, Date.now() / 86400000)}</button>` : ''}
           </div>
         </div>
@@ -530,6 +564,7 @@ function placeBet() {
     chestPull = pull;
     chestRewardData = reward;
     if (reward.player) {
+      addCopies(c, reward.player.id, 1);
       if (reward.duplicate) {
         c.duplicates = c.duplicates || {};
         c.duplicates[reward.player.id] = (c.duplicates[reward.player.id] || 0) + 1;
@@ -546,7 +581,7 @@ function placeBet() {
   el.className = 'guess-result ' + (won ? 'good' : 'bad');
   el.textContent = `${won ? i18n.t('correct') : i18n.t('wrong')} · ${text} · ${delta > 0 ? '+' : ''}${delta} ${chestText}`;
   renderBetPanel();
-  renderCareer();
+  renderCareer(); renderHUD();
   if (chestPull) {
     const found = chestRewardData && chestRewardData.player ? findPlayer(chestRewardData.player.id) : null;
     revealChest(chestPull, chestRewardData, { sfx, i18n, team: found ? found.team : null });
@@ -720,6 +755,45 @@ function bind() {
       const row = e.target.closest('[data-player-id]');
       if (row) openFromRow(row.dataset.playerId);
     });
+  });
+  $('btnShop').addEventListener('click', () => {
+    switchView('franchise');
+    document.querySelectorAll('[data-sub]').forEach(x => x.classList.toggle('active', x.dataset.sub === 'career'));
+    ['teams', 'career'].forEach(name => { $('view-' + name).hidden = name !== 'career'; });
+  });
+  $('chestShopOptions').addEventListener('click', e => {
+    const btn = e.target.closest('[data-buy]');
+    if (!btn) return;
+    const result = buyChest(state.data.career, btn.dataset.buy);
+    save(state.data);
+    renderHUD(); renderChestShop();
+    toast(result.ok ? i18n.t('chestBought') : i18n.t(result.reason === 'queue-full' ? 'queueFull' : 'needCredits'));
+  });
+  $('btnSpeedChest').addEventListener('click', () => {
+    const result = speedUpChest(state.data.career);
+    save(state.data);
+    renderHUD(); renderChestShop();
+    if (!result.ok) toast(i18n.t('needCredits'));
+  });
+  $('btnOpenChest').addEventListener('click', () => {
+    const result = openChest(state.data.career);
+    if (!result.ok) { toast(i18n.t('noChest')); return; }
+    const c = state.data.career;
+    const def = CHEST_TYPES[result.chest.type];
+    const pull = pityPull(c, seededRandom(Date.now() >>> 0));
+    pull.tier = enforceMinTier(pull.tier, def.minTier);
+    if (pull.tier === 'legendary') c.pity = 0;
+    const reward = chestReward(pull.tier, state.teams, c.collection || [], seededRandom((Date.now() ^ 0x55) >>> 0));
+    if (reward.player) {
+      addCopies(c, reward.player.id, 1);
+      if (reward.duplicate) c.fragments = (c.fragments || 0) + fragmentsFor(pull.tier);
+      else if (!c.collection.includes(reward.player.id)) c.collection.push(reward.player.id);
+    }
+    c.chests = (c.chests || 0) + 1;
+    save(state.data);
+    renderHUD(); renderChestShop(); renderCareer();
+    const found = reward.player ? findPlayer(reward.player.id) : null;
+    revealChest(pull, reward, { sfx, i18n, team: found ? found.team : null });
   });
   $('btnMoreControls').addEventListener('click', () => {
     const extra = $('extraControls');
@@ -906,10 +980,10 @@ function bind() {
     }
     const up = e.target.closest('[data-upgrade]');
     if (up) {
-      const result = applyUpgrade(state.data.career, up.dataset.upgrade);
+      const result = upgradeWithCopies(state.data.career, up.dataset.upgrade);
       save(state.data);
-      renderCareer();
-      toast(result.ok ? i18n.t('saved') : i18n.t('fragments'));
+      renderCareer(); renderHUD();
+      toast(result.ok ? i18n.t('saved') : i18n.t('needCredits'));
       return;
     }
     const card = e.target.closest('.card3d');
@@ -926,6 +1000,7 @@ function bind() {
     if (!claimDailyChest(c)) return;
     const pull = pityPull(c, seededRandom(Date.now() >>> 0));
     const reward = chestReward(pull.tier, state.teams, c.collection || [], seededRandom((Date.now() ^ 0x1234) >>> 0));
+    if (reward.player) addCopies(c, reward.player.id, 1);
     if (reward.player && reward.duplicate) {
       c.duplicates = c.duplicates || {};
       c.duplicates[reward.player.id] = (c.duplicates[reward.player.id] || 0) + 1;
@@ -934,7 +1009,7 @@ function bind() {
     c.chests = (c.chests || 0) + 1;
     c.xp += RARITIES[pull.tier].xp;
     save(state.data);
-    renderCareer();
+    renderCareer(); renderHUD(); renderChestShop();
     const found = reward.player ? findPlayer(reward.player.id) : null;
     revealChest(pull, reward, { sfx, i18n, team: found ? found.team : null });
   });
@@ -997,6 +1072,9 @@ function init() {
   applyTeamTheme(teamByCode($('selHome').value), teamByCode($('selAway').value));
   bind();
   claimDailyCredits(state.data.career);
+  renderHUD();
+  renderChestShop();
+  setInterval(() => { renderHUD(); if (state.view === 'franchise') renderChestShop(); }, 1000);
   updatePropOptions();
   renderBetPanel();
   save(state.data);

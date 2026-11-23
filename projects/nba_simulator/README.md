@@ -10,6 +10,8 @@
 Simulatore di basket NBA interamente **on-device**: 30 franchigie, 300 giocatori, tattiche, stagione, playoff, carriera, carte collezionabili e scommesse con crediti virtuali. Nessun dato personale viene inviato a un server; solo i moduli statici e il Three.js vendored vengono scaricati dal sito.
 
 ### Interfaccia (5 schede)
+
+Una barra sticky in alto mostra sempre **crediti, livello e stato del baule** con countdown e pulsante Apri.
 | Scheda | Cosa contiene |
 |---|---|
 | **Game** | Selezione squadre, scorebug, campo 3D, controlli (play/pausa, velocità, camera, sim-to-end), feed e box score. Il pulsante `•••` nasconde i controlli secondari. |
@@ -26,7 +28,9 @@ Simulatore di basket NBA interamente **on-device**: 30 franchigie, 300 giocatori
 
 **Carriera** — Roster editor, contratti, trade, free agency, draft, progressione multi-anno, XP, livelli e badge. Rarità in base alla forza: Comune <80, Raro 80+, Epico 88+, Leggendario 95+.
 
-**Carte** — Set (Rookie Class, All-Star, Champions, Legends, Base), frammenti dai duplicati, upgrade fino al livello 5 (foil e firmata), crafting mirato, pity trasparente con leggendario garantito al 40° pull, storico ultimi 12 pull, baule giornaliero e offerte AI per i duplicati. La carta si apre con flip 3D e retro con carriera/curiosità.
+**Carte** — Set (Rookie Class, All-Star, Champions, Legends, Base), duplicati che diventano copie, upgrade fino al livello 5 con 2/4/8/16 copie + crediti (foil e firmata), frammenti per il crafting mirato, pity trasparente con leggendario garantito al 40° pull, storico ultimi 12 pull, baule giornaliero e offerte AI per i duplicati. La carta si apre con flip 3D e retro con carriera/curiosità.
+
+**Bauli a tempo** — Negozio con Argento (250 crediti, 30 s), Oro (700, 3 min) e Leggendario (1800, 10 min), coda di 4 bauli, countdown nella barra in alto, apertura manuale e velocizzazione con crediti. Le soglie minime di rarità crescono col tipo di baule.
 
 **Scommesse (solo crediti virtuali)** — Saldo con 250 crediti giornalieri, posta 10/25/50, quote calcolate dalla forza squadra (underdog pagano di più), streak bonus, bonus set, prop bets (over/under, margine, quarto migliore), parlay a 3 partite. Nessun denaro reale.
 
@@ -45,14 +49,14 @@ Simulatore di basket NBA interamente **on-device**: 30 franchigie, 300 giocatori
 Roster e statistiche sono approssimativi (non collegati ad API esterne); alcune citazioni sono verificate, le curiosità sono fattuali; WebM non è supportato ovunque; il primo avvio richiede rete per i moduli CDN; i crediti sono virtuali e non hanno valore reale.
 
 ### Salvataggio
-Chiave `pf.nba.v3`, versione 3, con migrazione automatica da `pf.nba.v2` e `nba.sim.v1`. Contiene impostazioni, lega, playoff, cronologia, statistiche giocatore, replay, previsioni, carriera, collezione, crediti, pity, duplicati e scommesse.
+Chiave `pf.nba.v3`, versione 3, con migrazione automatica da `pf.nba.v2` e `nba.sim.v1`. Contiene impostazioni, lega, playoff, cronologia, statistiche giocatore, replay, previsioni, carriera, collezione, crediti, pity, duplicati, copie, livelli carta, coda bauli e scommesse.
 
 ### Test
 ```bash
 node --test projects/nba_simulator/test/logic-test.mjs
 node games/_kit/test/run-all.mjs
 ```
-27 test coprono determinismo, roster, stagione, playoff, statistiche, carriera, medie reali, avatar, citazioni, storage, rarity, tema, replay, carte, quote, prop/parlay, pity, mercato AI ed effetti bauli.
+29 test coprono determinismo, roster, stagione, playoff, statistiche, carriera, medie reali, avatar, citazioni, storage, rarity, tema, replay, carte, quote, prop/parlay, pity, mercato AI, effetti bauli, negozio a tempo e potenziamento con copie+crediti.
 
 ---
 
@@ -62,6 +66,8 @@ node games/_kit/test/run-all.mjs
 A fully **on-device** NBA basketball simulator: 30 franchises, 300 players, tactics, season, playoffs, franchise mode, collectible cards and virtual-credit betting. No personal data leaves the device; only static modules and the vendored Three.js are downloaded from the site.
 
 ### Interface (5 tabs)
+
+A sticky top bar always shows **credits, level and chest status** with a countdown and Open button.
 | Tab | Contents |
 |---|---|
 | **Game** | Team selection, scorebug, 3D court, controls (play/pause, speed, camera, sim-to-end), feed and box score. The `•••` button reveals secondary controls. |
@@ -78,7 +84,9 @@ A fully **on-device** NBA basketball simulator: 30 franchises, 300 players, tact
 
 **Career** — Roster editor, contracts, trades, free agency, draft, multi-year progression, XP, levels and badges. Rarity by rating: Common <80, Rare 80+, Epic 88+, Legendary 95+.
 
-**Cards** — Sets (Rookie Class, All-Star, Champions, Legends, Base), fragments from duplicates, upgrades to level 5 (foil and signed), targeted crafting, transparent pity with guaranteed legendary at pull 40, last-12 pull history, daily chest and AI offers for duplicates. Cards flip in 3D with career/trivia on the back.
+**Cards** — Sets (Rookie Class, All-Star, Champions, Legends, Base), duplicates become copies, upgrades to level 5 with 2/4/8/16 copies + credits (foil and signed), fragments for targeted crafting, transparent pity with guaranteed legendary at pull 40, last-12 pull history, daily chest and AI offers for duplicates. Cards flip in 3D with career/trivia on the back.
+
+**Timed chests** — Shop with Silver (250 credits, 30 s), Gold (700, 3 min) and Legendary (1800, 10 min), a 4-chest queue, countdown in the sticky top bar, manual opening and credit-based speed-up. Minimum rarity rises with chest type.
 
 **Betting (virtual credits only)** — Daily 250 credits, 10/25/50 stakes, strength-based odds (underdogs pay more), streak and set bonuses, prop bets (over/under, margin, top quarter), 3-game parlays. No real money involved.
 
@@ -97,13 +105,13 @@ A fully **on-device** NBA basketball simulator: 30 franchises, 300 players, tact
 Rosters and stats are approximate (no external APIs); a few quotes are verified and trivia is factual; WebM is not universally supported; first launch needs network access for CDN modules; credits are virtual with no real-world value.
 
 ### Storage
-Key `pf.nba.v3`, version 3, with automatic migration from `pf.nba.v2` and `nba.sim.v1`. Holds settings, league, playoffs, history, player stats, replays, predictions, career, collection, credits, pity, duplicates and bets.
+Key `pf.nba.v3`, version 3, with automatic migration from `pf.nba.v2` and `nba.sim.v1`. Holds settings, league, playoffs, history, player stats, replays, predictions, career, collection, credits, pity, duplicates, copies, card levels, chest queue and bets.
 
 ### Tests
 ```bash
 node --test projects/nba_simulator/test/logic-test.mjs
 node games/_kit/test/run-all.mjs
 ```
-27 tests cover determinism, rosters, season, playoffs, stats, career, real averages, avatars, trivia, storage, rarity, theme, replays, cards, odds, props/parlays, pity, AI market and chest effects.
+29 tests cover determinism, rosters, season, playoffs, stats, career, real averages, avatars, trivia, storage, rarity, theme, replays, cards, odds, props/parlays, pity, AI market, chest effects, timed shop and copy/credit upgrades.
 
 > Legacy top-level JS files (`data.js`, `engine.js`, `ui.js`, …) are kept from the earlier build for compatibility; they are not loaded by the current `index.html`.
