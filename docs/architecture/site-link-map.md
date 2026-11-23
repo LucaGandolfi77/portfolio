@@ -5,10 +5,10 @@
 
 ## Summary
 
-- HTML files scanned: 396
-- HTML-to-HTML edges: 242
-- JavaScript-generated catalog routes: 215
-- Orphan candidates: 257
+- HTML files scanned: 399
+- HTML-to-HTML edges: 245
+- JavaScript-generated catalog routes: 216
+- Orphan candidates: 259
 - Broken or inconsistent references: 46
 
 ## Architecture
@@ -533,6 +533,12 @@ portfolio/
 ### `projects/gba-emulator/index.html`
 - `index.html`
 
+### `projects/kinect/index.html`
+- `index.html`
+
+### `projects/kinect/offline.html`
+- `projects/kinect/index.html`
+
 ### `projects/nails/index.html`
 - `index.html`
 
@@ -541,6 +547,9 @@ portfolio/
 
 ### `projects/nba_simulator/legacy-nba_simulator.html`
 - `projects/nba_simulator/index.html`
+
+### `projects/neural-style-transfer/offline.html`
+- `projects/neural-style-transfer/index.html`
 
 ### `projects/offline-editor-studio/index.html`
 - `index.html`
@@ -682,88 +691,89 @@ portfolio/
 | `assets/js/catalog-data.js` | 95 | `games/scopa/index.html` | `games/scopa/index.html` | valid |
 | `assets/js/catalog-data.js` | 96 | `games/guess-who/index.html` | `games/guess-who/index.html` | valid |
 | `assets/js/catalog-data.js` | 97 | `games/shogi/index.html` | `games/shogi/index.html` | valid |
-| `assets/js/catalog-data.js` | 98 | `games/plane/index.html` | `games/plane/index.html` | valid |
-| `assets/js/catalog-data.js` | 99 | `games/aviator/index.html` | `games/aviator/index.html` | valid |
-| `assets/js/catalog-data.js` | 100 | `games/shotmind/index.html` | `games/shotmind/index.html` | valid |
-| `assets/js/catalog-data.js` | 101 | `games/cdd/index.html` | `games/cdd/index.html` | valid |
-| `assets/js/catalog-data.js` | 102 | `games/brawl-stars/index.html` | `games/brawl-stars/index.html` | valid |
-| `assets/js/catalog-data.js` | 103 | `games/tower-defense/index.html` | `games/tower-defense/index.html` | valid |
-| `assets/js/catalog-data.js` | 104 | `games/forza4/index.html` | `games/forza4/index.html` | valid |
-| `assets/js/catalog-data.js` | 105 | `games/snake/index.html` | `games/snake/index.html` | valid |
-| `assets/js/catalog-data.js` | 106 | `games/rpg/index.html` | `games/rpg/index.html` | valid |
-| `assets/js/catalog-data.js` | 107 | `games/mobile-air-hockey/index.html` | `games/mobile-air-hockey/index.html` | valid |
-| `assets/js/catalog-data.js` | 108 | `games/memory/index.html` | `games/memory/index.html` | valid |
-| `assets/js/catalog-data.js` | 109 | `games/slot-collect/index.html` | `games/slot-collect/index.html` | valid |
-| `assets/js/catalog-data.js` | 110 | `games/geom_dash/index.html` | `games/geom_dash/index.html` | valid |
-| `assets/js/catalog-data.js` | 111 | `games/space-invaders/index.html` | `games/space-invaders/index.html` | valid |
-| `assets/js/catalog-data.js` | 112 | `games/space-universe/index.html` | `games/space-universe/index.html` | valid |
-| `assets/js/catalog-data.js` | 113 | `games/blackhole-orbit/index.html` | `games/blackhole-orbit/index.html` | valid |
-| `assets/js/catalog-data.js` | 114 | `games/tetris/index.html` | `games/tetris/index.html` | valid |
-| `assets/js/catalog-data.js` | 115 | `games/poker/index.html` | `games/poker/index.html` | valid |
-| `assets/js/catalog-data.js` | 116 | `games/blackjack/index.html` | `games/blackjack/index.html` | valid |
-| `assets/js/catalog-data.js` | 117 | `games/chess/index.html` | `games/chess/index.html` | valid |
-| `assets/js/catalog-data.js` | 118 | `games/card-games/public/index.html` | `games/card-games/public/index.html` | valid |
-| `assets/js/catalog-data.js` | 119 | `games/dama/index.html` | `games/dama/index.html` | valid |
-| `assets/js/catalog-data.js` | 120 | `games/backgammon/index.html` | `games/backgammon/index.html` | valid |
-| `assets/js/catalog-data.js` | 121 | `games/goose/index.html` | `games/goose/index.html` | valid |
-| `assets/js/catalog-data.js` | 122 | `games/flappy-bird/index.html` | `games/flappy-bird/index.html` | valid |
-| `assets/js/catalog-data.js` | 123 | `games/wikipedia/index.html` | `games/wikipedia/index.html` | valid |
-| `assets/js/catalog-data.js` | 124 | `games/pixel-runner/index.html` | `games/pixel-runner/index.html` | valid |
-| `assets/js/catalog-data.js` | 125 | `games/tamagotchi/index.html` | `games/tamagotchi/index.html` | valid |
-| `assets/js/catalog-data.js` | 126 | `games/coloring_book/index.html` | `games/coloring_book/index.html` | valid |
-| `assets/js/catalog-data.js` | 127 | `games/quantum-tictactoe/index.html` | `games/quantum-tictactoe/index.html` | valid |
-| `assets/js/catalog-data.js` | 128 | `games/quantum-forge/index.html` | `games/quantum-forge/index.html` | valid |
-| `assets/js/catalog-data.js` | 129 | `games/tokyo/index.html` | `games/tokyo/index.html` | valid |
-| `assets/js/catalog-data.js` | 130 | `games/pinball-classic/index.html` | `games/pinball-classic/index.html` | valid |
-| `assets/js/catalog-data.js` | 131 | `games/clash-royale/index.html` | `games/clash-royale/index.html` | valid |
-| `assets/js/catalog-data.js` | 132 | `games/pokedex-classic/index.html` | `games/pokedex-classic/index.html` | valid |
-| `assets/js/catalog-data.js` | 133 | `games/pokemon-classic/index.html` | `games/pokemon-classic/index.html` | valid |
-| `assets/js/catalog-data.js` | 134 | `games/yatzee/index.html` | `games/yatzee/index.html` | valid |
-| `assets/js/catalog-data.js` | 135 | `games/yatzee-solo/index.html` | `games/yatzee-solo/index.html` | valid |
-| `assets/js/catalog-data.js` | 136 | `games/orlog/index.html` | `games/orlog/index.html` | valid |
-| `assets/js/catalog-data.js` | 137 | `games/taboo/index.html` | `games/taboo/index.html` | valid |
-| `assets/js/catalog-data.js` | 138 | `games/visual-novels/index.html` | `games/visual-novels/index.html` | valid |
-| `assets/js/catalog-data.js` | 139 | `pages/content/karamazov.html` | `pages/content/karamazov.html` | valid |
-| `assets/js/catalog-data.js` | 140 | `games/kart/index.html` | `games/kart/index.html` | valid |
-| `assets/js/catalog-data.js` | 141 | `games/battleship/index.html` | `games/battleship/index.html` | valid |
-| `assets/js/catalog-data.js` | 142 | `games/warship/index.html` | `games/warship/index.html` | valid |
-| `assets/js/catalog-data.js` | 143 | `games/battlelands-royale/index.html` | `games/battlelands-royale/index.html` | valid |
-| `assets/js/catalog-data.js` | 144 | `games/arena-royale-2/index.html` | `games/arena-royale-2/index.html` | valid |
-| `assets/js/catalog-data.js` | 145 | `games/echoes-of-the-last-dawn/index.html` | `games/echoes-of-the-last-dawn/index.html` | valid |
-| `assets/js/catalog-data.js` | 146 | `games/coop-game/index.html` | `games/coop-game/index.html` | valid |
-| `assets/js/catalog-data.js` | 147 | `games/friends-tycoon/index.html` | `games/friends-tycoon/index.html` | valid |
-| `assets/js/catalog-data.js` | 148 | `games/orto-magico/index.html` | `games/orto-magico/index.html` | valid |
-| `assets/js/catalog-data.js` | 149 | `games/pokopia-clone/index.html` | `games/pokopia-clone/index.html` | valid |
-| `assets/js/catalog-data.js` | 150 | `games/3dgame/index.html` | `games/3dgame/index.html` | valid |
-| `assets/js/catalog-data.js` | 151 | `games/airhockey/index.html` | `games/airhockey/index.html` | valid |
-| `assets/js/catalog-data.js` | 152 | `games/animal-crossing/index.html` | `games/animal-crossing/index.html` | valid |
-| `assets/js/catalog-data.js` | 153 | `games/city-sim/index.html` | `games/city-sim/index.html` | valid |
-| `assets/js/catalog-data.js` | 154 | `games/pinball/index.html` | `games/pinball/index.html` | valid |
-| `assets/js/catalog-data.js` | 155 | `games/pokedex/index.html` | `games/pokedex/index.html` | valid |
-| `assets/js/catalog-data.js` | 156 | `games/pokemon/index.html` | `games/pokemon/index.html` | valid |
-| `assets/js/catalog-data.js` | 157 | `games/referendum-game/index.html` | `games/referendum-game/index.html` | valid |
-| `assets/js/catalog-data.js` | 158 | `games/slot/index.html` | `games/slot/index.html` | valid |
-| `assets/js/catalog-data.js` | 159 | `games/warorbit/index.html` | `games/warorbit/index.html` | valid |
-| `assets/js/catalog-data.js` | 160 | `games/watermelon.html` | `games/watermelon.html` | valid |
-| `assets/js/catalog-data.js` | 161 | `games/watermelon-fall.html` | `games/watermelon-fall.html` | valid |
-| `assets/js/catalog-data.js` | 162 | `games/watermelon/index.html` | `games/watermelon/index.html` | valid |
-| `assets/js/catalog-data.js` | 163 | `games/steel-waves/index.html` | `games/steel-waves/index.html` | valid |
-| `assets/js/catalog-data.js` | 164 | `games/rivincita/index.html` | `games/rivincita/index.html` | valid |
-| `assets/js/catalog-data.js` | 165 | `games/miraggio-hotel/index.html` | `games/miraggio-hotel/index.html` | valid |
-| `assets/js/catalog-data.js` | 166 | `games/stanza9/index.html` | `games/stanza9/index.html` | valid |
-| `assets/js/catalog-data.js` | 167 | `games/webgl-diagnostics/index.html` | `games/webgl-diagnostics/index.html` | valid |
-| `assets/js/catalog-data.js` | 168 | `games/arcade-lab/index.html` | `games/arcade-lab/index.html` | valid |
-| `assets/js/catalog-data.js` | 169 | `games/farkle/index.html` | `games/farkle/index.html` | valid |
-| `assets/js/catalog-data.js` | 170 | `games/regno-di-moneta/index.html` | `games/regno-di-moneta/index.html` | valid |
-| `assets/js/catalog-data.js` | 171 | `games/petali-parametri/index.html` | `games/petali-parametri/index.html` | valid |
-| `assets/js/catalog-data.js` | 172 | `games/scarlius/index.html` | `games/scarlius/index.html` | valid |
-| `assets/js/catalog-data.js` | 173 | `games/scalpel/index.html` | `games/scalpel/index.html` | valid |
-| `assets/js/catalog-data.js` | 174 | `games/votopoli/index.html` | `games/votopoli/index.html` | valid |
-| `assets/js/catalog-data.js` | 175 | `games/mystic-quest/index.html` | `games/mystic-quest/index.html` | valid |
-| `assets/js/catalog-data.js` | 176 | `games/scalpel-2/index.html` | `games/scalpel-2/index.html` | valid |
-| `assets/js/catalog-data.js` | 177 | `games/voidbound/index.html` | `games/voidbound/index.html` | valid |
-| `assets/js/catalog-data.js` | 178 | `games/precision-skating-game/index.html` | `games/precision-skating-game/index.html` | valid |
-| `assets/js/catalog-data.js` | 179 | `games/miraggio-pass/index.html` | `games/miraggio-pass/index.html` | valid |
+| `assets/js/catalog-data.js` | 98 | `games/italy-flight-sim/index.html` | `games/italy-flight-sim/index.html` | valid |
+| `assets/js/catalog-data.js` | 99 | `games/plane/index.html` | `games/plane/index.html` | valid |
+| `assets/js/catalog-data.js` | 100 | `games/aviator/index.html` | `games/aviator/index.html` | valid |
+| `assets/js/catalog-data.js` | 101 | `games/shotmind/index.html` | `games/shotmind/index.html` | valid |
+| `assets/js/catalog-data.js` | 102 | `games/cdd/index.html` | `games/cdd/index.html` | valid |
+| `assets/js/catalog-data.js` | 103 | `games/brawl-stars/index.html` | `games/brawl-stars/index.html` | valid |
+| `assets/js/catalog-data.js` | 104 | `games/tower-defense/index.html` | `games/tower-defense/index.html` | valid |
+| `assets/js/catalog-data.js` | 105 | `games/forza4/index.html` | `games/forza4/index.html` | valid |
+| `assets/js/catalog-data.js` | 106 | `games/snake/index.html` | `games/snake/index.html` | valid |
+| `assets/js/catalog-data.js` | 107 | `games/rpg/index.html` | `games/rpg/index.html` | valid |
+| `assets/js/catalog-data.js` | 108 | `games/mobile-air-hockey/index.html` | `games/mobile-air-hockey/index.html` | valid |
+| `assets/js/catalog-data.js` | 109 | `games/memory/index.html` | `games/memory/index.html` | valid |
+| `assets/js/catalog-data.js` | 110 | `games/slot-collect/index.html` | `games/slot-collect/index.html` | valid |
+| `assets/js/catalog-data.js` | 111 | `games/geom_dash/index.html` | `games/geom_dash/index.html` | valid |
+| `assets/js/catalog-data.js` | 112 | `games/space-invaders/index.html` | `games/space-invaders/index.html` | valid |
+| `assets/js/catalog-data.js` | 113 | `games/space-universe/index.html` | `games/space-universe/index.html` | valid |
+| `assets/js/catalog-data.js` | 114 | `games/blackhole-orbit/index.html` | `games/blackhole-orbit/index.html` | valid |
+| `assets/js/catalog-data.js` | 115 | `games/tetris/index.html` | `games/tetris/index.html` | valid |
+| `assets/js/catalog-data.js` | 116 | `games/poker/index.html` | `games/poker/index.html` | valid |
+| `assets/js/catalog-data.js` | 117 | `games/blackjack/index.html` | `games/blackjack/index.html` | valid |
+| `assets/js/catalog-data.js` | 118 | `games/chess/index.html` | `games/chess/index.html` | valid |
+| `assets/js/catalog-data.js` | 119 | `games/card-games/public/index.html` | `games/card-games/public/index.html` | valid |
+| `assets/js/catalog-data.js` | 120 | `games/dama/index.html` | `games/dama/index.html` | valid |
+| `assets/js/catalog-data.js` | 121 | `games/backgammon/index.html` | `games/backgammon/index.html` | valid |
+| `assets/js/catalog-data.js` | 122 | `games/goose/index.html` | `games/goose/index.html` | valid |
+| `assets/js/catalog-data.js` | 123 | `games/flappy-bird/index.html` | `games/flappy-bird/index.html` | valid |
+| `assets/js/catalog-data.js` | 124 | `games/wikipedia/index.html` | `games/wikipedia/index.html` | valid |
+| `assets/js/catalog-data.js` | 125 | `games/pixel-runner/index.html` | `games/pixel-runner/index.html` | valid |
+| `assets/js/catalog-data.js` | 126 | `games/tamagotchi/index.html` | `games/tamagotchi/index.html` | valid |
+| `assets/js/catalog-data.js` | 127 | `games/coloring_book/index.html` | `games/coloring_book/index.html` | valid |
+| `assets/js/catalog-data.js` | 128 | `games/quantum-tictactoe/index.html` | `games/quantum-tictactoe/index.html` | valid |
+| `assets/js/catalog-data.js` | 129 | `games/quantum-forge/index.html` | `games/quantum-forge/index.html` | valid |
+| `assets/js/catalog-data.js` | 130 | `games/tokyo/index.html` | `games/tokyo/index.html` | valid |
+| `assets/js/catalog-data.js` | 131 | `games/pinball-classic/index.html` | `games/pinball-classic/index.html` | valid |
+| `assets/js/catalog-data.js` | 132 | `games/clash-royale/index.html` | `games/clash-royale/index.html` | valid |
+| `assets/js/catalog-data.js` | 133 | `games/pokedex-classic/index.html` | `games/pokedex-classic/index.html` | valid |
+| `assets/js/catalog-data.js` | 134 | `games/pokemon-classic/index.html` | `games/pokemon-classic/index.html` | valid |
+| `assets/js/catalog-data.js` | 135 | `games/yatzee/index.html` | `games/yatzee/index.html` | valid |
+| `assets/js/catalog-data.js` | 136 | `games/yatzee-solo/index.html` | `games/yatzee-solo/index.html` | valid |
+| `assets/js/catalog-data.js` | 137 | `games/orlog/index.html` | `games/orlog/index.html` | valid |
+| `assets/js/catalog-data.js` | 138 | `games/taboo/index.html` | `games/taboo/index.html` | valid |
+| `assets/js/catalog-data.js` | 139 | `games/visual-novels/index.html` | `games/visual-novels/index.html` | valid |
+| `assets/js/catalog-data.js` | 140 | `pages/content/karamazov.html` | `pages/content/karamazov.html` | valid |
+| `assets/js/catalog-data.js` | 141 | `games/kart/index.html` | `games/kart/index.html` | valid |
+| `assets/js/catalog-data.js` | 142 | `games/battleship/index.html` | `games/battleship/index.html` | valid |
+| `assets/js/catalog-data.js` | 143 | `games/warship/index.html` | `games/warship/index.html` | valid |
+| `assets/js/catalog-data.js` | 144 | `games/battlelands-royale/index.html` | `games/battlelands-royale/index.html` | valid |
+| `assets/js/catalog-data.js` | 145 | `games/arena-royale-2/index.html` | `games/arena-royale-2/index.html` | valid |
+| `assets/js/catalog-data.js` | 146 | `games/echoes-of-the-last-dawn/index.html` | `games/echoes-of-the-last-dawn/index.html` | valid |
+| `assets/js/catalog-data.js` | 147 | `games/coop-game/index.html` | `games/coop-game/index.html` | valid |
+| `assets/js/catalog-data.js` | 148 | `games/friends-tycoon/index.html` | `games/friends-tycoon/index.html` | valid |
+| `assets/js/catalog-data.js` | 149 | `games/orto-magico/index.html` | `games/orto-magico/index.html` | valid |
+| `assets/js/catalog-data.js` | 150 | `games/pokopia-clone/index.html` | `games/pokopia-clone/index.html` | valid |
+| `assets/js/catalog-data.js` | 151 | `games/3dgame/index.html` | `games/3dgame/index.html` | valid |
+| `assets/js/catalog-data.js` | 152 | `games/airhockey/index.html` | `games/airhockey/index.html` | valid |
+| `assets/js/catalog-data.js` | 153 | `games/animal-crossing/index.html` | `games/animal-crossing/index.html` | valid |
+| `assets/js/catalog-data.js` | 154 | `games/city-sim/index.html` | `games/city-sim/index.html` | valid |
+| `assets/js/catalog-data.js` | 155 | `games/pinball/index.html` | `games/pinball/index.html` | valid |
+| `assets/js/catalog-data.js` | 156 | `games/pokedex/index.html` | `games/pokedex/index.html` | valid |
+| `assets/js/catalog-data.js` | 157 | `games/pokemon/index.html` | `games/pokemon/index.html` | valid |
+| `assets/js/catalog-data.js` | 158 | `games/referendum-game/index.html` | `games/referendum-game/index.html` | valid |
+| `assets/js/catalog-data.js` | 159 | `games/slot/index.html` | `games/slot/index.html` | valid |
+| `assets/js/catalog-data.js` | 160 | `games/warorbit/index.html` | `games/warorbit/index.html` | valid |
+| `assets/js/catalog-data.js` | 161 | `games/watermelon.html` | `games/watermelon.html` | valid |
+| `assets/js/catalog-data.js` | 162 | `games/watermelon-fall.html` | `games/watermelon-fall.html` | valid |
+| `assets/js/catalog-data.js` | 163 | `games/watermelon/index.html` | `games/watermelon/index.html` | valid |
+| `assets/js/catalog-data.js` | 164 | `games/steel-waves/index.html` | `games/steel-waves/index.html` | valid |
+| `assets/js/catalog-data.js` | 165 | `games/rivincita/index.html` | `games/rivincita/index.html` | valid |
+| `assets/js/catalog-data.js` | 166 | `games/miraggio-hotel/index.html` | `games/miraggio-hotel/index.html` | valid |
+| `assets/js/catalog-data.js` | 167 | `games/stanza9/index.html` | `games/stanza9/index.html` | valid |
+| `assets/js/catalog-data.js` | 168 | `games/webgl-diagnostics/index.html` | `games/webgl-diagnostics/index.html` | valid |
+| `assets/js/catalog-data.js` | 169 | `games/arcade-lab/index.html` | `games/arcade-lab/index.html` | valid |
+| `assets/js/catalog-data.js` | 170 | `games/farkle/index.html` | `games/farkle/index.html` | valid |
+| `assets/js/catalog-data.js` | 171 | `games/regno-di-moneta/index.html` | `games/regno-di-moneta/index.html` | valid |
+| `assets/js/catalog-data.js` | 172 | `games/petali-parametri/index.html` | `games/petali-parametri/index.html` | valid |
+| `assets/js/catalog-data.js` | 173 | `games/scarlius/index.html` | `games/scarlius/index.html` | valid |
+| `assets/js/catalog-data.js` | 174 | `games/scalpel/index.html` | `games/scalpel/index.html` | valid |
+| `assets/js/catalog-data.js` | 175 | `games/votopoli/index.html` | `games/votopoli/index.html` | valid |
+| `assets/js/catalog-data.js` | 176 | `games/mystic-quest/index.html` | `games/mystic-quest/index.html` | valid |
+| `assets/js/catalog-data.js` | 177 | `games/scalpel-2/index.html` | `games/scalpel-2/index.html` | valid |
+| `assets/js/catalog-data.js` | 178 | `games/voidbound/index.html` | `games/voidbound/index.html` | valid |
+| `assets/js/catalog-data.js` | 179 | `games/precision-skating-game/index.html` | `games/precision-skating-game/index.html` | valid |
+| `assets/js/catalog-data.js` | 180 | `games/miraggio-pass/index.html` | `games/miraggio-pass/index.html` | valid |
 | `assets/js/projects-data.js` | 9 | `projects/atlas/` | `projects/atlas/index.html` | valid |
 | `assets/js/projects-data.js` | 18 | `projects/payamazadi/index.html` | `projects/payamazadi/index.html` | valid |
 | `assets/js/projects-data.js` | 27 | `projects/tiny-ai/index.html` | `projects/tiny-ai/index.html` | valid |
@@ -933,6 +943,7 @@ These files have no incoming HTML-to-HTML link in the scanned graph. Some are in
 - `games/geom_dash/legacy-geom_dash.html`
 - `games/goose/legacy-goose.html`
 - `games/guess-who/legacy-guess_who.html`
+- `games/italy-flight-sim/index.html`
 - `games/kalaazu/index.html`
 - `games/kart/legacy-kart.html`
 - `games/math-duel/legacy-math_duel.html`
@@ -1055,6 +1066,7 @@ These files have no incoming HTML-to-HTML link in the scanned graph. Some are in
 - `projects/hourly-wellness-widget/index.html`
 - `projects/iqos-timer/index.html`
 - `projects/kinect-2/index.html`
+- `projects/kinect/offline.html`
 - `projects/longest-midi/index.html`
 - `projects/lyrics-finder/index.html`
 - `projects/mesh-camera2/index.html`
@@ -1063,8 +1075,8 @@ These files have no incoming HTML-to-HTML link in the scanned graph. Some are in
 - `projects/nba_simulator/offline.html`
 - `projects/neural-flock/index.html`
 - `projects/neural-flock/legacy-neural-flock.html`
-- `projects/neural-style-transfer/index.html`
 - `projects/neural-style-transfer/legacy-neural-style-transfer.html`
+- `projects/neural-style-transfer/offline.html`
 - `projects/neural-vision/index.html`
 - `projects/neural-vision/legacy-neural-vision.html`
 - `projects/offline-editor-studio/index.html`

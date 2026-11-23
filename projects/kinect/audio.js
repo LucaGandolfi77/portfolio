@@ -46,6 +46,10 @@ export class Sfx {
 
   miss() { this.tone(230, .16, 'sawtooth', .025, 120); }
 
+  power() {
+    [0, 1, 2, 3].forEach(i => this.tone(520 + i * 180, .22, 'square', .035, null, i * .05));
+  }
+
   start() {
     [0, 1, 2].forEach(i => this.tone(360 + i * 140, .18, 'sine', .06, null, i * .09));
   }

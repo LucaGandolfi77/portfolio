@@ -1,50 +1,49 @@
-# Neural Style Transfer — Artistic AI
+# Neural Style Studio
 
-> Transform your photos into artwork in your browser. Choose one of **5 artistic styles** and one of **3 built-in example photos** (or upload your own), and watch the blend animate live from 0 → 100%. Everything runs on-device — nothing leaves your device.
+Browser style-transfer studio with instant GPU previews and optional **real neural renders** that never leave the device.
 
-**Portfolio project** — a lightweight, dependency-free homage to *A Neural Algorithm of Artistic Style* (Gatys, Ecker & Bethge). It demonstrates a real, visible artistic-transfer pipeline without shipping hundreds of MB of VGG-19 weights.
+## Stack
 
-## How it works
+- **Preview**: WebGPU where supported, WebGL2 otherwise, Canvas2D as a last resort (`js/preview.js`). Fullscreen shaders do color transfer, style mixing, stroke displacement, masking, before/after split, vignette and grain.
+- **Neural render**: ONNX Runtime Web 1.21.0 with the ONNX Model Zoo **Fast Neural Style Transfer** models (candy, mosaic, rain-princess, udnie, pointilism — 6.6 MB each). WebGPU execution provider with automatic WASM fallback; models are streamed into `CacheStorage` on first use (`js/neural.js`).
+- **No uploads**: photos, styles and inference stay on the device. Only the model and runtime are downloaded from a CDN and cached.
 
-1. **Pick a photo** — 3 built-in examples (landscape, portrait, city skyline) or 📁 upload your own (square-cropped, cover-fit to 512×512 desktop / 360×360 mobile).
-2. **Pick a style** — 5 procedurally-generated example images, each visually distinct:
-   - **Starry Night** — swirling skies, luminous oranges and yellows
-   - **Cubismo** — geometric fragments, overlapping planes
-   - **Pixel Art** — mosaic blocks, crisp edges, retro gaming aesthetic
-   - **Abstract Expressionist** — gestural brushstrokes, emotional color fields
-   - **Ukiyo-e** — japanese woodblock waves, elegant linework
-3. **Watch the transfer** — 50 frames (desktop) / 20 (mobile), blend eased 0→100%:
-   - **Perceptual color transfer** (Reinhard-style in YCbCr): the photo's luminance/chroma means & deviations are matched to the style's, so the content keeps its structure while adopting the style's palette.
-   - **Per-style artistic filter**: swirling displacement + vibrance + warm/cool split (Starry Night), translucent geometric planes (Cubismo), posterize + true pixelation with big blocks (Pixel Art), gestural brush dabs (Abstract), sine-wave warp + posterize + indigo tint + woodblock outlines (Ukiyo-e).
-4. **🧠 Live network panel**: a mini network (photo → style match → output) with neurons and a traveling pulse synced to the blend — the "brain" of the transfer, always visible.
-5. **⏪ Timelapse**: every run is recorded frame-by-frame; replay it with play/pause, scrub and 1×/2×/4× speed.
-6. **Download** the result as PNG.
+## Features
 
-HUD shows **ITER / BLEND / TIME** live; 🎲 RANDOM picks a random style + photo; STOP freezes the current frame.
+- 3 built-in photos + photo upload; 5 built-in styles + custom style upload.
+- GPU mode with two-style mixing slider, strength and before/after split.
+- Touch/mouse **strength brush**: paint the effect only where you want it.
+- **Live camera** stylization with snapshot capture.
+- **Neural enhance** button for a high-quality ONNX render, with downloadable PNG.
+- Timelapse of blend keyframes with replay, scrub and replay controls.
+- EN/IT interface, installable PWA with icons, shortcuts and offline fallback.
 
-## Technical details
+## Mobile
 
-- Color statistics in YCbCr (`Y=0.299R+0.587G+0.114B`), Reinhard-style matching: `y' = (y−μc)/σc·σs + μs`.
-- 512×512 px (~262k px/frame) single-pass blend + filters — smooth on iPhone (360×360 there).
-- Pure vanilla JS + Canvas 2D, zero dependencies, no server.
-
-## Why "neural"?
-
-The original Gatys et al. algorithm optimizes a generated image against VGG-19 content and style features. Shipping that in-browser needs hundreds of MB of weights; this project instead implements the *perceptible essence* — palette transfer + signature brushwork filters — in ~300 lines, running instantly on any device. The README and UI say so explicitly: an honest, fast, in-browser homage.
+`viewport-fit=cover`, `100dvh`, 44 px tap targets, adaptive DPR (1 on low quality, up to 2 otherwise), 30 fps camera preview, pointer/touch brush, reduced-motion support.
 
 ## Files
 
 ```
-projects/neural-style-transfer/legacy-neural-style-transfer.html          → intro screen (wrapper)
-projects/neural-style-transfer/index.html    → the app (engine + example pickers)
-projects/neural-style-transfer/examples/     → 5 style + 3 content example SVGs (real files)
-projects/neural-style-transfer/README.md     → this file
+index.html                 app shell
+styles.css                 studio UI
+js/app.js                  controller
+js/preview.js              WebGPU/WebGL2/Canvas2D pipeline
+js/neural.js               ONNX engine + model cache
+js/pipeline.js             pure image/tensor helpers
+js/styles.js               style registry
+js/history.js              timelapse keyframes
+js/i18n.js                 EN/IT dictionary
+test/logic-test.mjs        Node tests
+examples/                  SVG presets
+legacy-neural-style-transfer.*  legacy launcher (unchanged)
 ```
 
-> The example images ship as real `.svg` files with relative URLs — no inline data-URLs, so they work on any host (GitHub Pages, Codespaces preview, local).
+## Tests
 
-*“Don't just admire art — understand how it's made.”*
+```bash
+node --test projects/neural-style-transfer/test/logic-test.mjs
+node games/_kit/test/run-all.mjs
+```
 
----
-
-*Inspired by [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576) — Gatys, Ecker & Bethge.*
+The first neural render needs network access to download the runtime and one model; after that the app and model work offline.

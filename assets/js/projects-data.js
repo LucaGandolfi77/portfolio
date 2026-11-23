@@ -257,7 +257,7 @@ const PROJECTS_DATA = [
   {
     "id": "kinect-game",
     "title": "Kinect Game",
-    "description": "Interactive body tracking game.",
+    "description": "Hand-tracking arcade with gesture controls, WebGL2 graphics and offline PWA.",
     "href": "projects/kinect/index.html",
     "emoji": "🎮",
     "badge": "AR",

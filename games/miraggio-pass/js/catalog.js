@@ -85,7 +85,7 @@
     G('airhockey','Air Hockey','🏒','arcade','airhockey.html','games',jsonFields('airhockey_neon',['highScore','wins']),'Record',4),
     G('kart','Kart Royale','🏎️','arcade','kart.html','games',exists(['kart_save','kart_scores']),'Giocato',3),
     G('vola','Vola PWA','🪂','arcade','../projects/vola-pwa/index.html','projects',num('vola_best_v1'),'Record',4),
-    G('kinect','Kinect Runner','🤖','arcade','../projects/kinect/app.js','projects',num('kinect_best'),'Record',4),
+    G('kinect','Kinect Runner','🤖','arcade','../projects/kinect/index.html','projects',num('kinect_best'),'Record',4),
 
     /* ── Strategia ── */
     G('chess','Chess','♟️','strategia','chess.html','games',exists(['chess-prefs','chess_save','chess-v1']),'Giocato',6),

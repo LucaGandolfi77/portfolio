@@ -16,7 +16,17 @@ function walk(dir, out = []) {
   return out;
 }
 
-const tests = walk(ROOT)
+function safeWalk(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    if (['node_modules', 'dist', 'www', 'android', 'ios', '.git'].includes(name)) continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) safeWalk(p, out);
+    else out.push(p);
+  }
+  return out;
+}
+
+const tests = [...walk(ROOT), ...safeWalk(join(REPO, 'projects'))]
   .filter(p => /\/test\/[^/]+\.mjs$/.test(p) && !p.endsWith('run-all.mjs'))
   .sort();
 
