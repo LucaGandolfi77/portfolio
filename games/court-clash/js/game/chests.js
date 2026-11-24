@@ -30,6 +30,16 @@ export function chestInfo(type) {
   return CHEST_TYPES[type] || CHEST_TYPES.wood;
 }
 
+export function upgradeChestTier(type, steps = 1) {
+  const index = CHEST_ORDER.indexOf(type);
+  return CHEST_ORDER[Math.min(CHEST_ORDER.length - 1, Math.max(0, (index < 0 ? 0 : index) + steps))];
+}
+
+export function chestTierRank(type) {
+  const index = CHEST_ORDER.indexOf(type);
+  return index < 0 ? 0 : index;
+}
+
 export function createChest(type, now = Date.now()) {
   const info = chestInfo(type);
   return {

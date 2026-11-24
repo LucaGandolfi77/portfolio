@@ -138,7 +138,7 @@
     ['tokyo', 'Tokyo Dice', 'Banking dice duel with AI rival, missions, streaks and three modes. Offline PWA.', 'games/tokyo/index.html', '🎲', 'party', ['Dice'], false],
     ['pinball', 'Space Cadet Pinball (Classic)', 'Original portfolio page for the classic pinball demo.', 'games/pinball-classic/index.html', '🚀', 'arcade', ['Retro'], false],
     ['clash-royale', 'Royale Battle', 'Deploy troops and destroy enemy towers.', 'games/clash-royale/index.html', '♛', 'strategy', ['Strategy'], false],
-    ['court-clash', 'Court Clash', 'Scommetti crediti virtuali su quick match NBA, vinci bauli con 3–5 carte, colleziona 300 giocatori e potenzia le carte. PWA offline.', 'games/court-clash/index.html', '🏀', 'cards', ['Cards', 'Betting', 'PWA'], true],
+    ['court-clash', 'Court Clash', 'Scommetti crediti virtuali su quick match NBA, crea una formazione da 5 carte, vinci bauli, sali di arena e completa missioni. 300 carte, PWA offline.', 'games/court-clash/index.html', '🏀', 'cards', ['Cards', 'Betting', 'PWA'], true],
     ['pokedex', 'Pokédex (Classic)', 'Original portfolio page for the searchable Pokédex.', 'games/pokedex-classic/index.html', '●', 'quiz', ['Database'], false],
     ['pokemon', 'Pokémon Adventure (Classic)', 'Original portfolio page for the Pokémon adventure.', 'games/pokemon-classic/index.html', '⚡', 'story', ['Adventure'], false],
     ['yatzee', 'Yatzee', 'Classic dice game for local players.', 'games/yatzee/index.html', '🎲', 'party', ['Dice'], false],
