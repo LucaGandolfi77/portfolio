@@ -1,23 +1,52 @@
-# 🖥️ Cello — il browser degli anni '90
+# 🖥️ CelloOS — un desktop del 1994 nel browser
 
-Clone interattivo di **Cello 1.01a** (Cornell Law Information Institute, 1993–94): il primo browser grafico per Windows 3.x. UI stile Win3.1, navigazione in un web inventato del 1994, suono modem e modalità "Modem Live" che carica pagine reali via r.jina.ai rendendole in stile anni '90.
+Evoluzione del clone di Cello 1.01a: il browser è ora **un'app dentro un vero sistema operativo desktop** ricreato con tecnologie web, zero dipendenze esterne.
 
-## Caratteristiche
-- **Chrome Win 3.1**: title bar, menu bar, toolbar, campo Location, status bar con progress bar.
-- **Mini motore HTML 2**: parsa un whitelist di tag (h1–h6, p, a, b/i/em/strong, ul/ol/li, pre, blockquote, table, blink, img…). Le immagini mostrano un segnaposto `[IMAGE]` (citazione storica: Cello non supportava le immagini).
-- **Web 1994 offline**: 14 pagine collegate (Home, About, What's New, Yahoo Catalog, Surfing Guide, Gopher, FTP, USENET, WebRing, Guestbook, Under Construction, Image Test, modern domain, 404).
-- **📡 Modem Live**: digita un URL reale → fetch via `r.jina.ai` (reader pubblico), rendering in stile '94. Timeout 8s con fallback a pagina di errore "Busy signal".
-- **Storia Back/Forward**, Preferiti (localStorage), contatore pagine visitate.
-- **Suono modem** sintetizzato (WebAudio, toggle).
-- **iPhone-safe**: bottom toolbar touch, target ≥44px, area contenuto scrollabile.
+## Cosa c'è
+
+### Desktop
+- Boot screen, sfondi selezionabili (verde acqua, tempesta, sabbia, stellato, prato)
+- Icone desktop, doppio clic per aprire le app
+- Taskbar con Start, pulsanti finestre, tray con suono, notifiche e orologio
+- Start menu con griglia programmi, documenti recenti, impostazioni, info, spegnimento
+- Centros notifiche, modal di sistema, toast
+
+### Window manager
+- Finestre trascinabili e ridimensionabili con Pointer Events (touch incluso)
+- Focus/z-index, minimize, maximize, chiudi, taskbar sincronizzata
+- `Alt+Tab` cambia finestra, `Alt+F4` chiude, `Win`/`Ctrl+Esc` apre Start
+
+### App native
+- **Cello Browser**: le 14 pagine del web 1994, link cliccabili, history, preferiti, modem live via `r.jina.ai`, suono moderno corretto
+- **Esplora file** su file system virtuale in localStorage
+- **Blocco note** con autosave su VFS, apre `.txt`
+- **Terminale** con comandi reali (`help`, `ls`, `cd`, `cat`, `echo > file`, `mkdir`, `rm`, `open`, `date`, `ver`, `clear`)
+- **Calcolatrice**, **Impostazioni**, **Informazioni di sistema**
+
+### File system
+`Cello:/Cello/Documents/WELCOME.TXT` e `NOTE.TXT` sono file reali modificabili. Le pagine `.html` salvate dall'utente possono essere aperte nel browser.
+
+## Struttura
+```
+cello-browser/
+├── index.html · styles.css · manifest.webmanifest · sw.js · icon.svg
+├── pages.js                     # 14 pagine del 1994
+├── js/
+│   ├── core/{bus,state,vfs,html}.js
+│   ├── wm.js                    # window manager
+│   ├── shell.js                 # desktop, taskbar, Start, notifiche
+│   ├── main.js
+│   └── apps/{browser,files,notepad,settings,about,terminal,calculator}.js
+└── test/logic-test.mjs
+```
 
 ## Tecnologie
-- Vanilla HTML + CSS + JS (nessuna libreria esterna).
-- PWA: no manifest (come `web-linux` nel portfolio).
+Script classici con namespace `window.CelloOS` (mantiene l'apertura via `file://`), CSS puro, WebAudio, localStorage, service worker versionato. Nessuna libreria, nessun CDN, nessun account.
 
-## Navigazione
-Apri `index.html` nel browser. Clicca i link, digita URL nella Location bar, o usa 📡 per il modem live.
+## Test
+```bash
+node projects/cello-browser/test/logic-test.mjs
+```
 
-## Registrato nel portfolio
-- `assets/js/projects-data.js`: id `cello-browser`, badge "Sim", emoji 🖥️, colore `#ff9f43`.
-- Appare nel catalogo progetti (`projects.html` e homepage).
+## Registro portfolio
+`assets/js/projects-data.js` — id `cello-browser`, badge "Sim", icona 🖥️.

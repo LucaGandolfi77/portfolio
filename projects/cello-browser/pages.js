@@ -1,4 +1,7 @@
-const PAGES = [
+(function () {
+  "use strict";
+  var O = window.CelloOS = window.CelloOS || {};
+  O.pages = [
   { url: "/", title: "Welcome to the World-Wide Web!", html: `<html><head><title>Welcome to the World-Wide Web!</title></head><body>
 <h1>Welcome to the World-Wide Web!</h1>
 <p>Welcome to <b>CELLO</b>, the world's first <i>graphical</i> Web browser for <b>Windows 3.x</b>. Created at the <a href="/about">Cornell Law Information Institute</a> by Thomas R. Bruce, 1993–1994.</p>
@@ -177,4 +180,5 @@ It was never a contest.</pre>
 <p>It may have been moved, deleted, or never existed. The Web was small in 1994; most things were here.</p>
 <p><a href="/">Home</a></p>
 </body></html>` }
-];
+  ];
+}());
