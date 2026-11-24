@@ -23,7 +23,7 @@ const PROJECTS_DATA = [
   {
     "id": "tiny-local-ai",
     "title": "Tiny Local AI",
-    "description": "Chat con modelli AI piccoli e allo stato dell'arte che girano DAVVERO nel browser: Transformers.js con 18 modelli verificati, inclusi i ⚡ ultra-tiny per iPhone (TinyStories 1M ≈ 15 MB, TinyStories 3M ≈ 22 MB, DistilGPT2 82M, SmolLM2 135M, Qwen 2.5 0.5B…) su WebGPU con fallback WASM — zero chiavi, zero server. In più Web-LLM/WebGPU (SmolLM2, Qwen 2.5/3/3.5, Llama 3.2, Phi, Gemma, DeepSeek R1…), OpenRouter cloud e server Flask locale.",
+    "description": "Chat AI con modelli VERIFICATI contro Hugging Face e WebLLM (2026): Transformers.js con TinyStories 1M/3M, SmolLM2 135M/360M Instruct, Gemma 3 270M, LFM 2.5, Qwen 3/3.5 e Llama/Phi su WebGPU con fallback WASM — zero chiavi, zero server. Verifica modelli live, capability detection, chat multiple con export, streaming OpenRouter, WebLLM e backend avanzati, interfaccia liquid glass, EN/IT, PWA offline.",
     "href": "projects/tiny-ai/index.html",
     "emoji": "🤖",
     "badge": "Local AI",
