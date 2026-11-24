@@ -108,6 +108,7 @@
     ['forza4', 'Forza 4', 'Connect four pieces before your opponent.', 'games/forza4/index.html', '4', 'strategy', ['Board'], false],
     ['snake', 'Snake', 'Classic arcade snake with increasing speed.', 'games/snake/index.html', '●', 'arcade', ['Retro'], false],
     ['rpg', 'RPG Adventure', 'A browser role-playing game with exploration and combat.', 'games/rpg/index.html', '⚔', 'story', ['RPG'], false],
+    ['rpg-game', 'RPG Adventure: Realm Quest', 'Mobile-first action RPG PWA: three zones, combo combat, four skills, loot and equipment, quests, shops, save system, EN/IT and liquid-glass UI.', 'games/rpg-game/index.html', '🗡️', 'story', ['RPG','PWA','Mobile','Offline'], false],
     ['air-hockey', 'Air Hockey', 'Full-screen touch air hockey for two players.', 'games/mobile-air-hockey/index.html', '🏒', 'multiplayer', ['Touch', 'Multiplayer'], false],
     ['memory', 'Memory', 'Match pairs and keep your move count low.', 'games/memory/index.html', '◎', 'puzzle', ['Puzzle'], false],
     ['slot-collect', 'Slot Collect', 'Symbol collection with set goals, reel upgrades, three modes and persistent progress.', 'games/slot-collect/index.html', '🎰', 'arcade', ['Cards'], false],
