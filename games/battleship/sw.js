@@ -14,14 +14,14 @@ var ASSETS = [
   './js/input.js',
   './js/ui.js',
   '../../top_buttons.js',
-  '../../_kit/storage.js',
-  '../../_kit/progression.js',
-  '../../_kit/meta-layer.js',
-  '../../_kit/campaign.js',
-  '../../_kit/pwa.js',
-  '../../_kit/audio.js',
-  '../../_kit/fx.js',
-  '../../_kit/a11y.css'
+  '../_kit/storage.js',
+  '../_kit/progression.js',
+  '../_kit/meta-layer.js',
+  '../_kit/campaign.js',
+  '../_kit/pwa.js',
+  '../_kit/audio.js',
+  '../_kit/fx.js',
+  '../_kit/a11y.css'
 ];
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE)

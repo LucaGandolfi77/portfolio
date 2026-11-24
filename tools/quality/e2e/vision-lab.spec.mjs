@@ -101,7 +101,7 @@ test.describe('Vision Lab', () => {
     expect(settings.mirror).toBe(false);
   });
 
-  test('legacy FaceMesh and Smile URLs redirect to the right mode', async ({ page }) => {
+  test('legacy FaceMesh URL redirects and Smile Detection app loads', async ({ page }) => {
     await page.goto('/projects/vision-lab/legacy-facemesh_camera.html');
     await expect(page).toHaveURL(/\/projects\/vision-lab\/index\.html#mesh$/);
     await expect(page.locator('#meshPanel')).toBeVisible();
@@ -111,8 +111,9 @@ test.describe('Vision Lab', () => {
     await expect(page.locator('#smilePanel')).toBeVisible();
 
     await page.goto('/projects/smile_detection/index.html');
-    await expect(page).toHaveURL(/\/projects\/vision-lab\/#smile$/);
-    await expect(page.locator('#smilePanel')).toBeVisible();
+    await expect(page).toHaveURL(/\/projects\/smile_detection\/index\.html$/);
+    await expect(page.locator('h1')).toContainText('SMILE DETECTION');
+    await expect(page.locator('#startBtn')).toBeVisible();
   });
 
   test('mobile layout has no overflow and 44px controls', async ({ page }) => {

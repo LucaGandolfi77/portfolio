@@ -279,16 +279,15 @@ test('catalogo, redirect legacy e service worker root', () => {
   const catalog = read('../../assets/js/projects-data.js');
   assert.equal((catalog.match(/"id": "vision-lab"/g) || []).length, 1);
   assert.match(catalog, /"href": "projects\/vision-lab\/"/);
-  assert.doesNotMatch(catalog, /facemesh_camera\.html|smile_detection/);
+  assert.doesNotMatch(catalog, /facemesh_camera\.html/);
   assert.match(read('../../index.html'), /href="projects\/vision-lab\/"/);
 
   const extras = read('../../assets/js/catalog-data.js');
-  assert.doesNotMatch(extras, /smile-detection/);
+  assert.match(extras, /projects\/smile_detection\/index\.html/);
 
   const redirects = [
     ['../../projects/vision-lab/legacy-facemesh_camera.html', './index.html', 'mesh'],
     ['../../projects/vision-lab/legacy-smile_detection.html', './index.html', 'smile'],
-    ['../../projects/smile_detection/index.html', '../vision-lab/', 'smile']
   ];
   for (const [file, target, section] of redirects) {
     const source = read(file);

@@ -62,10 +62,12 @@
     ['silent-voice-reader', 'Silent Voice Reader', 'Silent vocal reading tool with local voice synthesis, privacy-first approach.', 'projects/silent-voice-reader/index.html', '🗣️', 'accessibility', ['Accessibility', 'Privacy']],
     ['solar-system-tracker', 'Solar System Tracker 3D', 'Real-time 3D solar system with JPL orbital elements and Kepler\'s equation.', 'projects/solar-system-tracker/index.html', '🪐', 'simulation', ['3D', 'Space']],
     ['soundscape-studio', 'Soundscape Studio', 'Ambient sound generator with mixer, equalizer, timer, and offline presets.', 'projects/soundscape-studio/index.html', '🎧', 'audio', ['Audio', 'PWA', 'Offline']],
-    ['verso-il-17', 'Verso il 17', 'Countdown diary for Monza Precision Team\'s world roller skating championship.', 'projects/verso-il-17/index.html', '⛸️', 'story', ['Story', 'PWA']],
+    ['verso-il-17', 'Verso il 17', 'Countdown diary for Monza Precision Team\'s world roller skating championship.', 'verso-il-17/index.html', '⛸️', 'story', ['Story', 'PWA']],
     ['countdown-to-san-dunen', 'Countdown to San Dunén', 'Goliardic countdown to October 9, San Donnino patron of Fidenza: 31 boxes with a unique ritual each, and an 8-stage bicycle route from Zheng to the Duomo.', 'projects/countdown-to-san-dunen/index.html', '🚲', 'story', ['Story', 'PWA', 'iPhone']],
     ['web-linux', 'WebLinux', 'Linux terminal emulator in the browser using v86 x86 WASM and xterm.js.', 'projects/web-linux/index.html', '🐧', 'tools', ['Linux', 'Terminal']],
     ['panettone-quiz', 'Quiz Panettone', 'Che panettone sei? Quiz condivisibile per scoprire il tuo panettone ideale.', 'projects/quizzes/panettone_quiz.html', '🧁', 'quiz', ['Quiz', 'Share', 'iPhone']]
+,    ['audio-editor-pwa', 'Audio Editor PWA', 'Browser audio editor with offline support and local processing.', 'projects/audio-editor-pwa/index.html', '🎧', 'audio', ['Audio', 'PWA', 'Offline']],
+    ['smile-detection', 'Smile Detection', 'On-device smile analysis with webcam, emotion metrics and a liquid-glass interface.', 'projects/smile_detection/index.html', '😊', 'computer-vision', ['Camera', 'AI', 'PWA', 'iPhone']]
   ].map(([id, title, description, href, icon, category, badges]) => ({
     id, title, description, href, icon, category, badges, technologies: badges,
     featured: false, status: 'live', type: 'project', requirements: badges.includes('Camera') ? ['camera'] : []
@@ -88,6 +90,8 @@
     ['csi-fidenza', 'CSI: Fidenza', 'Stessa squadra di CSI: Milano, trasferita in provincia di Parma: dalla balena dello Stirone alla testa di San Donnino.', 'games/csi-fidenza/', '🕵️‍♂️', 'story', ['PixiJS', 'GSAP', 'iPhone', 'Offline'], true],
     ['sinibbio', 'SINIBBIO AR', 'Mostri sul tavolo con la fotocamera: inclina il telefono e restano lì. Sconfiggili ripetendo le parole al microfono, schiaccia i patagarrri e affronta il SINIBBIO REALE a due parole.', 'games/sinibbio/', '👾', 'arcade', ['AR', 'Camera', 'Mic', 'Canvas', 'iPhone'], true],
     ['math-duel', 'Math Duel', 'Timed arithmetic with an AI rival, four operations, combo streaks and three modes.', 'games/math-duel/index.html', '∑', 'puzzle', ['AI', 'Speed', 'PWA'], false],
+    ['watermelon-classic', 'Watermelon Classic', 'Classic fruit-slicing arcade game, offline-ready.', 'games/watermelon-classic/index.html', '🍉', 'arcade', ['Retro', 'Touch'], false],
+    ['watermelon-fall', 'Watermelon Fall', 'Catch and slice falling fruit in this fast offline arcade game.', 'games/watermelon-fall/index.html', '🍉', 'arcade', ['Retro', 'Touch'], false],
     ['card-collector', 'Card Collector', 'Collect, upgrade, and battle with rare cards.', 'games/cards/index.html', '🎴', 'cards', ['Cards'], false],
     ['uno-online', 'UNO Online', 'Host a room and play classic UNO with friends in real time.', 'games/uno/index.html', '🎴', 'multiplayer', ['Multiplayer', 'Cards'], false],
     ['drinking-game', 'Drinking Game', 'A simple party game with custom rules and prompts.', 'games/drinking-game/index.html', '🥂', 'party', ['Party'], false],
