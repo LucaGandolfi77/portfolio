@@ -143,7 +143,7 @@
     ['taboo', 'Taboo', 'Describe the word without using the forbidden ones.', 'games/taboo/index.html', '🚫', 'party', ['Party'], false],
     ['visual-novels', 'Visual Novels', 'Interactive stories and adventures.', 'games/visual-novels/index.html', '📖', 'story', ['Story'], false],
     ['bros-karamazov', 'I Fratelli Karamazov', 'Visual novel interattiva sul capolavoro di Dostoevskij: scelte, sottotrame e molteplici percorsi.', 'pages/content/karamazov.html', '🕯️', 'story', ['Story', 'Italiano'], false],
-    ['neon-kart', 'Neon Kart', 'Drift and use nitro in a fast browser racer.', 'games/kart/index.html', '🏎', 'arcade', ['Racing'], false],
+    ['neon-kart', 'Neon Kart', 'Fast iPhone-ready PWA racer: 12 karts, 9 tracks, 4 modes, AI rivals, drift with mini-turbo, nitro, power-ups, ghosts, unlocks and liquid-glass UI.', 'games/kart/index.html', '🏎', 'arcade', ['Racing','PWA','Mobile','Offline'], false],
     ['battleship', 'Battleship Commander', 'Command your fleet and find the enemy.', 'games/battleship/index.html', '🚢', 'strategy', ['Board'], false],
     ['warship', 'Warship Commander', 'First-person naval action in the browser.', 'games/warship/index.html', '⚓', 'arcade', ['Action'], false],
     ['battlelands', 'Battlelands Royale 3D', 'Survive and eliminate opponents in a 3D arena.', 'games/battlelands-royale/index.html', '🪖', 'arcade', ['3D', 'Action'], false],
