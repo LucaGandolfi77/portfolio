@@ -1,0 +1,34 @@
+/* Pixel Runner — EN/IT overlay dictionary (the arcade kit has its own) */
+import { STR } from './config.js';
+const KEY = 'pf.pixel-runner.lang';
+let current = 'en';
+export function detect() {
+  try {
+    const v = localStorage.getItem('lang') || localStorage.getItem('site_lang') || localStorage.getItem(KEY);
+    return v === 'it' ? 'it' : 'en';
+  } catch (e) { return 'en'; }
+}
+export function initLang(v) { current = v === 'it' ? 'it' : 'en'; document.documentElement.lang = current; }
+export function getLang() { return current; }
+export function setLang(v) {
+  current = v === 'it' ? 'it' : 'en';
+  document.documentElement.lang = current;
+  try { localStorage.setItem(KEY, current); localStorage.setItem('lang', current); localStorage.setItem('site_lang', current); } catch (e) {}
+  applyStatic(document);
+  window.dispatchEvent(new CustomEvent('pixelrunner:langchange', { detail:{ lang:current } }));
+}
+export function t(key, vars) {
+  let text = (STR[current] && STR[current][key]) ??
+    (typeof STR[current]?.[key] === 'object' ? STR[current][key] : null) ??
+    STR.en[key] ?? key;
+  if (vars && typeof text === 'string') for (const [k, v] of Object.entries(vars)) text = text.replaceAll('{' + k + '}', String(v));
+  return text;
+}
+export function modeName(id) {
+  const entry = STR[current].modes?.[id] || STR.en.modes?.[id] || id;
+  return entry;
+}
+export function applyStatic(root) {
+  root.querySelectorAll?.('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+}
+window.addEventListener('project:langchange', e => { if (e.detail?.lang) setLang(e.detail.lang); });

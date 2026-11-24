@@ -126,7 +126,7 @@
     ['goose', 'Game of the Goose', 'A light classic board game.', 'games/goose/index.html', '◉', 'strategy', ['Board'], false],
     ['flappy-bird', 'Flappy Bird', 'Navigate the gaps and chase a high score.', 'games/flappy-bird/index.html', '🐦', 'arcade', ['Retro'], false],
     ['wikipedia', 'Wikipedia Game', 'A quiz whose difficulty grows with each article’s fame, from iconic to obscure.', 'games/wikipedia/index.html', 'W', 'quiz', ['Knowledge', 'Quiz'], false],
-    ['pixel-runner', 'Pixel Runner', 'Five stages, four bosses, dash and shields in a fully offline arcade runner.', 'games/pixel-runner/index.html', '▸', 'arcade', ['Retro'], false],
+    ['pixel-runner', 'Pixel Runner', 'Five stages, four bosses, four modes, six power-ups, daily challenge, stage select, local leaderboard and liquid-glass UI. Offline mobile PWA.', 'games/pixel-runner/index.html', '▸', 'arcade', ['Retro','PWA','Mobile'], false],
     ['tamagotchi', 'Tamagotchi', 'Care for a small digital companion.', 'games/tamagotchi/index.html', '♥', 'simulation', ['Casual'], false],
     ['coloring-book', 'Coloring Book', 'Relax and color figures in the browser.', 'games/coloring_book/index.html', '✎', 'creative', ['Canvas'], false],
     ['quantum-tictactoe', 'Quantum Tic-Tac-Toe', 'Play with superposition and entanglement.', 'games/quantum-tictactoe/index.html', '⚛', 'strategy', ['Quantum'], false],
