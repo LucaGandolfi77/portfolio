@@ -1,29 +1,33 @@
-const CACHE = 'pinball-pwa-v1';
+const CACHE = 'pf-pinball-shell-v1';
 const ASSETS = [
-  './index.html',
-  './manifest.webmanifest',
-  '../../top_buttons.js',
-  '../_kit/a11y.css',
-  '../_kit/storage.js',
-  '../_kit/progression.js',
-  '../_kit/meta-layer.js',
-  '../_kit/campaign.js'
+  './', './index.html', './manifest.webmanifest', './icon.svg',
+  './icons/icon-192.png', './icons/icon-512.png',
+  '../../projects/_shared/tokens.css', '../../projects/_shared/base.css',
+  '../../projects/_shared/shell.css', '../../projects/_shared/shell.js',
+  './css/app.css',
+  './js/config.js', './js/i18n.js', './js/storage.js', './js/glass.js', './js/ui.js', './js/main.js',
+  './js/engine/core.js', './js/engine/physics.js', './js/engine/tables.js', './js/engine/scoring.js'
 ];
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
-self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(
+    keys.filter(k => k.indexOf('pf-pinball-') === 0 && k !== CACHE).map(k => caches.delete(k))
+  )).then(() => self.clients.claim()));
 });
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).then(r => {
-      const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(event.request, copy));
-      return r;
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).then(r => {
+      const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r;
     }).catch(() => caches.match('./index.html')));
     return;
   }
-  event.respondWith(caches.match(event.request).then(hit => hit || fetch(event.request)));
+  e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
+    if (r && r.ok && new URL(e.request.url).origin === self.location.origin) {
+      const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c));
+    }
+    return r;
+  })));
 });
