@@ -167,7 +167,7 @@ const PROJECTS_DATA = [
   {
     "id": "morse-converter",
     "title": "Morse Converter",
-    "description": "Convert text to Morse code.",
+    "description": "Convertitore Morse moderno: conversione live, decodifica anche senza spazi, player audio con WPM/frequenza/volume, oscilloscopio, export WAV e TXT, tabella filtrabile e allenamento con flashcard, dettato e speed run. PWA offline EN/IT.",
     "href": "projects/morse/index.html",
     "emoji": "🔤",
     "badge": "Utility",
