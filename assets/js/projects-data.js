@@ -104,10 +104,10 @@ const PROJECTS_DATA = [
   {
     "id": "p2p-walkie-talkie",
     "title": "📻 P2P Walkie Talkie",
-    "description": "Secure, peer-to-peer voice chat using WebRTC. Push-to-talk functionality with retro interface.",
+    "description": "Walkie talkie P2P in liquid glass: push-to-talk con mesh audio reale fra tutti gli operatori, messaggi rapidi, VU meter, lock TX, scelta dispositivo e server di segnalazione configurabile. EN/IT e PWA offline.",
     "href": "projects/walkietalkie/index.html",
     "emoji": "🎙️",
-    "badge": "AI Tool",
+    "badge": "P2P Voice",
     "badgeColor": "#00d4ff"
   },
   {

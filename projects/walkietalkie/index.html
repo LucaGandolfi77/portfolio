@@ -1,682 +1,153 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-skin="lab">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Walkie Talkie - Multi-User</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            background: #1a1a1a;
-            color: white;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* ... Stili CSS (gli stessi del codice originale) ... */
-
-        .walkie-container {
-            background: #333;
-            width: 300px;
-            height: 550px;
-            border-radius: 40px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            box-shadow: 
-                inset 5px 5px 15px rgba(255,255,255,0.1),
-                inset -5px -5px 15px rgba(0,0,0,0.5),
-                10px 10px 30px rgba(0,0,0,0.5);
-            position: relative;
-            border: 4px solid #222;
-        }
-
-        .antenna {
-            width: 20px;
-            height: 100px;
-            background: #222;
-            position: absolute;
-            top: -80px;
-            right: 40px;
-            border-radius: 10px 10px 0 0;
-            z-index: -1;
-        }
-
-        .screen {
-            width: 80%;
-            height: 100px;
-            background: #9ea768;
-            border-radius: 10px;
-            margin-top: 30px;
-            border: 4px solid #222;
-            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-family: 'VT323', monospace;
-            color: #333;
-            text-align: center;
-            padding: 10px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .screen-text {
-            font-weight: bold;
-            font-size: 1.2rem;
-            z-index: 2;
-        }
-
-        .frequency {
-            font-size: 0.8rem;
-            margin-top: 5px;
-        }
-
-        .speaker-grill {
-            width: 80%;
-            height: 100px;
-            margin: 20px 0;
-            background: 
-                radial-gradient(circle, #111 2px, transparent 2.5px);
-            background-size: 10px 10px;
-            opacity: 0.5;
-        }
-
-        .ptt-btn {
-            width: 120px;
-            height: 120px;
-            background: #e74c3c;
-            border-radius: 50%;
-            border: none;
-            box-shadow: 
-                inset 0 5px 10px rgba(255,255,255,0.3),
-                0 5px 10px rgba(0,0,0,0.3);
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            color: white;
-            font-size: 1.2rem;
-            transition: all 0.1s;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .ptt-btn:active, .ptt-btn.active {
-            transform: scale(0.95);
-            background: #c0392b;
-            box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);
-        }
-
-        .ptt-btn:disabled {
-            background: #555;
-            cursor: not-allowed;
-            color: #888;
-        }
-
-        .controls {
-            display: flex;
-            gap: 20px;
-            margin-top: auto;
-            margin-bottom: 20px;
-        }
-
-        .small-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: none;
-            background: #555;
-            color: white;
-            box-shadow: 0 3px 5px rgba(0,0,0,0.3);
-            cursor: pointer;
-        }
-
-        .modal {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .modal-content {
-            background: #222;
-            padding: 30px;
-            border-radius: 12px;
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        .hidden { display: none !important; }
-
-        input {
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #444;
-            background: #333;
-            color: white;
-            margin: 10px 0;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .btn {
-            background: #00d4ff;
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        .noise-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAA5OTkAAABERERmZmZOTk5QUFCZmZkmj4D3AAAACHRSTlMAMwA1MzMzM7O0s14AAABPAURBVDjLY2AYBaNgFDCQAQowMIIBCTSEKQMjGFAQAxJoiFAGRjCgIAYk0BChDIxgQEEMSKAhQhkYwYCCGJBAQ4QyMIKBCgYqYBSMggEHAHRjB6Z64l5kAAAAAElFTkSuQmCC');
-            opacity: 0.1;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .led {
-            width: 10px;
-            height: 10px;
-            background: #333;
-            border-radius: 50%;
-            position: absolute;
-            top: 15px;
-            left: 20px;
-            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);
-        }
-
-        .led.on {
-            background: #e74c3c;
-            box-shadow: 0 0 5px #e74c3c;
-        }
-            
-        .led.rx {
-            background: #2ecc71;
-            box-shadow: 0 0 5px #2ecc71;
-        }
-
-        /* Visualizer bars */
-        .viz {
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-            height: 20px;
-            margin-top: 5px;
-        }
-        .bar {
-            width: 4px;
-            background: #333;
-            height: 2px;
-        }
-    </style>
-    <link rel="manifest" href="./manifest.webmanifest">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b1f">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Walkie Talkie — peer-to-peer voice chat in a liquid-glass radio. Push-to-talk, mesh audio, chat and fully offline-ready PWA.">
+<title>Walkie Talkie — P2P voice</title>
+<link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/walkietalkie/index.html">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/base.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<a class="pf-skip" href="#app" data-i18n="skip">Skip to content</a>
+<header data-project-shell data-title="Walkie Talkie" data-id="walkie-talkie"
+  data-back="../../projects.html" data-home="../../index.html"
+  data-languages="en,it" data-heading="div"></header>
 
-    <div id="connection-modal" class="modal">
-        <div class="modal-content">
-            <h2>P2P Walkie Talkie 📻</h2>
-            <p>Secure, peer-to-peer voice chat (Multi-Channel).</p>
-            
-            <div id="menu-main">
-                <button class="btn" onclick="setupHost()" style="width:100%; margin-bottom:10px;">Create Channel</button>
-                <button class="btn" onclick="showJoin()" style="width:100%; background:#444; color:white;">Join Channel</button>
-            </div>
-
-            <div id="menu-host" class="hidden">
-                <p>Channel Frequency (ID):</p>
-                <h1 id="channel-id-display-modal" style="color:#00d4ff; letter-spacing: 2px; font-family:monospace; background:#111; padding:10px; border-radius:6px;">...</h1>
-                <p style="font-size:0.8rem; color:#888;">Share this ID to invite friends</p>
-                <div style="margin: 20px auto; color:#aaa;">Waiting for clients...</div>
-                <button class="btn" onclick="resetMenu()" style="background:#444; color:white;">Back</button>
-            </div>
-
-            <div id="menu-join" class="hidden">
-                <p>Enter Frequency (ID):</p>
-                <input type="text" id="join-id-input" placeholder="e.g. A1B2" style="text-transform:uppercase;">
-                <button class="btn" onclick="joinGame()" style="width:100%; margin-bottom:10px;">Tune In</button>
-                <button class="btn" onclick="resetMenu()" style="background:#444; color:white; width:100%;">Back</button>
-            </div>
-        </div>
+<div id="app">
+  <header class="topbar glass">
+    <div class="brand"><span class="brand-icon">📻</span><div><b data-i18n="title">WALKIE TALKIE</b><small data-i18n="tagline">P2P voice in your pocket</small></div></div>
+    <div class="top-actions">
+      <button class="tbtn" id="btnHelp" type="button">? <span data-i18n="docs">Documentazione</span></button>
+      <button class="tbtn" id="btnTheme" type="button" data-i18n="theme">Tema</button>
+      <button class="tbtn" id="btnLang" type="button" data-i18n="lang">IT / EN</button>
+      <button class="tbtn primary" id="btnSettings" type="button">⚙ <span data-i18n="settings">Impostazioni</span></button>
     </div>
+  </header>
 
-    <div class="walkie-container">
+  <main class="stage">
+    <section class="device-wrap">
+      <div class="walkie glass" id="walkie">
         <div class="antenna"></div>
         <div class="led" id="status-led"></div>
-        
         <div class="screen">
-            <div class="noise-overlay"></div>
-            <div class="screen-text" id="channel-id-display">ID: ---</div> 
-            <div class="frequency" id="screen-freq">---.--- MHz</div>
-            <div class="screen-text" id="screen-status">OFFLINE</div>
-            <div class="viz" id="viz-bars">
-                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            </div>
-            <div style="font-size: 0.6rem; color: #555; margin-top: 5px;" id="client-count">Clients: 0</div>
+          <div class="scanlines"></div>
+          <div class="screen-top"><span id="channel-id-display">ID: ---</span><span id="screen-freq">---.--- MHz</span></div>
+          <div class="screen-status" id="screen-status" data-i18n="offline">OFFLINE</div>
+          <div class="vu" id="vu-bars" aria-hidden="true"></div>
+          <div class="screen-foot"><span id="client-count">0</span> <span data-i18n="clients">Operatori</span></div>
         </div>
-
-        <div class="speaker-grill"></div>
-
-        <button id="ptt-btn" class="ptt-btn" disabled>HOLD<br>TO TALK</button>
-
-        <div class="controls">
-            <button class="small-btn" onclick="showConnectionModal()">📡</button>
-            <button class="small-btn" onclick="toggleMute()">🔇</button>
+        <div class="speaker" aria-hidden="true"></div>
+        <button class="ptt" id="ptt-btn" type="button" disabled>
+          <span class="ptt-icon">🎙️</span>
+          <span class="ptt-label"><b id="pttMain" data-i18n="hold">Tieni premuto</b><small id="pttSub" data-i18n="toTalk">per parlare</small></span>
+        </button>
+        <div class="device-controls">
+          <button class="round" id="btnConnect" type="button" title="Connect">📡</button>
+          <button class="round" id="btnMute" type="button" title="Mute">🔇</button>
+          <button class="round" id="btnLock" type="button" title="PTT lock">🔒</button>
+          <button class="round" id="btnCopy" type="button" title="Copy ID">📋</button>
+          <button class="round" id="btnLink" type="button" title="Copy link">🔗</button>
         </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="glass card">
+        <h3 data-i18n="chat">Messaggi</h3>
+        <div class="chat-list" id="chatList"></div>
+        <div class="quick" id="quickMsgs"></div>
+        <form class="chat-form" id="chatForm">
+          <input id="chatInput" data-i18n-placeholder="typeMessage" placeholder="Scrivi un messaggio…" maxlength="300" autocomplete="off">
+          <button class="tbtn primary" type="submit" data-i18n="send">Invia</button>
+        </form>
+      </div>
+      <div class="glass card">
+        <h3 data-i18n="who">In rete</h3>
+        <div class="peer-list" id="peerList"></div>
+        <h3 data-i18n="recent">Canali recenti</h3>
+        <div class="chips" id="recentList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toasts" aria-live="polite"></div>
+</div>
+
+<div class="modal" id="connectModal" role="dialog" aria-modal="true">
+  <div class="glass modal-box">
+    <h2>📻 <span data-i18n="channel">Frequenza / Canale</span></h2>
+    <div id="menu-main">
+      <button class="tbtn big wide" id="btnCreate" type="button" data-i18n="create">Crea canale</button>
+      <button class="tbtn wide" id="btnJoin" type="button" data-i18n="join">Unisciti</button>
     </div>
+    <div id="menu-host" class="hidden">
+      <p data-i18n="shareId">Condividi questo ID con i tuoi amici</p>
+      <h1 class="channel-code" id="channel-id-modal">····</h1>
+      <p class="hint" data-i18n="waiting">In attesa di operatori…</p>
+      <div class="btn-row">
+        <button class="tbtn" id="btnCopyId" type="button" data-i18n="copy">Copia</button>
+        <button class="tbtn" id="btnCopyLink2" type="button" data-i18n="copyLink">Copia link</button>
+        <button class="tbtn" type="button" data-close="connectModal" data-i18n="close">Chiudi</button>
+      </div>
+    </div>
+    <div id="menu-join" class="hidden">
+      <label class="fld"><span data-i18n="enterId">Inserisci l’ID del canale</span><input id="join-id-input" maxlength="8" autocomplete="off" style="text-transform:uppercase"></label>
+      <button class="tbtn big wide" id="btnJoinGo" type="button" data-i18n="tune">Sintonizza</button>
+      <button class="tbtn wide" id="btnBack" type="button" data-i18n="back">Indietro</button>
+    </div>
+  </div>
+</div>
 
-    <div id="remote-audio-container">
-        </div>
+<div class="modal" id="settingsModal" role="dialog" aria-modal="true">
+  <div class="glass modal-box wide-box">
+    <h2>⚙ <span data-i18n="settings">Impostazioni</span></h2>
+    <div class="settings-grid">
+      <label class="fld"><span data-i18n="device">Dispositivo audio</span><select id="deviceSelect"></select></label>
+      <label class="fld"><span data-i18n="speaker">Volume altoparlante</span><input id="volumeRange" type="range" min="0" max="100" value="80"></label>
+      <label class="check"><input type="checkbox" id="echoCheck" checked> <span data-i18n="echo">Cancellazione eco</span></label>
+      <label class="check"><input type="checkbox" id="noiseCheck" checked> <span data-i18n="noise">Riduzione rumore</span></label>
+      <label class="check"><input type="checkbox" id="gainCheck" checked> <span data-i18n="gain">Guadagno automatico</span></label>
+      <label class="check"><input type="checkbox" id="squelchCheck" checked> <span data-i18n="squelch">Squelch (rumore TX/RX)</span></label>
+      <label class="check"><input type="checkbox" id="lockCheck"> <span data-i18n="lockMode">PTT a blocco</span></label>
+      <label class="fld"><span data-i18n="host">Host</span><input id="signalingHost" value="0.peerjs.com"></label>
+      <label class="fld"><span data-i18n="port">Porta</span><input id="signalingPort" type="number" value="443"></label>
+      <label class="check"><input type="checkbox" id="signalingSecure" checked> <span data-i18n="secure">Connessione sicura (TLS)</span></label>
+    </div>
+    <p class="hint" data-i18n="echoNote">La segnalazione richiede internet o un PeerServer locale.</p>
+    <div class="btn-row">
+      <button class="tbtn danger" id="btnReset" type="button" data-i18n="reset">Disconnetti</button>
+      <button class="tbtn big" type="button" data-close="settingsModal" data-i18n="close">Chiudi</button>
+    </div>
+  </div>
+</div>
 
-    <script>
-        // --- Stato Globale (Aggiornato per Multi-User) ---
-        let peer = null;
-        let localStream = null;
-        let isHost = false;
-        let isMuted = false;
-        let channelId = null;
-        
-        // Collezione di tutte le connessioni dati e vocali attive
-        const activeConnections = new Map(); // Map<PeerID, {data: DataConnection, call: MediaConnection, remoteStream: MediaStream}>
+<div class="modal" id="helpModal" role="dialog" aria-modal="true">
+  <div class="glass modal-box wide-box">
+    <h2>📖 <span data-i18n="docs">Documentazione</span></h2>
+    <div id="helpBody">
+      <p><b>Push to talk:</b> tieni premuto il pulsante rosso (o la barra spaziatrice) per trasmettere.</p>
+      <p><b>Canale:</b> crea un ID a 4 caratteri e condividilo. Chi si unisce si collega in rete mesh a tutti gli altri operatori.</p>
+      <p><b>Micrófono:</b> il browser chiede il permesso al primo accesso; la traccia resta disattivata finché non trasmetti.</p>
+      <p><b>Segnalazione:</b> PeerJS usa un server di segnalazione pubblico; imposta un PeerServer locale nelle impostazioni per un uso offline/LAN.</p>
+    </div>
+    <button class="tbtn big" type="button" data-close="helpModal" data-i18n="close">Chiudi</button>
+  </div>
+</div>
 
-        // --- UI Elements ---
-        const modal = document.getElementById('connection-modal');
-        const screenStatus = document.getElementById('screen-status');
-        const screenFreq = document.getElementById('screen-freq');
-        const pttBtn = document.getElementById('ptt-btn');
-        const led = document.getElementById('status-led');
-        const channelIdDisplay = document.getElementById('channel-id-display');
-        const clientCountDisplay = document.getElementById('client-count');
-        const remoteAudioContainer = document.getElementById('remote-audio-container');
+  <div id="remote-audio-container" hidden></div>
 
-        // --- Audio Context for Visualizer ---
-        let audioCtx, analyser, dataArray;
-
-        // --- Funzioni UI di Base ---
-        function showConnectionModal() {
-            modal.classList.remove('hidden');
-        }
-
-        function resetMenu() {
-            document.getElementById('menu-main').classList.remove('hidden');
-            document.getElementById('menu-host').classList.add('hidden');
-            document.getElementById('menu-join').classList.add('hidden');
-        }
-        
-        // --- Setup Iniziale ---
-        async function getLocalStream() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                localStream = stream;
-                // Inizialmente disattiva la traccia per la logica PTT
-                localStream.getAudioTracks()[0].enabled = false;
-                return stream;
-            } catch (err) {
-                console.error("Mic access denied", err);
-                alert("Microphone access is required!");
-                return null;
-            }
-        }
-
-        // --- HOST: Creazione Canale ---
-        function setupHost() {
-            getLocalStream().then(stream => {
-                if (!stream) return;
-                
-                // Genera un ID casuale e unico
-                const id = Math.random().toString(36).substring(2, 6).toUpperCase();
-                channelId = id;
-                peer = new Peer(id);
-                
-                peer.on('open', (id) => {
-                    document.getElementById('channel-id-display-modal').innerText = id;
-                    document.getElementById('menu-main').classList.add('hidden');
-                    document.getElementById('menu-host').classList.remove('hidden');
-                    channelIdDisplay.innerText = `ID: ${id}`; // Mostra ID in alto
-                    screenFreq.innerText = "HOST CHANNEL";
-                    isHost = true;
-                    updateStatus("LISTENING", "led");
-                });
-
-                // Gestisce le NUOVE connessioni in entrata (Host)
-                peer.on('connection', handleNewDataConnection);
-                peer.on('call', handleIncomingCall);
-            });
-        }
-
-        // --- JOINER: Accesso Canale ---
-        function showJoin() {
-            document.getElementById('menu-main').classList.add('hidden');
-            document.getElementById('menu-join').classList.remove('hidden');
-        }
-
-        function joinGame() {
-            const id = document.getElementById('join-id-input').value.toUpperCase();
-            if (!id) return;
-            channelId = id;
-            
-            getLocalStream().then(stream => {
-                if (!stream) return;
-
-                // Non forniamo un ID, PeerJS ne genera uno casuale
-                peer = new Peer(); 
-                peer.on('open', (myPeerId) => {
-                    // Imposta l'ID del canale in alto
-                    channelIdDisplay.innerText = `ID: ${channelId}`;
-                    screenFreq.innerText = `CONNECTED TO ${channelId}`;
-                    updateStatus("CONNECTING...", "led");
-                    
-                    // Inizia la connessione dati e vocale verso l'host
-                    connectToPeer(channelId);
-                });
-                
-                // I client devono essere pronti a ricevere chiamate dagli altri client
-                peer.on('connection', handleNewDataConnection);
-                peer.on('call', handleIncomingCall);
-            });
-        }
-        
-        // --- Connessione a un Peer Specifico ---
-        function connectToPeer(targetPeerId) {
-            console.log(`Connecting to ${targetPeerId}`);
-            
-            // 1. Connessione Dati
-            const dataConn = peer.connect(targetPeerId);
-            setupDataConnection(dataConn);
-            
-            // 2. Connessione Media (Voce)
-            const mediaCall = peer.call(targetPeerId, localStream);
-            setupMediaCall(mediaCall);
-            
-            // Aggiungi alla mappa (solo l'host usa la mappa in modo estensivo, ma la usiamo per uniformità)
-            activeConnections.set(targetPeerId, { data: dataConn, call: mediaCall, remoteStream: null });
-            
-            // L'host aggiorna i client connessi, il client mostra l'host
-            updateClientCount();
-
-            // Nasconde il modale per tutti dopo la prima connessione
-            modal.classList.add('hidden');
-            pttBtn.disabled = false;
-        }
-
-        // --- Gestione Connessioni Dati ---
-        function handleNewDataConnection(conn) {
-            console.log(`Incoming Data Connection from: ${conn.peer}`);
-            setupDataConnection(conn);
-            
-            // Se l'host riceve una connessione, la salva e tenta di chiamare
-            if (isHost) {
-                // Se non è già in mappa, connettiti anche per la voce
-                if (!activeConnections.has(conn.peer)) {
-                    const mediaCall = peer.call(conn.peer, localStream);
-                    setupMediaCall(mediaCall);
-                    activeConnections.set(conn.peer, { data: conn, call: mediaCall, remoteStream: null });
-                }
-                
-                // Invia a tutti i client l'ID del nuovo arrivato (opzionale, per connettersi a tutti)
-                // Nota: In questa implementazione semplificata, tutti parlano con tutti (Mesh), 
-                // quindi l'host si limita a gestire la prima connessione dati.
-                
-                updateClientCount();
-            }
-        }
-        
-        function setupDataConnection(conn) {
-            conn.on('open', () => {
-                console.log(`Data connection established with ${conn.peer}`);
-                updateStatus("CONNECTED", "led");
-                
-                // Dopo la prima connessione, nascondi il modale
-                if (modal.classList.contains('hidden')) {
-                     playStaticBurst();
-                }
-                
-                // Se non è l'host, deve connettersi anche agli altri peer noti!
-                // Per semplicità, in questa mesh P2P, ci aspettiamo che l'host faccia da coordinatore.
-                
-                conn.on('data', (data) => {
-                    handleData(data, conn.peer);
-                });
-
-                conn.on('close', () => {
-                    handlePeerDisconnect(conn.peer);
-                });
-                
-                conn.on('error', (err) => {
-                    console.error("Data connection error:", err);
-                });
-            });
-        }
-
-        // --- Gestione Chiamate Vocali ---
-        function handleIncomingCall(call) {
-            console.log(`Incoming Media Call from: ${call.peer}`);
-            
-            // Risponde alla chiamata in entrata con il proprio flusso locale
-            call.answer(localStream); 
-            setupMediaCall(call);
-
-            // Se il peer non è nell'elenco delle connessioni (caso di connessione diretta)
-            if (!activeConnections.has(call.peer)) {
-                 activeConnections.set(call.peer, { data: null, call: call, remoteStream: null });
-            }
-            updateClientCount();
-        }
-        
-        function setupMediaCall(call) {
-            call.on('stream', (remoteStream) => {
-                handleRemoteStream(remoteStream, call.peer);
-            });
-            
-            call.on('close', () => {
-                 handlePeerDisconnect(call.peer);
-            });
-            
-            call.on('error', (err) => {
-                console.error("Media call error:", err);
-            });
-        }
-
-        // --- Gestione dei Dati (PTT Status) ---
-        function handleData(data, peerId) {
-            if (data.type === 'talking_start') {
-                screenStatus.innerText = `RX: ${peerId}`;
-                led.className = "led rx";
-            } else if (data.type === 'talking_end') {
-                screenStatus.innerText = "CONNECTED";
-                led.className = "led";
-                playStaticBurst();
-            }
-        }
-        
-        // --- Gestione Streaming Audio Remoto ---
-        function handleRemoteStream(stream, peerId) {
-            // Se esiste già un elemento audio, aggiorna
-            let audioEl = document.getElementById(`remote-audio-${peerId}`);
-            if (!audioEl) {
-                // Altrimenti, crea un nuovo elemento <audio> per questo peer
-                audioEl = document.createElement('audio');
-                audioEl.id = `remote-audio-${peerId}`;
-                audioEl.autoplay = true;
-                remoteAudioContainer.appendChild(audioEl);
-            }
-            audioEl.srcObject = stream;
-            
-            // Aggiorna l'oggetto in activeConnections
-            if (activeConnections.has(peerId)) {
-                activeConnections.get(peerId).remoteStream = stream;
-            }
-            
-            // Configura il visualizer sul primo stream ricevuto (o sul principale)
-            // if (!audioCtx) setupVisualizer(stream); 
-            // Nota: Per semplicità, manteniamo il visualizer sul primo stream
-            
-            // Nasconde il modale dopo aver ricevuto il primo stream audio
-            modal.classList.add('hidden');
-            updateStatus("CONNECTED", "led");
-        }
-        
-        // --- Logica PTT (Push-to-Talk) ---
-        
-        // Mouse & Touch events
-        pttBtn.addEventListener('mousedown', startTalking);
-        document.addEventListener('mouseup', stopTalking);
-        pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startTalking(); });
-        pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopTalking(); });
-
-        function startTalking() {
-            if (!localStream || pttBtn.disabled) return;
-            
-            // 1. Abilita la traccia vocale locale
-            localStream.getAudioTracks()[0].enabled = true;
-            
-            // 2. Aggiorna la UI locale
-            pttBtn.classList.add('active');
-            screenStatus.innerText = "TRANSMITTING";
-            led.className = "led on";
-            
-            // 3. BROADCAST: Invia il segnale di 'talking_start' a TUTTE le connessioni
-            activeConnections.forEach(conn => {
-                if (conn.data && conn.data.open) {
-                    conn.data.send({ type: 'talking_start', senderId: peer.id });
-                }
-            });
-        }
-
-        function stopTalking() {
-            if (!localStream || !pttBtn.classList.contains('active')) return;
-            
-            // 1. Disabilita la traccia vocale locale
-            localStream.getAudioTracks()[0].enabled = false;
-            
-            // 2. Aggiorna la UI locale
-            pttBtn.classList.remove('active');
-            screenStatus.innerText = "CONNECTED";
-            led.className = "led";
-            
-            // 3. BROADCAST: Invia il segnale di 'talking_end' a TUTTE le connessioni
-            activeConnections.forEach(conn => {
-                if (conn.data && conn.data.open) {
-                    conn.data.send({ type: 'talking_end', senderId: peer.id });
-                }
-            });
-            playStaticBurst();
-        }
-
-        // --- Gestione Disconnessione e UI ---
-        function handlePeerDisconnect(peerId) {
-            console.warn(`Peer ${peerId} disconnected.`);
-            
-            // Rimuovi l'elemento audio
-            const audioEl = document.getElementById(`remote-audio-${peerId}`);
-            if (audioEl) audioEl.remove();
-            
-            // Rimuovi dalla mappa
-            activeConnections.delete(peerId);
-            updateClientCount();
-
-            updateStatus("CONNECTED", "led"); // Ritorna allo stato base
-            playStaticBurst();
-        }
-        
-        function updateClientCount() {
-            clientCountDisplay.innerText = `Clients: ${activeConnections.size}`;
-        }
-        
-        function updateStatus(text, ledClass) {
-            screenStatus.innerText = text;
-            led.className = `led ${ledClass}`;
-        }
-
-        // --- Funzioni Audio FX e Visualizer (non modificate) ---
-
-        function playStaticBurst() {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const bufferSize = ctx.sampleRate * 0.2; 
-            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
-            
-            const noise = ctx.createBufferSource();
-            noise.buffer = buffer;
-            
-            const gain = ctx.createGain();
-            gain.gain.value = 0.1;
-            
-            noise.connect(gain);
-            gain.connect(ctx.destination);
-            noise.start();
-            noise.stop(ctx.currentTime + 0.1); // Ferma dopo 100ms
-        }
-
-        function setupVisualizer(stream) {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioCtx.createMediaStreamSource(stream);
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 32;
-            source.connect(analyser);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            drawViz();
-        }
-
-        const vizBars = document.querySelectorAll('.bar');
-        function drawViz() {
-            requestAnimationFrame(drawViz);
-            if (!analyser) return;
-            
-            analyser.getByteFrequencyData(dataArray);
-            
-            for(let i=0; i<8; i++) {
-                // Calcola l'indice per campionare il dato dalla frequenza
-                const dataIndex = Math.floor(i * dataArray.length / 8); 
-                const val = dataArray[dataIndex];
-                const h = (val / 255) * 20;
-                if (vizBars[i]) {
-                    vizBars[i].style.height = Math.max(2, h) + 'px';
-                    vizBars[i].style.background = val > 100 ? '#e74c3c' : '#333';
-                }
-            }
-        }
-        
-        function toggleMute() {
-            // Mute tutti i flussi remoti
-            const audioElements = document.querySelectorAll('#remote-audio-container audio');
-            const isCurrentlyMuted = audioElements.length > 0 ? audioElements[0].muted : false;
-            
-            audioElements.forEach(el => {
-                el.muted = !isCurrentlyMuted;
-            });
-            
-            screenStatus.innerText = !isCurrentlyMuted ? "MUTED" : "CONNECTED";
-        }
-        
-    </script>
-    <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{})</script>
+<script src="./vendor/peerjs.min.js"></script>
+<script type="module" src="./js/main.js"></script>
+<script src="../_shared/shell.js" defer></script>
 </body>
-<script src="../_shared/top_buttons.js"></script>
 </html>
