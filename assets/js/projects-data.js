@@ -239,7 +239,7 @@ const PROJECTS_DATA = [
   {
     "id": "people-simulator",
     "title": "People Simulator",
-    "description": "US population statistics map.",
+    "description": "Simulatore agent-based di una giornata negli USA: 3 coorti con transizioni Markov orarie, eventi (neve, caldo, festività, blackout), metriche emergenti (felicità, traffico, energia, produttività), mappa coropleta con zoom, confronto tra stati, timeline 24h e scenario editor. Mappa e dati vendoriati: funziona offline. EN/IT, PWA, zero CDN.",
     "href": "projects/people-simulator/index.html",
     "emoji": "👥",
     "badge": "Data",
