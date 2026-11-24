@@ -8,6 +8,12 @@ import * as filters from './filters.js';
 import * as gallery from './gallery.js';
 import * as subtitles from './subtitles.js';
 import * as ui from './ui.js';
+import { MediaPipeEngine, MP_FILTERS, modelLabel } from './mediapipe.js';
+import { drawStickers, drawPose, poseFromMatrix, STICKERS } from './ar.js';
+import { createScanner, drawBoxes } from './barcode.js';
+import { createRecorder } from './recorder.js';
+import { drawGrid, drawLevel, drawHistogram } from './photo-tools.js';
+import { createVoice } from './voice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('canvas');
@@ -40,6 +46,14 @@ let cameraStarted = false;
 let pinchStart = null;
 let lastTap = 0;
 
+const mpEngine = new MediaPipeEngine();
+let barcodeScanner = null;
+let qrCodes = [];
+let recorderInst = null;
+let voiceInst = null;
+let histogramData = null;
+let lastHistogram = 0;
+
 function persistSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -62,17 +76,27 @@ async function selectFilter(filter) {
   ui.setFilter(filter.id);
   ui.setStatus(t('status.ready'));
 
-  if (filter.id !== 'subtitles') subtitles.stop();
+  if (filter.id !== 'subtitles') { subtitles.stop(); if (voiceInst) voiceInst.stop(); }
 
   if (filter.voice) {
-    if (!subtitles.isSupported()) {
-      ui.toast(t('status.subtitleError'));
-    } else {
-      subtitles.start(
-        text => { subtitleText = text; },
-        key => ui.setStatus(t(key))
-      );
+    if (!voiceInst) {
+      voiceInst = createVoice({
+        lang: settings.language || 'it-IT',
+        onTranscript: (text) => { subtitleText = text; },
+        onCommand: handleVoiceCommand,
+        onStatus: (status) => ui.setStatus(t(status === 'error' ? 'status.subtitleError' : 'status.subtitleListening'))
+      });
     }
+    if (!voiceInst.start(settings.language || 'it-IT')) ui.toast(t('status.subtitleError'));
+    return;
+  }
+
+  if (filter.barcode) {
+    if (!barcodeScanner) barcodeScanner = await createScanner();
+    if (!barcodeScanner) {
+      ui.toast('BarcodeDetector non supportato');
+      setFilterState(filter, 'error');
+    } else setFilterState(filter, null);
     return;
   }
 
@@ -80,22 +104,63 @@ async function selectFilter(filter) {
 
   setFilterState(filter, 'loading');
   ui.setStatus(t('status.aiNeeded'));
-  const result = await ai.prepare(filter, () => {
-    ui.setStatus(t('status.aiNeeded'));
-  });
-  if (result.ok) {
+  let ready = false;
+  if (filter.runtime === 'mediapipe' && settings.aiRuntime !== 'legacy') {
+    const needed = MP_FILTERS[filter.id] || [];
+    try {
+      ready = await mpEngine.prepare(needed, (task) => ui.setStatus('MediaPipe: ' + (task === 'wasm' ? 'WASM…' : modelLabel(task))));
+    } catch (e) { ready = false; }
+  } else {
+    const result = await ai.prepare(filter, () => ui.setStatus(t('status.aiNeeded')));
+    ready = result.ok;
+  }
+  if (ready) {
     setFilterState(filter, null);
     ui.setStatus(t('status.aiReady'));
   } else {
     setFilterState(filter, 'error');
-    ui.setStatus(t(result.reason === 'offline' ? 'status.offline' : 'status.cameraError'), 'error');
-    ui.toast(t(result.reason === 'offline' ? 'msg.offlineAI' : 'msg.loadFail'));
+    ui.setStatus(t('status.cameraError'), 'error');
+    ui.toast(t('msg.loadFail'));
     if (previous && previous.id) {
       currentFilter = previous;
       settings.filter = previous.id;
       ui.setFilter(previous.id);
     }
   }
+}
+
+function handleVoiceCommand(command) {
+  if (command === 'capture') schedulePhoto();
+  else if (command === 'record') toggleRecording();
+  else if (command === 'stop') stopAll();
+  else if (command === 'grid') toggleTool('grid');
+}
+
+function toggleTool(name) {
+  settings[name] = !settings[name];
+  persistSettings();
+  ui.toast(name.toUpperCase() + ': ' + (settings[name] ? 'ON' : 'OFF'));
+}
+
+function stopAll() {
+  if (recorderInst && (recorderInst.recording || recorderInst.timelapse)) toggleRecording();
+  if (voiceInst) voiceInst.stop();
+}
+
+function toggleRecording() {
+  if (!cameraStarted) { ui.toast(t('status.cameraError')); return; }
+  if (recorderInst && (recorderInst.recording || recorderInst.timelapse)) {
+    recorderInst.stop();
+    ui.toast('Registrazione fermata');
+    return;
+  }
+  recorderInst = createRecorder({ onStop: () => ui.toast('Video salvato') });
+  const timelapseMs = Number(settings.timelapse || 0) * 1000;
+  const ok = recorderInst.start(canvas, {
+    timelapseMs,
+    onFrame: (count) => ui.toast('Time-lapse ' + count)
+  });
+  ui.toast(ok ? (timelapseMs ? 'Time-lapse avviato' : 'Registrazione avviata') : 'Registrazione non supportata');
 }
 
 async function startCamera() {
@@ -123,15 +188,34 @@ function drawPlaceholder() {
 }
 
 function maybeDetect(now) {
-  if (!currentFilter.ai || !cameraStarted || !detectionResultsReady()) return;
+  if (!cameraStarted) return;
+  const isMP = currentFilter.runtime === 'mediapipe' && settings.aiRuntime !== 'legacy' && currentFilter.ai;
+  const isQR = !!currentFilter.barcode;
+  if (!currentFilter.ai && !isQR) return;
   const interval = 1000 / Math.max(1, settings.detectionFps || 10);
   if (now - lastDetection < interval) return;
   lastDetection = now;
   const started = performance.now();
-  Promise.resolve(ai.detect(currentFilter, video)).then(result => {
-    detectionResults = result;
+  if (isMP) {
+    const names = MP_FILTERS[currentFilter.id] || [];
+    detectionResults = {};
+    names.forEach((name) => { detectionResults[name] = mpEngine.detect(name, video); });
     detectionMs = performance.now() - started;
-  });
+    if (currentFilter.id === 'pose') {
+      const matrix = detectionResults.pose && detectionResults.pose.facialTransformationMatrixes && detectionResults.pose.facialTransformationMatrixes[0];
+      void matrix;
+    }
+  } else if (isQR && barcodeScanner) {
+    barcodeScanner.detect(video).then((codes) => {
+      qrCodes = codes || [];
+      detectionMs = performance.now() - started;
+    });
+  } else {
+    Promise.resolve(ai.detect(currentFilter, video)).then(result => {
+      detectionResults = result;
+      detectionMs = performance.now() - started;
+    });
+  }
 }
 
 function detectionResultsReady() {
@@ -156,9 +240,51 @@ function frame(now) {
     };
     filters.renderFrame(ctx, video, canvas, currentFilter.id, opts);
     maybeDetect(now);
-    if (currentFilter.ai || currentFilter.voice) {
+    const useMP = currentFilter.runtime === 'mediapipe' && settings.aiRuntime !== 'legacy';
+    if ((currentFilter.ai || currentFilter.voice) && !useMP) {
       filters.renderOverlay(ctx, canvas, currentFilter.id, detectionResults, opts);
     }
+    if (currentFilter.id === 'objects' && detectionResults && detectionResults.objects && detectionResults.objects.detections) {
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.font = '600 11px ui-monospace, monospace';
+      for (const detection of detectionResults.objects.detections) {
+        const box = detection.boundingBox;
+        if (!box) continue;
+        ctx.strokeStyle = '#67e8f9';
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+        const category = detection.categories && detection.categories[0];
+        const label = (category ? category.categoryName : 'object') + ' ' + Math.round((category ? category.score : 0) * 100) + '%';
+        ctx.fillStyle = 'rgba(4,10,24,.8)';
+        ctx.fillRect(box.x, Math.max(0, box.y - 18), ctx.measureText(label).width + 10, 17);
+        ctx.fillStyle = '#eef2ff';
+        ctx.fillText(label, box.x + 5, Math.max(12, box.y - 5));
+      }
+      ctx.restore();
+    }
+
+    if (currentFilter.id === 'ar' && detectionResults && detectionResults.face) {
+      drawStickers(ctx, detectionResults.face, canvas.width, canvas.height, settings.stickers || []);
+    }
+    let tilt = 0;
+    if (currentFilter.id === 'ar' && detectionResults && detectionResults.face && detectionResults.face.facialTransformationMatrixes) {
+      tilt = poseFromMatrix(detectionResults.face.facialTransformationMatrixes[0]?.data).roll;
+    }
+    if (currentFilter.id === 'pose' && detectionResults && detectionResults.pose && detectionResults.pose.poseLandmarks) {
+      const points = detectionResults.pose.poseLandmarks[0];
+      if (points && points[11] && points[12]) {
+        tilt = Math.atan2(points[12].y - points[11].y, points[12].x - points[11].x) * 180 / Math.PI;
+        drawPose(ctx, { yaw: 0, pitch: 0, roll: tilt }, canvas.width - 70, 70, 90);
+      }
+    }
+    if (currentFilter.barcode) drawBoxes(ctx, qrCodes, canvas.width, canvas.height);
+    if (settings.grid) drawGrid(ctx, canvas.width, canvas.height);
+    if (settings.level) drawLevel(ctx, canvas.width, canvas.height, tilt);
+    if (settings.histogram && now - lastHistogram > 600) {
+      lastHistogram = now;
+      try { histogramData = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch (e) {}
+    }
+    if (settings.histogram && histogramData) drawHistogram(ctx, histogramData, 12, canvas.height - 92, 160, 72);
   } else {
     drawPlaceholder();
   }
@@ -345,6 +471,63 @@ ui.initUI({
     persistSettings();
   }
 }, settings);
+
+/* Nuovi controlli AR / tool / registrazione */
+function buildStickerTray() {
+  const tray = $('stickerTray');
+  if (!tray) return;
+  tray.innerHTML = STICKERS.map((item) => `<button type="button" class="sticker-btn ${(settings.stickers || []).includes(item.id) ? 'on' : ''}" data-sticker="${item.id}" title="${item.id}">${item.emoji}</button>`).join('');
+  tray.querySelectorAll('[data-sticker]').forEach((button) => button.addEventListener('click', () => {
+    const id = button.dataset.sticker;
+    settings.stickers = settings.stickers || [];
+    if (settings.stickers.includes(id)) settings.stickers = settings.stickers.filter((value) => value !== id);
+    else settings.stickers.push(id);
+    button.classList.toggle('on', settings.stickers.includes(id));
+    persistSettings();
+  }));
+}
+
+const toolButtons = [
+  ['btnGrid', 'grid'], ['btnLevel', 'level'], ['btnHistogram', 'histogram']
+];
+toolButtons.forEach(([id, key]) => {
+  const button = $(id);
+  if (!button) return;
+  button.classList.toggle('active', !!settings[key]);
+  button.addEventListener('click', () => {
+    toggleTool(key);
+    button.classList.toggle('active', !!settings[key]);
+  });
+});
+$('btnRecord')?.addEventListener('click', toggleRecording);
+$('btnVoice')?.addEventListener('click', () => {
+  if (!voiceInst) {
+    voiceInst = createVoice({
+      lang: settings.language || 'it-IT',
+      onTranscript: (text) => { subtitleText = text; },
+      onCommand: handleVoiceCommand,
+      onStatus: (status) => ui.setStatus(t(status === 'error' ? 'status.subtitleError' : 'status.subtitleListening'))
+    });
+  }
+  const active = voiceInst.toggle(settings.language || 'it-IT');
+  $('btnVoice')?.classList.toggle('active', active);
+});
+if ($('aiRuntimeSelect')) {
+  $('aiRuntimeSelect').value = settings.aiRuntime || 'mediapipe';
+  $('aiRuntimeSelect').addEventListener('change', (event) => {
+    settings.aiRuntime = event.target.value;
+    persistSettings();
+    ui.toast('Runtime AI: ' + event.target.value);
+  });
+}
+if ($('timelapseSelect')) {
+  $('timelapseSelect').value = String(settings.timelapse || 0);
+  $('timelapseSelect').addEventListener('change', (event) => {
+    settings.timelapse = Number(event.target.value);
+    persistSettings();
+  });
+}
+buildStickerTray();
 
 ui.setFilter(currentFilter.id);
 ui.setTimerActive(!!timerValue);

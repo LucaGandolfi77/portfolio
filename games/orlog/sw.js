@@ -1,29 +1,46 @@
-const CACHE = 'orlog-pwa-v1';
-const ASSETS = [
+/* Orlog — service worker (GitHub Pages offline) */
+var CACHE = 'pf-orlog-shell-v1';
+var ASSETS = [
+  './',
   './index.html',
   './manifest.webmanifest',
-  '../../top_buttons.js',
-  '../_kit/a11y.css',
-  '../_kit/storage.js',
-  '../_kit/progression.js',
-  '../_kit/meta-layer.js',
-  '../_kit/campaign.js'
+  './icon.svg',
+  './css/app.css',
+  './js/main.js',
+  './js/config.js',
+  './js/engine.js',
+  './js/modes.js',
+  './js/progression.js',
+  './js/share.js',
+  './js/audio.js',
+  './js/ui.js',
+  '../../top_buttons.js'
 ];
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+self.addEventListener('install', function (event) {
+  event.waitUntil(caches.open(CACHE)
+    .then(function (cache) { return Promise.allSettled(ASSETS.map(function (url) { return cache.add(url); })); })
+    .then(function () { return self.skipWaiting(); }));
 });
-self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+self.addEventListener('activate', function (event) {
+  event.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (key) {
+      return key.indexOf('pf-orlog-') === 0 && key !== CACHE;
+    }).map(function (key) { return caches.delete(key); }));
+  }).then(function () { return self.clients.claim(); }));
 });
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).then(r => {
-      const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(event.request, copy));
-      return r;
-    }).catch(() => caches.match('./index.html')));
-    return;
-  }
-  event.respondWith(caches.match(event.request).then(hit => hit || fetch(event.request)));
+  event.respondWith(caches.match(event.request).then(function (hit) {
+    if (hit) return hit;
+    return fetch(event.request).then(function (response) {
+      if (response && response.ok) {
+        var copy = response.clone();
+        caches.open(CACHE).then(function (cache) { cache.put(event.request, copy); });
+      }
+      return response;
+    });
+  }));
+});
+self.addEventListener('message', function (event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

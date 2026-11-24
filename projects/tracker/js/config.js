@@ -21,7 +21,10 @@ export const FILTERS = [
   { id: 'hands', icon: '✋', key: 'filter.hands', deps: ['mediape', 'handTracker'], ai: true },
   { id: 'tracker', icon: '◎', key: 'filter.tracker', deps: ['tfjs', 'cocossd', 'mobilenet', 'aiTracker'], ai: true },
   { id: 'segment', icon: '◓', key: 'filter.segment', deps: ['tfjs', 'bodypix'], ai: true },
-  { id: 'subtitles', icon: '💬', key: 'filter.subtitles', deps: [], voice: true }
+  { id: 'subtitles', icon: '💬', key: 'filter.subtitles', deps: [], voice: true },
+  { id: 'ar', icon: '🎩', key: 'filter.ar', deps: ['face'], ai: true, runtime: 'mediapipe' },
+  { id: 'pose', icon: '🧍', key: 'filter.pose', deps: ['pose'], ai: true, runtime: 'mediapipe' },
+  { id: 'qr', icon: '🔳', key: 'filter.qr', deps: [], barcode: true }
 ];
 
 export const LIBRARIES = {
@@ -91,7 +94,13 @@ export const DEFAULT_SETTINGS = {
   detectionFps: 10,
   timer: 0,
   sound: true,
-  filter: 'normal'
+  filter: 'normal',
+  aiRuntime: 'mediapipe',
+  grid: false,
+  level: false,
+  histogram: false,
+  timelapse: 0,
+  stickers: []
 };
 
 export function findFilter(id) {

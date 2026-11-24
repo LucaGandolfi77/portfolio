@@ -2,12 +2,13 @@
 
 "use strict";
 
-const CACHE = 'camera-tracker-v1';
+const CACHE = 'pf-tracker-shell-v1';
 
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './css/liquid.css',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',
@@ -23,6 +24,13 @@ const ASSETS = [
   './js/subtitles.js',
   './js/ui.js',
   './js/main.js',
+  './js/mediapipe.js',
+  './js/ar.js',
+  './js/barcode.js',
+  './js/recorder.js',
+  './js/photo-tools.js',
+  './js/voice.js',
+  '../vision-lab/js/vendor/mediapipe/vision_bundle.js',
   '../../assets/js/face_tracker.js',
   '../../assets/js/ai_tracker.js',
   '../../assets/js/hand_tracker.js',
@@ -42,7 +50,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('pf-tracker-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -55,6 +63,8 @@ function isKnownCdn(url) {
 function isOurAsset(url) {
   if (url.origin !== self.location.origin) return isKnownCdn(url);
   return url.pathname.indexOf('/projects/tracker/') !== -1 ||
+    url.pathname.indexOf('/projects/vision-lab/js/vendor/mediapipe/') !== -1 ||
+    url.pathname.indexOf('/projects/vision-lab/model/') !== -1 ||
     url.pathname.indexOf('/assets/js/face_tracker') !== -1 ||
     url.pathname.indexOf('/assets/js/ai_tracker') !== -1 ||
     url.pathname.indexOf('/assets/js/hand_tracker') !== -1 ||

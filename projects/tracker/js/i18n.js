@@ -25,6 +25,9 @@ const DICT = {
     'filter.tracker': 'AI Tracker',
     'filter.segment': 'Segmenta',
     'filter.subtitles': 'Sottotitoli',
+    'filter.ar': 'Sticker AR',
+    'filter.pose': 'Posa',
+    'filter.qr': 'QR / Codici',
 
     'action.settings': 'Impostazioni',
     'action.gallery': 'Galleria',
@@ -124,6 +127,9 @@ const DICT = {
     'filter.tracker': 'AI Tracker',
     'filter.segment': 'Segment',
     'filter.subtitles': 'Subtitles',
+    'filter.ar': 'AR stickers',
+    'filter.pose': 'Pose',
+    'filter.qr': 'QR / Barcode',
 
     'action.settings': 'Settings',
     'action.gallery': 'Gallery',
