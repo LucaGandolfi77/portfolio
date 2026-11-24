@@ -77,7 +77,7 @@ const PROJECTS_DATA = [
   {
     "id": "streaming",
     "title": "Streaming",
-    "description": "Browse and play free video content and public TV archives from the Internet Archive and other public sources.",
+    "description": "Browser fluid-glass per film e archivi pubblici di Internet Archive: collezioni curate (Prelinger, NASA), filtro pubblico dominio, sort trending, coda di riproduzione, preferiti, cronologia con ripresa, Media Session, Picture-in-Picture, export link e PWA offline EN/IT.",
     "href": "projects/streaming/index.html",
     "emoji": "📺",
     "badge": "Video / Streams",
