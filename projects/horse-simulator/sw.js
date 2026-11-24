@@ -1,10 +1,43 @@
-/* Service Worker — horse-simulator-pwa-v1 */
-const CACHE = './';
-const ASSETS = [
+/* Royal Derby — service worker */
+var CACHE = 'pf-royal-derby-shell-v1';
+var ASSETS = [
+  './',
   './index.html',
   './manifest.webmanifest',
+  './icon.svg',
+  './css/app.css',
+  './js/sim.js',
+  './js/track.js',
+  './js/finish3d.js',
+  './js/audio.js',
+  './js/i18n.js',
+  './js/storage.js',
+  './js/ui.js',
+  './js/main.js',
   '../_shared/top_buttons.js'
 ];
-self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(u => c.add(u)))).then(() => self.skipWaiting())));
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(CACHE.split('-').slice(0, -1).join('-') + '-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
-self.addEventListener('fetch', e => { if (e.request.method === 'GET') e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request))); });
+
+self.addEventListener('install', function (event) {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(function (cache) { return Promise.allSettled(ASSETS.map(function (url) { return cache.add(url); })); })
+      .then(function () { return self.skipWaiting(); })
+  );
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys
+        .filter(function (key) { return key.indexOf('pf-royal-derby-') === 0 && key !== CACHE; })
+        .map(function (key) { return caches.delete(key); }));
+    }).then(function () { return self.clients.claim(); })
+  );
+});
+
+self.addEventListener('fetch', function (event) {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(
+    caches.match(event.request).then(function (hit) { return hit || fetch(event.request); })
+  );
+});

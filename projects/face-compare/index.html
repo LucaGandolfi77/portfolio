@@ -1,126 +1,237 @@
 <!doctype html>
-<html>
+<html lang="it">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width,initial-scale=1">
-	<title>Face Compare</title>
-	<style>
-		body{ font-family:Inter,system-ui; background:#0b1220; color:#eaf6ff; margin:0; padding:20px }
-		.card{ max-width:900px; margin:0 auto; background:rgba(255,255,255,0.03); padding:20px; border-radius:12px }
-		img{ max-width:45%; }
-		.row{ display:flex; gap:12px; align-items:center }
-	</style>
-    <link rel="manifest" href="./manifest.webmanifest">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Confronta due volti direttamente nel browser con MediaPipe: rilevamento, allineamento e descrittori on-device, nessuna immagine caricata.">
+  <meta name="theme-color" content="#070b14">
+  <meta property="og:title" content="Face Compare — confronto volti on-device">
+  <meta property="og:description" content="Rilevamento del volto, allineamento e similarità coseno: tutto gira nel browser.">
+  <link rel="canonical" href="https://lucagandolfi77.github.io/portfolio/projects/face-compare/index.html">
+  <title>Face Compare — confronto volti on-device</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-	<div class="card">
-		<h1>Face Compare</h1>
-		<div class="row">
-			<div>
-				<div style="margin-bottom:8px">
-					<button id="startCam">Start Webcam</button>
-					<button id="stopCam" style="display:none">Stop Webcam</button>
-					<button id="capture" style="display:none">Capture Frame</button>
-				</div>
-				<video id="video" autoplay playsinline muted style="display:block;max-width:45%;border-radius:8px;background:#000"></video>
-				<div style="margin-top:8px">or upload image:<br><input id="a" type="file" accept="image/*"></div>
-				<img id="ia" style="display:block;margin-top:8px;max-width:100%">
-			</div>
-			<div>
-				<input id="b" type="file" accept="image/*"><br>
-				<img id="ib" style="max-width:45%;display:block;margin-top:8px">
-			</div>
-		</div>
-		<div style="margin-top:12px"><button id="compare">Compare</button> <span id="res"></span></div>
-	</div>
-	<script>
-		function load(file, img){ if(!file) return; img.src = URL.createObjectURL(file); }
-		document.getElementById('a').addEventListener('change', e=> load(e.target.files[0], document.getElementById('ia')));
-		document.getElementById('b').addEventListener('change', e=> load(e.target.files[0], document.getElementById('ib')));
 
-		// Webcam handling
-		let stream = null;
-		const video = document.getElementById('video');
-		const startBtn = document.getElementById('startCam');
-		const stopBtn = document.getElementById('stopCam');
-		const captureBtn = document.getElementById('capture');
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">🎭</div>
+      <div class="brand-text">
+        <h1 data-i18n="app.title">Face Compare</h1>
+        <small data-i18n="app.tagline">Confronto volti sul dispositivo</small>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="pill" id="model-pill" role="status">Modello non caricato</span>
+      <span class="pill" id="camera-pill">Camera spenta</span>
+      <span class="pill" id="net-pill">Online</span>
+      <button class="btn" id="lang-toggle" title="Lingua / Language" aria-label="Lingua / Language">🇮🇹 IT</button>
+    </div>
+  </header>
 
-		startBtn.addEventListener('click', async ()=>{
-			try{
-				stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
-				video.srcObject = stream;
-				startBtn.style.display = 'none'; stopBtn.style.display='inline-block'; captureBtn.style.display='inline-block';
-				startCompareLoop();
-			}catch(e){ alert('Cannot access webcam: '+e.message); }
-		});
+  <main class="wrap">
+    <section class="hero">
+      <p data-i18n="messages.privacy">Tutto gira nel browser: immagini e biometrici non lasciano il dispositivo.</p>
+    </section>
 
-		stopBtn.addEventListener('click', ()=>{
-			if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-			video.srcObject = null; startBtn.style.display='inline-block'; stopBtn.style.display='none'; captureBtn.style.display='none';
-		});
+    <div class="layout">
 
-		captureBtn.addEventListener('click', ()=>{
-			// capture current video frame into image B
-			const ib = document.getElementById('ib');
-			const w = 640, h = 480;
-			const c = document.createElement('canvas'); c.width = w; c.height = h;
-			const cx = c.getContext('2d'); cx.drawImage(video, 0, 0, w, h);
-			ib.src = c.toDataURL('image/png');
-		});
+      <!-- ══ A: riferimento ══ -->
+      <section class="card" aria-labelledby="ref-title">
+        <div class="card-head">
+          <div>
+            <h2 id="ref-title" data-i18n="ref.title">Volto di riferimento</h2>
+            <p data-i18n="ref.subtitle">Trascina, incolla o scegli un profilo.</p>
+          </div>
+          <span class="card-index">A</span>
+        </div>
 
-		// Comparison logic (real-time)
-		const resEl = document.getElementById('res');
-		const compareBtn = document.getElementById('compare');
-		let running = false;
+        <div class="dropzone" id="ref-drop">
+          <input class="file-input" id="ref-input" type="file" accept="image/*">
+          <div class="drop-hint" id="ref-hint">
+            <span class="drop-icon" aria-hidden="true">🖼️</span>
+            <strong data-i18n="messages.dropHere">Rilascia qui</strong>
+            <small data-i18n="messages.pasteHint">Puoi incollare un'immagine</small>
+          </div>
+          <div class="media-frame" id="ref-media">
+            <img id="ref-img" alt="Volto di riferimento caricato">
+            <canvas id="ref-overlay" class="media-overlay" width="300" height="200" aria-hidden="true"></canvas>
+            <span class="media-label" id="ref-label"></span>
+            <span class="media-badge" id="ref-badge"></span>
+            <footer>
+              <canvas id="ref-aligned" class="aligned-thumb" width="256" height="256" aria-label="Volto di riferimento allineato"></canvas>
+              <span class="aligned-caption" data-i18n="labels.aligned">Volto allineato</span>
+            </footer>
+          </div>
+        </div>
 
-		function getImageDataFromEl(el, w, h){
-			const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d');
-			if(el.tagName === 'VIDEO') cx.drawImage(el, 0, 0, w, h);
-			else cx.drawImage(el, 0, 0, w, h);
-			return cx.getImageData(0,0,w,h).data;
-		}
+        <div class="card-actions">
+          <label class="btn file-btn" for="ref-input">🖼️ <span data-i18n="actions.chooseFile">Scegli immagine</span></label>
+          <button class="btn" id="btn-save-profile" data-i18n="actions.saveProfile">Salva profilo</button>
+          <button class="btn ghost" id="btn-swap" data-i18n="actions.swap">Inverti A/B</button>
+        </div>
+      </section>
 
-		function computeSimilarity(dataA, dataB){
-			let total = 0;
-			const len = Math.min(dataA.length, dataB.length);
-			for(let i=0;i<len;i+=4){
-				const dr = Math.abs(dataA[i] - dataB[i]);
-				const dg = Math.abs(dataA[i+1] - dataB[i+1]);
-				const db = Math.abs(dataA[i+2] - dataB[i+2]);
-				total += (dr+dg+db)/3;
-			}
-			const avg = total / (len/4);
-			const sim = 1 - (avg / 255);
-			return Math.max(0, Math.min(1, sim));
-		}
+      <!-- ══ risultato ══ -->
+      <section class="card result-card" aria-labelledby="result-title">
+        <div class="card-head">
+          <div>
+            <h2 id="result-title" data-i18n="labels.similarity">Similarità</h2>
+            <p data-i18n="messages.tip">Luce frontale e posa simile.</p>
+          </div>
+          <span class="card-index">Σ</span>
+        </div>
 
-		function startCompareLoop(){ if(running) return; running = true; const SIZE = 128; (function loop(){
-			if(!running) return;
-			let srcA = null, srcB = null;
-			// prefer video as A if available
-			if(stream && video.readyState >= 2) srcA = video;
-			else if(document.getElementById('ia').src) srcA = document.getElementById('ia');
-			if(document.getElementById('ib').src) srcB = document.getElementById('ib');
-			if(srcA && srcB){
-				try{
-					const dA = getImageDataFromEl(srcA, SIZE, SIZE);
-					const dB = getImageDataFromEl(srcB, SIZE, SIZE);
-					const sim = computeSimilarity(dA,dB);
-					resEl.textContent = `Similarity: ${(sim*100).toFixed(1)}%`;
-				}catch(e){ /* ignore */ }
-			}
-			requestAnimationFrame(loop);
-		})(); }
+        <div class="gauge-wrap">
+          <div class="gauge" id="gauge" role="img" aria-label="Punteggio di similarità">
+            <svg viewBox="0 0 180 180" aria-hidden="true">
+              <circle class="track" cx="90" cy="90" r="52"></circle>
+              <circle class="progress" id="gauge-progress" cx="90" cy="90" r="52"
+                      stroke-dasharray="326.73" stroke-dashoffset="326.73"></circle>
+            </svg>
+            <div class="gauge-center">
+              <strong id="gauge-value">0</strong>
+              <small>%</small>
+            </div>
+          </div>
+        </div>
 
-		compareBtn.addEventListener('click', ()=>{
-			// one-shot compare (if not using webcam loop)
-			const ia = document.getElementById('ia'); const ib = document.getElementById('ib');
-			if(!ia.src||!ib.src) return alert('Select both images or start webcam and upload/capture a frame');
-			startCompareLoop();
-		});
-	</script>
-    <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{})</script>
+        <div class="result-line">
+          <span class="badge" id="confidence-badge">—</span>
+          <span class="chip" data-i18n="labels.confidence">Confidenza</span>
+        </div>
+        <p class="result-desc" id="confidence-desc"></p>
+        <div class="chips" id="warning-list" aria-live="polite"></div>
+
+        <div class="chips">
+          <span class="chip" id="chip-quality">Qualità —</span>
+          <span class="chip" id="chip-faces">Volti —</span>
+          <span class="chip" id="chip-pose">Posa —</span>
+          <span class="chip" id="chip-fps">FPS —</span>
+        </div>
+
+        <div>
+          <div class="spark-head">
+            <h3 data-i18n="labels.trend">Andamento</h3>
+            <small>live · 60 samples</small>
+          </div>
+          <canvas id="sparkline" aria-label="Grafico della similarità nel tempo"></canvas>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn primary" id="btn-compare" data-i18n="actions.compare">Confronta</button>
+          <button class="btn" id="btn-export" data-i18n="actions.exportPng">Esporta PNG</button>
+          <button class="btn ghost" id="btn-clear" data-i18n="actions.clear">Cancella</button>
+        </div>
+        <p class="note" data-i18n="messages.descriptorNote">Punteggio calibrato su descrittori.</p>
+      </section>
+
+      <!-- ══ B: live ══ -->
+      <section class="card" aria-labelledby="live-title">
+        <div class="card-head">
+          <div>
+            <h2 id="live-title" data-i18n="live.title">Volto da confrontare</h2>
+            <p data-i18n="live.subtitle">Usa la webcam o carica un'immagine.</p>
+          </div>
+          <span class="card-index">B</span>
+        </div>
+
+        <div class="dropzone" id="live-drop">
+          <input class="file-input" id="live-input" type="file" accept="image/*">
+          <div class="drop-hint" id="live-hint">
+            <span class="drop-icon" aria-hidden="true">📷</span>
+            <strong data-i18n="messages.dropHere">Rilascia qui</strong>
+            <small data-i18n="messages.pasteHint">Puoi incollare un'immagine</small>
+          </div>
+          <div class="media-frame" id="live-media">
+            <img id="live-img" alt="Immagine da confrontare" class="hidden">
+            <video id="live-video" autoplay playsinline muted class="hidden"></video>
+            <canvas id="live-overlay" class="media-overlay" width="300" height="200" aria-hidden="true"></canvas>
+            <span class="media-label" id="live-label">Live</span>
+            <footer>
+              <canvas id="live-aligned" class="aligned-thumb" width="256" height="256" aria-label="Volto live allineato"></canvas>
+              <span class="aligned-caption" data-i18n="labels.aligned">Volto allineato</span>
+            </footer>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn" id="btn-camera" data-i18n="actions.startCamera">Avvia webcam</button>
+          <button class="btn" id="btn-capture" data-i18n="actions.capture" disabled>Cattura come riferimento</button>
+          <label class="btn file-btn" for="live-input">🖼️ <span data-i18n="actions.chooseFile">Scegli immagine</span></label>
+        </div>
+      </section>
+    </div>
+
+    <div class="lower-grid">
+      <section class="card" aria-labelledby="settings-title">
+        <div class="card-head">
+          <h2 id="settings-title" data-i18n="labels.quality">Analisi</h2>
+        </div>
+        <div class="settings-grid">
+          <label class="switch-row">
+            <span data-i18n="labels.overlay">Overlay landmark</span>
+            <input class="switch" id="overlay-toggle" type="checkbox" checked>
+          </label>
+          <label class="switch-row">
+            <span data-i18n="labels.mirror">Specchio webcam</span>
+            <input class="switch" id="mirror-toggle" type="checkbox" checked>
+          </label>
+          <div>
+            <div class="range-label"><span data-i18n="labels.geometryWeight">Peso geometria</span><span id="weight-value">55%</span></div>
+            <input class="range" id="weight-range" type="range" min="0" max="100" value="55">
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="profiles-title">
+        <div class="card-head">
+          <h2 id="profiles-title" data-i18n="labels.profiles">Profili salvati</h2>
+          <span class="card-index">💾</span>
+        </div>
+        <div class="list" id="profiles-list"></div>
+      </section>
+
+      <section class="card" aria-labelledby="history-title">
+        <div class="card-head">
+          <h2 id="history-title" data-i18n="labels.history">Storico confronti</h2>
+          <span class="card-index">⏱</span>
+        </div>
+        <div class="list" id="history-list"></div>
+      </section>
+    </div>
+
+    <footer class="site-footer">
+      <span>Face Compare · MediaPipe Tasks Vision · on-device</span>
+      <span><a href="../../index.html" data-i18n="nav.home">Portfolio</a></span>
+    </footer>
+  </main>
+
+  <dialog id="name-dialog">
+    <h2 data-i18n="messages.askName">Nome del profilo</h2>
+    <p id="name-help">Scegli un nome.</p>
+    <form id="name-form">
+      <input id="profile-name" type="text" maxlength="60" required>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" id="name-cancel" data-i18n="actions.cancel">Annulla</button>
+        <button type="submit" class="btn primary" data-i18n="actions.save">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog">
+    <h2 data-i18n="actions.clear">Cancella</h2>
+    <p id="confirm-text"></p>
+    <div class="dialog-actions">
+      <button class="btn ghost" id="confirm-cancel" data-i18n="actions.cancel">Annulla</button>
+      <button class="btn primary" id="confirm-ok" data-i18n="actions.save">OK</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="hidden" role="status" aria-live="polite"></div>
+
+  <script src="../_shared/top_buttons.js" defer></script>
+  <script type="module" src="./js/app.js"></script>
 </body>
-<script src="../_shared/top_buttons.js"></script>
 </html>
-

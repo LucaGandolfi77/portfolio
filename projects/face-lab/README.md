@@ -1,60 +1,61 @@
-# 👁️ FACE LAB — Distortion Mirror
+# FACE//LAB — Ridiculous Selfie Lenses
 
-> Look into the camera: **68 AI landmarks** trace your face in 3D in real time, a holographic wireframe wraps around you, live telemetry reads your expressions — then flip to **Fun mode** and bend reality: giant eyes, funhouse stretch, emoji swap, fish-eye, expressive squash, cartoon.
+Specchio selfie in stile Snapchat: scegli una lente dal carosello, trascina gli sticker sul volto, scatta e salva tutto sul dispositivo. 68 landmark AI tracciano il viso in tempo reale; la modalità Tech mantiene la telemetria e la mesh 3D.
 
-**Portfolio project #4** — adds visual AI to the existing camera family (kinect_2, shhh-reader) without overlapping neural-vision (which is a pure forward pass on handwritten numbers).
+**Live:** <https://lucagandolfi77.github.io/portfolio/projects/face-lab/>
 
----
+## Cosa fa
 
-## 🛰️ Tech mode
+- **30 lenti** in 7 categorie, una attiva alla volta:
+  - **Basic/Classics**: None, Giant eyes, Funhouse, Emoji swap, Fish-eye, Squash, Cartoon, Swirl, Chromatic, Pixelate, Neon.
+  - **Animals**: 🐶 Doggo (orecchie, muso, lingua), 🐱 Kitty (orecchie, baffi), 🐰 Bunny, 🐸 Frog.
+  - **Monsters**: 👽 Alien, 🧟 Zombie, 🤖 Robot, 💀 X-ray.
+  - **Psychedelic**: 🪞 Kaleidoscope, 📺 Glitch TV, 🫠 Melting, 👥 Triple face.
+  - **Reactive**: 🎉 coriandoli al sorriso, ✨ scintille all'ammiccamento, 🌈 arcobaleno con l'inclinazione, 🔥 fiamme a bocca aperta.
+  - **Retro**: 📼 CRT/VHS, 🧾 Polaroid, 👾 8-bit.
+- **15 sticker** posizionabili con il dito (offset salvati in `localStorage`).
+- **UI Snapchat-like**: viewfinder full-bleed, carosello circolare con anello attivo, rail laterale, griglia di composizione, timer, mirror, flip camera, shutter.
+- **Tech mode**: HUD con blink counter, smile/brow, mouth–nose, head pose, emozione e mesh Three.js con 68 punti luminosi.
+- **📸 Snapshot** composito con nome lente e timestamp; **✏️ Sketch** con galleria locale (ultimi 12) e download PNG.
+- Mobile-first, safe-area iPhone, `prefers-reduced-motion`, tutto on-device.
 
-- **MediaPipe FaceLandmarker** (478-point mesh + 52 blendshapes, GPU delegate, WASM) — the classic **68-key subset** is highlighted on top of the mesh.
-- **Three.js holographic overlay**: glowing points + curated wireframe (jaw, brows, nose, eyes, lips, connectors), additive glow shader, **pulse synced to your expressions** — points flare on blink, smile and brow raise.
-- **Head-pose axes** (yaw/pitch/roll) projected from the nose tip.
-- **Side telemetry panel**: blink (Eye Aspect Ratio) + live blink counter, smile, brow raise, mouth–nose distance, head pose in degrees with a **gyroscope widget**, and a playful **emotion guess** (happy / surprised / angry / sad / winking / neutral).
-- **Multi-face**: up to 4 faces detected; secondary faces get dotted outlines, primary face (largest) drives the effects and metrics.
+## Architettura
 
-## 🎈 Fun mode — Distortion Lab
+```text
+projects/face-lab/
+├─ index.html            # shell del viewfinder (importmap three + mp-vision)
+├─ css/app.css           # design system
+├─ js/
+│  ├─ main.js            # camera, MediaPipe, loop, UI, snapshot/galleria
+│  ├─ lenses.js          # REGISTRY lenti/sticker e metadati
+│  ├─ effects.js         # warp pixel condiviso + overlay vettoriali
+│  ├─ props.js           # sticker ancorati ai landmark e drag
+│  ├─ reactions.js       # particelle reattive
+│  ├─ metrics.js         # PURO: 68-map, EAR, pose, emozioni, box
+│  └─ tech.js            # Three.js + HUD telemetria
+├─ tests/*.test.mjs      # 12 test Node
+└─ legacy-*              # wrapper storici
+```
 
-| Mode | Effect |
+Aggiungere una lente: un entry in `LENSES` con `category`, `kind` (`warp`/`overlay`/`reaction`) e `params`. Carosello e test si generano dalla registry.
+
+## Dati e privacy
+
+| Chiave | Contenuto |
 | --- | --- |
-| 👁️ **Giant eyes** | Eye cutouts from the original frame scaled ~2× — anime mode |
-| ↔️ **Funhouse** | Horizontal stretch of the face region (the "orizzontali allungate") |
-| 😳 **Emoji swap** | Eyes and mouth replaced by rotating emojis that track the face |
-| 🔮 **Fish-eye** | Real radial bulge via inverse-mapping pixel warp of the face region |
-| 🫠 **Squash** | Expressive: mouth opens → face squashes vertically, smile → stretches |
-| 🎨 **Cartoon** | Saturated video + bold comic contour outlines of the features |
-| 🌀 **Swirl** | Rotational twist of the face region, stronger near the core |
-| 🌈 **Chromatic** | RGB channel split (chromatic aberration) on the face region |
-| 🧊 **Pixelate** | Blocky mosaic on the face region |
-| ⚡ **Neon** | Inverted, saturated, hue-shifted video — cyber glow |
-| 👓👑🥸🎩😊🧔😇 **Props** | Vector glasses, crown, mustache, top hat, blush, beard and halo tracking the face |
+| `facelab_settings` | lente attiva, categoria, mirror, griglia, sticker e offset |
+| `facelab_sketches` | ultimi 12 sketch (punti 68) |
 
-## ✨ Extra
+Video e landmark non lasciano il dispositivo. Nota: modello MediaPipe (`face_landmarker.task`), WASM e Three.js sono caricati da CDN al primo avvio: serve connessione la prima volta.
 
-- **📸 Photo snapshot** — composites the live video + effects + 3D overlay into a PNG download.
-- **✏️ Sketch** — a line-art "portrait" of your 68 landmarks (neon on dark), saved to **localStorage** gallery (last 12) + downloadable PNG.
-- **🪞 Mirror toggle**, **📷 camera flip** (front/back where available).
-- **🔒 On-device**: video never leaves the device.
+## Sviluppo e test
 
-## 🍎 iPhone-optimized
+```bash
+python3 -m http.server 8080
+# http://localhost:8080/projects/face-lab/
 
-`playsinline` + muted + autoplay, camera permission on user gesture, `facingMode: 'user'`, safe-area insets, portrait layout with collapsible metrics bottom-sheet and full-width fun bar, DPR-capped canvases, adaptive detection (30 fps), GPU delegate with CPU fallback.
+node --test projects/face-lab/tests/*.test.mjs
+node --check projects/face-lab/js/main.js
+```
 
-## 🛠️ Architecture
-
-- Single-file `projects/face-lab/index.html` (zero build): 2D canvas pipeline for video + warps + props, transparent Three.js overlay on top (Tech mode only).
-- MediaPipe `tasks-vision@0.10.14` (vision_bundle.mjs + WASM from jsDelivr) + the official `face_landmarker.task` model; Three.js r170 via importmap.
-- Pure logic (68-map, chains, EAR/blink, head pose, emotion rules) isolated and unit-tested in Node.
-
-## 🧪 Test (Node)
-
-- 68-point mapping: unique, all within the 478-mesh range; chains within 0..67.
-- EAR/blink: synthetic open eye → blink 0.00, closed eye → 0.75.
-- Head pose: roll/yaw detected from synthetic landmark geometry.
-- Emotion rules: smile → happy, brow+jaw → surprised, single-eye blink → wink.
-
-## 🔗 Links
-
-- Wrapper: `projects/face-lab/legacy-face-lab.html`
-- App: `projects/face-lab/index.html`
+I test coprono registry, mapping 68, EAR/blink, emozioni, pose, box/proiezione, offset e hit-test degli sticker, parametri delle lenti.

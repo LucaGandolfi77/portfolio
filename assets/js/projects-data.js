@@ -140,10 +140,10 @@ const PROJECTS_DATA = [
   {
     "id": "face-compare-ai",
     "title": "Face Compare AI",
-    "description": "Compare your face with a reference image and visualize differences.",
+    "description": "Confronta due volti on-device con MediaPipe: allineamento, descrittori e similarità, senza upload.",
     "href": "projects/face-compare/index.html",
     "emoji": "🎭",
-    "badge": "AI Tool",
+    "badge": "AI · On-device",
     "badgeColor": "#00d4ff"
   },
   {
@@ -356,10 +356,10 @@ const PROJECTS_DATA = [
   {
     "id": "royal-derby-sim",
     "title": "Royal Derby Sim",
-    "description": "Simulatore di corse di cavalli con scommesse: porta€500 virtuali, punta sui cavalli (evidenziati in oro) con quote live, vincite e perdite sul portafoglio. Cavalli rinomina-bili con colori della casacca, statistiche (velocità, scatto, stamina, forma), record di carriera (corse, vittorie, podi, guadagni), commento live con sorpassi e scatti, grafica canvas curata. Ottimizzato per iPhone.",
+    "description": "The Royal Derby — corse ippiche in stile regale inglese con scommesse Win/Place/Each-way/Forecast, meteo e terreno, tre ippodromi, paddock con jockey e silks, classifica stagionale e un fotofinish 3D in replay con Three.js. Interfaccia bilingue IT/EN, audio e export PNG.",
     "href": "projects/horse-simulator/index.html",
     "emoji": "🏇",
-    "badge": "Sim",
+    "badge": "Sim · 3D",
     "badgeColor": "#00d4ff"
   },
   {
