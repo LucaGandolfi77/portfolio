@@ -596,5 +596,14 @@ const PROJECTS_DATA = [
     "emoji": "⛸️",
     "badge": "Story / PWA",
     "badgeColor": "#e8a2b8"
+  },
+  {
+    "id": "cockpit-arena",
+    "title": "Cockpit Arena",
+    "description": "Gestisci un gallo stilizzato: allenalo, compragli l’equipaggiamento e portalo alla vittoria del campionato. Combattimenti a turni con timing Perfect/Good/Miss, scommesse con crediti virtuali (quote, squash, storico), simulazioni AI e sfida giornaliera. PWA offline, EN/IT, zero librerie.",
+    "href": "projects/cock-fight/index.html",
+    "emoji": "🐓",
+    "badge": "Sim",
+    "badgeColor": "#ff5d8f"
   }
 ];
