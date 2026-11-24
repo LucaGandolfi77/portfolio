@@ -57,7 +57,7 @@
     ['offline-editor-studio', 'Offline Editor Studio', 'Local code editor with themes, bookmarks, and file management, zero server.', 'projects/offline-editor-studio/index.html', '📝', 'tools', ['Editor', 'Offline']],
     ['offline-library', 'Offline Library', 'Local .txt/.md file reader with bookmarks, runs entirely offline with no server.', 'projects/offline-library/index.html', '📚', 'tools', ['Reader', 'Offline']],
     ['privacy-audit', 'Privacy Audit', 'Audits local cookies, IndexedDB, localStorage, and notifications with export.', 'projects/privacy-audit/index.html', '🔍', 'tools', ['Privacy', 'PWA']],
-    ['puzzle-scale', 'Scale Puzzle', 'Procedural pattern-matching puzzle with scalable levels, undo, and stats.', 'projects/puzzle-scale/index.html', '🧩', 'puzzle', ['Puzzle', 'PWA']],
+    ['puzzle-scale', 'Scale Puzzle', 'Neon pattern puzzle: memorize glowing paths, five modes, combo scoring, stars, XP, 200 scalable levels and offline PWA.', 'projects/puzzle-scale/index.html', '🧩', 'puzzle', ['Puzzle', 'PWA', 'Memory', 'EN/IT']],
     ['silent-journal', 'Silent Journal', 'Private journal with AES-256 local encryption, no server, no account needed.', 'projects/silent-journal/index.html', '📓', 'tools', ['Privacy', 'Offline']],
     ['silent-voice-reader', 'Silent Voice Reader', 'Silent vocal reading tool with local voice synthesis, privacy-first approach.', 'projects/silent-voice-reader/index.html', '🗣️', 'accessibility', ['Accessibility', 'Privacy']],
     ['solar-system-tracker', 'Solar System Tracker 3D', 'Real-time 3D solar system with JPL orbital elements and Kepler\'s equation.', 'projects/solar-system-tracker/index.html', '🪐', 'simulation', ['3D', 'Space']],
