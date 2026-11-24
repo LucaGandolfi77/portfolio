@@ -230,7 +230,7 @@ const PROJECTS_DATA = [
   {
     "id": "sierpinski-explorer",
     "title": "Sierpinski Explorer",
-    "description": "Visualize fractal triangles.",
+    "description": "Fractal Observatory: 11 frattali con parametri creativi (skew, twist, jitter, simmetria, glow), chaos game potenziato, render neon con blend, animazione, export PNG/SVG, preset e UI mobile. PWA offline EN/IT.",
     "href": "projects/sierpinski/index.html",
     "emoji": "📐",
     "badge": "Math",

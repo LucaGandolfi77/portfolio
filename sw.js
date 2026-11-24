@@ -94,7 +94,7 @@ self.addEventListener('activate', event => {
                         cacheName.indexOf('pf-qr-studio-') === 0 || cacheName.indexOf('pf-atlas-') === 0 ||
                         cacheName.indexOf('pf-vision-lab-') === 0 ||
                         cacheName.indexOf('pf-text-lab-') === 0 || cacheName.indexOf('cello-') === 0 || cacheName.indexOf('pixel-studio-') === 0 ||
-                        cacheName.indexOf('pf-lyrics-') === 0 || cacheName.indexOf('pf-face-compare-') === 0 || cacheName.indexOf('pf-cockpit-') === 0 || cacheName.indexOf('pf-morse-') === 0 || cacheName.indexOf('pf-royal-derby-') === 0 || cacheName.indexOf('pf-people-') === 0 || cacheName.indexOf('pf-puzzle-scale-') === 0;
+                        cacheName.indexOf('pf-lyrics-') === 0 || cacheName.indexOf('pf-face-compare-') === 0 || cacheName.indexOf('pf-cockpit-') === 0 || cacheName.indexOf('pf-morse-') === 0 || cacheName.indexOf('pf-royal-derby-') === 0 || cacheName.indexOf('pf-people-') === 0 || cacheName.indexOf('pf-puzzle-scale-') === 0 || cacheName.indexOf('pf-fractal-') === 0;
                     if (cacheName !== CACHE_NAME && !nested) {
                         console.log('Eliminazione vecchia cache:', cacheName);
                         return caches.delete(cacheName);
