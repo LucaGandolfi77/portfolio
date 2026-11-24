@@ -1,49 +1,73 @@
-# 🌌 T-SNE 3D — Dispiegamento dei Dati
+# 🌌 T-SNE 3D
 
-> Carica un CSV (o scegli un dataset di esempio) e guarda i tuoi dati **dispiegarsi nello spazio**: una proiezione 3D ottimizzata in-browser dove i punti simili si raggruppano in tempo reale. Porta lo slider da *casuale* a *t-SNE ottimizzato* e osserva la **coerenza del clustering** salire.
+Osservatorio interattivo per il dispiegamento di dataset in 3D. Carichi un CSV (o scegli uno dei 7 dataset inclusi) e guardi i punti separarsi con **t-SNE eseguito in un Web Worker**, mentre le metriche di clustering si aggiornano in tempo reale.
 
-**Progetto #3 del portfolio** — dimostra competenza matematica/ML che nessun altro progetto mostra e si collega al filone "dati" del sito (world_weather, seriea_simulator).
+## Quickstart
 
----
+```bash
+# dall'root del portfolio
+python3 -m http.server 8000
+# apri http://localhost:8000/projects/tsne-3d/index.html
+```
 
-## ✨ Cosa fa
+Non serve build, npm o rete: Three.js è vendoriato in `vendor/` e l'app funziona offline dopo il primo caricamento (PWA).
 
-- **Input dati**: file CSV (drag & drop, upload, incolla), 5 dataset di esempio (Iris sintetico, meteo città italiane, calcio a 5 campionati, MNIST ridotto 8×8, blobs generati). Separatori: virgola, punto e virgola, tab. Header opzionale.
-- **Classificazione automatica delle colonne**: le colonne numeriche diventano dimensioni (z-score), quelle categoriche (o con pochi valori, tipo id/classe) diventano etichette. Colonna etichetta selezionabile dal pannello.
-- **t-SNE leggero in Web Worker**: affinità perplexity (binary search su σ), early exaggeration ×12, momentum (0.5→0.8), inizializzazione casuale → l'ottimizzazione scorre in background senza bloccare la UI (su iPhone compreso). Zero dipendenze, Float32Array.
-- **Slider "Dispiegamento" 0–100%**: 0 = posizioni casuali, 100 = convergenza. Avanti = continua, indietro = riparte da zero. **▶️ Dispiega** anima la transizione da solo.
-- **Coerenza del clustering (silhouette)**: misurata live sull'embedding 3D rispetto alle etichette (o ai cluster k-means) — il pannello mostra il valore animato + una **sparkline** che sale mentre i gruppi si separano (Iris: −0.04 → 0.74).
-- **K-means overlay**: clustering senza etichette (k regolabile), centroidi come stelle grandi che seguono il campo; colora i punti per cluster.
-- **🎯 Focus sul cluster**: clicca una voce della legenda → la camera **vola sul gruppo** (tween eased) e gli altri punti si **attenuano** (shader con attributo per-punto); clic sullo spazio vuoto o ✕ per uscire.
-- **🪐 Pianeta dei dati / 📐 Vista 2D / 🗺️ Mappa**: toggle per punti su una sfera (globo 3D con anello), proiezione planare in 2D, oppure **mappa stereografica del pianeta** (polo sud al centro, polo nord al bordo del disco, con meridiani e cerchio equatoriale).
-- **👻 Confronto prima/dopo**: la disposizione casuale iniziale (iter 0) resta **congelata come fantasma** attenuato mentre il t-SNE si dispiega — vedi a colpo d'occhio il passaggio dal caos alla struttura, in tutte le viste (nuvola, pianeta, 2D, mappa).
-- **⏪ Time-lapse**: lo dispiegamento viene **registrato** automaticamente (snapshot delle posizioni + coerenza per iterazione, fino a ~260 frame con decimazione) e riprodotto con **play/pausa, scrub e velocità 1×/2×/4×** — la coerenza e la sparkline seguono la posizione del replay. La registrazione riparte a ogni nuovo run (slider a 0% o nuovo dataset).
-- **🔗 Condivisione via URL**: il link incorpora dataset e parametri nell'hash — `#s=iris&p=30&l=4&v=0.5` per i dataset di esempio, `#d=…` (base64) per i CSV personalizzati. Aprendo il link la proiezione si ricostruisce identica. Bottone 🔗 copia il link corrente.
-- **Ispezione**: tap/clic su un punto → riga originale del CSV nel pannello; tooltip al passaggio.
-- **Export**: PNG della proiezione, JSON (embedding + metadati), CSV (x,y,z + classe).
+## Funzionalità
 
-## 🎨 Scelte stilistiche (come da decisioni)
+- **t-SNE 3D in Web Worker** con perplexity ed early exaggeration regolabili, 240 iterazioni e fallback main-thread se i Worker non sono disponibili.
+- **Controllo continuo del dispiegamento** con slider, play/pausa e **time-lapse** dei frame salvati (1×/2×/4×).
+- **K-means** con K manuale o **K ottimale** automatico; evidenzia i cluster e permette il focus su uno con fly-to della camera.
+- **Metriche live**: silhouette, Davies–Bouldin, Calinski–Harabasz, explained variance, plus sparkline della coerenza.
+- **7 dataset**: Iris, meteo italiana, calcio (5 campionati), MNIST ridotto 8×8, blobs, wine quality, cluster annidati.
+- **Viste**: nuvola di punti, pianeta, mappa, proiezione 2D; rotazione automatica e ghost prima/dopo.
+- **Ispezione**: click su un punto apre la tabella riga; hover mostra tooltip.
+- **Condivisione** via URL hash (serializza dataset, parametri, vista e iterazione) ed **export** PNG / JSON / CSV.
+- **Liquid glass**: layer CSS universale + rifrazione SVG solo Chromium (feature detection), EN/IT, design responsive con bottom sheet mobile.
 
-- Tema **cosmo dei dati**: spazio profondo, nebulose cyan/viola/magenta, campo stellare.
-- Punti come **sfere luminose morbide**: shader custom (falloff radiale, core bianco, additive blending) — migliaia di punti in un solo draw call.
-- **Responsive iPhone**: pannello controlli come bottom-sheet collassabile su mobile, laterale su desktop; safe-area; touch nativo (orbit + pinch).
+## Architettura
 
-## 🛠️ Architettura
+```
+tsne-3d/
+├── index.html            shell + importmap (Three.js locale)
+├── css/app.css           sistema liquid glass
+├── manifest · icon.svg · icons/ · sw.js     PWA offline (pf-tsne-shell-v1)
+├── vendor/
+│   ├── three.module.js   Three.js r170 vendoriato
+│   └── OrbitControls.js
+├── js/
+│   ├── config.js         palette, dataset, stringhe EN/IT, default
+│   ├── i18n.js · storage.js · glass.js
+│   ├── core/
+│   │   ├── csv.js        parser CSV + classificazione colonne + z-score
+│   │   ├── datasets.js   generatori puri dei 7 dataset
+│   │   ├── kmeans.js     k-means, silhouette, metriche, K ottimale
+│   │   ├── tsne.js       P, gradiente, step, normalizzazione
+│   │   └── share.js      codec URL hash
+│   ├── scene.js          Three.js: shader points, stelle, viste, picking
+│   ├── ui.js             pannelli, tab, inspector, modali, toast
+│   └── main.js           worker, orchestrazione, replay, export
+├── docs/API.md · docs/ALGORITHM.md
+├── tests/logic-test.mjs
+└── legacy-tsne-3d.html   redirect di compatibilità
+```
 
-- Single-file `projects/tsne-3d/index.html`: **zero build, zero server**.
-- **Web Worker** (inline via Blob, con fallback main-thread automatico se i Worker non sono disponibili): `computeP` (perplexity), `step` (gradiente t-SNE simmetrico i<j), `coherence` (silhouette campionata), `normalizeY` (bounding-box −1.5…1.5).
-- Three.js r170 via importmap (stesso setup di neural-vision e genetic-art).
-- La logica pura (CSV, classificazione, k-means, t-SNE) è isolata e testata in Node: purezza k-means 0.99 sui blobs, silhouette Iris 0.74, MNIST 0.63 (solo dai pixel), roundtrip completo worker.
+I moduli in `js/core/` sono **puri** (nessun DOM, nessuna rete) e quindi testabili in Node.
 
-## 🧪 Test (Node)
+## Test
 
-- Parser CSV (virgola/; /tab, virgolette, header opzionale)
-- Classificazione colonne (feature vs idLike vs etichette — nessun "trucco" sul MNIST: la colonna digit è esclusa dalle feature)
-- k-means purity > 0.9 sui blobs (30 run stabili)
-- Worker t-SNE end-to-end su Iris e MNIST: coerenza che sale, convergenza in secondi
-- Roundtrip condivisione URL: base64 CSV UTF-8 + parametri, hash compatto per i campioni
+```bash
+node projects/tsne-3d/tests/logic-test.mjs
+```
 
-## 🔗 Link
+Copre parsing CSV, normalizzazione, generatori, k-means, metriche, t-SNE, share codec e struttura del progetto.
 
-- Wrapper: `projects/tsne-3d/legacy-tsne-3d.html`
-- App: `projects/tsne-3d/index.html`
+## Limiti
+
+- t-SNE è O(N²) in memoria/tempo: oltre ~1.500 punti l'esperienza degrada; per dataset più grandi serve Barnes–Hut.
+- Il CSV condiviso via hash è incluso solo sotto i 4 KB; oltre quella soglia il link contiene solo l'ID del dataset campione.
+- La rifrazione SVG richiede Chromium; altrove resta attivo il solo layer CSS.
+
+## Documentazione
+
+- [API dei moduli](docs/API.md)
+- [Dettagli algoritmici](docs/ALGORITHM.md)

@@ -509,8 +509,8 @@ const PROJECTS_DATA = [
   {
     "id": "tsne-3d",
     "title": "T-SNE 3D — Dispiegamento dei Dati",
-    "description": "Carica un CSV e guarda i dati dispiegarsi in 3D: t-SNE in-browser (Web Worker), coerenza del clustering live, k-means, pianeta dei dati, export PNG/JSON/CSV. Three.js + riduzione dimensionale.",
-    "href": "projects/tsne-3d/legacy-tsne-3d.html",
+    "description": "Carica un CSV e guarda i dati dispiegarsi in 3D: t-SNE in un Web Worker, perplexity/esagerazione regolabili, k-means con K ottimale, metriche di coerenza (silhouette, Davies-Bouldin, Calinski-Harabasz), time-lapse, 7 dataset, export PNG/JSON/CSV. Three.js vendoriato, interfaccia liquid glass, offline PWA, EN/IT.",
+    "href": "projects/tsne-3d/index.html",
     "emoji": "🌌",
     "badge": "ML / 3D",
     "badgeColor": "#3ee6ff"
