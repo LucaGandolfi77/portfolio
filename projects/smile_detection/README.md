@@ -6,8 +6,8 @@ App dedicata all'analisi del sorriso, rinata come progetto autonomo dopo il tras
 
 ## Pipeline
 
-1. **MediaPipe FaceLandmarker** (modello e WASM vendorizzati in `vision-lab`, riusati senza duplicazione): 478 landmark, 52 blendshape, box del volto e crop 224×224 allineato sugli occhi.
-2. **ViT-B/16 FER** (`Xenova/facial_emotions_image_detection`, q8 ~88 MB, Apache-2.0) eseguito in un **Web Worker** con Transformers.js: classificazione di 7 emozioni su WebGPU con fallback WASM, ~2 inferenze/s.
+1. **MediaPipe FaceLandmarker** (modello e WASM vendorizzati in `projects/vision-lab`, riusati senza duplicazione): 478 landmark, 52 blendshape, box del volto e crop 224×224 allineato sugli occhi.
+2. **ViT-B/16 FER** (`Xenova/facial_emotions_image_detection`, q8 ~88 MB, Apache-2.0) eseguito in un **Web Worker** con Transformers.js su WASM: classificazione di 7 emozioni con ampia compatibilità browser.
 3. **Fusione** (`fusion.js`): `smile = w·blendshapeSmile + (1−w)·P(happy)`, pesata da margine top-1 e entropia della softmax. Se la lettura è ambigua l'app mostra "inquadra meglio" invece di un numero affidabile. Media mobile EMA e banda di confidenza.
 4. **Denti** (`teeth.js`): crop dalle labbra interne, whiteness in spazio **LAB** (L* e neutralità a*/b*) e allineamento tramite regressione sulla linea dei denti; richiede bocca aperta e luce buona.
 
@@ -29,7 +29,7 @@ projects/smile_detection/
 │  ├─ emotion.js               # client worker
 │  ├─ fusion.js / teeth.js     # PURI e testati
 │  ├─ ui.js / storage.js / i18n.js / main.js
-├─ tests/analysis.test.mjs
+├─ tests/analysis.test.mjs / assets.test.mjs
 └─ manifest.webmanifest / icon.svg / sw.js
 ```
 
@@ -37,7 +37,7 @@ I vecchi file (`app.js`, `smile_analyzer.js`, `face_tracker.js`, `ui.js`, `style
 
 ## Dati e privacy
 
-Il primo avvio scarica il modello ViT (~88 MB) e i dati MediaPipe; poi tutto resta in cache. `localStorage`: `smiledet.v1` (record e contatori), `smiledet.lang`. Nessun upload. Servono HTTPS o localhost per il microfono e un browser con WebAssembly/WebGL.
+Il primo avvio scarica il modello ViT (~88 MB); MediaPipe, WASM e modello facciale sono serviti localmente da `projects/vision-lab` e memorizzati nella cache del service worker. `localStorage`: `smiledet.v1` (record e contatori), `smiledet.lang`. Nessun upload. Servono HTTPS o localhost per la camera e un browser con WebAssembly/WebGL.
 
 ## Sviluppo e test
 

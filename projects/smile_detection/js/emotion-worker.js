@@ -1,5 +1,4 @@
-/* emotion-worker.js —ViT FER in Web Worker (Transformers.js) */
-
+/* emotion-worker.js — ViT FER in Web Worker (Transformers.js) */
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1/+esm';
 
 env.allowLocalModels = false;
@@ -10,26 +9,20 @@ let classifier = null;
 
 async function load() {
   if (classifier) return;
-  for (const device of ['webgpu', 'wasm']) {
-    try {
-      classifier = await pipeline('image-classification', MODEL, {
-        dtype: 'q8',
-        device,
-        progress_callback: (event) => {
-          if (event.status === 'progress' && event.total) {
-            self.postMessage({ type: 'progress', pct: (event.loaded / event.total) * 100 });
-          } else if (event.status === 'done') {
-            self.postMessage({ type: 'progress', pct: 100 });
-          }
-        }
-      });
-      self.postMessage({ type: 'ready', device });
-      return;
-    } catch (error) {
-      self.postMessage({ type: 'deviceFailed', device, message: String(error && error.message || error) });
+  // WASM diretto: in Transformers.js 3.3.1 un tentativo WebGPU fallito
+  // avvelena la promessa condivisa e impedisce il fallback WASM nello stesso worker.
+  classifier = await pipeline('image-classification', MODEL, {
+    dtype: 'q8',
+    device: 'wasm',
+    progress_callback: (event) => {
+      if (event.status === 'progress' && event.total) {
+        self.postMessage({ type: 'progress', pct: (event.loaded / event.total) * 100 });
+      } else if (event.status === 'done') {
+        self.postMessage({ type: 'progress', pct: 100 });
+      }
     }
-  }
-  throw new Error('Modello emozioni non caricabile');
+  });
+  self.postMessage({ type: 'ready', device: 'wasm' });
 }
 
 self.onmessage = async (event) => {
@@ -54,6 +47,10 @@ self.onmessage = async (event) => {
       });
     }
   } catch (error) {
-    self.postMessage({ type: 'error', message: String(error && error.message || error) });
+    self.postMessage({
+      type: 'error',
+      id: message.id || null,
+      message: String(error && error.message || error)
+    });
   }
 };

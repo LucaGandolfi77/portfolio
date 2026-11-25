@@ -19,6 +19,7 @@ export function createEmotionClient({ onStatus = () => {}, onProgress = () => {}
         resolve(message.type === 'error' ? null : message);
       }
       busy = false;
+      if (message.type === 'error' && !message.id) onStatus('error', message.message);
     }
   };
   worker.onerror = (error) => { onStatus('error', error.message); busy = false; };
