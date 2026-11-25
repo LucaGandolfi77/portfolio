@@ -98,6 +98,14 @@
           a.setAttribute('data-style-href', '#projects');
           a.setAttribute('href', 'projects.html');
         });
+        // Foto professionale solo in questo stile (anche in stampa/PDF).
+        var img = document.getElementById('profileImg');
+        if (img && !img.hasAttribute('data-style-src')) {
+          img.setAttribute('data-style-src', img.getAttribute('src') || '');
+          img.setAttribute('data-style-srcset', img.getAttribute('srcset') || '');
+          img.setAttribute('srcset', './assets/profile/business-200.webp 200w, ./assets/profile/business-400.webp 400w, ./assets/profile/business-800.webp 800w');
+          img.setAttribute('src', './assets/profile/business-400.webp');
+        }
       },
       stop: function () {
         var b = document.getElementById('printProfile');
@@ -106,6 +114,13 @@
           a.setAttribute('href', a.getAttribute('data-style-href'));
           a.removeAttribute('data-style-href');
         });
+        var img = document.getElementById('profileImg');
+        if (img && img.hasAttribute('data-style-src')) {
+          img.setAttribute('srcset', img.getAttribute('data-style-srcset'));
+          img.setAttribute('src', img.getAttribute('data-style-src'));
+          img.removeAttribute('data-style-src');
+          img.removeAttribute('data-style-srcset');
+        }
       }
     },
     terminal: {

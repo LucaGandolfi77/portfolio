@@ -128,10 +128,12 @@ test('business: recruiter layout, print button and legacy ?mode=business links',
   expect(await y('#about')).toBeLessThan(await y('#experience'));
 
   await expect(page.locator('#printProfile')).toBeVisible();
+  await expect(page.locator('#profileImg')).toHaveAttribute('src', /business-400\.webp$/);
   await expect(page.locator('#selected-work a.text-link')).toHaveAttribute('href', 'projects.html');
 
   await page.evaluate(() => window.PortfolioStyle.choose('classic'));
   await expect(page.locator('#printProfile')).toHaveCount(0);
+  await expect(page.locator('#profileImg')).not.toHaveAttribute('src', /business-/);
   await expect(page.locator('#selected-work a.text-link')).toHaveAttribute('href', '#projects');
   expect(errors).toEqual([]);
 });
