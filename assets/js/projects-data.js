@@ -130,12 +130,12 @@ const PROJECTS_DATA = [
   },
   {
     "id": "camera-sentinel",
-    "title": "CAM//SENTINEL — chi ti sta guardando?",
-    "description": "Accende la fotocamera del dispositivo e analizza in tempo reale ciò che vede: LED a infrarossi e riflessi di lenti delle telecamere di sorveglianza attive, lampeggio dei LED di stato, e AI on-device (COCO-SSD) per i dispositivi che possono nascondere una camera. Rileva anche se la tua camera è già in uso da un'altra app (NotReadableError) ed elenca tutte le telecamere collegate. Spiega perché il browser NON può vedere le telecamere sulla rete e come lo farebbe un'app nativa.",
+    "title": "CAM//LAB — Camera & Privacy Diagnostics",
+    "description": "Demo didattica su permessi e fotocamere locali nel browser: diagnostica degli errori, elenco dispositivi, analisi sperimentale delle luci e COCO-SSD per oggetti generici. I frame restano sul dispositivo. Spiega i limiti reali del browser e non è un rilevatore certificato di telecamere.",
     "href": "projects/camera-sentinel/index.html",
-    "emoji": "🕵️",
-    "badge": "Camera / Tools",
-    "badgeColor": "#ff5c7a"
+    "emoji": "🔬",
+    "badge": "Privacy / Lab",
+    "badgeColor": "#35e0ff"
   },
   {
     "id": "face-compare-ai",
@@ -374,7 +374,7 @@ const PROJECTS_DATA = [
   {
     "id": "fantapanchina",
     "title": "FantaPanchina",
-    "description": "Il fantacalcio che gioca da solo. Idle game con squadre parodiche, mercato svincolati, bidoni leggendari, telecronaca da bar, scudetti d'oro e guadagni offline. La tua squadra segna anche mentre dormi. PWA installabile.",
+    "description": "Il fantacalcio che gioca da solo. Idle game con squadre parodiche, bauli da aprire, 48 carte da collezionare, doppioni da potenziare e un mercante che simula altri fantallenatori online. Mercato svincolati, bidoni leggendari, telecronaca da bar, scudetti d'oro e guadagni offline. PWA installabile.",
     "href": "projects/fantapanchina/index.html",
     "emoji": "🛋️",
     "badge": "Game",
@@ -418,8 +418,8 @@ const PROJECTS_DATA = [
   },
     {
     "id": "coloring-book",
-    "title": "Coloring Book",
-    "description": "Interactive coloring book with various designs.",
+    "title": "Coloring Studio",
+    "description": "Interactive coloring studio with 70+ original drawings across animals, nature, food, vehicles, ocean, fantasy, space and celebrations. Includes category filters, search, flood fill, brushes, photo outlining, undo/redo and PNG export.",
     "href": "projects/coloring/index.html",
     "emoji": "🎨",
     "badge": "Fun",
@@ -536,7 +536,7 @@ const PROJECTS_DATA = [
   {
     "id": "alcohol-tracker",
     "title": "🍺 AlcoTracker — Tasso Alcolemico",
-    "description": "Calcola il tuo tasso alcolemico con la formula di Widmark: inserisci sesso, peso, altezza ed età, aggiungi bevande e pasti con l'orario, e il grafico mostra la curva alcolica con picco, tempo per tornare sotto il limite di 0.5 g/L (quando puoi guidare) e ora in cui sarai completamente sobrio. Doppia visuale: classica con grafico dettagliato e timeline -12h/+12h dove trascini cibo e bevande sull'orario (con ⭐ preferiti sempre in vista). Timeline zoomabile (-12h/+12h, +/− o rotella) con selezione ed eliminazione degli elementi inseriti e cibo che influenza l'alcol SOLO dal momento del pasto in poi. Metabolismo regolabile (0.10/0.15/0.20 g/L/h), unità alcoliche, ottimizzato per iPhone. ⚠️ Vietato ai minori di 18 anni.",
+    "description": "Stima il tasso alcolemico con un modello a due compartimenti (assorbimento gastrico + eliminazione epatica) e la formula di Watson per l'acqua corporea: sesso, peso, altezza ed età. Aggiungi bevande e pasti con l'orario e il grafico mostra la curva alcolica con picco, tempo per tornare sotto il limite di 0.5 g/L e ora in cui sarai sobrio. Il pasto rallenta l'assorbimento dell'alcol ancora nello stomaco, abbassa e ritarda il picco, ma non accelera lo smaltimento. Doppia visuale: dashboard con grafico interattivo e timeline zoomabile (24/12/6/3 h) dove trascini cibo e bevande sull'orario, con ⭐ preferiti e selezione degli elementi. Metabolismo regolabile (0.10/0.15/0.20 g/L/h), unità alcoliche, PWA offline, ottimizzato per iPhone. ⚠️ Vietato ai minori di 18 anni.",
     "href": "projects/alcohol-tracker/index.html",
     "emoji": "🍺",
     "badge": "Health / Tool",
@@ -562,8 +562,8 @@ const PROJECTS_DATA = [
   },
   {
     "id": "cello-browser",
-    "title": "Cello — il browser degli anni '90",
-    "description": "Clone di Cello 1.01a (Cornell Law, 1993–94): chrome stile Windows 3.1, navigazione nel web inventato del 1994 (14 pagine collegate), suono modem sintetizzato e modalità \"Modem Live\" che carica pagine reali via r.jina.ai rendendole in stile anni '90. Immagini mostrano segnaposto ironici (Cello non supportava le immagini). Ottimizzato iPhone.",
+    "title": "CelloOS — desktop 1994",
+    "description": "Un desktop del 1994 nel browser: boot screen, icone, taskbar, Start menu, finestre trascinabili e sette app native. Il browser Cello naviga le 14 pagine del web inventato del 1994 (con suono modem sintetizzato e modalità \"Modem Live\" via r.jina.ai); Esplora file, Blocco note e Terminale usano un file system virtuale salvato in localStorage. Zero dipendenze, funziona offline come PWA.",
     "href": "projects/cello-browser/index.html",
     "icon": "🖥️",
     "emoji": "🖥️",
