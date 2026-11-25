@@ -210,9 +210,9 @@ export class NailRenderer {
     hands.forEach((hand, hi) => {
       const pts = hand.points;
       if (!pts || pts.length < 21) return;
-      const opacity = hand.facing === 'palm' ? 0.12 : 1;
+      const showNails = hand.facing !== 'palm';
 
-      TIPS.forEach((tipIdx, i) => {
+      if (showNails) TIPS.forEach((tipIdx, i) => {
         const tip = pts[tipIdx];
         const dip = pts[DIPS[i]];
         const pip = pts[PIPS[i]];
@@ -226,16 +226,20 @@ export class NailRenderer {
         const foreshorten = Math.max(0.25, Math.min(1, dist2D / bone3D));
         const angle = dist2D > 4 ? Math.atan2(dy, dx) : Math.atan2(tip.y - pip.y, tip.x - pip.x);
         const w = Math.max(9, Math.min(34, bone3D * 0.74 * FINGER_WIDTH[i]));
+
+        // Anchor at the fingertip, but keep the nail long enough to extend past it.
+        // This matches the preview and prevents the artwork from sitting on the joint.
+        const projected = Math.max(dist2D, bone3D * 0.45);
         const bedY = bone3D * 0.46;
-        const topY = -(1.5 + Math.max(0, this.design.state.length - 1) * bone3D * 0.8);
-        paintNail(this.ctx, { x: tip.x, y: tip.y, angle, w, bedY, topY, opacity, foreshorten }, this.design.state);
+        const topY = Math.max(-bone3D * 1.8, bedY - projected * this.design.state.length);
+        paintNail(this.ctx, { x: tip.x, y: tip.y, angle, w, bedY, topY, opacity: 1, foreshorten }, this.design.state);
       });
 
-      if (debug) this.drawSkeleton(pts, hi);
+      if (debug) this.drawSkeleton(pts, hi, hand.facing, hand.label);
     });
   }
 
-  drawSkeleton(pts, handIndex) {
+  drawSkeleton(pts, handIndex, facing = 'back', label = '') {
     const ctx = this.ctx;
     ctx.save();
     ctx.strokeStyle = handIndex === 0 ? 'rgba(77,232,255,.9)' : 'rgba(169,139,255,.9)';
@@ -260,6 +264,10 @@ export class NailRenderer {
       ctx.font = "600 10px 'JetBrains Mono', monospace";
       ctx.fillText(String(idx), p.x + 6, p.y - 6);
     });
+    if (pts[0]) {
+      ctx.font = "600 11px 'JetBrains Mono', monospace";
+      ctx.fillText(`${label || 'Hand'} · ${facing}`, pts[0].x + 8, pts[0].y + 20);
+    }
     ctx.restore();
   }
 }
