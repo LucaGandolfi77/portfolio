@@ -13,6 +13,7 @@ const scopedStaticPaths = [
     'index.html',
     // CSS della home: tutti, non solo i primi due. Senza questi la
     // prima pagina offline e' senza layout.
+    'assets/css/tokens.css',
     'assets/css/main.css',
     'assets/css/design-system.css',
     'assets/css/animations.css',
@@ -21,12 +22,15 @@ const scopedStaticPaths = [
     'assets/css/catalog.css',
     'assets/css/sections-modern.css',
     'assets/css/light-theme.css',
+    'assets/css/home-components.css',
+    'assets/css/style-engine.css',
     // Core JS della home
     'assets/js/main.js',
     'assets/js/projects-data.js',
     'assets/js/catalog-data.js',
     'assets/js/catalog-home.js',
     'assets/js/cookies.js',
+    'assets/js/style-engine.js',
     'assets/js/reference-scene.js',
     // LCP: senza l'avatar il primo paint offline mostra un'immagine rotta.
     'assets/cv_gandolfi.jpeg',

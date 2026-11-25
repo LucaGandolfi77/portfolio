@@ -119,6 +119,36 @@ Build output is never committed (`.gitignore`). Today this applies to
 8. Run `npm run check`, `npm run build` and `npm run serve`, then open the app
    under `/portfolio/`.
 
+## Home page styles
+
+The home page has six complete styles, picked from the **Style** button in the
+top bar or with a link such as `?style=terminal`:
+
+| Style | Look | Theme |
+|---|---|---|
+| `classic` (default) | Lexend + Source Sans 3, brand lime | light or dark (user toggle) |
+| `glass` | frosted glass on an animated aurora, bento grid | dark |
+| `terminal` | shell session, typed headline, CRT scanlines | dark |
+| `arcade` | pixel type, HUD scores, pixelated avatar | dark |
+| `newspaper` | front page: blackletter masthead, rules, drop cap | light |
+| `fashion` | magazine cover: Bodoni, numbered contents | light |
+
+- All colours, fonts and motion come from `assets/css/tokens.css`. Write new
+  CSS with the `--c-*` / `--f-*` tokens, never with fixed colours.
+- A style is one file, `assets/css/styles/<name>.css`: it redefines the tokens
+  under `:root[data-style="<name>"]`, then adds its signature rules.
+- `assets/js/style-engine.js` loads that CSS and its Google Fonts only when
+  the style is chosen. It switches styles with the View Transitions API and
+  runs the style's motion module. The inline script in `index.html` applies
+  the saved style before the first paint.
+- With `prefers-reduced-motion`, every style shows its final state: no
+  transitions, no typing effect, no entrance animations.
+- To add a style, add it to `window.PORTFOLIO_STYLES` in `index.html`, to
+  `META`/`ORDER` in `style-engine.js`, and create its CSS file. Then add it to
+  `tools/quality/e2e/home-styles.spec.mjs`.
+
+The interactive preview used to choose the styles is in `labs/style-preview/`.
+
 ## Hosting notes
 
 - GitHub Pages serves static files only. Projects that need Node, Python,

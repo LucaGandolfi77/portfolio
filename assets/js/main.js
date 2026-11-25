@@ -42,9 +42,11 @@ function createTopBar() {
     // Theme toggle (light/dark)
     const themeBtn = document.createElement('button');
     themeBtn.className = 'top-bar-btn';
+    themeBtn.id = 'themeToggle';
     const isDark = !document.documentElement.hasAttribute('data-theme') || document.documentElement.getAttribute('data-theme') !== 'light';
     themeBtn.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
     themeBtn.title = 'Toggle light/dark mode';
+    themeBtn.setAttribute('aria-label', themeBtn.title);
     themeBtn.addEventListener('click', () => {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         if (currentTheme === 'light') {
@@ -64,6 +66,7 @@ function createTopBar() {
     topBtn.className = 'top-bar-btn';
     topBtn.innerHTML = '<i class="fas fa-arrow-up"></i>';
     topBtn.title = 'Back to top';
+    topBtn.setAttribute('aria-label', topBtn.title);
     topBtn.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
@@ -77,6 +80,8 @@ function createTopBar() {
 // Restore saved light/dark theme preference immediately
 (function initSavedTheme() {
     try {
+        // Gli stili alternativi fissano il proprio tema (vedi style-engine.js).
+        if (document.documentElement.hasAttribute('data-style')) return;
         if (localStorage.getItem('theme') === 'light') {
             document.documentElement.setAttribute('data-theme', 'light');
         }
@@ -95,7 +100,7 @@ const translations = {
     en: {
         common: { showMore: 'Show More', showLess: 'Show Less' },
         nav: { about: 'About Me', skills: 'Skills', languages: 'Languages', experience: 'Experience', achievements: 'Achievements', projects: 'Projects', books: 'Books', dailyQuote: 'Daily Quote', blog: 'Blog', testimonials: 'Testimonials', contact: 'Contact', cv: 'Download CV' },
-        hero: { title: 'Luca Gandolfi — Full‑Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
+        hero: { title: 'Luca Gandolfi — Full-Stack Engineer', subtitle: 'Developer • Embedded Systems • AI • Web', contactBtn: 'Contact me', cvBtn: 'Download CV' },
         sections: { about: 'About Me', skills: 'Technical Skills', languages: 'Languages', experience: 'Work Experience', achievements: 'Achievements & Certifications', contact: 'Personal Information', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'My Projects', testimonials: 'Testimonials', dailyQuote: 'Day Motivation Quote' },
         languages: { italian: 'Italian', english: 'English', french: 'French', spanish: 'Spanish', native: 'Native Speaker', fluent: 'Level C1 (Advanced)', intermediate: 'Intermediate', basic: 'Basic' },
         games: { 
@@ -114,7 +119,7 @@ const translations = {
     es: {
         common: { showMore: 'Ver más', showLess: 'Ver menos' },
         nav: { about: 'Sobre mí', skills: 'Habilidades', languages: 'Idiomas', experience: 'Experiencia', achievements: 'Logros', projects: 'Proyectos', books: 'Libros', dailyQuote: 'Frase Diaria', blog: 'Blog', testimonials: 'Testimonios', contact: 'Contacto', cv: 'Descargar CV' },
-        hero: { title: 'Luca Gandolfi — Ingeniero Full‑Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
+        hero: { title: 'Luca Gandolfi — Ingeniero Full-Stack', subtitle: 'Desarrollador • Sistemas embebidos • IA • Web', contactBtn: 'Contáctame', cvBtn: 'Descargar CV' },
         sections: { about: 'Sobre mí', skills: 'Habilidades técnicas', languages: 'Idiomas', experience: 'Experiencia laboral', achievements: 'Logros y Certificaciones', contact: 'Información personal', cv: 'Currículum Vitae', social: 'Redes & Contacto', projects: 'Mis Proyectos', testimonials: 'Testimonios', dailyQuote: 'Frase Motivacional del Día' },
         languages: { italian: 'Italiano', english: 'Inglés', french: 'Francés', spanish: 'Español', native: 'Nativo', fluent: 'Nivel C1 (Avanzado)', intermediate: 'Intermedio', basic: 'Básico' },
         about: { p1: '¡Hola! Soy Luca, un desarrollador full-stack apasionado por crear soluciones digitales innovadoras. Con años de experiencia en desarrollo web, sistemas embebidos y IA. Me especializo en construir aplicaciones modernas y escalables que marcan la diferencia.', p2: 'Mi trayectoria en tecnología comenzó con la curiosidad y se ha convertido en una carrera impulsada por el aprendizaje continuo y la resolución de problemas. Creo en escribir código limpio, adoptar nuevas tecnologías y crear experiencias centradas en el usuario.' },
@@ -142,7 +147,7 @@ const translations = {
     ru: {
         common: { showMore: 'Показать больше', showLess: 'Свернуть' },
         nav: { about: 'Обо мне', skills: 'Навыки', languages: 'Языки', experience: 'Опыт', achievements: 'Достижения', projects: 'Проекты', books: 'Книги', dailyQuote: 'Цитата дня', blog: 'Блог', testimonials: 'Отзывы', contact: 'Контакт', cv: 'Скачать CV' },
-        hero: { title: 'Лука Гандольфи — Full‑Stack инженер', subtitle: 'Разработчик • Встроенные системы • ИИ • Веб', contactBtn: 'Связаться', cvBtn: 'Скачать CV' },
+        hero: { title: 'Лука Гандольфи — Full-Stack инженер', subtitle: 'Разработчик • Встроенные системы • ИИ • Веб', contactBtn: 'Связаться', cvBtn: 'Скачать CV' },
         sections: { about: 'Обо мне', skills: 'Технические навыки', languages: 'Языки', experience: 'Опыт работы', achievements: 'Достижения и сертификаты', contact: 'Личная информация', cv: 'Резюме', social: 'Соцсети & Контакт', projects: 'Мои проекты', testimonials: 'Отзывы', dailyQuote: 'Цитата дня' },
         languages: { italian: 'Итальянский', english: 'Английский', french: 'Французский', spanish: 'Испанский', native: 'Родной язык', fluent: 'Уровень C1 (Продвинутый)', intermediate: 'Средний', basic: 'Базовый' },
         about: { p1: 'Привет! Я Лука, увлеченный full-stack разработчик, создающий инновационные цифровые решения. Многолетний опыт в веб-разработке, встроенных системах и ИИ. Я специализируюсь на создании современных масштабируемых приложений.', p2: 'Моё путешествие в IT началось с любопытства и превратилось в карьеру, основанную на постоянном обучении и решении задач. Я верю в чистый код, освоение новых технологий и создание удобного для пользователей опыта.' },
@@ -156,11 +161,11 @@ const translations = {
     de: {
         common: { showMore: 'Mehr anzeigen', showLess: 'Weniger anzeigen' },
         nav: { about: 'Über mich', skills: 'Fähigkeiten', languages: 'Sprachen', experience: 'Erfahrung', achievements: 'Erfolge', projects: 'Projekte', books: 'Bücher', dailyQuote: 'Zitat des Tages', blog: 'Blog', testimonials: 'Referenzen', contact: 'Kontakt', cv: 'CV herunterladen' },
-        hero: { title: 'Luca Gandolfi — Full‑Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
+        hero: { title: 'Luca Gandolfi — Full-Stack Entwickler', subtitle: 'Entwickler • Eingebettete Systeme • KI • Web', contactBtn: 'Kontaktiere mich', cvBtn: 'CV herunterladen' },
         sections: { about: 'Über mich', skills: 'Technische Fähigkeiten', languages: 'Sprachen', experience: 'Berufserfahrung', achievements: 'Erfolge & Zertifikate', contact: 'Persönliche Informationen', cv: 'Lebenslauf', social: 'Soziales & Kontakt', projects: 'Meine Projekte', testimonials: 'Referenzen', dailyQuote: 'Zitat des Tages' },
         languages: { italian: 'Italienisch', english: 'Englisch', french: 'Französisch', spanish: 'Spanisch', native: 'Muttersprache', fluent: 'Niveau C1 (Fortgeschritten)', intermediate: 'Mittelstufe', basic: 'Grundkenntnisse' },
-        about: { p1: 'Hallo! Ich bin Luca, ein leidenschaftlicher Full‑Stack‑Entwickler, der gerne innovative digitale Lösungen erstellt. Mit mehrjähriger Erfahrung in Webentwicklung, Embedded Systems und KI. Ich spezialisiere mich auf moderne, skalierbare Anwendungen.', p2: 'Meine Reise in der Technik begann mit Neugier und entwickelte sich zu einer Karriere, die von kontinuierlichem Lernen und Problemlösung angetrieben wird. Ich glaube an sauberen Code, neue Technologien und benutzerzentrierte Erlebnisse.' },
-        contact: { email: 'E‑Mail', phone: 'Telefon', location: 'Standort', specialization: 'Spezialisierung' },
+        about: { p1: 'Hallo! Ich bin Luca, ein leidenschaftlicher Full-Stack-Entwickler, der gerne innovative digitale Lösungen erstellt. Mit mehrjähriger Erfahrung in Webentwicklung, Embedded Systems und KI. Ich spezialisiere mich auf moderne, skalierbare Anwendungen.', p2: 'Meine Reise in der Technik begann mit Neugier und entwickelte sich zu einer Karriere, die von kontinuierlichem Lernen und Problemlösung angetrieben wird. Ich glaube an sauberen Code, neue Technologien und benutzerzentrierte Erlebnisse.' },
+        contact: { email: 'E-Mail', phone: 'Telefon', location: 'Standort', specialization: 'Spezialisierung' },
         cv: { download: 'CV herunterladen' },
         dailyQuote: { viewAll: 'Alle Zitate anzeigen' },
         page: { back: 'Zurück zum Portfolio' },
@@ -170,7 +175,7 @@ const translations = {
     it: {
         common: { showMore: 'Mostra altro', showLess: 'Mostra meno' },
         nav: { about: 'Chi sono', skills: 'Competenze', languages: 'Lingue', experience: 'Esperienza', achievements: 'Risultati', projects: 'Progetti', books: 'Libri', dailyQuote: 'Frase del Giorno', blog: 'Blog', testimonials: 'Testimonianze', contact: 'Contatto', cv: 'Scarica CV' },
-        hero: { title: 'Luca Gandolfi — Ingegnere Full‑Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
+        hero: { title: 'Luca Gandolfi — Ingegnere Full-Stack', subtitle: 'Sviluppatore • Sistemi Embedded • IA • Web', contactBtn: 'Contattami', cvBtn: 'Scarica CV' },
         sections: { about: 'Chi sono', skills: 'Competenze tecniche', languages: 'Lingue', experience: 'Esperienza lavorativa', achievements: 'Risultati e Certificazioni', contact: 'Informazioni personali', cv: 'Curriculum Vitae', social: 'Social & Contatto', projects: 'I miei progetti', testimonials: 'Testimonianze', dailyQuote: 'Frase Motivazionale del Giorno' },
         languages: { italian: 'Italiano', english: 'Inglese', french: 'Francese', spanish: 'Spagnolo', native: 'Madrelingua', fluent: 'Livello C1 (Avanzato)', intermediate: 'Intermedio', basic: 'Base' },
         games: { 
@@ -189,7 +194,7 @@ const translations = {
     fr: {
         common: { showMore: 'Voir plus', showLess: 'Voir moins' },
         nav: { about: 'À propos', skills: 'Compétences', languages: 'Langues', experience: 'Expérience', achievements: 'Réalisations', projects: 'Projets', books: 'Livres', dailyQuote: 'Citation du Jour', blog: 'Blog', testimonials: 'Témoignages', contact: 'Contact', cv: 'Télécharger le CV' },
-        hero: { title: 'Luca Gandolfi — Ingénieur Full‑Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez‑moi', cvBtn: 'Télécharger le CV' },
+        hero: { title: 'Luca Gandolfi — Ingénieur Full-Stack', subtitle: 'Développeur • Systèmes embarqués • IA • Web', contactBtn: 'Contactez-moi', cvBtn: 'Télécharger le CV' },
         sections: { about: 'À propos', skills: 'Compétences techniques', languages: 'Langues', experience: 'Expérience professionnelle', achievements: 'Réalisations & Certifications', contact: 'Informations personnelles', cv: 'Curriculum Vitae', social: 'Social & Contact', projects: 'Mes projets', testimonials: 'Témoignages', dailyQuote: 'Citation du Jour' },
         languages: { italian: 'Italien', english: 'Anglais', french: 'Français', spanish: 'Espagnol', native: 'Langue maternelle', fluent: 'Niveau C1 (Avancé)', intermediate: 'Intermédiaire', basic: 'Basique' },
         about: { p1: "Bonjour ! Je suis Luca, un développeur full-stack passionné par la création de solutions numériques innovantes. Avec plusieurs années d'expérience en développement web, systèmes embarqués et IA. Je me spécialise dans la création d'applications modernes et évolutives qui font la différence.", p2: "Mon parcours dans la tech a commencé par la curiosité et est devenu une carrière guidée par l'apprentissage continu et la résolution de problèmes. Je crois en l'écriture d'un code propre, l'adoption de nouvelles technologies et la création d'expériences centrées sur l'utilisateur." },
