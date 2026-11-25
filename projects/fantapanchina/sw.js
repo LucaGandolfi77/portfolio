@@ -1,7 +1,7 @@
 /* FantaPanchina — service worker v2: app shell offline + cache versionata */
 "use strict";
 
-const CACHE = "fantapanchina-v2";
+const CACHE = "fantapanchina-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,7 @@ const ASSETS = [
   "./manifest.json",
   "./src/main.js",
   "./src/config.js",
+  "./src/catalog.js",
   "./src/state.js",
   "./src/sim.js",
   "./src/persistence.js",
@@ -17,6 +18,7 @@ const ASSETS = [
   "./src/views/hud.js",
   "./src/views/squadra.js",
   "./src/views/mercato.js",
+  "./src/views/collezione.js",
   "./src/views/strutture.js",
   "./src/views/classifica.js",
   "./src/views/quest.js",
@@ -38,7 +40,9 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k.indexOf("fantapanchina-") === 0 && k !== CACHE).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });

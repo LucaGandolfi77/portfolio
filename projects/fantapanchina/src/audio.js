@@ -36,6 +36,8 @@ export function play(name, enabled) {
     case 'goal': [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.24, 'triangle', 0.1, i * 0.09)); break;
     case 'whistle': tone(1400, 0.16, 'square', 0.05, 0, 1800); break;
     case 'prestige': [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'sine', 0.1, i * 0.1)); break;
+    case 'chest': tone(220, 0.12, 'triangle', 0.08, 0, 340); tone(660, 0.16, 'sine', 0.06, 0.1); tone(990, 0.2, 'sine', 0.05, 0.2); break;
+    case 'trade': tone(392, 0.1, 'sine', 0.07); tone(587, 0.12, 'sine', 0.07, 0.1); tone(784, 0.16, 'triangle', 0.06, 0.2); break;
     case 'error': tone(180, 0.16, 'sawtooth', 0.06, 0, 120); break;
     default: break;
   }

@@ -12,6 +12,7 @@ import * as Mercato from './views/mercato.js';
 import * as Strutture from './views/strutture.js';
 import * as Classifica from './views/classifica.js';
 import * as Quest from './views/quest.js';
+import * as Collezione from './views/collezione.js';
 import { createMatchView } from './views/match.js';
 import { esc } from './views/util.js';
 
@@ -21,9 +22,10 @@ const state = loaded || Sim.createInitialState();
 const store = new Store(state);
 
 let activeTab = 'squadra';
+let colUI = { sub: 'bauli', scope: 'tutte', role: 'all', rarity: 'all' };
 let ips = Sim.calcFCPerSec(state);
-let lastTime = Date.now();
-let lastTick = Date.now();
+let lastTime = 0;
+let lastTick = 0;
 let acc = 0;
 let pendingMatch = null;
 let toastTimer = null;
@@ -44,6 +46,7 @@ app.innerHTML = `
   <nav class="tabs" id="tabs">
     <button class="tab on" data-tab="squadra">⚽ <span>Squadra</span></button>
     <button class="tab" data-tab="mercato">🏷️ <span>Mercato</span></button>
+    <button class="tab" data-tab="collezione">🃏 <span>Collezione</span><b class="tab-badge" id="tab-badge" hidden></b></button>
     <button class="tab" data-tab="strutture">🏗️ <span>Strutture</span></button>
     <button class="tab" data-tab="classifica">🏆 <span>Classifica</span></button>
     <button class="tab" data-tab="quest">🎯 <span>Obiettivi</span></button>
@@ -83,17 +86,26 @@ const match = createMatchView({
     document.getElementById('match-sub').textContent =
       `Fischio finale · ${res.scoreUs}-${res.scoreAi}. La tua squadra ha giocato.`;
     setTimeout(() => { ov.hidden = true; showToast('Giornata completata · +FP e mercato aggiornato'); }, 1600);
-    refreshAll();
     if (!state.mercato.length) Sim.generateMercato(state);
+    refreshAll();
   }
 });
 match.mount(document.getElementById('match-canvas'));
 
 /* ------------------------------------------------------------------- render */
 const PANELS = {
-  squadra: Squadra.html, mercato: Mercato.html, strutture: Strutture.html,
-  classifica: Classifica.html, quest: Quest.html
+  squadra: Squadra.html,
+  mercato: Mercato.html,
+  collezione: s => Collezione.html(s, colUI),
+  strutture: Strutture.html,
+  classifica: Classifica.html,
+  quest: Quest.html
 };
+function activateTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
+  renderPanel();
+}
 function renderPanel() {
   const el = document.getElementById('panel-content');
   el.innerHTML = PANELS[activeTab](state);
@@ -106,7 +118,34 @@ function renderFeed() {
     ? feed.map(f => `<div class="feed-item t-${f.type}"><span class="fi-dot"></span><span>${esc(f.msg)}</span></div>`).join('')
     : '<div class="feed-empty">Il feed si riempie durante le giornate.</div>';
 }
-function refreshAll() { renderPanel(); renderFeed(); store.set({}); }
+function refreshBadges() {
+  const badge = document.getElementById('tab-badge');
+  if (!badge) return;
+  const n = (state.chests || []).length;
+  badge.textContent = n > 0 ? String(n) : '';
+  badge.hidden = n <= 0;
+  badge.classList.toggle('hot', n > 0);
+}
+function refreshAll() {
+  ips = Sim.calcFCPerSec(state);
+  renderPanel();
+  renderFeed();
+  refreshBadges();
+  store.set({});
+}
+
+function hydrateCollections(now) {
+  now = now || Date.now();
+  Sim.syncAllRosterCards(state);
+  Sim.recomputeCollectionStats(state);
+  Sim.maintainChests(state, now);
+  if (!state.chests.length && !state.chestQueue.length && !(state.stats.chestsOpened > 0)) {
+    Sim.grantChest(state, 'legno', 'benvenuto nella collezione');
+  }
+  Sim.ensureMerchant(state, now);
+  if (!state.mercato.length) Sim.generateMercato(state);
+  refreshBadges();
+}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -122,10 +161,12 @@ function showModal(html) {
 function closeModal() { document.getElementById('modal').hidden = true; }
 
 function showOfflineModal(report, giornate, fp, fc) {
+  const chests = (state.chests || []).length + (state.chestQueue || []).length;
   showModal(`<div class="modal-icon">🌙</div><h2>Bentornato!</h2>
     <p>Sei stato via per ${Math.round(report.elapsed / 60000)} minuti${report.wasCapped ? ' (max 8h)' : ''}.</p>
     <div class="modal-reward">La squadra ha giocato <b>${giornate}</b> giornate</div>
     <div class="modal-reward">+${CFG.formatNum(fp)} FP · +${CFG.formatNum(fc)} FC</div>
+    ${chests ? `<div class="modal-reward">🎁 ${chests} bauli in attesa</div>` : ''}
     <button class="btn-primary" data-action="close-modal">INCASSA!</button>`);
 }
 
@@ -133,10 +174,8 @@ function showOfflineModal(report, giornate, fp, fc) {
 document.getElementById('tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-tab]');
   if (!b) return;
-  activeTab = b.dataset.tab;
-  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
   Audio.play('tap', state.settings.sound);
-  renderPanel();
+  activateTab(b.dataset.tab);
 });
 
 /* --------------------------------------------------------------- tap mister */
@@ -210,9 +249,10 @@ document.addEventListener('click', e => {
     if (res.ok) {
       Object.keys(state).forEach(k => delete state[k]);
       Object.assign(state, res.state);
+      hydrateCollections();
       Audio.play('prestige', state.settings.sound);
       showModal(`<div class="modal-icon">🏆</div><h2>SCUDETTO D'ORO #${state.scudettiDoro}</h2>
-        <p>Nuova stagione! +25% income permanente.</p>
+        <p>Nuova stagione! +25% income permanente. La collezione resta tua.</p>
         <button class="btn-primary" data-action="close-modal">NUOVA STAGIONE</button>`);
     } else showToast(res.msg);
     refreshAll();
@@ -224,6 +264,80 @@ document.addEventListener('click', e => {
     if (p) { p.titolare = !p.titolare; renderPanel(); }
   } else if (action === 'refresh-market') {
     Sim.generateMercato(state); Audio.play('tap', state.settings.sound); renderPanel();
+  } else if (action === 'col-tab') {
+    colUI.sub = btn.dataset.sub || 'bauli';
+    Audio.play('tap', state.settings.sound);
+    renderPanel();
+  } else if (action === 'col-scope') {
+    colUI.scope = btn.dataset.value || 'tutte';
+    renderPanel();
+  } else if (action === 'col-role') {
+    colUI.role = btn.dataset.value || 'all';
+    renderPanel();
+  } else if (action === 'col-rarity') {
+    colUI.rarity = btn.dataset.value || 'all';
+    renderPanel();
+  } else if (action === 'open-chest') {
+    res = Sim.openChest(state, btn.dataset.id);
+    if (res.ok) {
+      Audio.play('chest', state.settings.sound);
+      if (res.levelUp) setTimeout(() => Audio.play('combo', state.settings.sound), 260);
+      showModal(Collezione.revealHtml(res));
+      Sim.maintainChests(state, Date.now());
+      refreshAll();
+    } else showToast(res.msg);
+  } else if (action === 'chest-buy') {
+    res = Sim.buyChest(state, btn.dataset.tier);
+    Audio.play(res.ok ? 'buy' : 'error', state.settings.sound);
+    showToast(res.ok ? (res.queued ? 'Baule in coda: slot pieni' : 'Baule aggiunto!') : res.msg);
+    refreshAll();
+  } else if (action === 'merchant-reroll') {
+    res = Sim.rerollMerchant(state);
+    Audio.play(res.ok ? 'tap' : 'error', state.settings.sound);
+    showToast(res.ok ? 'Offerte rimescolate' : res.msg);
+    refreshAll();
+  } else if (action === 'merchant-trade') {
+    res = Sim.tradeMerchant(state, btn.dataset.id);
+    if (res.ok) {
+      Audio.play('trade', state.settings.sound);
+      if (res.levelUp) setTimeout(() => Audio.play('combo', state.settings.sound), 260);
+      showModal(Collezione.revealHtml(res));
+      refreshAll();
+    } else showToast(res.msg);
+  } else if (action === 'deploy-card') {
+    res = Sim.deployCard(state, btn.dataset.id);
+    if (res.ok) {
+      closeModal();
+      showToast(`${res.player.name} entra in rosa!`);
+      Audio.play('buy', state.settings.sound);
+      refreshAll();
+    } else if (res.needReplace) {
+      showModal(Collezione.replaceHtml(state, btn.dataset.id));
+    } else showToast(res.msg);
+  } else if (action === 'choose-replace') {
+    res = Sim.deployCard(state, btn.dataset.cardId, btn.dataset.outId);
+    if (res.ok) {
+      closeModal();
+      showToast(`${res.player.name} entra in rosa!`);
+      Audio.play('buy', state.settings.sound);
+      refreshAll();
+    } else showToast(res.msg);
+  } else if (action === 'remove-card') {
+    res = Sim.removeCardFromRoster(state, btn.dataset.id);
+    if (res.ok) {
+      closeModal();
+      showToast(`${res.removed.name} torna in collezione`);
+      refreshAll();
+    } else showToast(res.msg);
+  } else if (action === 'card-detail') {
+    showModal(Collezione.cardDetailHtml(state, btn.dataset.id));
+  } else if (action === 'goto-collezione') {
+    closeModal();
+    colUI.sub = 'carte';
+    colUI.scope = 'owned';
+    colUI.role = 'all';
+    colUI.rarity = 'all';
+    activateTab('collezione');
   } else if (action === 'share') {
     shareTeam();
   } else if (action === 'reset') {
@@ -232,7 +346,8 @@ document.addEventListener('click', e => {
       <button class="btn-ghost" data-action="close-modal">ANNULLA</button>`);
   } else if (action === 'confirm-reset') {
     clear(); Object.keys(state).forEach(k => delete state[k]);
-    Object.assign(state, Sim.createInitialState()); closeModal(); refreshAll(); showToast('Nuova partita!');
+    Object.assign(state, Sim.createInitialState());
+    hydrateCollections(); closeModal(); refreshAll(); showToast('Nuova partita!');
   } else if (action === 'export') {
     const blob = new Blob([JSON.stringify(state)], { type:'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -247,8 +362,11 @@ document.addEventListener('click', e => {
       rd.onload = () => {
         try {
           const d = JSON.parse(rd.result);
+          const next = migrate(d);
+          if (!next) throw new Error('salvataggio non valido');
           Object.keys(state).forEach(k => delete state[k]);
-          Object.assign(state, migrate(d) || d);
+          Object.assign(state, next);
+          hydrateCollections();
           closeModal(); refreshAll(); showToast('Salvataggio importato');
         } catch (err) { showToast('File non valido'); }
       };
@@ -317,7 +435,8 @@ function startGiornata() {
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(100, now - lastTime);
+  const wall = Date.now();
+  const dt = lastTime ? Math.max(0, Math.min(100, now - lastTime)) : 0;
   lastTime = now;
   acc += dt;
   if (acc > 1000) acc = 1000; // evita un ciclo infinito dopo un tab in background
@@ -325,17 +444,60 @@ function frame(now) {
     acc -= CFG.TICK_MS;
     const step = CFG.TICK_MS / 1000;
     if (ips > 0) { const gain = ips * step; state.fc += gain; state.totalFc += gain; }
-    if (now - state.lastGiornataTime >= CFG.GIORNATA_MS) {
-      state.lastGiornataTime = now;
+    if (wall - state.lastGiornataTime >= CFG.GIORNATA_MS) {
+      state.lastGiornataTime = wall;
       startGiornata();
     }
     if (Math.random() < 0.0004) { Sim.randomNews(state); renderFeed(); }
   }
   if (now - lastTick >= 250) {
     lastTick = now;
-    Hud.update(state, ips, CFG.GIORNATA_MS - (now - state.lastGiornataTime));
+    Hud.update(state, ips, CFG.GIORNATA_MS - (wall - state.lastGiornataTime));
     const comboChip = document.getElementById('combo-chip');
     if (comboChip && combo === 0) comboChip.textContent = '×1';
+    if (Sim.maintainChests(state, wall)) {
+      refreshBadges();
+      if (activeTab === 'collezione' && colUI.sub === 'bauli') renderPanel();
+    }
+    if (Sim.ensureMerchant(state, wall)) {
+      if (activeTab === 'collezione' && colUI.sub === 'mercante') renderPanel();
+    }
+    updateCollectionLive(wall);
+  }
+}
+
+function updateCollectionLive(now) {
+  if (activeTab !== 'collezione') return;
+  document.querySelectorAll('[data-action="chest-buy"]').forEach(btn => {
+    const tier = CFG.CHEST_TIERS[btn.dataset.tier];
+    if (tier) btn.disabled = state.fc < tier.price;
+  });
+  const reroll = document.querySelector('[data-action="merchant-reroll"]');
+  if (reroll) reroll.disabled = state.fc < CFG.MERCHANT.rerollCost;
+  document.querySelectorAll('[data-action="merchant-trade"]').forEach(btn => {
+    const offer = state.merchant && state.merchant.offers.find(o => o.id === btn.dataset.id);
+    if (!offer) { btn.disabled = true; return; }
+    btn.disabled = offer.recovery
+      ? state.fc < offer.cost
+      : Sim.duplicatesOf(state, offer.wantId) < offer.wantQty;
+  });
+  if (colUI.sub === 'bauli') {
+    const status = Sim.chestStatus(state, now);
+    const timer = document.querySelector('[data-chest-timer]');
+    if (timer) timer.textContent = status.full ? 'In pausa' : Collezione.timeText(status.remaining);
+    const bar = document.querySelector('[data-chest-bar]');
+    if (bar) {
+      const pct = status.full ? 100
+        : Math.max(0, Math.min(100, (1 - status.remaining / CFG.CHEST_FREE_MS) * 100));
+      bar.style.width = pct.toFixed(2) + '%';
+    }
+  } else if (colUI.sub === 'mercante') {
+    const timer = document.querySelector('[data-merchant-timer]');
+    if (timer) {
+      const m = state.merchant;
+      timer.textContent = Collezione.timeText(m && m.nextAt
+        ? Math.max(0, m.nextAt - now) : CFG.MERCHANT.rotateMs);
+    }
   }
 }
 setInterval(() => save(state), CFG.AUTOSAVE_MS);
@@ -355,7 +517,10 @@ if (report.giornate > 0) {
 } else state.lastGiornataTime = Date.now();
 
 if (!state.mercato.length) Sim.generateMercato(state);
+hydrateCollections();
 refreshAll();
 Hud.update(state, ips, CFG.GIORNATA_MS);
 requestAnimationFrame(frame);
-window.__fp = { state, store, Sim, match };
+window.__fp = {
+  state, store, Sim, match, refresh: refreshAll, activateTab, colUI, Collezione
+};

@@ -3,12 +3,84 @@
    Nessuna logica, nessun DOM. Modificare qui per bilanciare il gioco.
    ============================================================================ */
 
+/* La chiave resta 'v2' per non perdere i salvataggi esistenti: la forma interna è v3. */
 export const SAVE_KEY = 'fantapanchina-save-v2';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const TICK_MS = 100;
 export const GIORNATA_MS = 180000;
 export const AUTOSAVE_MS = 8000;
 export const MAX_OFFLINE_H = 8;
+export const MAX_ROSTER = 16;
+
+/* --------------------------------------------------------------- carte */
+export const RARITY_ORDER = ['comune', 'raro', 'epico', 'leggendario'];
+
+export const RARITIES = {
+  comune: {
+    name: 'Comune', short: 'COM', color: '#9aa9c2', glow: 'rgba(154,169,194,.28)',
+    skill: [1.4, 3.3], quotazione: [2, 9], costanza: [0.35, 0.72]
+  },
+  raro: {
+    name: 'Raro', short: 'RAR', color: '#3ee6ff', glow: 'rgba(62,230,255,.32)',
+    skill: [3.3, 5.3], quotazione: [9, 24], costanza: [0.45, 0.82]
+  },
+  epico: {
+    name: 'Epico', short: 'EPI', color: '#b28dff', glow: 'rgba(178,141,255,.36)',
+    skill: [5.3, 7.3], quotazione: [24, 56], costanza: [0.55, 0.9]
+  },
+  leggendario: {
+    name: 'Leggendario', short: 'LEG', color: '#ffd166', glow: 'rgba(255,209,102,.4)',
+    skill: [7.3, 9.3], quotazione: [56, 120], costanza: [0.7, 0.96]
+  }
+};
+
+/* Livello = copie totali trovate. La prima copia non si perde mai. */
+export const CARD_LEVELS = [1, 2, 3, 5, 8];
+export const CARD_LEVEL_BONUS = { skill: 0.4, quotazione: 1, costanza: 0.02 };
+
+/* --------------------------------------------------------------- bauli */
+export const CHEST_SLOTS = 4;
+export const CHEST_QUEUE_MAX = 12;
+export const CHEST_FREE_MS = 6 * 60 * 1000;
+export const CHEST_TIER_ORDER = ['legno', 'argento', 'oro', 'diamante'];
+
+export const CHEST_TIERS = {
+  legno: {
+    name: 'Baule di Legno', emoji: '🪵', color: '#c89b6a', price: 1500,
+    minRarity: 'comune', blurb: 'Il classico baule da panchina.',
+    drops: { comune: 70, raro: 25, epico: 5, leggendario: 0 }
+  },
+  argento: {
+    name: 'Baule d’Argento', emoji: '🥈', color: '#c7d6ea', price: 6000,
+    minRarity: 'comune', blurb: 'Un regalo per ogni vittoria.',
+    drops: { comune: 45, raro: 40, epico: 13, leggendario: 2 }
+  },
+  oro: {
+    name: 'Baule d’Oro', emoji: '🥇', color: '#ffd166', price: 20000,
+    minRarity: 'raro', blurb: 'Almeno un raro, garantito.',
+    drops: { comune: 20, raro: 45, epico: 30, leggendario: 5 }
+  },
+  diamante: {
+    name: 'Baule di Diamante', emoji: '💎', color: '#8ce7ff', price: 75000,
+    minRarity: 'epico', blurb: 'Almeno un epico, garantito.',
+    drops: { comune: 0, raro: 25, epico: 55, leggendario: 20 }
+  }
+};
+
+export const PITY = { epico: 10, leggendario: 50 };
+
+/* --------------------------------------------------------------- mercante */
+export const MERCHANT = {
+  offers: 3,
+  rotateMs: 12 * 60 * 1000,
+  rerollCost: 300,
+  recoveryCost: 500,
+  historyMax: 12
+};
+
+export const MERCHANT_STATUS = [
+  'online ora', 'online · 2 min fa', 'sta trattando', 'connesso', 'online · 5 min fa'
+];
 
 export const NAMES = [
   'Gennaro','Cristian','Sandro','Erling','Marco','Antonio','Diego','Luca','Matteo','Davide',
@@ -190,7 +262,11 @@ export const QUESTS = [
   { id:'goal5', name:'Cannoniere', desc:'Segna 5 gol', target:5, reward:800, stat:'goals' },
   { id:'win3', name:'Serie positiva', desc:'Vinci 3 giornate', target:3, reward:1200, stat:'wins' },
   { id:'buy1', name:'Pronto mercato', desc:'Acquista 1 giocatore', target:1, reward:250, stat:'buys' },
-  { id:'up3', name:'Imprenditore', desc:'Potenzia una struttura 3 volte', target:3, reward:400, stat:'upgrades' }
+  { id:'up3', name:'Imprenditore', desc:'Potenzia una struttura 3 volte', target:3, reward:400, stat:'upgrades' },
+  { id:'chest3', name:'Scassinatore', desc:'Apri 3 bauli', target:3, reward:500, stat:'chestsOpened' },
+  { id:'cards15', name:'Collezionista', desc:'Colleziona 15 carte diverse', target:15, reward:900, stat:'cardsFound' },
+  { id:'trade1', name:'Mercante', desc:'Concludi 1 scambio', target:1, reward:600, stat:'trades' },
+  { id:'card_max', name:'Carta vincente', desc:'Porta una carta al livello 5', target:1, reward:1500, stat:'level5' }
 ];
 
 export const ACHIEVEMENTS = [
@@ -198,7 +274,12 @@ export const ACHIEVEMENTS = [
   { id:'bidone', name:'Fregato!', desc:'Compra un bidone', icon:'🪣' },
   { id:'prestige', name:'Nuova stagione', desc:'Fai il tuo primo scudetto d’oro', icon:'🏆' },
   { id:'rich', name:'Tutto soldi', desc:'Raggiungi 10.000 FC', icon:'💰' },
-  { id:'quests', name:'Sergente', desc:'Completa 3 obiettivi', icon:'🎯' }
+  { id:'quests', name:'Sergente', desc:'Completa 3 obiettivi', icon:'🎯' },
+  { id:'chest10', name:'Baulomane', desc:'Apri 10 bauli', icon:'🧰' },
+  { id:'collector', name:'Collezionista', desc:'Possiedi 20 carte diverse', icon:'🃏' },
+  { id:'legend', name:'Leggenda', desc:'Trova una carta leggendaria', icon:'👑' },
+  { id:'trader', name:'Mercante', desc:'Concludi 5 scambi', icon:'🤝' },
+  { id:'card_max', name:'Carta vincente', desc:'Porta una carta al livello 5', icon:'🌟' }
 ];
 
 export function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
