@@ -6,8 +6,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#060a12">
-<meta name="description" content="CAM//SENTINEL — accende la fotocamera del tuo dispositivo e analizza in tempo reale ciò che vede: LED a infrarossi e riflessi di lenti (tipici delle telecamere di sorveglianza attive), lampeggio dei LED di stato, e oggetti che possono nascondere una camera (AI on-device). Spiega anche perché il browser NON può vedere le telecamere sulla rete e come lo farebbe un'app nativa.">
-<title>CAM//SENTINEL — chi ti sta guardando?</title>
+<meta name="description" content="CAM//LAB — demo didattica su permessi e dispositivi fotocamera nel browser, analisi locale sperimentale delle luci e rilevamento di oggetti generici. Spiega i limiti reali del browser e non è un rilevatore certificato di telecamere.">
+<title>CAM//LAB — Camera & Privacy Diagnostics</title>
 <style>
 :root{--bg:#060a12;--panel:#0b1320;--line:rgba(120,180,255,.14);--txt:#dbe7ff;--dim:#8fa3c7;--accent:#35e0ff;--warn:#ffd166;--danger:#ff5c7a;--ok:#4ade80}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -76,8 +76,8 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
 </head>
 <body>
 <header>
-  <h1>CAM//SENTINEL</h1>
-  <span>scanner ottico di telecamere attive — on-device, niente va su internet</span>
+  <h1>CAM//LAB</h1>
+  <span>diagnostica fotocamera e privacy — i frame restano sul dispositivo</span>
 </header>
 <main>
   <section class="viewfinder" id="viewfinder">
@@ -86,15 +86,15 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
     <div class="scanline"></div>
     <div id="statusPill">
       <div class="pill" id="pillState">● offline</div>
-      <div class="pill" id="pillHits">IR: 0</div>
+      <div class="pill" id="pillHits">Luci: 0</div>
     </div>
   </section>
 
   <div class="controls">
     <button class="btn primary" id="btnStart">▶ Accendi fotocamera</button>
     <button class="btn" id="btnFlip" disabled>🔄 Cambia camera</button>
-    <button class="btn warnbtn" id="btnAI" disabled>🤖 AI device scan</button>
-    <label class="sens">IR sens
+    <button class="btn warnbtn" id="btnAI" disabled>🧖 Rileva oggetti</button>
+    <label class="sens">Sensibilità luci
       <input type="range" id="sens" min="40" max="220" value="140">
     </label>
   </div>
@@ -105,16 +105,16 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
       <ul id="busyList"><li class="empty">Premi "Accendi fotocamera" per iniziare.</li></ul>
     </div>
     <div class="panel">
-      <h3>📷 Telecamere collegate</h3>
+      <h3>📷 Fotocamere locali rilevate</h3>
       <ul id="devList"><li class="empty">L'elenco appare dopo il permesso.</li></ul>
     </div>
     <div class="panel">
-      <h3>🕵️ IR / riflessi di lenti in vista</h3>
-      <ul id="irList"><li class="empty">Nessuna sorgente IR rilevata.</li></ul>
+      <h3>💡 Luci e variazioni — sperimentale</h3>
+      <ul id="irList"><li class="empty">Nessuna sorgente luminosa rilevata.</li></ul>
     </div>
     <div class="panel" style="grid-column:1/-1">
-      <h3>🤖 AI — oggetti che possono nascondere una camera</h3>
-      <ul id="aiList"><li class="empty">Attiva "AI device scan" (TensorFlow.js COCO-SSD, on-device).</li></ul>
+      <h3>🧖 Oggetti in vista — non telecamere</h3>
+      <ul id="aiList"><li class="empty">COCO-SSD riconosce oggetti generici: TV, laptop, telefoni, orologi e telecomandi.</li></ul>
     </div>
     <div class="panel" style="grid-column:1/-1">
       <h3>📜 Registro eventi</h3>
@@ -123,67 +123,57 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   </section>
 
   <section class="explain">
-    <h2>🔍 Cosa posso rilevare davvero — e cosa no</h2>
+    <h2>🔍 Cosa fa davvero questa pagina</h2>
 
-    <h3>✅ Quello che QUESTA pagina fa (nel browser)</h3>
-    <p><b>1. La tua fotocamera.</b> Con <code>getUserMedia</code> accendo solo la fotocamera
-    del <i>tuo</i> dispositivo, solo dopo il tuo permesso. Su iOS e Android il sistema concede la
-    camera in <b>esclusiva a una sola app per volta</b>: se un'altra app la sta già usando,
-    la richiesta fallisce con <code>NotReadableError</code>. Quando succede, la pagina ti avvisa:
-    <span class="bad"><b>la tua camera è già in uso da un'altra app</b></span>. È l'unico modo —
-    onesto — per scoprirlo dal browser.</p>
-    <p><b>2. Tutte le telecamere collegate al dispositivo.</b> Con <code>enumerateDevices()</code>
-    elenco ogni camera (webcam interna, esterna, schede di acquisizione) e ascolto
-    <code>devicechange</code> per le accensioni/spegnimenti a caldo.</p>
-    <p><b>3. Telecamere NEL TUO CAMPO VISIVO.</b> Le telecamere di sorveglianza con visione notturna
-    emettono <b>infrarossi</b>: il sensore del telefono li vede come un <b>bagliore viola/bianco</b>.
-    Analizzo ogni frame cercando sorgenti IR brillanti, ne misuro il <b>lampeggio</b> (i LED di stato
-    pulsano) e i <b>riflessi di lente</b>. Una macchia IR stabile o pulsante in vista = fortissima
-    indicazione di una camera accesa. È la stessa tecnica delle app "rilevatore di spie".</p>
-    <p><b>4. AI opzionale.</b> TensorFlow.js + COCO-SSD (tutto on-device) riconosce oggetti che
-    spesso <i>ospitano</i> una camera (TV, laptop, smartphone, telecomando). Non prova che la camera
-    sia accesa: ti dice "qui c'è un dispositivo che può contenerne una".</p>
+    <h3>✅ Diagnostica browser</h3>
+    <p><b>Accesso alla fotocamera.</b> Con <code>getUserMedia</code> la pagina può aprire una
+    fotocamera locale dopo il tuo consenso. Se la richiesta fallisce con
+    <code>NotReadableError</code>, il dispositivo potrebbe essere occupato, ma anche il driver
+    o l'hardware potrebbero non essere disponibili: <b>non è una prova che qualcuno ti stia spiando</b>.</p>
+    <p><b>Elenco dispositivi.</b> Con <code>enumerateDevices()</code> puoi vedere le fotocamere
+    locali visibili al browser. Non vengono elencate telecamere IP, dispositivi di rete o
+    fotocamere di altri utenti.</p>
 
-    <h3>❌ Perché NON posso vedere le telecamere sulla rete o di altri</h3>
-    <p><b>Sandbox del browser.</b> Una pagina web vive in una scatola isolata:
-    <code>getUserMedia</code> dà accesso solo a <i>questa</i> camera, non al sistema.
-    Niente socket raw, niente scansione della rete locale, niente probe RTSP/ONVIF,
-    niente mDNS/UPnP. <code>fetch()</code> verso IP locali è bloccato (Private Network Access),
-    e WebRTC funziona solo verso peer di cui conosci l'indirizzo — non "sente" i dispositivi.</p>
-    <p><b>Nessun accesso all'hardware altrui.</b> La camera del vicino, del soffitto o del laptop
-    accanto è un dispositivo separato: il browser non ha alcun canale per interrogarne lo stato.
-    Se la telecamera non è nel campo visivo della <i>tua</i> camera, per questa pagina
-    semplicemente non esiste.</p>
-    <p><b>Radio/Wi-Fi.</b> Le API di scansione Wi-Fi sono sparite dai browser per motivi di privacy;
-    il Bluetooth Web non permette di "ascoltare" trasmettitori video. Rilevare segnali wireless
-    richiede hardware (SDR), non JavaScript.</p>
+    <h3>🧪 Analisi sperimentale</h3>
+    <p><b>Luci e variazioni.</b> L'algoritmo cerca macchie luminose e cambi rapidi di intensità.
+    Non sa distinguere un LED IR da uno schermo, un riflesso o una lampada: possono esserci
+    molti falsi positivi e falsi negativi. Molti telefoni filtrano gli infrarossi, quindi una
+    telecamera IR può anche non essere visibile.</p>
+    <p><b>Oggetti in vista.</b> TensorFlow.js + COCO-SSD riconosce oggetti generici come TV,
+    laptop, telefoni, orologi e telecomandi. <b>Non riconosce telecamere o lenti</b> e non dice
+    se un dispositivo stia registrando.</p>
 
-    <h3>🛠️ Come lo farebbe un'app nativa (e come lo faresti tu)</h3>
+    <h3>❌ Limiti reali del browser</h3>
+    <p>Una pagina web non può eseguire una scansione arbitraria della rete locale, aprire socket
+    raw, interrogare RTSP/ONVIF o ascoltare trasmissioni radio. Questi limiti proteggono la
+    privacy e impediscono a un sito di esplorare i tuoi dispositivi.</p>
+    <p>I frame video vengono elaborati localmente e non vengono inviati a un server. Le librerie
+    AI vengono però scaricate da una CDN, quindi la pagina richiede una connessione per
+    quella funzione.</p>
+
+    <h3>🛠️ Come cercare una telecamera in modo concreto</h3>
     <ul>
-      <li><b>iOS / macOS:</b> <code>AVCaptureDevice</code> + <code>AVCaptureSession</code> per lo
-      stato d'uso della camera; <code>NWBrowser</code> (Bonjour) e probe RTSP sulla porta 554 per
-      trovare telecamere IP sulla LAN; librerie ONVIF per interrogare il firmware.</li>
-      <li><b>Android:</b> API Camera2 — <code>CameraManager.registerAvailabilityCallback()</code>
-      ti dice in tempo reale quando una camera viene <b>aperta o chiusa da un'altra app</b>;
-      scansione mDNS/SSDP + probe RTSP per la rete.</li>
-      <li><b>Desktop:</b> su macOS IOKit/CoreMediaIO (il famoso trucco <code>ioreg</code> per lo
-      stato della camera); su Windows Media Foundation / <code>DeviceInformation</code>.</li>
-      <li><b>Radio:</b> un dongle SDR (RTL-SDR) capta i segnali analogici/digitali delle telecamere
-      wireless — serve un'app nativa con permessi di sistema, mai una pagina web.</li>
+      <li><b>Ispezione fisica:</b> cerca lenti di vetro, riflessi circolari, aperture scure, LED,
+      cablaggi o oggetti fuori posto. Usa una torcia e osserva da angolazioni diverse.</li>
+      <li><b>Rete autorizzata:</b> da un computer o da un'app nativa puoi usare Bonjour/mDNS,
+      ONVIF Discovery, ARP e strumenti come <code>nmap</code> per identificare dispositivi sulla
+      tua LAN, verificando indirizzi MAC e interfacce web.</li>
+      <li><b>Radio:</b> per telecamere wireless servono hardware dedicato o SDR, non JavaScript.</li>
+      <li><b>Riconoscimento automatico:</b> servirebbe un modello addestrato specificamente su
+      telecamere e lenti; anche quel modello resterebbe uno strumento di supporto.</li>
     </ul>
-    <p><b>In sintesi:</b> dal browser posso dirti "la tua camera è occupata", elencare le tue
-    telecamere, e trovare telecamere attive <i>che la tua camera può vedere</i> (via IR/lenti + AI).
-    Non posso (e nessun browser può) scansionare la rete o le telecamere degli altri: è un limite
-    di sicurezza, non di codice. Per quello serve un'app nativa — qui sopra c'è la ricetta.</p>
+    <p><b>In sintesi:</b> CAM//LAB è una demo didattica su fotocamere, permessi e privacy.
+    Non è uno scanner certificato e non deve essere usato per affermare che una telecamera
+    sia presente o attiva.</p>
   </section>
 </main>
-<footer>CAM//SENTINEL — tutto l'analisi gira sul tuo dispositivo · nessun frame viene inviato</footer>
+<footer>CAM//LAB — i frame restano sul dispositivo · le librerie AI vengono caricate da CDN</footer>
 
 <script>
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var S = window.__SENTINEL__ = {};
+  var S = window.__CAM_LAB__ = window.__SENTINEL__ = {};
 
   /* ═══════ CORE PURA (testabile headless) ═══════ */
   function classifyError(e) {
@@ -196,8 +186,8 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   }
   S.classifyError = classifyError;
 
-  // Analizza un frame RGBA (Uint8ClampedArray w*h) e restituisce blob IR/lenti.
-  // x,y ∈ [0,1]. thr = soglia di luminosità. Parla di "sorgente brillante + viola".
+  // Analizza un frame RGBA e restituisce macchie luminose.
+  // x,y ∈ [0,1]. thr = soglia di luminosità. Non identifica IR, lenti o telecamere.
   function analyzeIR(frame, w, h, thr) {
     var gridW = Math.max(8, Math.round(w / 8));
     var gridH = Math.max(8, Math.round(h / 8));
@@ -276,24 +266,24 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
     var b1 = analyzeIR(dark, 64, 48, 140);
     check('frame scuro → 0 blob', b1.length === 0, 'blob=' + b1.length);
 
-    // 2) macchia viola brillante (LED IR) → 1 blob con score>0
-    var ir = new Uint8ClampedArray(64 * 48 * 4);
-    for (var p = 0; p < ir.length; p += 4) { ir[p] = 18; ir[p + 1] = 18; ir[p + 2] = 18; ir[p + 3] = 255; }
+    // 2) macchia chiara sintetica → 1 blob con score>0
+    var bright = new Uint8ClampedArray(64 * 48 * 4);
+    for (var p = 0; p < bright.length; p += 4) { bright[p] = 18; bright[p + 1] = 18; bright[p + 2] = 18; bright[p + 3] = 255; }
     for (var yy = 18; yy < 28; yy++) for (var xx = 28; xx < 36; xx++) {
-      var o = (yy * 64 + xx) * 4; ir[o] = 255; ir[o + 1] = 120; ir[o + 2] = 255; ir[o + 3] = 255;
+      var o = (yy * 64 + xx) * 4; bright[o] = 255; bright[o + 1] = 120; bright[o + 2] = 255; bright[o + 3] = 255;
     }
-    var b2 = analyzeIR(ir, 64, 48, 140);
-    check('LED IR viola → blob rilevato', b2.length >= 1, 'blob=' + b2.length);
-    check('score > 0 sul blob', b2.length >= 1 && b2[0].score > 0, 'score=' + (b2[0] ? b2[0].score.toFixed(2) : '-'));
+    var b2 = analyzeIR(bright, 64, 48, 140);
+    check('macchia chiara → blob rilevato', b2.length >= 1, 'blob=' + b2.length);
+    check('score > 0 sulla macchia', b2.length >= 1 && b2[0].score > 0, 'score=' + (b2[0] ? b2[0].score.toFixed(2) : '-'));
 
     // 3) blob centrato approssimativamente a (0.5, 0.5)
     check('posizione blob ~centro', b2.length >= 1 && Math.abs(b2[0].x - 0.5) < 0.2 && Math.abs(b2[0].y - 0.5) < 0.2,
       'x=' + (b2[0] ? b2[0].x.toFixed(2) : '-') + ' y=' + (b2[0] ? b2[0].y.toFixed(2) : '-'));
 
-    // 4) lampeggio: serie alternata → blinkRate alto
+    // 4) variazione sintetica: serie alternata → blinkRate alto
     var blink = [];
     for (var t = 0; t < 12; t++) blink.push(t % 2 ? 240 : 30);
-    check('lampeggio periodico rilevato', blinkRate(blink) > 0.5, 'rate=' + blinkRate(blink).toFixed(2));
+    check('variazione periodica rilevata', blinkRate(blink) > 0.5, 'rate=' + blinkRate(blink).toFixed(2));
 
     // 5) serie costante → blinkRate ~0
     var steady = [];
@@ -316,7 +306,7 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
     var res = runSelfTest();
     var pane = document.createElement('div');
     pane.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:60vh;overflow:auto;z-index:99;background:#05070d;border-top:1px solid #223;padding:12px;font:12px/1.6 ui-monospace,Menlo,monospace;color:#cfe';
-    pane.innerHTML = '<b>CAM//SENTINEL self-test</b><br>' + res.map(function (r) {
+    pane.innerHTML = '<b>CAM//LAB self-test</b><br>' + res.map(function (r) {
       return (r.pass ? '✅' : '❌') + ' ' + r.name + (r.detail ? ' — ' + r.detail : '');
     }).join('<br>') + '<br><b>' + res.filter(function (r) { return r.pass; }).length + '/' + res.length + ' PASS</b>';
     document.body.appendChild(pane);
@@ -329,7 +319,7 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   var btnStart = $('btnStart'), btnFlip = $('btnFlip'), btnAI = $('btnAI');
   var devList = $('devList'), irList = $('irList'), aiList = $('aiList'), logEl = $('log');
   var stream = null, running = false, facing = 'user', aiOn = false, aiModel = null, aiBusy = false;
-  var irHistory = {}, lastFrame = 0, aiLast = 0, hc = 0;
+  var irHistory = {}, lastFrame = 0, aiLast = 0, hc = 0, rafId = 0;
 
   function log(msg) {
     var li = document.createElement('li');
@@ -347,7 +337,7 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   }
   function setStatus(kind, msg) {
     if (kind === 'on') setPill(pillState, '● live', 'on');
-    else if (kind === 'busy') setPill(pillState, '⚠ camera in uso', 'busy');
+    else if (kind === 'busy') setPill(pillState, '⚠ camera non disponibile', 'busy');
     else if (kind === 'warn') setPill(pillState, msg, 'warn');
     else setPill(pillState, '● ' + msg, '');
   }
@@ -381,8 +371,18 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
     var vw = overlay.clientWidth, vh = overlay.clientHeight;
     if (overlay.width !== vw || overlay.height !== vh) { overlay.width = vw; overlay.height = vh; }
     octx.clearRect(0, 0, vw, vh);
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    // object-fit: cover ritaglia il frame: riporta le coordinate al box visibile.
+    var scale = Math.max(vw / video.videoWidth, vh / video.videoHeight);
+    var drawnW = video.videoWidth * scale, drawnH = video.videoHeight * scale;
+    var offsetX = (vw - drawnW) / 2, offsetY = (vh - drawnH) / 2;
+
     blobs.forEach(function (b) {
-      var px = b.x * vw, py = b.y * vh, r = Math.max(14, b.r * vw);
+      // Il video è specchiato via CSS, quindi anche l'overlay deve esserlo.
+      var px = offsetX + (1 - b.x) * drawnW;
+      var py = offsetY + b.y * drawnH;
+      var r = Math.max(14, b.r * drawnW);
       octx.strokeStyle = 'rgba(255,209,102,.95)';
       octx.lineWidth = 2;
       octx.beginPath(); octx.arc(px, py, r, 0, 6.283); octx.stroke();
@@ -394,7 +394,7 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
       octx.stroke();
       octx.fillStyle = 'rgba(255,209,102,.9)';
       octx.font = 'bold 11px system-ui';
-      octx.fillText(b.blink > 0.4 ? 'LED pulsante' : 'IR', px + r + 6, py - 6);
+      octx.fillText(b.blink > 0.4 ? 'Variazione' : 'Luce', px + r + 6, py - 6);
     });
   }
 
@@ -402,16 +402,18 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   var sctx = scanCanvas.getContext('2d');
 
   function frameTick() {
-    if (!running || !video.videoWidth) { requestAnimationFrame(frameTick); return; }
+    rafId = 0;
+    if (!running || !video.videoWidth) return;
     var w = 160, h = Math.max(60, Math.round(160 * video.videoHeight / video.videoWidth));
     scanCanvas.width = w; scanCanvas.height = h;
     sctx.drawImage(video, 0, 0, w, h);
     var img;
-    try { img = sctx.getImageData(0, 0, w, h); } catch (e) { requestAnimationFrame(frameTick); return; }
+    try { img = sctx.getImageData(0, 0, w, h); }
+    catch (e) { if (running) rafId = requestAnimationFrame(frameTick); return; }
     var thr = parseInt(sens.value, 10) || 140;
     var blobs = analyzeIR(img.data, w, h, thr);
     var now = performance.now();
-    // aggiorna storico per il lampeggio
+    // aggiorna storico per le variazioni luminose
     blobs.forEach(function (b) {
       var key = Math.round(b.x * 8) + '_' + Math.round(b.y * 8);
       if (!irHistory[key]) irHistory[key] = [];
@@ -427,22 +429,30 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
 
     drawBlobs(blobs);
     hc = blobs.length;
-    pillHits.textContent = 'IR: ' + hc;
+    pillHits.textContent = 'Luci: ' + hc;
     pillHits.className = 'pill' + (hc ? ' warn' : '');
     if (now - lastFrame > 1200) {
       lastFrame = now;
       irList.innerHTML = '';
-      if (!blobs.length) irList.innerHTML = '<li class="empty">Nessuna sorgente IR. Prova a puntare la camera verso un altro schermo, un LED o una telecamera di sorveglianza.</li>';
+      if (!blobs.length) irList.innerHTML = '<li class="empty">Nessuna sorgente luminosa. È un risultato euristico, non una prova sull\'assenza di telecamere.</li>';
       blobs.forEach(function (b) {
         var li = document.createElement('li');
         li.innerHTML = '<span class="k">Sorgente a ' + Math.round(b.x * 100) + '%, ' + Math.round(b.y * 100) + '%</span>' +
           '<span class="v ' + (b.blink > 0.4 ? 'danger' : 'warn') + '">' +
-          (b.blink > 0.4 ? '⚡ LED pulsante ' + Math.round(b.blink * 100) + '%' : 'IR ' + Math.round(b.score * 100) + '%') + '</span>';
+          (b.blink > 0.4 ? '⚡ Variazione ' + Math.round(b.blink * 100) + '%' : 'Luce ' + Math.round(b.score * 100) + '%') + '</span>';
         irList.appendChild(li);
       });
     }
     if (aiOn && aiModel && now - aiLast > 1500) { aiLast = now; runAI(); }
-    requestAnimationFrame(frameTick);
+    if (running) rafId = requestAnimationFrame(frameTick);
+  }
+
+  function startFrameLoop() {
+    if (running && !rafId) rafId = requestAnimationFrame(frameTick);
+  }
+  function stopFrameLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
   }
 
   function startCamera(flipTo) {
@@ -462,22 +472,26 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
       stream = s;
       facing = use;
       running = true;
+      irHistory = {};
       video.srcObject = s;
       video.play().catch(function () {});
       setStatus('on', '');
-      setPill(pillHits, 'IR: 0', '');
+      setPill(pillHits, 'Luci: 0', '');
+      busyList.innerHTML = '<li><span class="k">Camera</span><span class="v ok">disponibile</span></li>';
+      btnStart.disabled = false;
+      btnStart.textContent = '⏹ Spegni fotocamera';
       btnFlip.disabled = false;
       btnAI.disabled = false;
       log('✅ Fotocamera avviata (' + (facing === 'user' ? 'frontale' : 'posteriore') + ') — ' + s.getVideoTracks().length + ' traccia video');
       refreshDevices();
-      requestAnimationFrame(frameTick);
+      startFrameLoop();
     }).catch(function (e) {
       var kind = classifyError(e);
       btnStart.disabled = false;
       if (kind === 'busy') {
         setStatus('busy', '');
-        log('⚠️ NotReadableError → la fotocamera è GIÀ in uso da un\'altra app');
-        busyList.innerHTML = '<li><span class="k">Camera</span><span class="v danger">in uso da un\'altra app</span></li>';
+        log('⚠️ Fotocamera non disponibile: potrebbe essere occupata oppure esserci un problema hardware/driver');
+        busyList.innerHTML = '<li><span class="k">Camera</span><span class="v danger">non disponibile</span></li>';
       } else if (kind === 'denied') {
         setStatus('warn', 'permesso negato');
         log('⛔ Permesso negato per la fotocamera');
@@ -493,7 +507,21 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
   var busyList = $('busyList');
 
   btnStart.addEventListener('click', function () {
-    if (running) { stream.getTracks().forEach(function (t) { t.stop(); }); running = false; video.srcObject = null; setStatus('', 'offline'); btnFlip.disabled = true; btnAI.disabled = true; log('⏹ Fotocamera spenta'); return; }
+    if (running) {
+      stopFrameLoop();
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      running = false;
+      video.srcObject = null;
+      irHistory = {};
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      setStatus('', 'offline');
+      setPill(pillHits, 'Luci: 0', '');
+      btnStart.textContent = '▶ Accendi fotocamera';
+      btnFlip.disabled = true;
+      btnAI.disabled = true;
+      log('⏹ Fotocamera spenta');
+      return;
+    }
     startCamera();
   });
   btnFlip.addEventListener('click', function () {
@@ -504,19 +532,19 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
       btnAI.textContent = '⏳ caricamento AI…';
       loadAI().then(function () {
         aiOn = true;
-        btnAI.textContent = '🤖 AI on';
+        btnAI.textContent = '🧖 Oggetti on';
         btnAI.classList.add('on');
-        log('🤖 COCO-SSD caricato — rilevamento oggetti attivo');
+        log('🧖 COCO-SSD caricato — rilevamento oggetti generici attivo');
       }).catch(function () {
-        btnAI.textContent = '🤖 AI device scan';
+        btnAI.textContent = '🧖 Rileva oggetti';
         log('❌ Impossibile caricare il modello AI (offline?)');
       });
     } else {
       aiOn = false;
-      btnAI.textContent = '🤖 AI device scan';
+      btnAI.textContent = '🧖 Rileva oggetti';
       btnAI.classList.remove('on');
-      aiList.innerHTML = '<li class="empty">AI disattivata.</li>';
-      log('🤖 AI disattivata');
+      aiList.innerHTML = '<li class="empty">Rilevamento oggetti disattivato.</li>';
+      log('🧖 Rilevamento oggetti disattivato');
     }
   });
 
@@ -552,7 +580,7 @@ footer{padding:10px 18px 26px;text-align:center;color:#4d5f82;font-size:11px;let
         return ['tv', 'laptop', 'cell phone', 'remote', 'clock'].indexOf(p.class) >= 0;
       });
       aiList.innerHTML = '';
-      if (!hosts.length) aiList.innerHTML = '<li class="empty">Nessun dispositivo "host camera" in vista.</li>';
+      if (!hosts.length) aiList.innerHTML = '<li class="empty">Nessuno degli oggetti monitorati è in vista.</li>';
       hosts.forEach(function (p) {
         var li = document.createElement('li');
         var icons = { 'tv': '📺', 'laptop': '💻', 'cell phone': '📱', 'remote': '🕹', 'clock': '⏰' };
