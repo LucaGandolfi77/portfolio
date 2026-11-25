@@ -21,13 +21,14 @@
 
   var META = {
     classic:   { label: 'Classic',     desc: 'Clean and readable, light or dark',          swatch: 'linear-gradient(135deg,#0a0d0b 50%,#b3e836 50%)' },
+    business:  { label: 'Business',    desc: 'Professional profile for recruiters',        swatch: 'linear-gradient(135deg,#f8fafc 50%,#1e3a5f 50%)' },
     glass:     { label: 'Liquid Glass', desc: 'Frosted glass, aurora and a bento grid',     swatch: 'linear-gradient(135deg,#22d3ee,#c6f25a 55%,#0a0d18 56%)' },
     terminal:  { label: 'Terminal',    desc: 'The home page as a shell session',           swatch: 'linear-gradient(135deg,#050805 55%,#b3e836 56%)' },
     arcade:    { label: 'Arcade',      desc: 'Pixel type, scores and stages',              swatch: 'linear-gradient(135deg,#1b1036 55%,#ffd23f 56%)' },
     newspaper: { label: 'Newspaper',   desc: 'A front page with columns and rules',        swatch: 'linear-gradient(135deg,#f3efe6 55%,#8a1c1c 56%)' },
     fashion:   { label: 'Fashion',     desc: 'A magazine cover with a numbered contents',  swatch: 'linear-gradient(135deg,#fbf8f6 55%,#be185d 56%)' }
   };
-  var ORDER = ['classic', 'glass', 'terminal', 'arcade', 'newspaper', 'fashion'];
+  var ORDER = ['classic', 'business', 'glass', 'terminal', 'arcade', 'newspaper', 'fashion'];
 
   var reduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   function motionOK() { return !reduce.matches; }
@@ -78,7 +79,35 @@
       if (i < text.length) typingTimer = setTimeout(step, i < 8 ? 70 : 32);
     })();
   }
+  /* Business: pulsante "Print / PDF" accanto al CV e i link al catalogo
+     (nascosto in questo stile) portati alla pagina dei progetti. */
   var MODULES = {
+    business: {
+      start: function () {
+        var group = document.querySelector('.header .cta-group');
+        if (group && !document.getElementById('printProfile')) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.id = 'printProfile';
+          b.className = 'btn btn-ghost';
+          b.textContent = 'Print / PDF';
+          b.addEventListener('click', function () { window.print(); });
+          group.appendChild(b);
+        }
+        Array.prototype.forEach.call(document.querySelectorAll('a[href="#projects"]'), function (a) {
+          a.setAttribute('data-style-href', '#projects');
+          a.setAttribute('href', 'projects.html');
+        });
+      },
+      stop: function () {
+        var b = document.getElementById('printProfile');
+        if (b) b.remove();
+        Array.prototype.forEach.call(document.querySelectorAll('a[data-style-href]'), function (a) {
+          a.setAttribute('href', a.getAttribute('data-style-href'));
+          a.removeAttribute('data-style-href');
+        });
+      }
+    },
     terminal: {
       start: function () {
         var h = document.querySelector('.header .title');
@@ -125,6 +154,7 @@
   /* ---------------- entrance choreography ---------------- */
   var ENTER = {
     classic:   { frames: [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], duration: 420, stagger: 70, easing: 'cubic-bezier(.2,.8,.2,1)' },
+    business:  { frames: [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], duration: 320, stagger: 50, easing: 'ease-out' },
     glass:     { frames: [{ opacity: 0, transform: 'scale(.97)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], duration: 620, stagger: 90, easing: 'cubic-bezier(.34,1.56,.64,1)' },
     terminal:  { frames: [{ opacity: 0, clipPath: 'inset(0 0 100% 0)' }, { opacity: 1, clipPath: 'inset(0 0 0 0)' }], duration: 260, stagger: 60, easing: 'steps(6, end)' },
     arcade:    { frames: [{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], duration: 360, stagger: 110, easing: 'steps(4, end)' },
@@ -169,6 +199,7 @@
     store(KEY, name);
     try {
       var url = new URL(location.href);
+      url.searchParams.delete('mode');
       if (name === 'classic') url.searchParams.delete('style'); else url.searchParams.set('style', name);
       history.replaceState(history.state, '', url);
     } catch (e) { /* URL non modificabile: la scelta resta comunque salvata */ }

@@ -121,12 +121,13 @@ Build output is never committed (`.gitignore`). Today this applies to
 
 ## Home page styles
 
-The home page has six complete styles, picked from the **Style** button in the
+The home page has seven complete styles, picked from the **Style** button in the
 top bar or with a link such as `?style=terminal`:
 
 | Style | Look | Theme |
 |---|---|---|
 | `classic` (default) | Lexend + Source Sans 3, brand lime | light or dark (user toggle) |
+| `business` | recruiter profile: Swiss layout, navy, Poppins + Open Sans; experience first, personal sections hidden, A4 print/PDF | light |
 | `glass` | frosted glass on an animated aurora, bento grid | dark |
 | `terminal` | shell session, typed headline, CRT scanlines | dark |
 | `arcade` | pixel type, HUD scores, pixelated avatar | dark |
@@ -141,6 +142,12 @@ top bar or with a link such as `?style=terminal`:
   the style is chosen. It switches styles with the View Transitions API and
   runs the style's motion module. The inline script in `index.html` applies
   the saved style before the first paint.
+- **Business profile** — the link to send to recruiters is
+  `https://lucagandolfi77.github.io/portfolio/?style=business` (old
+  `?mode=business` links still work). It reorders the page (experience and
+  skills first), hides the lab, games, personal content and the joke
+  testimonials, expands collapsed sections and adds a **Print / PDF** button
+  with a dedicated A4 print stylesheet.
 - With `prefers-reduced-motion`, every style shows its final state: no
   transitions, no typing effect, no entrance animations.
 - To add a style, add it to `window.PORTFOLIO_STYLES` in `index.html`, to

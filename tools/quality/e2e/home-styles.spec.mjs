@@ -14,6 +14,7 @@ test.use({ video: 'off', reducedMotion: 'reduce' });
 
 const STYLES = {
   classic:   { bg: '#0a0d0b', theme: null },
+  business:  { bg: '#f8fafc', theme: 'light' },
   glass:     { bg: '#0a0d18', theme: null },
   terminal:  { bg: '#050805', theme: null },
   arcade:    { bg: '#1b1036', theme: null },
@@ -54,7 +55,7 @@ test('picker switches style, updates the URL and remembers the choice', async ({
   const errors = await open(page);
   await page.locator('#styleToggle').click();
   const options = page.locator('#stylePicker [role="radio"]');
-  await expect(options).toHaveCount(6);
+  await expect(options).toHaveCount(Object.keys(STYLES).length);
   await expect(page.locator('#stylePicker [aria-checked="true"]')).toHaveAttribute('data-style-opt', 'classic');
 
   await page.locator('#stylePicker [data-style-opt="terminal"]').click();
@@ -109,4 +110,28 @@ test('arcade draws the pixel avatar and removes it when leaving', async ({ page 
   await expect(page.locator('.style-pixel-avatar')).toHaveCount(1);
   await page.evaluate(() => window.PortfolioStyle.choose('classic'));
   await expect(page.locator('.style-pixel-avatar')).toHaveCount(0);
+});
+
+test('business: recruiter layout, print button and legacy ?mode=business links', async ({ page }) => {
+  const errors = await open(page, '?mode=business');
+  await expect(page.locator('html')).toHaveAttribute('data-style', 'business');
+  await expect(page).toHaveURL(/[?&]style=business|mode=business/);
+
+  for (const hidden of ['#testimonials', '#lab', '#games', '#cabinet', '.orientation']) {
+    await expect(page.locator(hidden).first()).toBeHidden();
+  }
+  for (const shown of ['#about', '#experience', '#skills', '#selected-work', '#contact']) {
+    await expect(page.locator(shown)).toBeVisible();
+  }
+  const y = async (sel) => (await page.locator(sel).boundingBox()).y;
+  expect(await y('#experience')).toBeLessThan(await y('#selected-work'));
+  expect(await y('#about')).toBeLessThan(await y('#experience'));
+
+  await expect(page.locator('#printProfile')).toBeVisible();
+  await expect(page.locator('#selected-work a.text-link')).toHaveAttribute('href', 'projects.html');
+
+  await page.evaluate(() => window.PortfolioStyle.choose('classic'));
+  await expect(page.locator('#printProfile')).toHaveCount(0);
+  await expect(page.locator('#selected-work a.text-link')).toHaveAttribute('href', '#projects');
+  expect(errors).toEqual([]);
 });
