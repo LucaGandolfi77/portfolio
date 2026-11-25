@@ -7,7 +7,10 @@ import { test, expect } from '@playwright/test';
 // La home anima canvas e particelle: registrare il video rende lentissima la
 // chiusura del contesto ("Tearing down context exceeded the test timeout").
 // Screenshot e trace restano attivi sui fallimenti.
-test.use({ video: 'off' });
+// Movimento ridotto di default: niente canvas animati, meno CPU sottratta
+// agli altri spec che girano in parallelo (l'OCR di Text Lab in CI).
+// I test sulle animazioni lo riattivano con emulateMedia.
+test.use({ video: 'off', reducedMotion: 'reduce' });
 
 const STYLES = {
   classic:   { bg: '#0a0d0b', theme: null },
@@ -90,6 +93,7 @@ test('terminal: reduced motion shows the typed headline at once', async ({ page 
 });
 
 test('terminal: the typed copy follows the real headline (i18n included)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await open(page, '?style=terminal');
   const title = page.locator('.header .title');
   const typed = page.locator('.style-typed .style-typed__text');

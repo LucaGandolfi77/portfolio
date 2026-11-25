@@ -21,6 +21,9 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   timeout: 35000,
+  // In CI un solo nuovo tentativo: i runner condivisi rallentano a volte
+  // OCR e modelli WASM. Un test che fallisce due volte resta rosso.
+  retries: process.env.CI ? 1 : 0,
   expect: { timeout: 8000 },
   reporter: process.env.CI
     ? [['github'], ['html', { open: 'never' }]]
