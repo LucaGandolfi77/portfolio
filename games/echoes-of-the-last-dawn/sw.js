@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 /* Echoes of the Last Dawn — Service Worker
    Cache-first for vendored Three.js, network-first for source. */
 'use strict';
@@ -29,7 +32,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME && k.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '')).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });

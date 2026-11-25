@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 /* Pocket Wild — service worker (offline PWA)
  * Cache-first per gli asset dell'app; il gioco è un singolo file, quindi
  * la shell intera sta in poche decine di KB. Bump CACHE_VERSION per invalidare. */
@@ -45,7 +48,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE_VERSION && k.replace(/-[^-]*$/, '') === CACHE_VERSION.replace(/-[^-]*$/, '')).map(k => caches.delete(k)))
   ).then(() => self.clients.claim()));
 });
 

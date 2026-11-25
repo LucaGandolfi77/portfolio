@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 var CACHE_NAME = 'scalpel2-v1';
 var URLS = [
   './',
@@ -52,7 +55,7 @@ self.addEventListener('activate', function(e) {
     caches.keys().then(function(names) {
       return Promise.all(
         names.filter(function(name) {
-          return name !== CACHE_NAME;
+          return name !== CACHE_NAME && name.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '');
         }).map(function(name) {
           return caches.delete(name);
         })

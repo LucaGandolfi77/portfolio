@@ -1,7 +1,10 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 const CACHE_NAME='esposta-v2';
 const OFFLINE_URL='./offline.html';
 const urls=['./','./index.html','./offline.html','./manifest.webmanifest','./js/story.js','./js/concepts.js','./js/cases.js','./js/minigames.js','./js/agency.js','./js/ads.js','./js/i18n.js','./js/translations.js','./js/save.js','./js/analytics.js','./js/touch.js','./js/main.js','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable.png','./icons/apple-touch-icon.png'];
 
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(urls)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))));self.clients.claim()});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x !== CACHE_NAME && x.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '')).map(x=>caches.delete(x)))));self.clients.claim()});
 self.addEventListener('fetch',e=>{const url=new URL(e.request.url);if(url.hostname.includes('admob.google.com')||url.hostname.includes('pagead2.googlesyndication.com')||url.hostname.includes('googleads.g.doubleclick.net')||url.hostname.includes('tpc.googlesyndication.com')||url.hostname.includes('www.google.com/pagead')){e.respondWith(fetch(e.request));return}e.respondWith(caches.match(e.request).then(r=>{if(r)return r;return fetch(e.request).then(resp=>{if(!resp||resp.status!==200||resp.type!=='basic')return resp;const c=resp.clone();caches.open(CACHE_NAME).then(ca=>ca.put(e.request,c));return resp}).catch(()=>{if(e.request.mode==='navigate')return caches.match(OFFLINE_URL);return new Response('Offline',{status:503,statusText:'Offline'})})}))});

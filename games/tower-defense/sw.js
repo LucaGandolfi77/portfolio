@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 /* Tower Defense — service worker con scope dedicato alla sottocartella.
    Non sovrascrive il service worker di Sky Ace (scope /games/). */
 
@@ -41,7 +44,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k.replace(/-[^-]*$/, '') === CACHE.replace(/-[^-]*$/, '')).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

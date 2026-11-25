@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 // sw.js — Referendum Rumble Service Worker
 // Cache-first for static assets, background sync for offline votes
 
@@ -40,7 +43,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key !== CACHE_NAME && key.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, ''))
           .map((key) => caches.delete(key))
       )
     )

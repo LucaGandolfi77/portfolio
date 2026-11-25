@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 const CACHE_NAME='wikithriving-v4';
 const CORE_ASSETS=['./','./index.html','./manifest.webmanifest','./privacy.html'];
 const JS_ASSETS=[
@@ -36,5 +39,5 @@ const JS_ASSETS=[
 ];
 const ALL_ASSETS=CORE_ASSETS.concat(JS_ASSETS);
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ALL_ASSETS)).then(()=>self.skipWaiting()));});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k !== CACHE_NAME && k.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '')).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{if(r)return r;return fetch(e.request).then(resp=>{if(!resp||resp.status!==200||resp.type!=='basic')return resp;const clone=resp.clone();caches.open(CACHE_NAME).then(c=>c.put(e.request,clone));return resp;}).catch(()=>caches.match('./index.html'));}));});

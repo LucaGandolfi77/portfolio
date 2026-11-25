@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 // Service Worker for Battlelands Royale PWA
 const CACHE_NAME = 'battlelands-v2';
 const urlsToCache = [
@@ -61,7 +64,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.filter((cacheName) => {
-          return cacheName !== CACHE_NAME;
+          return cacheName !== CACHE_NAME && cacheName.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '');
         }).map((cacheName) => {
           return caches.delete(cacheName);
         })

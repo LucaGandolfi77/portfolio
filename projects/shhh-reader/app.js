@@ -168,14 +168,11 @@ const App = {
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return
     if ('serviceWorker' in navigator) {
+      // Registra sempre il proprio SW con scope relativo: getRegistration()
+      // senza argomenti restituirebbe quello della home del portfolio (scope
+      // piu' ampio) e l'app non installerebbe mai il suo.
       let reg = null
-      try { reg = await navigator.serviceWorker.getRegistration() } catch {}
-      if (!reg) {
-        try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }) } catch {}
-      }
-      if (!reg) {
-        try { reg = await navigator.serviceWorker.register('/sw.js', { scope: '/app/' }) } catch {}
-      }
+      try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }) } catch {}
       this._swReg = reg
     }
     this._scheduleReminder()

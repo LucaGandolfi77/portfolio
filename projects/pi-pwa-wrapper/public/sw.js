@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 /* Pi Agent PWA service worker — offline app shell.
    The chat itself needs the server, but the UI should load from cache. */
 "use strict";
@@ -26,7 +29,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== VERSION && k.replace(/-[^-]*$/, '') === VERSION.replace(/-[^-]*$/, '')).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });

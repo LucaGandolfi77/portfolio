@@ -82,28 +82,33 @@ self.addEventListener('install', event => {
 });
 
 // Attivazione del Service Worker
+//
+// Elimina SOLO le cache della home (prefisso `portfolio-`). Ogni PWA annidata
+// in projects/ e games/ gestisce le proprie cache: in passato qui c'era una
+// lista di prefissi da risparmiare, scritta a mano, che lasciava fuori una
+// trentina di app e ne cancellava la cache offline a ogni visita della home.
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    // Le PWA annidate (es. games/snake, games/slot, projects/nba_simulator,
-                    // projects/radio, projects/qr-studio) hanno cache proprie.
-                    const nested = cacheName.indexOf('snake-') === 0 || cacheName.indexOf('slot-') === 0 ||
-                        cacheName.indexOf('nba-') === 0 || cacheName.indexOf('radio-') === 0 ||
-                        cacheName.indexOf('pf-qr-studio-') === 0 || cacheName.indexOf('pf-atlas-') === 0 ||
-                        cacheName.indexOf('pf-vision-lab-') === 0 ||
-                        cacheName.indexOf('pf-text-lab-') === 0 || cacheName.indexOf('cello-') === 0 || cacheName.indexOf('pixel-studio-') === 0 ||
-                        cacheName.indexOf('pf-lyrics-') === 0 || cacheName.indexOf('pf-face-compare-') === 0 || cacheName.indexOf('pf-cockpit-') === 0 || cacheName.indexOf('pf-morse-') === 0 || cacheName.indexOf('pf-royal-derby-') === 0 || cacheName.indexOf('pf-people-') === 0 || cacheName.indexOf('pf-phonetic-transcriber-') === 0 || cacheName.indexOf('pf-puzzle-scale-') === 0 || cacheName.indexOf('pf-rave-') === 0 || cacheName.indexOf('pf-fractal-') === 0 || cacheName.indexOf('pf-smile-detection-') === 0 || cacheName.indexOf('pf-streaming-') === 0 || cacheName.indexOf('pf-text-researcher-') === 0 || cacheName.indexOf('pf-tiny-ai-') === 0 || cacheName.indexOf('pf-tsne-') === 0 || cacheName.indexOf('pf-rpg-game-') === 0 || cacheName.indexOf('pf-kart-') === 0 || cacheName.indexOf('pf-mystic-') === 0 || cacheName.indexOf('pf-pinball-') === 0 || cacheName.indexOf('pf-pixel-runner-') === 0 || cacheName.indexOf('pf-tracker-') === 0 || cacheName.indexOf('pf-walkie-') === 0 || cacheName.indexOf('pf-puppeteer-') === 0 || cacheName.indexOf('pf-battleship-') === 0 || cacheName.indexOf('pf-memory-garden-') === 0 || cacheName.indexOf('pf-orlog-') === 0 || cacheName.indexOf('pf-orto-magico-') === 0;
-                    if (cacheName !== CACHE_NAME && !nested) {
-                        console.log('Eliminazione vecchia cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
+        caches.keys()
+            .then(cacheNames => Promise.all(
+                cacheNames
+                    .filter(name => name.startsWith('portfolio-') && name !== CACHE_NAME)
+                    .map(name => caches.delete(name))
+            ))
+            .then(() => self.clients.claim())
     );
 });
+
+// Le app in projects/, games/ (e i lab) hanno il proprio service worker con
+// scope piu' specifico. Quelle che non lo hanno non devono essere servite da
+// questo worker (fallback alla home, cache condivisa): passano dritte in rete.
+const APP_PREFIXES = ['projects/', 'games/', 'labs/', 'verso-il-17/']
+    .map(p => new URL(p, self.registration.scope).pathname);
+
+function isNestedApp(url) {
+    const { pathname, origin } = new URL(url);
+    return origin === self.location.origin && APP_PREFIXES.some(p => pathname.startsWith(p));
+}
 
 // Strategia di fetch
 //
@@ -136,7 +141,7 @@ function trimCache(cache, maxEntries) {
 self.addEventListener('fetch', event => {
     const { request } = event;
 
-    if (request.method !== 'GET') {
+    if (request.method !== 'GET' || isNestedApp(request.url)) {
         return;
     }
 

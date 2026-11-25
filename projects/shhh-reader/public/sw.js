@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 const CACHE = 'shhh-v3'
 const SHELL = [
   '/', '/app/', '/app.html', '/styles.css', '/app.js',
@@ -26,7 +29,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(ks =>
-      Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(ks.filter(k => k !== CACHE && k.replace(/-[^-]*$/, '') === CACHE.replace(/-[^-]*$/, '')).map(k => caches.delete(k)))
     )
   )
   self.clients.claim()

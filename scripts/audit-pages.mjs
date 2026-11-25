@@ -79,21 +79,24 @@ for (const section of ['games', 'projects']) {
   }
 }
 
-/* ---- root SW allowlist coverage ---- */
-const rootSw = read('sw.js');
-const prefixes = [...rootSw.matchAll(/cacheName\.indexOf\('([^']+)'\)\s*===\s*0/g)].map(m => m[1]);
+/* ---- nested SW hygiene ----
+ * Tutte le PWA condividono l'origin lucagandolfi77.github.io: un SW che in
+ * activate cancella ogni cache diversa dalla propria distrugge l'offline delle
+ * altre app. Ogni cleanup deve essere limitato al proprio prefisso.
+ */
 for (const section of ['games', 'projects']) {
   const dir = path.join(ROOT, section);
   for (const entry of fs.readdirSync(dir, { withFileTypes:true })) {
     if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
-    const swPath = path.join(dir, entry.name, 'sw.js');
+    const rel = `${section}/${entry.name}/sw.js`;
+    const swPath = path.join(ROOT, rel);
     if (!fs.existsSync(swPath)) continue;
-    const m = fs.readFileSync(swPath, 'utf8').match(/const CACHE\s*=\s*'([^']+)'/);
-    if (!m) continue;
-    const prefix = m[1].replace(/-v\d+.*$/, '-').replace(/^(?:pf-)?/, 'pf-');
-    const cacheName = m[1];
-    const covered = prefixes.some(p => cacheName.startsWith(p.replace(/-$/, '-')) || cacheName.startsWith(prefix));
-    if (!covered) add(warnings, `${section}/${entry.name}/sw.js`, 'sw-allowlist', `cache ${cacheName} not covered by root sw.js allowlist`);
+    const src = fs.readFileSync(swPath, 'utf8');
+    const chain = src.match(/caches\.keys\(\)[\s\S]{0,400}?caches\.delete\(/);
+    if (chain && !/startsWith|indexOf\([^)]*\)\s*[!=]==\s*0|replace\(\/-\[\^-\]\*\$\/|sameApp/.test(chain[0])) {
+      add(errors, rel, 'sw-cross-app-cleanup', 'activate deletes caches of other apps on the same origin');
+    }
+    if (/serviceWorker\.register\(\s*['"]\//.test(src)) add(errors, rel, 'sw-absolute', 'absolute SW path breaks on GitHub Pages');
   }
 }
 

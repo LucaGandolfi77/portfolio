@@ -1,3 +1,6 @@
+// Cache cleanup: delete only older versions of THIS app's cache (same name
+// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
+// (lucagandolfi77.github.io) and their caches must not be touched.
 const CACHE_NAME = "slips-catastrophes-v1";
 const APP_SHELL = [
   "./",
@@ -29,7 +32,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => key !== CACHE_NAME && key.replace(/-[^-]*$/, '') === CACHE_NAME.replace(/-[^-]*$/, '')).map((key) => caches.delete(key))
     )).then(() => self.clients.claim())
   );
 });

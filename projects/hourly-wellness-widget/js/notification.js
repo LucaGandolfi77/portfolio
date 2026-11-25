@@ -29,10 +29,10 @@ var NotificationService = {
       if (Notification.permission === 'granted') {
         new Notification('Hourly Wellness Widget', {
           body: 'Tempo per una pausa di respirazione di 60 secondi.',
-          icon: '/icons/icon-192.png',
+          icon: '../../assets/icon-192.png',
           tag: 'hourly-break',
           renotify: false,
-          data: { url: '/app/' }
+          data: { url: './' }
         });
       }
     }, 60 * 60 * 1000); // Every hour
@@ -41,7 +41,7 @@ var NotificationService = {
   // Service Worker integration (Capacitor/Bubblewrap)
   setupSW() {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/sw.js', { scope: '/app/' })
+    navigator.serviceWorker.register('sw.js', { scope: './' })
       .then(reg => {
         console.log('SW registered', reg);
         // Listen for push messages
@@ -49,7 +49,7 @@ var NotificationService = {
           const data = e.data ? e.data.json() : {};
           self.registration.showNotification(data.title || 'Hourly Wellness', {
             body: data.body || 'Promemoria pausa respiro',
-            icon: data.icon || '/icons/icon-192.png',
+            icon: data.icon || '../../assets/icon-192.png',
             tag: data.tag || 'hourly-break',
           });
         });
