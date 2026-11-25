@@ -13,7 +13,7 @@
   function create(root, win) {
     var s = 'cello-' + (++counter);
     var id = function (n) { return n + '-' + s; };
-    var $ = function (n) { return root.querySelector('#' + id(n)); };
+    var $ = function (n) { return root.querySelector('[data-el="' + n + '"]'); };
 
     root.innerHTML =
       '<div class="cello-app">' +
@@ -132,8 +132,17 @@
       var raw = elLocation.value.trim(); if (!raw) return;
       var url = !/^https?:\/\//i.test(raw) && raw.indexOf(':') === -1 ? 'http://' + raw : raw;
       var path = null;
+      if (/^cello:\/\//i.test(raw)) path = raw.replace(/^cello:\/\//i, '/') || '/';
+      else {
+        try {
+          var u = new URL(url);
+          if (/^cello\.94$/i.test(u.hostname)) path = u.pathname.replace(/\/$/, '') || '/';
+        } catch (e) {}
+        if (!path && raw.charAt(0) === '/') path = raw.split('#')[0].replace(/\/$/, '') || '/';
+      }
+      if (path) { navigate(findPage(path) ? path : '/404', { load: true }); return; }
       for (var i = 0; i < PAGES.length; i++) {
-        if (PAGES[i].url === raw || url.indexOf(PAGES[i].url) !== -1) { path = PAGES[i].url; break; }
+        if (PAGES[i].url !== '/' && (PAGES[i].url === raw || url.indexOf(PAGES[i].url) !== -1)) { path = PAGES[i].url; break; }
       }
       if (path) navigate(path, { load: true }); else modemLive(url);
     }

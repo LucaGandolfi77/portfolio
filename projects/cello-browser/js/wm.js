@@ -86,7 +86,6 @@
     var resize = el('div', 'os-resize');
     resize.setAttribute('aria-hidden', 'true');
     w.appendChild(bar); w.appendChild(body); w.appendChild(status); w.appendChild(resize);
-    setGeom(w, g);
     layer.appendChild(w);
 
     var win = {
@@ -95,6 +94,7 @@
       minimized: false, maximized: false, instance: null, prev: null, ctx: ctx || {}
     };
     windows[winId] = win;
+    setGeom(win, g);
 
     try { win.instance = def.create(body, win); }
     catch (e) { body.innerHTML = '<div class="app-pad"><h3>Errore</h3><p>' + String(e.message || e) + '</p></div>'; }

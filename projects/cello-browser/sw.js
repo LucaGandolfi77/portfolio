@@ -1,4 +1,4 @@
-const CACHE = 'cello-os-v1';
+const CACHE = 'cello-os-v2';
 const ASSETS = [
   './', './index.html', './styles.css', './pages.js', './icon.svg', './manifest.webmanifest',
   './js/core/bus.js', './js/core/state.js', './js/core/vfs.js', './js/core/html.js', './js/wm.js', './js/shell.js', './js/main.js',
