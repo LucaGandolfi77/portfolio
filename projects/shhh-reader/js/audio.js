@@ -12,6 +12,7 @@ class AudioMonitor {
   }
 
   async start() {
+    if (this.running) return true
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -22,10 +23,14 @@ class AudioMonitor {
       this.analyser = this.ctx.createAnalyser()
       this.analyser.fftSize = 512
       src.connect(this.analyser)
+      this.smoothed = -60
       this.running = true
       this._tick()
+      return true
     } catch (e) {
+      this.stop()
       if (this.onError) this.onError(e)
+      return false
     }
   }
 
@@ -48,8 +53,12 @@ class AudioMonitor {
   stop() {
     this.running = false
     if (this._frame) cancelAnimationFrame(this._frame)
+    this._frame = null
     if (this.stream) this.stream.getTracks().forEach(t => t.stop())
     if (this.ctx) this.ctx.close()
+    this.stream = null
+    this.ctx = null
+    this.analyser = null
   }
 
   get level() { return this.smoothed }

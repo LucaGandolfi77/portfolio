@@ -1,9 +1,9 @@
-const CACHE = 'shhh-v2'
+const CACHE = 'shhh-v3'
 const SHELL = [
-  '/app/', '/app/app.html', '/app/styles.css', '/app/app.js',
-  '/app/js/audio.js', '/app/js/reader.js', '/app/js/browser.js',
-  '/app/manifest.webmanifest',
-  '/app/icons/icon-192.png', '/app/icons/icon-512.png', '/app/icons/icon-maskable-512.png', '/app/icons/icon-180.png',
+  '/', '/app/', '/app.html', '/styles.css', '/app.js',
+  '/js/i18n.js', '/js/audio.js', '/js/reader.js', '/js/browser.js',
+  '/manifest.webmanifest',
+  '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/icon-180.png',
 ]
 const CDN = [
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11/build/pdf.min.js',
@@ -38,8 +38,8 @@ self.addEventListener('push', e => {
   e.waitUntil(
     self.registration.showNotification(data.title || 'SHHH', {
       body: data.body || 'Time to find silence and read! 📖',
-      icon: '/app/icons/icon-192.png',
-      badge: '/app/icons/icon-192.png',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       tag: 'shhh-focus-reminder',
       renotify: true,
       actions: [{ action: 'open', title: 'Open SHHH' }]
@@ -93,7 +93,7 @@ self.addEventListener('fetch', e => {
       }
       return r
     }).catch(() => {
-      if (e.request.mode === 'navigate') return caches.match('/app/app.html')
+      if (e.request.mode === 'navigate') return caches.match('/app/')
       return new Response('', { status: 503, statusText: 'Offline' })
     }))
   )

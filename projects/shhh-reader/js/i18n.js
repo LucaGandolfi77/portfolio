@@ -7,7 +7,7 @@ const I18N = {
     stats: 'Statistiche',
     dropzone: "Trascina un file qui o ",
     browse: 'sfoglia',
-    formats: 'PDF &middot; ePub &middot; TXT &middot; MD &middot; HTML',
+    formats: 'PDF · ePub · TXT · MD · HTML',
     recentBooks: 'Aperti di recente',
     readerTitle: 'Titolo',
     prevPage: '←',
@@ -36,7 +36,15 @@ const I18N = {
     permTitle: 'SHHH ha bisogno del tuo silenzio',
     permDesc: 'Per farti rispettare la concentrazione, SHHH monitora il rumore ambientale tramite il microfono. <strong>Nessun audio viene registrato o inviato</strong> — tutto viene elaborato solo sul tuo dispositivo.',
     permActivate: 'Attiva silenzio',
-    permSkip: 'Saltare (solo statistiche)',
+    permSkip: 'Continua senza microfono',
+    /* microfono */
+    microphone: 'Microfono',
+    enableMic: 'Attiva microfono',
+    micOn: 'Microfono attivo',
+    micOff: 'Microfono spento',
+    micDenied: 'Microfono non disponibile',
+    thresholdShort: 'Soglia',
+    fadeShort: 'Dissolvenza',
     // install
     installText: 'Installa SHHH per l\'accesso rapido',
     installBtn: 'Installa',
@@ -67,7 +75,7 @@ const I18N = {
     stats: 'Stats',
     dropzone: "Drag a file here or ",
     browse: 'browse',
-    formats: 'PDF &middot; ePub &middot; TXT &middot; MD &middot; HTML',
+    formats: 'PDF · ePub · TXT · MD · HTML',
     recentBooks: 'Recently opened',
     readerTitle: 'Title',
     prevPage: '←',
@@ -92,7 +100,14 @@ const I18N = {
     permTitle: 'SHHH needs your silence',
     permDesc: 'To respect your focus, SHHH monitors ambient noise through the microphone. <strong>No audio is recorded or sent</strong> — everything is processed only on your device.',
     permActivate: 'Activate silence',
-    permSkip: 'Skip (stats only)',
+    permSkip: 'Continue without microphone',
+    microphone: 'Microphone',
+    enableMic: 'Enable microphone',
+    micOn: 'Microphone active',
+    micOff: 'Microphone off',
+    micDenied: 'Microphone unavailable',
+    thresholdShort: 'Threshold',
+    fadeShort: 'Fade',
     installText: 'Install SHHH for quick access',
     installBtn: 'Install',
     installDismiss: 'No thanks',
@@ -128,7 +143,15 @@ function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n')
     const val = dict[key]
-    if (val !== undefined) el.textContent = val
+    if (val === undefined) return
+    if (!el.children.length) {
+      el.textContent = val
+      return
+    }
+    /* Non distruggere eventuali figli (bottoni, span dinamici): aggiorna
+       solo il primo nodo di testo. */
+    const textNode = Array.from(el.childNodes).find(n => n.nodeType === 3 && n.nodeValue.trim())
+    if (textNode) textNode.nodeValue = val
   })
   document.querySelectorAll('[data-i18n-html]').forEach(el => {
     const key = el.getAttribute('data-i18n-html')

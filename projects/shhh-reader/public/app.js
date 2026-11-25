@@ -32,60 +32,158 @@ const App = {
   async init() {
     this.loadPrefs()
     this.checkStreak()
+    this._initCore()
     this.renderHistory()
 
-    /* install prompt */
-    this._installSetup()
+    /* Il microfono è opzionale: l'app deve funzionare anche senza. */
+    let choice = ls('micChoice', null)
+    if (!choice && ls('micGranted', false)) choice = 'granted'
+    this.micChoice = choice
 
-    /* pre-permission screen — mic only on explicit user consent */
-    const granted = ls('micGranted', false)
-    if (!granted) {
+    if (!choice) {
       gid('perm-screen').hidden = false
+      gid('audiobar').hidden = true
+      gid('mic-dot').className = 'dot off'
+      this.updateMicUI()
       gid('perm-btn').onclick = async () => {
-        try {
-          await this.audio.start()
-          gid('mic-dot').className = 'dot green'
-          this._requestMic()
-          gid('perm-screen').hidden = true
-          gid('audiobar').hidden = false
-        } catch {
-          gid('mic-dot').className = 'dot off'
-          gid('level-text').textContent = '🎤 no'
-          /* degrade gracefully: allow use without mic */
-          gid('perm-screen').hidden = true
-          gid('audiobar').hidden = false
+        const ok = await this._startMic()
+        if (!ok) {
+          this.micChoice = 'denied'
+          lss('micChoice', 'denied')
         }
-      }
-      gid('perm-skip').onclick = () => {
         gid('perm-screen').hidden = true
         gid('audiobar').hidden = false
-        this._requestMic()
+        this.updateMicUI()
+        this._afterPermission()
       }
-      gid('audiobar').hidden = true
+      gid('perm-skip').onclick = () => {
+        this.micChoice = 'skipped'
+        lss('micChoice', 'skipped')
+        gid('perm-screen').hidden = true
+        gid('audiobar').hidden = false
+        this._setMicOff()
+        this._afterPermission()
+      }
       return
     }
 
-    await this._initAudio()
+    gid('perm-screen').hidden = true
+    gid('audiobar').hidden = false
+    if (choice === 'granted') {
+      const ok = await this._startMic()
+      if (!ok) {
+        this.micChoice = 'denied'
+        lss('micChoice', 'denied')
+      }
+    } else {
+      this._setMicOff()
+    }
+    this._afterPermission()
+  },
+
+  _initCore() {
+    this.audio = new AudioMonitor()
+    this.audio.onLevel = dB => this.onLevel(dB)
+    this.audio.onError = () => this._setMicOff()
+
+    this.reader = new Reader()
+    this.browser = new Browser()
+    this.reader.onPageChange = () => { this.stats.pages++; this.saveStats() }
+
+    this._installSetup()
+    this.bindEvents()
+    this.updateUI()
+    this.showTab('library')
+
+    this._silenceAccum = 0
+    this._silenceTimer = setInterval(() => {
+      if (this._silenceAccum > 0) {
+        this.stats.today += this._silenceAccum
+        this.stats.total += this._silenceAccum
+        this._silenceAccum = 0
+        this.saveStats()
+        this.renderStats()
+      }
+    }, 1000)
+  },
+
+  _afterPermission() {
     this._initConsent()
-    this._initNotifications()
     this._initWidget()
+    if (this.micChoice === 'granted' && this.audio && this.audio.running) {
+      this._initNotifications()
+    }
+  },
+
+  async _startMic() {
+    if (!this.audio) return false
+    if (this.audio.running) {
+      gid('mic-dot').className = 'dot green'
+      this.updateMicUI()
+      return true
+    }
+    const ok = await this.audio.start()
+    if (!ok || !this.audio.running) {
+      this._setMicOff()
+      return false
+    }
+    gid('mic-dot').className = 'dot green'
+    gid('level-text').textContent = '-∞ dB'
+    this.micChoice = 'granted'
+    lss('micChoice', 'granted')
+    const resumeCtx = () => {
+      if (this.audio.ctx && this.audio.ctx.state === 'suspended') this.audio.ctx.resume()
+    }
+    document.addEventListener('click', resumeCtx, { once: true })
+    document.addEventListener('touchstart', resumeCtx, { once: true })
+    this.updateMicUI()
+    return true
+  },
+
+  _setMicOff() {
+    gid('mic-dot').className = 'dot off'
+    gid('level-text').textContent = typeof t === 'function' ? t('noMic') : '🎤 no'
+    this.updateMicUI()
+  },
+
+  updateMicUI() {
+    const running = !!(this.audio && this.audio.running)
+    const btn = gid('enable-mic-btn')
+    const state = gid('mic-state')
+    if (btn) {
+      btn.disabled = running
+      btn.textContent = typeof t === 'function' ? t(running ? 'micOn' : 'enableMic') : 'Attiva microfono'
+    }
+    if (state) {
+      state.textContent = typeof t === 'function'
+        ? t(running ? 'micOn' : this.micChoice === 'denied' ? 'micDenied' : 'micOff')
+        : (running ? 'Microfono attivo' : 'Microfono spento')
+    }
   },
 
   /* ── Notifications for daily focus reminders ── */
   async _initNotifications() {
-    if (!('Notification' in window)) return
+    if (!('Notification' in window) || this._notifAsked) return
+    this._notifAsked = true
     const permission = await Notification.requestPermission()
-    if (permission === 'granted') {
-      try {
-        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/app/' })
-        reg.showNotification = true
-      } catch {}
-      /* schedule daily reminder */
-      this._scheduleReminder()
+    if (permission !== 'granted') return
+    if ('serviceWorker' in navigator) {
+      let reg = null
+      try { reg = await navigator.serviceWorker.getRegistration() } catch {}
+      if (!reg) {
+        try { reg = await navigator.serviceWorker.register('sw.js', { scope: './' }) } catch {}
+      }
+      if (!reg) {
+        try { reg = await navigator.serviceWorker.register('/sw.js', { scope: '/app/' }) } catch {}
+      }
+      this._swReg = reg
     }
+    this._scheduleReminder()
   },
 
   _scheduleReminder() {
+    if (this._reminderScheduled) return
+    this._reminderScheduled = true
     const hour = 20 /* 8 PM daily reminder */
     const now = new Date()
     const delay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour) - now
@@ -99,12 +197,15 @@ const App = {
   async _sendReminder() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     try {
-      const reg = await navigator.serviceWorker.getRegistration('/app/')
+      const reg = this._swReg || (navigator.serviceWorker && await navigator.serviceWorker.getRegistration())
+      const swUrl = this._swReg && this._swReg.active && this._swReg.active.scriptURL
+      const base = swUrl ? new URL('./', swUrl) : new URL('./', document.baseURI)
+      const icon = new URL('icons/icon-192.png', base).href
       if (reg && reg.showNotification) {
         reg.showNotification('SHHH', {
           body: 'Time to find silence and read! 📖',
-          icon: '/app/icons/icon-192.png',
-          badge: '/app/icons/icon-192.png',
+          icon,
+          badge: icon,
           tag: 'shhh-focus-reminder',
           renotify: true,
           actions: [{ action: 'open', title: 'Open SHHH' }]
@@ -134,24 +235,25 @@ const App = {
 
   _initConsent() {
     const banner = gid('ump-banner')
+    if (!banner) return
     const accepted = ls('umpConsent', null)
     if (!accepted) {
       banner.hidden = false
       gid('ump-accept').onclick = () => {
         try { localStorage.setItem('shhh_ad_consent', 'true') } catch {}
-        try { localStorage.setItem('shhh_ump_consent', 'accepted') } catch {}
+        lss('umpConsent', 'accepted')
         banner.hidden = true
         this._loadAdMob()
       }
       gid('ump-decline').onclick = () => {
         try { localStorage.setItem('shhh_ad_consent', 'false') } catch {}
-        try { localStorage.setItem('shhh_ump_consent', 'denied') } catch {}
+        lss('umpConsent', 'denied')
         banner.hidden = true
       }
     } else {
       /* already consented — check if ads allowed */
-      const adConsent = ls('shhh_ad_consent', null)
-      if (adConsent === 'true') this._loadAdMob()
+      const adConsent = ls('ad_consent', null)
+      if (adConsent === true || adConsent === 'true') this._loadAdMob()
     }
   },
 
@@ -166,57 +268,6 @@ const App = {
     statsSection.appendChild(adDiv)
     /* trigger AdMob */
     if (window.adsbygoogle) adsbygoogle.push([])
-  },
-
-  _requestMic() {
-    lss('micGranted', true)
-  },
-
-  async _initAudio() {
-    this.audio = new AudioMonitor()
-    this.audio.onLevel = dB => this.onLevel(dB)
-    this.audio.onError = () => {
-      gid('mic-dot').className = 'dot off'
-      gid('level-text').textContent = '🎤 no'
-    }
-
-    try {
-      await this.audio.start()
-      gid('mic-dot').className = 'dot green'
-      const resumeCtx = () => {
-        if (this.audio.ctx && this.audio.ctx.state === 'suspended')
-          this.audio.ctx.resume()
-      }
-      document.addEventListener('click', resumeCtx, { once: true })
-      document.addEventListener('touchstart', resumeCtx, { once: true })
-    } catch {
-      gid('mic-dot').className = 'dot off'
-      gid('level-text').textContent = '🎤 no'
-    }
-
-    /* reader & browser */
-    this.reader = new Reader()
-    this.browser = new Browser()
-    this.reader.onPageChange = () => { this.stats.pages++; this.saveStats() }
-
-    /* events */
-    this.bindEvents()
-
-    /* ui */
-    this.updateUI()
-    this.showTab('library')
-
-    /* stats tick */
-    this._silenceAccum = 0
-    this._silenceTimer = setInterval(() => {
-      if (this._silenceAccum > 0) {
-        this.stats.today += this._silenceAccum
-        this.stats.total += this._silenceAccum
-        this._silenceAccum = 0
-        this.saveStats()
-        this.renderStats()
-      }
-    }, 1000)
   },
 
   _installSetup() {
@@ -248,6 +299,7 @@ const App = {
           const resp = await fetch(fileParam)
           const blob = await resp.blob()
           const file = new File([blob], 'shared-file.pdf', { type: blob.type })
+          this.showTab('library')
           this.reader.open(file)
         } catch {}
       }
@@ -260,6 +312,7 @@ const App = {
         if (e.data && e.data.type === 'SHARED_FILE') {
           const { blob, name } = e.data
           const file = new File([blob], name, { type: blob.type || 'application/octet-stream' })
+          this.showTab('library')
           this.reader.open(file)
         }
       })
@@ -420,7 +473,9 @@ const App = {
   },
 
   updateUI() {
-    gid('mode-badge').textContent = this.mode === 'threshold' ? '🚫 Soglia' : '🌫️ Dissolvenza'
+    gid('mode-badge').textContent = this.mode === 'threshold'
+      ? '🚫 ' + (typeof t === 'function' ? t('thresholdShort') : 'Soglia')
+      : '🌫️ ' + (typeof t === 'function' ? t('fadeShort') : 'Dissolvenza')
     gid('mode-toggle').textContent = this.mode === 'threshold' ? '🌫️' : '🚫'
     gid('sel-mode').value = this.mode
     gid('threshold-slider').value = this.settings.threshold
@@ -460,6 +515,8 @@ const App = {
       const next = lang === 'it' ? 'en' : 'it'
       setLang(next)
       gid('lang-btn').textContent = next === 'it' ? '🇮🇹' : '🇬🇧'
+      this.updateUI()
+      this.updateMicUI()
     })
     /* mode toggle (audiobar) */
     gid('mode-toggle').addEventListener('click', () => {
@@ -469,6 +526,19 @@ const App = {
     /* settings panel */
     gid('settings-btn').addEventListener('click', () => { gid('settings-panel').hidden = false })
     gid('settings-close').addEventListener('click', () => { gid('settings-panel').hidden = true })
+
+    const micBtn = gid('enable-mic-btn')
+    if (micBtn) {
+      micBtn.addEventListener('click', async () => {
+        const ok = await this._startMic()
+        if (ok) this._initNotifications()
+        else {
+          this.micChoice = 'denied'
+          lss('micChoice', 'denied')
+          this.updateMicUI()
+        }
+      })
+    }
 
     gid('sel-mode').addEventListener('change', e => this.switchMode(e.target.value))
 
@@ -506,23 +576,38 @@ const App = {
     })
 
     /* file picker / dropzone */
-    gid('file-picker-link').addEventListener('click', () => gid('file-input').click())
-    gid('file-input').addEventListener('change', () => {
-      if (gid('file-input').files[0]) {
-        this.reader.open(gid('file-input').files[0])
+    const picker = gid('file-picker-link')
+    if (picker) {
+      picker.addEventListener('click', e => {
+        e.stopPropagation()
+        gid('file-input').click()
+      })
+    }
+    gid('file-input').addEventListener('change', async () => {
+      const file = gid('file-input').files[0]
+      if (!file) return
+      try {
+        this.showTab('library')
+        await this.reader.open(file)
         this.renderHistory()
+      } catch (err) {
+        console.error('Reader error', err)
       }
     })
 
     const dz = gid('dropzone')
     dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover') })
     dz.addEventListener('dragleave', () => dz.classList.remove('dragover'))
-    dz.addEventListener('drop', e => {
+    dz.addEventListener('drop', async e => {
       e.preventDefault(); dz.classList.remove('dragover')
       const f = e.dataTransfer.files[0]
-      if (f) {
-        this.reader.open(f)
+      if (!f) return
+      try {
+        this.showTab('library')
+        await this.reader.open(f)
         this.renderHistory()
+      } catch (err) {
+        console.error('Reader error', err)
       }
     })
     dz.addEventListener('click', () => gid('file-input').click())
