@@ -1,7 +1,10 @@
-// Cache cleanup: delete only older versions of THIS app's cache (same name
-// stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
-// (lucagandolfi77.github.io) and their caches must not be touched.
-const CACHE = 'template-v1';
+// Rinomina il prefisso 'template-' con lo slug del gioco.
+// __BUILD_ID__ viene sostituito con lo SHA del commit da scripts/build-site.mjs,
+// quindi ogni deploy crea una cache nuova senza bump manuali di versione.
+// In activate si cancellano SOLO le cache con il proprio prefisso: tutte le
+// PWA condividono l'origin lucagandolfi77.github.io.
+const PREFIX = 'template-';
+const CACHE = PREFIX + '__BUILD_ID__';
 const ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './js/config.js', './js/state.js', './js/engine.js', './js/main.js',
@@ -13,7 +16,7 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k.replace(/-[^-]*$/, '') === CACHE.replace(/-[^-]*$/, '')).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k.startsWith(PREFIX)).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
