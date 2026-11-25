@@ -18,6 +18,7 @@ const { Game } = await import(join(ROOT, 'js/engine.js'));
 const storage = await import(join(ROOT, 'js/storage.js'));
 const { seeded, dailySeed } = await import(join(ROOT, 'js/rng.js'));
 const { STR, MODES, DIFFICULTY, MAX_LEVEL } = await import(join(ROOT, 'js/config.js'));
+const { applyStatic } = await import(join(ROOT, 'js/i18n.js'));
 
 let passed = 0, total = 0;
 const cases = [];
@@ -166,6 +167,19 @@ run('HTML has canonical, shell and board, no legacy global scripts', () => {
   ok(html.includes('id="board"'));
   ok(!html.includes('src="game.js"'));
   ok(!html.includes('feature-test.js'));
+});
+run('translation preserves nested HUD elements', () => {
+  const nested = { nodeType: 1, textContent: '×0' };
+  const label = { nodeType: 3, textContent: 'Combo' };
+  const el = { dataset: { i18n: 'combo' }, childNodes: [label, nested], textContent: '' };
+  applyStatic({ querySelectorAll: () => [el] });
+  ok(el.childNodes.includes(nested), 'nested <b> was removed');
+  eq(label.textContent, 'Combo');
+});
+run('combo value lives outside translated nodes', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  ok(html.includes('id="comboVal"'));
+  ok(!/data-i18n="combo"[^>]*>[^<]*<b id="comboVal"/.test(html));
 });
 run('manifest has icons', () => {
   const m = JSON.parse(readFileSync(join(ROOT, 'manifest.webmanifest'), 'utf8'));

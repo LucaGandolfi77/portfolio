@@ -23,6 +23,14 @@ export function t(key, vars) {
   return text;
 }
 export function applyStatic(root) {
-  root.querySelectorAll?.('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll?.('[data-i18n]').forEach(el => {
+    const value = t(el.dataset.i18n);
+    /* Non sostituire textContent: cancellerebbe gli elementi annidati
+       (per esempio <b id="comboVal">) e romperebbe l'HUD. */
+    const children = [...(el.childNodes || [])];
+    const textNode = children.find(n => n.nodeType === 3);
+    if (textNode && children.some(n => n.nodeType === 1)) textNode.textContent = value;
+    else el.textContent = value;
+  });
 }
 window.addEventListener('project:langchange', e => { if (e.detail?.lang) setLang(e.detail.lang); });
