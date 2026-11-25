@@ -239,7 +239,7 @@ run('tournament charges entry and completes after three wins', () => {
   eq(data.tournament.active, false);
 });
 
-run('storage migrates v1 saves to v2 and round-trips', () => {
+run('storage migrates v1 saves to v3 and round-trips', () => {
   const store = new Map();
   globalThis.localStorage = {
     getItem: key => (store.has(key) ? store.get(key) : null),
@@ -261,7 +261,7 @@ run('storage migrates v1 saves to v2 and round-trips', () => {
     matchup: null
   }));
   const loaded = load();
-  eq(loaded.version, 2);
+  eq(loaded.version, 3);
   eq(loaded.wallet.coins, 777);
   eq(loaded.stats.wins, 7);
   eq(loaded.stats.losses, 3);
@@ -269,12 +269,58 @@ run('storage migrates v1 saves to v2 and round-trips', () => {
   eq(loaded.stats.chestsOpened, 5);
   eq(loaded.settings.lang, 'it');
   ok(loaded.lineup.slots.length === 5);
+  ok(loaded.progress.level >= 1);
+  eq(loaded.progress.rewardsLevel, loaded.progress.level);
   save(loaded);
   const again = load();
   eq(again.wallet.coins, 777);
   reset();
+  eq(store.has('pf.courtclash.v3'), false);
   eq(store.has('pf.courtclash.v2'), false);
   eq(store.has('pf.courtclash.v1'), false);
+});
+
+run('storage migrates v2 saves to v3 and keeps all progress', () => {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key)
+  };
+  store.set('pf.courtclash.v2', JSON.stringify({
+    version: 2,
+    wallet: { coins: 4321, dailyClaimed: '2026-11-24', comebackClaimed: '' },
+    login: { day: 3, last: '2026-11-24' },
+    collection: { 'BOS-1': { level: 3, copies: 2, isNew: false } },
+    chests: { slots: [], pity: 4, opened: 22, tutorialGiven: true },
+    lineup: { slots: ['BOS-1', null, null, null, null] },
+    setsClaimed: { base: true },
+    trophies: 450,
+    wildcards: { common: 1, rare: 2, epic: 0, legendary: 1 },
+    missions: { daily: null, weekly: null },
+    achievements: { unlocked: ['firstWin'] },
+    trophyRoadClaimed: [100, 200, 400],
+    lab: { date: '', offers: [] },
+    dailyChallenge: { date: '', done: false },
+    tournament: { active: false, step: 0 },
+    stats: { matches: 12, wins: 8, losses: 4, streak: 2, bestStreak: 5, chestsOpened: 22, coinsEarned: 0, coinsSpent: 0, cashOuts: 1, tournamentsWon: 0, underdogWins: 2, upgrades: 3, bestChest: 'gold', favoriteTeam: 'BOS', teamCounts: { BOS: 4 } },
+    history: [],
+    settings: { lang: 'it', sound: false, onboarded: true, tutorialDismissed: true },
+    matchup: null
+  }));
+  const loaded = load();
+  eq(loaded.version, 3);
+  eq(loaded.wallet.coins, 4321);
+  eq(loaded.trophies, 450);
+  eq(loaded.login.day, 3);
+  eq(loaded.collection['BOS-1'].level, 3);
+  eq(loaded.chests.opened, 22);
+  eq(loaded.settings.lang, 'it');
+  ok(loaded.progress.level > 1);
+  eq(loaded.progress.rewardsLevel, loaded.progress.level);
+  reset();
+  eq(store.has('pf.courtclash.v3'), false);
+  eq(store.has('pf.courtclash.v2'), false);
 });
 
 summary(passed, total);

@@ -1,8 +1,11 @@
-/* Court Clash — versioned local storage with v1 → v2 migration */
+/* Court Clash — versioned local storage with v1/v2 → v3 migration */
 
-const KEY = 'pf.courtclash.v2';
-const PREVIOUS = 'pf.courtclash.v1';
-const VERSION = 2;
+import { migratedProgress, sanitizeProgress } from '../game/levels.js';
+
+const KEY = 'pf.courtclash.v3';
+const PREVIOUS_V2 = 'pf.courtclash.v2';
+const PREVIOUS_V1 = 'pf.courtclash.v1';
+const VERSION = 3;
 
 export function defaults() {
   return {
@@ -23,6 +26,7 @@ export function defaults() {
     lineup: { slots: [null, null, null, null, null] },
     setsClaimed: {},
     trophies: 0,
+    progress: { xp: 0, level: 1, rewardsLevel: 1 },
     wildcards: { common: 0, rare: 0, epic: 0, legendary: 0 },
     missions: { daily: null, weekly: null },
     achievements: { unlocked: [] },
@@ -51,6 +55,7 @@ export function defaults() {
     settings: {
       lang: 'en',
       sound: true,
+      fastReveal: false,
       onboarded: false,
       tutorialDismissed: false
     },
@@ -63,42 +68,48 @@ function migrateV1(old) {
   if (!old || typeof old !== 'object') return base;
   const wins = old.wins || old.stats?.wins || 0;
   const losses = old.losses || old.stats?.losses || 0;
-  return {
-    ...base,
-    wallet: {
-      ...base.wallet,
-      coins: old.wallet?.coins ?? 1000,
-      dailyClaimed: old.wallet?.dailyClaimed || '',
-      comebackClaimed: old.wallet?.comebackClaimed || ''
-    },
-    collection: old.collection && typeof old.collection === 'object' ? old.collection : {},
-    chests: { ...base.chests, ...(old.chests || {}) },
-    setsClaimed: old.setsClaimed || {},
-    lineup: base.lineup,
-    stats: {
-      ...base.stats,
-      matches: wins + losses,
-      wins,
-      losses,
-      streak: old.streak || 0,
-      bestStreak: old.bestStreak || 0,
-      chestsOpened: old.chests?.opened || 0
-    },
-    history: Array.isArray(old.history) ? old.history.slice(0, 30) : [],
-    settings: { ...base.settings, ...(old.settings || {}) },
-    matchup: old.matchup || null
+  const stats = {
+    ...base.stats,
+    matches: wins + losses,
+    wins,
+    losses,
+    streak: old.streak || 0,
+    bestStreak: old.bestStreak || 0,
+    chestsOpened: old.chests?.opened || 0
   };
+  const migrated = normalize(base, {
+    wallet: old.wallet,
+    collection: old.collection,
+    chests: old.chests,
+    setsClaimed: old.setsClaimed,
+    stats,
+    history: old.history,
+    settings: old.settings,
+    matchup: old.matchup
+  });
+  migrated.progress = migratedProgress(stats);
+  return migrated;
 }
 
-function merge(base, saved) {
+function migrateV2(old) {
+  const base = defaults();
+  if (!old || typeof old !== 'object') return base;
+  const migrated = normalize(base, old);
+  migrated.progress = migratedProgress(migrated.stats);
+  return migrated;
+}
+
+function normalize(base, saved) {
   if (!saved || typeof saved !== 'object') return base;
   return {
     ...base,
     ...saved,
+    version: VERSION,
     wallet: { ...base.wallet, ...(saved.wallet || {}) },
     login: { ...base.login, ...(saved.login || {}) },
     chests: { ...base.chests, ...(saved.chests || {}) },
     lineup: { ...base.lineup, ...(saved.lineup || {}) },
+    progress: sanitizeProgress({ ...base.progress, ...(saved.progress || {}) }),
     wildcards: { ...base.wildcards, ...(saved.wildcards || {}) },
     missions: { ...base.missions, ...(saved.missions || {}) },
     achievements: { ...base.achievements, ...(saved.achievements || {}) },
@@ -119,11 +130,18 @@ export function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === VERSION) return merge(defaults(), parsed);
+      if (parsed && parsed.version === VERSION) return normalize(defaults(), parsed);
     }
-    const oldRaw = localStorage.getItem(PREVIOUS);
-    if (oldRaw) {
-      const old = JSON.parse(oldRaw);
+    const v2 = localStorage.getItem(PREVIOUS_V2);
+    if (v2) {
+      const old = JSON.parse(v2);
+      const migrated = migrateV2(old);
+      save(migrated);
+      return migrated;
+    }
+    const v1 = localStorage.getItem(PREVIOUS_V1);
+    if (v1) {
+      const old = JSON.parse(v1);
       const migrated = migrateV1(old);
       save(migrated);
       return migrated;
@@ -146,7 +164,8 @@ export function save(state) {
 export function reset() {
   try {
     localStorage.removeItem(KEY);
-    localStorage.removeItem(PREVIOUS);
+    localStorage.removeItem(PREVIOUS_V2);
+    localStorage.removeItem(PREVIOUS_V1);
   } catch (e) { /* ignore */ }
   return defaults();
 }

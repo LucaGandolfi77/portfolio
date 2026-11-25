@@ -1,6 +1,6 @@
 # Court Clash — NBA Chest Collector
 
-A **single-player, offline-first** collectible card game inspired by Clash Royale's chest loop. Bet virtual coins on simulated NBA matchups, build a 5-card lineup, win chests, collect 300 cards and climb the arenas.
+A **single-player, offline-first** collectible card game inspired by Clash Royale's chest loop. Bet virtual coins on simulated NBA matchups, earn XP and levels, build a 5-card lineup, win chests, collect 300 cards and climb the arenas.
 
 - **Live:** https://lucagandolfi77.github.io/portfolio/games/court-clash/
 - **No real money. No server. No PvP.**
@@ -14,7 +14,8 @@ A **single-player, offline-first** collectible card game inspired by Clash Royal
 5. A full win pays coins and awards a chest.
 6. Open chests, collect cards, use duplicates as copies and upgrade cards.
 7. Build a 5-card lineup. Its power and chemistry boost Winner and Margin picks.
-8. Climb Rookie → Pro → All-Star → Elite → Legend.
+8. Earn XP from every match, chest and mission. Levels never go down and grant coins or wildcards.
+9. Climb Rookie → Pro → All-Star → Elite → Legend.
 
 ## Match 2.0
 
@@ -36,6 +37,15 @@ A **single-player, offline-first** collectible card game inspired by Clash Royal
 - `boost = min(5, floor(lineupPower / 120))`
 - Auto-fill picks the strongest legal lineup.
 - The boost applies to the top eight players of the backed team in the simulation.
+
+## Player levels
+
+- 20 permanent levels. XP never decreases, so every match and chest moves you forward.
+- XP sources: match played +20, win +30, cash-out +10, chest opened +15, mission claimed +20, daily bonus +50, Daily Challenge +50, tournament win step +40, tournament complete +100.
+- Every level grants coins; levels 5, 10 and 15 also grant rare/epic wildcards, and level 20 grants a legendary wildcard.
+- Level 1 → 2 needs 80 XP; each following level needs 20 more XP than the previous one.
+- Existing v1/v2 saves get a level derived from their match, chest, cash-out and tournament history.
+- No level reward grants a chest.
 
 ## Arenas and trophies
 
@@ -83,7 +93,10 @@ A **single-player, offline-first** collectible card game inspired by Clash Royal
 - Daily: play 2 matches, win 1, open 1 chest, win a 2.00+ bet. All 4 → bonus.
 - Weekly: win 10, open 10 chests, upgrade 3 cards.
 - 21 permanent achievements with coin/wildcard rewards.
-- Profile with record, win rate, trophies, cards, sets, coins, favorite team, best chest and more.
+- **Progress** tab with level, XP, arena, next rewards, trophy road, missions, achievements and stats.
+- Guided Play: suggested next goal, one primary Quick Match card, Winner + 50 coins by default, and advanced markets behind "More markets".
+- Compact Today strip for Daily Challenge, Tournament and next chest; recent matches collapse.
+- Fast match reveal option in Settings.
 
 ## Special goals
 
@@ -94,8 +107,8 @@ A **single-player, offline-first** collectible card game inspired by Clash Royal
 
 - Static ES modules, no build step.
 - Reuses the NBA simulation engine, rosters, mini avatars and Three.js chest model.
-- Versioned storage: `pf.courtclash.v2`, with automatic migration from v1.
-- PWA: manifest, service worker (`court-clash-v2`), offline page and generated icons.
+- Versioned storage: `pf.courtclash.v3`, with automatic migration from v1 and v2.
+- PWA: manifest, service worker (`court-clash-v3`), offline page and generated icons.
 - EN/IT interface, reduced-motion fallback and mobile-first layout.
 
 ## Tests
@@ -103,8 +116,10 @@ A **single-player, offline-first** collectible card game inspired by Clash Royal
 ```bash
 node games/court-clash/test/logic-test.mjs
 node games/court-clash/test/v1-features-test.mjs
+node games/court-clash/test/levels-test.mjs
 ```
 
 - 17 core tests: odds, payouts, chest tiers, draws, pity, upgrades, slots, timers.
-- 19 v1.0 tests: lineup chemistry/boost, markets/cash-out, arenas/trophy road, achievements, missions, Card Lab, wildcards, login, challenge, tournament and storage migration.
-- Playwright smoke tests cover match reveal, cash-out, chest opening, lineup, market, profile, mobile and offline.
+- 20 v1.0/v1.1 tests: lineup chemistry/boost, markets/cash-out, arenas/trophy road, achievements, missions, Card Lab, wildcards, login, challenge, tournament and v1/v2 storage migration.
+- 10 level tests: XP curve, level derivation, rewards, multi-level ups, migration and sanitisation.
+- Playwright smoke tests cover the guided Play flow, next goal, cash-out, chest opening, lineups, filters, Progress tab, level-up modal, mobile/desktop and offline.

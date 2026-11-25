@@ -38,7 +38,7 @@ function rewardCard(card, i18n) {
   </article>`;
 }
 
-export function openChestModal({ tier, cards, coins, sfx, i18n, onDone }) {
+export function openChestModal({ tier, cards, coins, xp = 0, sfx, i18n, onDone }) {
   const modal = el('chestModal');
   const canvas = el('chestCanvas');
   if (!modal || !canvas) return null;
@@ -59,6 +59,12 @@ export function openChestModal({ tier, cards, coins, sfx, i18n, onDone }) {
   el('chestRevealKicker').textContent = `${i18n.t('chest' + tier.charAt(0).toUpperCase() + tier.slice(1))} · ${i18n.t('matchReward')}`;
   el('chestRevealTitle').textContent = i18n.t('chestRevealTitle');
   el('chestCoins').textContent = String(coins || 0);
+  const xpEl = el('chestXp');
+  if (xpEl) {
+    xpEl.hidden = !xp;
+    const xpAmount = el('chestXpAmount');
+    if (xpAmount) xpAmount.textContent = String(xp || 0);
+  }
   grid.innerHTML = (cards || []).map((card, i) => rewardCard({ ...card, index: i }, i18n)).join('');
   skip.hidden = false;
   skip.disabled = false;

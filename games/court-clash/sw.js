@@ -1,12 +1,12 @@
 /* Court Clash — offline cache */
-const CACHE = 'court-clash-v2';
+const CACHE = 'court-clash-v3';
 const CORE = [
   './', './index.html', './offline.html', './manifest.webmanifest', './style.css',
   './js/app.js', './js/i18n.js', './js/audio.js',
   './js/core/rng.js', './js/core/theme.js', './js/core/storage.js',
   './js/data/teams.js', './js/data/player-stats.js', './js/data/player-profile.js', './js/data/chest-fx.js',
   './js/game/economy.js', './js/game/collection.js', './js/game/chests.js',
-  './js/game/lineup.js', './js/game/markets.js', './js/game/progression.js', './js/game/missions.js', './js/game/lab.js', './js/game/events.js',
+  './js/game/lineup.js', './js/game/markets.js', './js/game/progression.js', './js/game/missions.js', './js/game/lab.js', './js/game/events.js', './js/game/levels.js',
   './js/sim/engine.js', './js/sim/ai.js', './js/sim/commentary.js', './js/sim/stats.js', './js/sim/career-mode.js',
   './js/render/chest.js', './js/render/mini-avatar.js',
   './js/ui/chest-opening.js',

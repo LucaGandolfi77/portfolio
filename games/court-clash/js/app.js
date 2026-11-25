@@ -1,4 +1,4 @@
-/* Court Clash — application controller v1.0 */
+/* Court Clash — application controller v1.1 */
 
 import { TEAMS } from './data/teams.js';
 import { enrichTeams } from './data/player-profile.js';
@@ -43,6 +43,11 @@ import {
   startTournament, tournamentWin, tournamentLoss, tournamentStatus,
   TOURNAMENT_ENTRY, TOURNAMENT_WINS
 } from './game/events.js';
+import {
+  levelInfo, levelReward, addXp, nextLevels,
+  XP_MATCH, XP_WIN, XP_CASHOUT, XP_CHEST, XP_MISSION, XP_DAILY_BONUS,
+  XP_DAILY_CHALLENGE, XP_TOURNAMENT_STEP, XP_TOURNAMENT_COMPLETE
+} from './game/levels.js';
 import { openChestModal } from './ui/chest-opening.js';
 import { miniAvatarUrl } from './render/mini-avatar.js';
 
@@ -61,6 +66,7 @@ const state = {
   matchups: [],
   selectedMatch: 0,
   market: 'winner',
+  marketsExpanded: false,
   pick: null,
   stake: 50,
   matchRun: null,
@@ -68,6 +74,10 @@ const state = {
   lineupSlot: null,
   lineupSearch: '',
   cardLimit: 36,
+  filtersOpen: false,
+  trophyRoadExpanded: false,
+  goalAction: 'play',
+  levelUpQueue: [],
   lastFocus: null,
   toastTimer: null,
   bootToasts: []
@@ -140,6 +150,7 @@ function closeModal(id) {
   modal.hidden = true;
   if (state.lastFocus && typeof state.lastFocus.focus === 'function') state.lastFocus.focus();
   state.lastFocus = null;
+  setTimeout(flushLevelUp, 0);
 }
 
 function visibleModal() {
@@ -160,8 +171,9 @@ function trapFocus(event) {
 }
 
 function setScreen(name, updateHash = true) {
-  const valid = ['play', 'chests', 'cards', 'profile'];
-  const screen = valid.includes(name) ? name : 'play';
+  const valid = ['play', 'chests', 'cards', 'progress'];
+  const normalized = name === 'profile' ? 'progress' : name;
+  const screen = valid.includes(normalized) ? normalized : 'play';
   state.screen = screen;
   document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === 'screen-' + screen));
   document.querySelectorAll('.tabbar [data-screen]').forEach(el => el.classList.toggle('active', el.dataset.screen === screen));
@@ -169,7 +181,7 @@ function setScreen(name, updateHash = true) {
   if (screen === 'play') renderPlay();
   else if (screen === 'chests') renderChests();
   else if (screen === 'cards') renderCards();
-  else renderProfile();
+  else renderProgress();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -188,6 +200,7 @@ function newMatchups() {
   state.matchups = matchups;
   state.selectedMatch = 0;
   state.market = 'winner';
+  state.marketsExpanded = false;
   state.pick = null;
 }
 
@@ -212,6 +225,8 @@ function ensureData() {
   }
   startNextChest(chests.slots);
 
+  if (!state.data.progress) state.data.progress = { xp: 0, level: 1, rewardsLevel: 1 };
+
   const unlocked = unlockedSlots(state.data.trophies || 0);
   let slots = sanitizeLineup(state.data.lineup?.slots, state.data.collection, state.cardIndex, unlocked);
   if (!slots.some(Boolean) && Object.keys(state.data.collection).length) {
@@ -225,11 +240,16 @@ function ensureData() {
 }
 
 function renderHUD() {
-  const lineup = lineupState();
+  const info = levelInfo(state.data.progress);
   $('hudCoins').textContent = formatCoins(state.data.wallet.coins);
   $('hudTrophies').textContent = String(state.data.trophies || 0);
-  $('hudPower').textContent = formatCoins(lineup.power);
-  $('hudBoost').textContent = '+' + lineup.boost;
+  $('hudLevel').textContent = String(info.level);
+  $('hudXpFill').style.width = Math.round(info.ratio * 100) + '%';
+  const xpHint = info.max
+    ? i18n.t('maxLevelReached')
+    : i18n.t('xpToNext', { xp: info.next - info.current, level: info.nextLevel });
+  $('hudLevelChip').title = xpHint;
+  $('hudLevelChip').setAttribute('aria-label', `${i18n.t('levelTitle', { level: info.level })} · ${xpHint}`);
 }
 
 function renderPlay() {
@@ -237,12 +257,19 @@ function renderPlay() {
   if (!state.matchups.length) newMatchups();
   const match = currentMatch();
   if (!match) return;
+  const info = levelInfo(state.data.progress);
   const arena = arenaFor(state.data.trophies || 0);
   const next = nextArena(state.data.trophies || 0);
-  const progress = arenaProgress(state.data.trophies || 0);
+
+  $('playLevel').textContent = String(info.level);
+  $('playLevelTitle').textContent = i18n.t('levelTitle', { level: info.level });
+  $('playXpText').textContent = info.max ? i18n.t('xpMax') : i18n.t('xpProgress', { current: info.current, next: info.next });
+  $('playXpFill').style.width = Math.round(info.ratio * 100) + '%';
+  $('playNextReward').textContent = info.max
+    ? i18n.t('maxLevelReached')
+    : i18n.t('nextRewardLine', { level: info.nextLevel, reward: rewardText(levelReward(info.nextLevel)) });
   $('arenaName').textContent = arenaName(arena);
   $('playTrophies').textContent = String(state.data.trophies || 0);
-  $('arenaFill').style.width = Math.round(progress.ratio * 100) + '%';
   $('arenaNext').textContent = next
     ? i18n.t('arenaNext', { arena: arenaName(next), trophies: next.min })
     : i18n.t('maxArena');
@@ -257,7 +284,7 @@ function renderPlay() {
   }).join('');
   $('selHomeName').textContent = match.homeTeam.name;
   $('selAwayName').textContent = match.awayTeam.name;
-  document.querySelectorAll('#marketTabs [data-market]').forEach(btn => btn.classList.toggle('active', btn.dataset.market === state.market));
+  renderMarketTabs();
   renderMarketOptions();
 
   const lineup = lineupState();
@@ -278,10 +305,73 @@ function renderPlay() {
   $('potential').textContent = option ? formatCoins(payout(state.stake, option.odds)) : '—';
   $('btnBet').disabled = !option;
   $('record').textContent = `${state.data.stats.wins || 0}W · ${state.data.stats.losses || 0}L`;
+  renderNextGoal();
   renderSpecialCards();
   renderNextChest();
-  renderTutorial();
   renderRecent();
+}
+
+function renderMarketTabs() {
+  const expanded = state.marketsExpanded || state.market !== 'winner';
+  document.querySelectorAll('#marketTabs [data-market]').forEach(btn => {
+    btn.hidden = !expanded && btn.dataset.market !== 'winner';
+    btn.classList.toggle('active', btn.dataset.market === state.market);
+  });
+  $('btnMoreMarkets').hidden = expanded;
+}
+
+function nextGoal() {
+  const stats = state.data.stats;
+  const lineup = lineupState();
+  const daily = ensureDailyChallenge(state.data, todayKey());
+  const tutorial = state.data.chests.slots.find(chest => chest.tutorial);
+  const readyChest = state.data.chests.slots.find(chest => isReady(chest));
+  const bonus = dailyBonusAvailable(state.data);
+  const claimable = [...DAILY_MISSIONS.map(mission => ['daily', mission]), ...WEEKLY_MISSIONS.map(mission => ['weekly', mission])]
+    .some(([period, mission]) => missionProgress(state.data, period, mission).ratio >= 1
+      && !state.data.missions[period].claimed.includes(mission.id));
+
+  if ((stats.matches || 0) < 1) {
+    return { icon: '🏀', title: i18n.t('goalPlayTitle'), hint: i18n.t('goalPlayHint'), label: i18n.t('goalPlayAction'), action: 'play' };
+  }
+  if (tutorial && isReady(tutorial) && (stats.chestsOpened || 0) === 0) {
+    return { icon: '📦', title: i18n.t('goalChestTitle'), hint: i18n.t('goalChestHint'), label: i18n.t('goalChestAction'), action: 'open-chest' };
+  }
+  if (Object.keys(state.data.collection).length && !lineup.slots.some(Boolean)) {
+    return { icon: '🃏', title: i18n.t('goalLineupTitle'), hint: i18n.t('goalLineupHint'), label: i18n.t('goalLineupAction'), action: 'lineup' };
+  }
+  if (bonus) {
+    return { icon: '🎁', title: i18n.t('goalBonusTitle'), hint: i18n.t('goalBonusHint'), label: i18n.t('goalBonusAction'), action: 'claim-bonus' };
+  }
+  if (claimable) {
+    return { icon: '✅', title: i18n.t('goalMissionsTitle'), hint: i18n.t('goalMissionsHint'), label: i18n.t('goalMissionsAction'), action: 'claim-missions' };
+  }
+  if (readyChest) {
+    return { icon: CHEST_ICON[readyChest.type] || '📦', title: i18n.t('goalReadyChestTitle'), hint: i18n.t('goalReadyChestHint'), label: i18n.t('goalReadyChestAction'), action: 'open-chest' };
+  }
+  if (!daily.done) {
+    return { icon: '🎯', title: i18n.t('goalDailyTitle'), hint: i18n.t('goalDailyHint'), label: i18n.t('goalDailyAction'), action: 'play' };
+  }
+  if (state.data.tournament?.active) {
+    const step = state.data.tournament.step || 0;
+    return {
+      icon: '🏆',
+      title: i18n.t('goalTournamentTitle', { step, total: TOURNAMENT_WINS }),
+      hint: i18n.t('goalTournamentHint', { left: TOURNAMENT_WINS - step }),
+      label: i18n.t('goalTournamentAction'),
+      action: 'play'
+    };
+  }
+  return { icon: '🏀', title: i18n.t('goalWinTitle'), hint: i18n.t('goalWinHint'), label: i18n.t('goalWinAction'), action: 'play' };
+}
+
+function renderNextGoal() {
+  const goal = nextGoal();
+  state.goalAction = goal.action;
+  $('goalIcon').textContent = goal.icon;
+  $('goalTitle').textContent = goal.title;
+  $('goalHint').textContent = goal.hint;
+  $('btnGoal').textContent = goal.label;
 }
 
 function renderMarketOptions() {
@@ -320,8 +410,7 @@ function renderSpecialCards() {
   if (!arena.tournament) {
     $('tournamentState').textContent = '🔒';
     $('tournamentText').textContent = i18n.t('unlocksAt', { arena: arenaName(ARENAS[1]) });
-    $('btnTournament').hidden = false;
-    $('btnTournament').textContent = i18n.t('unlocksAt', { arena: arenaName(ARENAS[1]) });
+    $('btnTournament').hidden = true;
     $('btnTournament').disabled = true;
   } else if (tournament.active) {
     $('tournamentState').textContent = `${tournament.step}/${TOURNAMENT_WINS}`;
@@ -334,23 +423,6 @@ function renderSpecialCards() {
     $('btnTournament').textContent = i18n.t('tournamentEnter');
     $('btnTournament').disabled = state.data.wallet.coins < TOURNAMENT_ENTRY + STAKE_OPTIONS[0];
   }
-}
-
-function renderTutorial() {
-  const done = [
-    state.data.stats.matches >= 1,
-    state.data.chests.opened >= 1,
-    lineupState().slots.some(Boolean),
-    state.data.stats.upgrades >= 1
-  ];
-  const allDone = done.every(Boolean);
-  const hidden = state.data.settings.tutorialDismissed || allDone;
-  $('tutorialCard').hidden = hidden;
-  if (hidden) return;
-  const labels = ['tutorialPlay', 'tutorialChest', 'tutorialLineup', 'tutorialUpgrade'];
-  $('tutorialSteps').innerHTML = labels.map((key, index) => `<div class="tutorial-step ${done[index] ? 'done' : ''}">
-    <span>${done[index] ? '✓' : index + 1}</span><b>${i18n.t(key)}</b>
-  </div>`).join('');
 }
 
 function renderNextChest() {
@@ -478,7 +550,26 @@ function setCardsHead(eyebrowKey, titleKey, summary) {
   $('collectionSummary').textContent = summary;
 }
 
+function activeFilterCount() {
+  let count = 0;
+  if ($('filterRarity').value) count += 1;
+  if ($('filterSet').value) count += 1;
+  if ($('filterTeam').value) count += 1;
+  if ($('filterOwned').value !== 'owned') count += 1;
+  if ($('sortCards').value !== 'power') count += 1;
+  return count;
+}
+
+function updateFilterUI() {
+  const count = activeFilterCount();
+  $('filterPanel').hidden = !state.filtersOpen;
+  $('filterCount').textContent = count ? ` (${count})` : '';
+  $('btnToggleFilters').classList.toggle('active', state.filtersOpen || count > 0);
+  $('btnToggleFilters').setAttribute('aria-expanded', String(state.filtersOpen));
+}
+
 function renderCards() {
+  updateFilterUI();
   document.querySelectorAll('[data-cards-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.cardsTab === state.cardsTab));
   $('cardsPaneCollection').hidden = state.cardsTab !== 'collection';
   $('cardsPaneLineup').hidden = state.cardsTab !== 'lineup';
@@ -489,12 +580,15 @@ function renderCards() {
 }
 
 function renderCollectionPane() {
+  updateFilterUI();
   const owned = Object.keys(state.data.collection).length;
   const power = collectionPower(state.data.collection, state.cardIndex);
   setCardsHead('tabCollection', 'yourCards', i18n.t('collectionSummary', {
     owned, total: state.cards.length, power: formatCoins(power)
   }));
   $('collectionEmpty').hidden = owned > 0;
+  const collectionCard = $('cardGrid').closest('.collection-card');
+  if (collectionCard) collectionCard.hidden = owned === 0;
   const progress = setProgress(state.data.collection, state.cards);
   $('setProgress').innerHTML = Object.keys(SETS).map(key => {
     const item = progress[key];
@@ -542,7 +636,11 @@ function renderLineupPane() {
   $('chemBreakdown').innerHTML = lineup.chemistry.labels.map(item =>
     `<span class="chem-chip">${i18n.t(item.key)} <b>+${item.value}</b></span>`
   ).join('') + `<span class="chem-chip">${i18n.t('chemScore', { score: lineup.chemistry.score })}</span>`;
-  $('btnAutoFill').disabled = !Object.keys(state.data.collection).length;
+  const hasCollection = Object.keys(state.data.collection).length > 0;
+  const emptyLineup = !lineup.slots.some(Boolean);
+  $('btnAutoFill').disabled = !hasCollection;
+  $('btnAutoFill').classList.toggle('primary', hasCollection && emptyLineup);
+  $('btnAutoFill').textContent = hasCollection && emptyLineup ? i18n.t('autoFillBest') : i18n.t('autoFill');
 }
 
 function renderMarketPane() {
@@ -598,17 +696,35 @@ function rewardText(reward) {
   return parts.join(' · ');
 }
 
-function renderProfile() {
+function renderProgress() {
   ensuredDaily();
+  const info = levelInfo(state.data.progress);
   const arena = arenaFor(state.data.trophies || 0);
   const next = nextArena(state.data.trophies || 0);
-  const progress = arenaProgress(state.data.trophies || 0);
+  const arenaInfo = arenaProgress(state.data.trophies || 0);
   const stats = state.data.stats;
-  $('profileArena').textContent = arenaName(arena);
-  $('profileTrophies').textContent = String(state.data.trophies || 0);
+  const xpText = info.max ? i18n.t('xpMax') : i18n.t('xpProgress', { current: info.current, next: info.next });
+  const xpHint = info.max ? i18n.t('maxLevelReached') : i18n.t('xpToNext', { xp: info.next - info.current, level: info.nextLevel });
+
+  $('profileLevel').textContent = String(info.level);
+  $('profileLevelTitle').textContent = i18n.t('levelTitle', { level: info.level });
   $('profileRecord').textContent = `${stats.wins || 0}W · ${stats.losses || 0}L`;
-  $('profileArenaFill').style.width = Math.round(progress.ratio * 100) + '%';
+  $('profileTrophies').textContent = String(state.data.trophies || 0);
+  $('profileXpText').textContent = xpText;
+  $('profileXpNext').textContent = xpHint;
+  $('profileXpFill').style.width = Math.round(info.ratio * 100) + '%';
+  $('profileArena').textContent = arenaName(arena);
+  $('profileArenaFill').style.width = Math.round(arenaInfo.ratio * 100) + '%';
   $('profileArenaNext').textContent = next ? i18n.t('arenaNext', { arena: arenaName(next), trophies: next.min }) : i18n.t('maxArena');
+
+  const reward = info.max ? null : levelReward(info.nextLevel);
+  $('nextRewardTitle').textContent = info.max ? i18n.t('maxLevelReached') : i18n.t('levelTitle', { level: info.nextLevel });
+  $('nextRewardXp').textContent = info.max ? '—' : xpHint;
+  $('nextRewardText').textContent = info.max ? i18n.t('maxLevelReached') : rewardText(reward);
+  const steps = nextLevels(state.data.progress, 5);
+  $('levelTrack').innerHTML = steps.length ? steps.map(step => `<div class="level-step">
+    <small>LV ${step.level}</small><b>${step.reward ? rewardText(step.reward) : '—'}</b>
+  </div>`).join('') : `<span class="hint">${i18n.t('maxLevelReached')}</span>`;
 
   renderTrophyRoad();
   renderMissions();
@@ -640,6 +756,8 @@ function renderProfile() {
 
 function renderTrophyRoad() {
   const claimed = state.data.trophyRoadClaimed || [];
+  $('trophyRoad').classList.toggle('collapsed', !state.trophyRoadExpanded);
+  $('btnToggleTrophyRoad').textContent = state.trophyRoadExpanded ? i18n.t('showLess') : i18n.t('showAll');
   $('trophyRoad').innerHTML = TROPHY_ROAD.map(item => {
     const done = claimed.includes(item.at);
     const reachable = state.data.trophies >= item.at;
@@ -661,6 +779,10 @@ function renderMissions() {
   $('dailyBonus').innerHTML = bonus
     ? `<span>${i18n.t('dailyBonusText')}</span><button class="btn small primary" type="button" data-claim-bonus="daily">${i18n.t('claim')} ${rewardText({ coins: 100, wildcards: { rare: 1 } })}</button>`
     : '';
+  const claimable = [...DAILY_MISSIONS.map(mission => ['daily', mission]), ...WEEKLY_MISSIONS.map(mission => ['weekly', mission])]
+    .some(([period, mission]) => missionProgress(state.data, period, mission).ratio >= 1
+      && !state.data.missions[period].claimed.includes(mission.id));
+  $('btnClaimAllMissions').disabled = !claimable && !bonus;
 }
 
 function missionRow(period, mission) {
@@ -743,6 +865,63 @@ function showPlayError(message) {
 }
 
 
+function awardPlayerXp(amount) {
+  const result = addXp(state.data.progress, amount);
+  if (result.gained.length) {
+    result.gained.forEach(item => applyReward(state.data, item.reward));
+    state.levelUpQueue.push(...result.gained);
+  }
+  return result;
+}
+
+function flushLevelUp() {
+  if (!state.levelUpQueue.length) return;
+  if (visibleModal() || !$('chestModal').hidden) return;
+  const gained = state.levelUpQueue.splice(0);
+  const last = gained[gained.length - 1];
+  const total = { coins: 0, wildcards: {} };
+  gained.forEach(item => {
+    const reward = item.reward || {};
+    total.coins += reward.coins || 0;
+    for (const [rarity, amount] of Object.entries(reward.wildcards || {})) {
+      total.wildcards[rarity] = (total.wildcards[rarity] || 0) + amount;
+    }
+  });
+  $('levelUpNumber').textContent = String(last.level);
+  $('levelUpTitle').textContent = i18n.t('levelTitle', { level: last.level });
+  $('levelUpText').textContent = i18n.t('levelUpText', { level: last.level });
+  const chips = [];
+  if (total.coins) chips.push(`<span class="level-reward-chip">🪙 +${formatCoins(total.coins)}</span>`);
+  for (const [rarity, amount] of Object.entries(total.wildcards)) {
+    chips.push(`<span class="level-reward-chip">${amount}× ${i18n.t(rarity)} ${i18n.t('wildcards')}</span>`);
+  }
+  $('levelUpRewards').innerHTML = chips.join('');
+  openModal('levelModal');
+  sfx.chest('rise');
+}
+
+function handleGoalAction() {
+  if (state.goalAction === 'open-chest') {
+    if (state.data.chests.slots.some(chest => isReady(chest))) openChestFlow();
+    else setScreen('chests');
+    return;
+  }
+  if (state.goalAction === 'lineup') {
+    state.cardsTab = 'lineup';
+    setScreen('cards');
+    return;
+  }
+  if (state.goalAction === 'claim-bonus') { claimDailyBonusReward(); return; }
+  if (state.goalAction === 'claim-missions') { claimAllMissions(); return; }
+  setScreen('play');
+  const card = $('quickMatchCard');
+  if (card) {
+    card.classList.add('attention');
+    setTimeout(() => card.classList.remove('attention'), 900);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
 function pickLabel(match, market, pick) {
   if (market === 'winner') return pick === 'home' ? match.homeTeam.name : match.awayTeam.name;
   if (market === 'margin') {
@@ -791,7 +970,7 @@ function startReveal(run) {
   clearTimeout(run.timer);
   run.revealedStage = 0;
   renderReveal(run);
-  run.timer = setTimeout(() => advanceReveal(run), 500);
+  run.timer = setTimeout(() => advanceReveal(run), state.data.settings.fastReveal ? 60 : 500);
 }
 
 function advanceReveal(run) {
@@ -811,7 +990,7 @@ function advanceReveal(run) {
       settleFinal(run);
       return;
     }
-    run.timer = setTimeout(() => advanceReveal(run), 550);
+    run.timer = setTimeout(() => advanceReveal(run), state.data.settings.fastReveal ? 60 : 550);
   }
 }
 
@@ -835,6 +1014,7 @@ function showCashout(run, stage) {
   run.pendingStage = stage;
   run.cashoutOffered[stage] = true;
   $('cashoutAmount').textContent = formatCoins(amount);
+  $('cashoutFull').textContent = i18n.t('fullPayout', { amount: formatCoins(payout(run.stake, run.odds)) });
   $('cashoutPanel').hidden = false;
   $('matchStatus').textContent = stage === 'HT' ? i18n.t('matchStatusHalf') : i18n.t('matchStatusQ', { quarter: 3 });
   $('btnMatchSkip').hidden = false;
@@ -862,16 +1042,19 @@ function settleCashout(run, amount) {
   recordMission(state.data, 'match');
   let tournamentEvent = null;
   if (state.data.tournament?.active) tournamentEvent = tournamentLoss(state.data);
+  const xp = XP_MATCH + XP_CASHOUT;
+  awardPlayerXp(xp);
   recordHistory(state.data, {
     home: run.match.home, away: run.match.away, homeName: run.match.homeTeam.name, awayName: run.match.awayTeam.name,
     hs: cumulative(run.summary, run.pendingStage).home, as: cumulative(run.summary, run.pendingStage).away,
     pick: run.pick, pickText: pickLabel(run.match, run.market, run.pick), market: run.market, won: false, cashedOut: true, stake: run.stake, odds: run.odds, delta, chest: null
   });
-  run.result = { type: 'cashout', amount, delta, tournamentEvent };
+  run.result = { type: 'cashout', amount, delta, tournamentEvent, xp };
   grantAchievementsAndNotify();
   save(state.data);
   renderAll();
   renderMatchResult(run);
+  flushLevelUp();
   sfx.chest('click');
   if (tournamentEvent) toast(i18n.t('tournamentFailed'));
 }
@@ -967,17 +1150,23 @@ function settleFinal(run) {
     recordMission(state.data, 'win');
     if (run.odds >= 2) recordMission(state.data, 'underdogWin');
   }
+  let xp = XP_MATCH + (won ? XP_WIN : 0);
+  if (dailyEligible) xp += XP_DAILY_CHALLENGE;
+  if (tournamentEvent?.advance) xp += XP_TOURNAMENT_STEP;
+  if (tournamentEvent?.complete) xp += XP_TOURNAMENT_STEP + XP_TOURNAMENT_COMPLETE;
+  awardPlayerXp(xp);
   recordHistory(state.data, {
     home: run.match.home, away: run.match.away, homeName: run.match.homeTeam.name, awayName: run.match.awayTeam.name,
     hs: summary.score.home, as: summary.score.away, pick: run.pick, pickText: pickLabel(run.match, run.market, run.pick), market: run.market, won,
     cashedOut: false, stake, odds: run.odds, delta, chest: chestType, slotFull
   });
-  run.result = { type: 'final', won, delta, chestType, chestUpgrade, slotFull, tournamentEvent, arenaChanged };
+  run.result = { type: 'final', won, delta, chestType, chestUpgrade, slotFull, tournamentEvent, arenaChanged, xp };
   const newAchievements = grantAchievements(state.data, state.cards);
   newAchievements.forEach(a => toast(i18n.t('newAchievement', { title: i18n.t(a.titleKey) })));
   save(state.data);
   renderAll();
   renderMatchResult(run);
+  flushLevelUp();
   if (won) sfx.win(); else sfx.buzzer();
   if (navigator.vibrate) navigator.vibrate(won ? [20, 40, 20] : 30);
 }
@@ -997,12 +1186,12 @@ function renderMatchResult(run) {
   banner.hidden = false;
   if (result.type === 'cashout') {
     banner.className = 'result-banner cashout';
-    banner.innerHTML = `<b>${i18n.t('cashedOut')}</b><span>${i18n.t('cashedOutText')} · ${formatCoins(result.amount)} 🪙</span>`;
+    banner.innerHTML = `<b>${i18n.t('cashedOut')}</b><span>${i18n.t('cashedOutText')} · ${formatCoins(result.amount)} 🪙 · ${i18n.t('xpGain', { amount: result.xp })}</span>`;
     $('matchStatus').textContent = i18n.t('cashedOut');
   } else {
     banner.className = 'result-banner ' + (result.won ? 'win' : 'loss');
     banner.innerHTML = `<b>${i18n.t(result.won ? 'matchWin' : 'matchLoss')}</b>
-      <span>${i18n.t(result.won ? 'pickCorrect' : 'pickWrong')} · ${i18n.t(result.won ? 'coinsEarned' : 'coinsLost')}: ${result.delta > 0 ? '+' : ''}${formatCoins(Math.abs(result.delta))} 🪙</span>`;
+      <span>${i18n.t(result.won ? 'pickCorrect' : 'pickWrong')} · ${i18n.t(result.won ? 'coinsEarned' : 'coinsLost')}: ${result.delta > 0 ? '+' : ''}${formatCoins(Math.abs(result.delta))} 🪙 · ${i18n.t('xpGain', { amount: result.xp })}</span>`;
     $('matchStatus').textContent = i18n.t('matchStatusFinal');
   }
   const top = summary.players.slice().sort((a, b) => b.pts - a.pts)[0];
@@ -1076,6 +1265,7 @@ function openChestFlow() {
   state.data.stats.chestsOpened = state.data.chests.opened;
   state.data.stats.coinsEarned = (state.data.stats.coinsEarned || 0) + rewards.coins + overflowCoins + setReward.coins;
   recordMission(state.data, 'chest');
+  awardPlayerXp(XP_CHEST);
   const openedCount = state.data.chests.opened;
   if (openedCount > 0 && openedCount % 10 === 0) {
     const rarity = openedCount % 40 === 0 ? 'epic' : 'rare';
@@ -1095,9 +1285,10 @@ function openChestFlow() {
     tier,
     cards: displayCards,
     coins: rewards.coins + overflowCoins + setReward.coins,
+    xp: XP_CHEST,
     sfx,
     i18n,
-    onDone: () => { renderAll(); save(state.data); }
+    onDone: () => { renderAll(); save(state.data); flushLevelUp(); }
   });
 }
 
@@ -1253,18 +1444,57 @@ function claimMissionReward(period, id) {
   const reward = claimMission(state.data, period, id);
   if (!reward) return;
   applyReward(state.data, reward);
+  awardPlayerXp(XP_MISSION);
   save(state.data);
   renderAll();
   toast(i18n.t('missionComplete', { reward: rewardText(reward) }));
+  flushLevelUp();
 }
 
 function claimDailyBonusReward() {
   const reward = claimDailyBonus(state.data);
   if (!reward) return;
   applyReward(state.data, reward);
+  awardPlayerXp(XP_DAILY_BONUS);
   save(state.data);
   renderAll();
   toast(i18n.t('missionComplete', { reward: rewardText(reward) }));
+  flushLevelUp();
+}
+
+function claimAllMissions() {
+  const total = { coins: 0, wildcards: {} };
+  let missionCount = 0;
+  let bonusClaimed = false;
+  for (const [period, list] of [['daily', DAILY_MISSIONS], ['weekly', WEEKLY_MISSIONS]]) {
+    for (const mission of list) {
+      const reward = claimMission(state.data, period, mission.id);
+      if (!reward) continue;
+      applyReward(state.data, reward);
+      missionCount += 1;
+      total.coins += reward.coins || 0;
+      for (const [rarity, amount] of Object.entries(reward.wildcards || {})) {
+        total.wildcards[rarity] = (total.wildcards[rarity] || 0) + amount;
+      }
+    }
+  }
+  if (dailyBonusAvailable(state.data)) {
+    const bonus = claimDailyBonus(state.data);
+    if (bonus) {
+      applyReward(state.data, bonus);
+      bonusClaimed = true;
+      total.coins += bonus.coins || 0;
+      for (const [rarity, amount] of Object.entries(bonus.wildcards || {})) {
+        total.wildcards[rarity] = (total.wildcards[rarity] || 0) + amount;
+      }
+    }
+  }
+  if (!missionCount && !bonusClaimed) { toast(i18n.t('noRewards')); return; }
+  awardPlayerXp(missionCount * XP_MISSION + (bonusClaimed ? XP_DAILY_BONUS : 0));
+  save(state.data);
+  renderAll();
+  toast(i18n.t('missionComplete', { reward: rewardText(total) }));
+  flushLevelUp();
 }
 
 function claimTrophyRoadRewards() {
@@ -1349,7 +1579,8 @@ function shareCard() {
 
 function shareProfile() {
   const stats = state.data.stats;
-  shareText(`Court Clash · 🏆 ${state.data.trophies || 0} · ${stats.wins || 0}W-${stats.losses || 0}L · ${Object.keys(state.data.collection).length}/300 cards`);
+  const info = levelInfo(state.data.progress);
+  shareText(`Court Clash · LV ${info.level} · 🏆 ${state.data.trophies || 0} · ${stats.wins || 0}W-${stats.losses || 0}L · ${Object.keys(state.data.collection).length}/300 cards`);
 }
 
 function renderAll() {
@@ -1358,7 +1589,7 @@ function renderAll() {
   renderPlay();
   renderChests();
   renderCards();
-  renderProfile();
+  renderProgress();
 }
 
 function applyLanguage() {
@@ -1380,6 +1611,7 @@ function populateFilters() {
 function updateSettings() {
   $('settingsLang').value = i18n.lang;
   $('settingsSound').checked = state.data.settings.sound !== false;
+  $('settingsFast').checked = state.data.settings.fastReveal === true;
   sfx.muted = state.data.settings.sound === false;
 }
 
@@ -1401,7 +1633,12 @@ function bind() {
     const btn = event.target.closest('[data-market]');
     if (!btn) return;
     state.market = btn.dataset.market;
+    if (state.market !== 'winner') state.marketsExpanded = true;
     state.pick = null;
+    renderPlay();
+  });
+  $('btnMoreMarkets').addEventListener('click', () => {
+    state.marketsExpanded = true;
     renderPlay();
   });
   $('marketOptions').addEventListener('click', event => {
@@ -1418,14 +1655,15 @@ function bind() {
   $('btnBet').addEventListener('click', placeBet);
   $('btnTournament').addEventListener('click', startTournamentRun);
   $('btnQuickOpen').addEventListener('click', openChestFlow);
-  $('btnDismissTutorial').addEventListener('click', () => {
-    state.data.settings.tutorialDismissed = true;
-    save(state.data);
-    renderTutorial();
-  });
+  $('btnGoal').addEventListener('click', handleGoalAction);
   $('chestSlots').addEventListener('click', event => {
     if (event.target.closest('[data-open]')) { openChestFlow(); return; }
     if (event.target.closest('[data-speed]')) speedUpSlot();
+  });
+  $('btnToggleFilters').addEventListener('click', () => {
+    state.filtersOpen = !state.filtersOpen;
+    updateFilterUI();
+    renderCollectionPane();
   });
   ['cardSearch', 'filterRarity', 'filterSet', 'filterTeam', 'filterOwned', 'sortCards'].forEach(id => {
     const el = $(id);
@@ -1466,7 +1704,7 @@ function bind() {
     if (btn) buyLab(Number(btn.dataset.buyOffer));
   });
   $('btnLogin').addEventListener('click', claimLoginReward);
-  $('screen-profile').addEventListener('click', event => {
+  $('screen-progress').addEventListener('click', event => {
     const mission = event.target.closest('[data-claim-mission]');
     if (mission) {
       const [period, id] = mission.dataset.claimMission.split(':');
@@ -1476,6 +1714,11 @@ function bind() {
     if (event.target.closest('[data-claim-bonus]')) claimDailyBonusReward();
   });
   $('btnClaimTrophyRoad').addEventListener('click', claimTrophyRoadRewards);
+  $('btnClaimAllMissions').addEventListener('click', claimAllMissions);
+  $('btnToggleTrophyRoad').addEventListener('click', () => {
+    state.trophyRoadExpanded = !state.trophyRoadExpanded;
+    renderTrophyRoad();
+  });
   $('btnShareProfile').addEventListener('click', shareProfile);
 
   $('btnCardClose').addEventListener('click', () => closeModal('cardModal'));
@@ -1510,6 +1753,10 @@ function bind() {
   });
   $('btnMatchShare').addEventListener('click', shareMatch);
 
+  $('btnLevelContinue').addEventListener('click', () => {
+    closeModal('levelModal');
+    flushLevelUp();
+  });
   $('btnHelp').addEventListener('click', () => openModal('helpModal'));
   $('btnHelpClose').addEventListener('click', () => closeModal('helpModal'));
   $('btnSettings').addEventListener('click', () => openModal('settingsModal'));
@@ -1531,6 +1778,10 @@ function bind() {
     if (event.target.checked) sfx.init();
     save(state.data);
   });
+  $('settingsFast').addEventListener('change', event => {
+    state.data.settings.fastReveal = event.target.checked;
+    save(state.data);
+  });
   $('btnReset').addEventListener('click', () => {
     if (!window.confirm(i18n.t('resetConfirm'))) return;
     state.data = reset();
@@ -1538,6 +1789,14 @@ function bind() {
     state.matchups = [];
     state.cardsTab = 'collection';
     state.matchRun = null;
+    state.filtersOpen = false;
+    state.trophyRoadExpanded = false;
+    state.marketsExpanded = false;
+    state.levelUpQueue = [];
+    ['filterRarity', 'filterSet', 'filterTeam', 'sortCards'].forEach(id => { if ($(id)) $(id).value = ''; });
+    if ($('filterOwned')) $('filterOwned').value = 'owned';
+    if ($('sortCards')) $('sortCards').value = 'power';
+    if ($('cardSearch')) $('cardSearch').value = '';
     ensureData();
     newMatchups();
     updateSettings();
@@ -1582,7 +1841,9 @@ function bind() {
     if (event.key === 'Escape') return;
   });
   window.addEventListener('hashchange', () => {
-    const next = location.hash.replace('#', '') || 'play';
+    const raw = location.hash.replace('#', '') || 'play';
+    const next = raw === 'profile' ? 'progress' : raw;
+    if (raw === 'profile') { setScreen('progress', true); return; }
     if (state.screen !== next) setScreen(next, false);
   });
   window.addEventListener('beforeunload', () => save(state.data));
@@ -1598,7 +1859,7 @@ function init() {
   renderAll();
   updateSettings();
   const initial = location.hash.replace('#', '') || 'play';
-  setScreen(initial, false);
+  setScreen(initial, initial === 'profile');
   if (!state.data.settings.onboarded) openModal('onboardingModal');
   state.bootToasts.forEach(text => toast(text));
   setTimeout(() => {
