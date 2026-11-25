@@ -5,7 +5,7 @@ const CORE = [
   './kinect.css', './app.js', './tracker.js', './renderer.js', './game.js',
   './geometry.js', './filters.js', './i18n.js', './ui.js', './audio.js',
   './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', e => {

@@ -13,7 +13,7 @@ var CORE = [
   './js/face-engine.js',
   './js/i18n.js',
   './js/storage.js',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', function (event) {

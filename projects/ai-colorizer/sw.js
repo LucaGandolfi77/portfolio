@@ -3,7 +3,7 @@ const CACHE = 'ai-colorizer-v2';
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js',
+  '../../top_buttons.js',
   '../../index.html'
 ];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(u => c.add(u)))).then(() => self.skipWaiting())));

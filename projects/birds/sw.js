@@ -5,7 +5,7 @@ const LEGACY_CACHES = ['./'];
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', e => e.waitUntil(

@@ -20,7 +20,7 @@ const ASSETS = [
   './js/tracker.js',
   './js/render.js',
   './js/main.js',
-  '../top_buttons.js',
+  '../../top_buttons.js',
   '../../i18n/en.json',
   '../../i18n/it.json'
 ];

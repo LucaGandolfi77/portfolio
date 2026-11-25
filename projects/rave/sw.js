@@ -17,7 +17,7 @@ var ASSETS = [
   './js/settings.js',
   './js/gallery.js',
   './js/i18n.js',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE)

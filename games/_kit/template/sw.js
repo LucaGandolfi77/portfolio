@@ -5,7 +5,7 @@ const CACHE = 'template-v1';
 const ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './js/config.js', './js/state.js', './js/engine.js', './js/main.js',
-  '../../top_buttons.js',
+  '../../../top_buttons.js',
   '../../_kit/core.js', '../../_kit/storage.js', '../../_kit/i18n.js',
   '../../_kit/audio.js', '../../_kit/fx.js', '../../_kit/pwa.js'
 ];

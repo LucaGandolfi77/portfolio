@@ -4,7 +4,7 @@
 const CACHE = 'warorbit-pwa-v1';
 const ASSETS = [
   './index.html',
-  '../top_buttons.js',
+  '../../top_buttons.js',
   '../_kit/a11y.css',
   '../_kit/storage.js',
   '../_kit/progression.js',

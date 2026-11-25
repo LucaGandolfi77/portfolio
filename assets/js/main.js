@@ -1,47 +1,7 @@
-// --- Theme toggle with seasonal themes ---
-// Note: themeToggle will be created dynamically, don't query it here
-
-// Seasonal themes definition
-const seasonalThemes = [
-    { id: 'default', name: 'Default', emoji: '🌙', data: null },
-    { id: 'easter', name: 'Easter', emoji: '🐰', data: 'easter' },
-    { id: 'summer', name: 'Summer', emoji: '☀️', data: 'summer' },
-    { id: 'autumn', name: 'Autumn', emoji: '🍂', data: 'autumn' },
-    { id: 'christmas', name: 'Christmas', emoji: '🎄', data: 'christmas' },
-    { id: 'halloween', name: 'Halloween', emoji: '👻', data: 'halloween' },
-    { id: 'cyberpunk', name: 'Cyberpunk', emoji: '⚡', data: 'cyberpunk' }
-];
-
+// --- Theme toggle (light / dark) ---
 function applyTheme(theme) {
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-    updateActiveThemeInBar();
-}
-
-function applySeasonalTheme(themeId) {
-    const theme = seasonalThemes.find(t => t.id === themeId);
-    if (!theme) return;
-    
-    document.documentElement.removeAttribute('data-seasonal-theme');
-    if (theme.data) {
-        document.documentElement.setAttribute('data-seasonal-theme', theme.data);
-    }
-    
-    localStorage.setItem('seasonal-theme', themeId);
-    updateActiveThemeInBar();
-}
-
-function updateActiveThemeInBar() {
-    const currentTheme = localStorage.getItem('seasonal-theme') || 'default';
-    const items = document.querySelectorAll('.theme-bar-item');
-    
-    items.forEach(item => {
-        if (item.dataset.theme === currentTheme) {
-            item.classList.add('active');
-        } else {
-            item.classList.remove('active');
-        }
-    });
 }
 
 // --- Top Bar with useful controls ---
@@ -76,7 +36,6 @@ function createTopBar() {
         if (typeof toggleCommandPalette === 'function') {
             toggleCommandPalette();
         }
-        if (window.PortfolioXP) window.PortfolioXP.add(1, 'Command palette', { cooldown: 10000, toast: false });
     });
     rightSection.appendChild(searchBtn);
     
@@ -110,207 +69,18 @@ function createTopBar() {
     });
     rightSection.appendChild(topBtn);
     
-    // Terminal Mode toggle
-    const termBtn = document.createElement('button');
-    termBtn.className = 'top-bar-btn';
-    termBtn.id = 'terminalToggle';
-    termBtn.innerHTML = '<i class="fas fa-terminal"></i> <span class="btn-text">Terminal</span>';
-    termBtn.title = 'Terminal Mode (Ctrl+Shift+T)';
-    termBtn.addEventListener('click', () => {
-        if (window.TerminalMode && typeof window.TerminalMode.toggle === 'function') {
-            window.TerminalMode.toggle();
-        }
-    });
-    rightSection.appendChild(termBtn);
-
-    // Twin Mode toggle (AI chat)
-    const twinBtn = document.createElement('button');
-    twinBtn.className = 'top-bar-btn';
-    twinBtn.id = 'twinToggle';
-    twinBtn.innerHTML = '<i class="fas fa-robot"></i> <span class="btn-text">Twin</span>';
-    twinBtn.title = 'Twin Mode — chat with Luca\'s AI twin';
-    twinBtn.addEventListener('click', () => {
-        if (window.TwinMode && typeof window.TwinMode.toggle === 'function') {
-            window.TwinMode.toggle();
-        }
-    });
-    rightSection.appendChild(twinBtn);
-    
-    // Recruiter Mode toggle (Creative / Business)
-    const recruiterBtn = document.createElement('button');
-    recruiterBtn.className = 'top-bar-btn top-bar-btn-mode';
-    recruiterBtn.id = 'recruiterToggle';
-    recruiterBtn.title = 'Toggle Recruiter Mode';
-    const isBusiness = document.documentElement.getAttribute('data-mode') === 'business';
-    recruiterBtn.innerHTML = isBusiness
-        ? '<i class="fas fa-masks-theater"></i> <span class="btn-text">Creative</span>'
-        : '<i class="fas fa-briefcase"></i> <span class="btn-text">Business</span>';
-    recruiterBtn.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-mode');
-        setRecruiterMode(current === 'business' ? 'creative' : 'business');
-    });
-    rightSection.appendChild(recruiterBtn);
-    
     bar.appendChild(leftSection);
     bar.appendChild(rightSection);
     document.body.prepend(bar);
 }
 
-// --- Recruiter Mode ---
-const RECRUITER_ORDER = ['about', 'skills', 'selected-work', 'projects', 'languages', 'nerve-center', 'contact', 'social-links', 'lab', 'games', 'cabinet'];
-const RECRUITER_PRIMARY = ['skills', 'projects', 'languages', 'contact']; // shown expanded & first
-
 // Restore saved light/dark theme preference immediately
 (function initSavedTheme() {
     try {
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light') {
+        if (localStorage.getItem('theme') === 'light') {
             document.documentElement.setAttribute('data-theme', 'light');
         }
-        const savedSeasonal = localStorage.getItem('seasonal-theme');
-        if (savedSeasonal && savedSeasonal !== 'default') {
-            applySeasonalTheme(savedSeasonal);
-        }
     } catch (e) {}
-})();
-
-function setRecruiterMode(mode) {
-    if (mode === 'business') {
-        document.documentElement.setAttribute('data-mode', 'business');
-        document.documentElement.setAttribute('data-theme', 'light'); // force clean light
-        localStorage.setItem('portfolio-mode', 'business');
-        reorderSectionsForRecruiter();
-        expandPrimarySections();
-        disableEasterEggs(true);
-    } else {
-        document.documentElement.removeAttribute('data-mode');
-        localStorage.setItem('portfolio-mode', 'creative');
-        restoreSectionsOrder();
-        restoreCollapseState();
-        disableEasterEggs(false);
-        // restore theme preference
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-        }
-    }
-    // Update button label
-    const btn = document.getElementById('recruiterToggle');
-    if (btn) {
-        btn.innerHTML = (mode === 'business')
-            ? '<i class="fas fa-masks-theater"></i> <span class="btn-text">Creative</span>'
-            : '<i class="fas fa-briefcase"></i> <span class="btn-text">Business</span>';
-        if (mode === 'business') btn.classList.add('active-mode');
-        else btn.classList.remove('active-mode');
-    }
-    // Update URL without reload
-    try {
-        const url = new URL(location.href);
-        if (mode === 'business') url.searchParams.set('mode', 'business');
-        else url.searchParams.delete('mode');
-        history.replaceState({}, '', url);
-    } catch (e) { /* ignore */ }
-    // Update theme toggle icon if present
-    const themeBtn = document.querySelector('.top-bar-btn[title="Toggle light/dark mode"]');
-    if (themeBtn) {
-        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-        themeBtn.innerHTML = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-    }
-}
-
-function reorderSectionsForRecruiter() {
-    const main = document.querySelector('main.container');
-    if (!main || main.dataset.reordered === '1') return;
-    // Remember original order
-    if (!main.dataset.originalOrder) {
-        main.dataset.originalOrder = '1';
-        main._originalChildren = Array.from(main.children);
-    }
-    const headerEls = [];
-    const footerEls = [];
-    const sections = {};
-    const middleLeftovers = [];
-
-    main._originalChildren.forEach(el => {
-        if (el.tagName === 'HEADER' || el.classList.contains('header') || el.classList.contains('orientation') || el.classList.contains('proof-strip')) {
-            headerEls.push(el);
-        } else if (el.tagName === 'FOOTER' || el.classList.contains('footer') || el.classList.contains('closing-cta')) {
-            footerEls.push(el);
-        } else if (el.id && RECRUITER_ORDER.includes(el.id)) {
-            sections[el.id] = el;
-        } else {
-            middleLeftovers.push(el);
-        }
-    });
-
-    const ordered = [...headerEls];
-    RECRUITER_ORDER.forEach(id => {
-        if (sections[id]) {
-            ordered.push(sections[id]);
-            delete sections[id];
-        }
-    });
-    ordered.push(...middleLeftovers, ...footerEls);
-    ordered.forEach(el => main.appendChild(el));
-    main.dataset.reordered = '1';
-}
-
-function restoreSectionsOrder() {
-    const main = document.querySelector('main.container');
-    if (!main || !main._originalChildren) return;
-    main._originalChildren.forEach(el => main.appendChild(el));
-    delete main.dataset.reordered;
-}
-
-function expandPrimarySections() {
-    document.querySelectorAll('.collapsible-container').forEach(c => c.classList.remove('collapsed'));
-    // hide show-more buttons in primary sections (already expanded)
-    RECRUITER_PRIMARY.forEach(id => {
-        const sec = document.getElementById(id);
-        if (!sec) return;
-        const btn = sec.querySelector('.show-more-btn');
-        if (btn) btn.style.display = 'none';
-    });
-}
-
-function restoreCollapseState() {
-    document.querySelectorAll('.collapsible-container').forEach(c => c.classList.add('collapsed'));
-    document.querySelectorAll('.show-more-btn').forEach(btn => { btn.style.display = ''; });
-}
-
-function disableEasterEggs(disabled) {
-    if (typeof EasterEggs === 'undefined') return;
-    // Use a flag the easter-eggs system can check; also remove matrix rain if active
-    if (disabled) {
-        document.documentElement.dataset.easterDisabled = '1';
-        const rain = document.getElementById('matrix-rain');
-        if (rain) rain.remove();
-        const hint = document.querySelector('.easter-hint');
-        if (hint) hint.remove();
-    } else {
-        delete document.documentElement.dataset.easterDisabled;
-    }
-}
-
-// Apply recruiter mode on load (from URL or localStorage)
-(function initRecruiterMode() {
-    let mode = null;
-    try {
-        const url = new URL(location.href);
-        if (url.searchParams.get('mode') === 'business') mode = 'business';
-    } catch (e) {}
-    if (!mode) {
-        const saved = localStorage.getItem('portfolio-mode');
-        if (saved === 'business') mode = 'business';
-    }
-    // Defer until DOM is ready so sections exist
-    function apply() {
-        if (mode === 'business') setRecruiterMode('business');
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
-    else apply();
 })();
 
 // Initialize top bar when DOM is ready
@@ -1156,42 +926,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const quickSearch = document.getElementById('quickSearch');
     if (quickSearch) {
         quickSearch.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const val = quickSearch.value.trim().toLowerCase();
-                if (val === 'easter') {
-                    window.location.href = 'pages/experiments/easter_egg.html';
-                } else if (val === 'viper') {
-                    window.location.href = 'pages/experiments/aviator_viper.html';
-                } else if (val === '8') {
-                    window.location.href = 'pages/experiments/8.html';
-                } else if (val === 'spark') {
-                    const sparkControl = document.getElementById('sparkControl');
-                    if (sparkControl) {
-                        sparkControl.style.display = 'block';
-                        if (typeof closeMenu === 'function') closeMenu();
-                    }
-                }
+            if (e.key !== 'Enter' || typeof toggleCommandPalette !== 'function') return;
+            const val = quickSearch.value.trim();
+            toggleCommandPalette();
+            const input = document.getElementById('command-input');
+            if (input && val) {
+                input.value = val;
+                if (typeof filterCommands === 'function') filterCommands(val);
             }
-        });
-    }
-
-    // Spark Control Logic
-    const sparkSlider = document.getElementById('sparkSlider');
-    const sparkValue = document.getElementById('sparkValue');
-    const closeSparkControl = document.getElementById('closeSparkControl');
-    const sparkControl = document.getElementById('sparkControl');
-
-    if (sparkSlider && sparkValue) {
-        sparkSlider.addEventListener('input', (e) => {
-            const val = parseInt(e.target.value);
-            sparkValue.textContent = val;
-            createParticles(val);
-        });
-    }
-
-    if (closeSparkControl && sparkControl) {
-        closeSparkControl.addEventListener('click', () => {
-            sparkControl.style.display = 'none';
         });
     }
 
@@ -1596,19 +1338,4 @@ if (commandOverlay) {
             toggleCommandPalette();
         }
     });
-}
-
-// === SECRET THEMES COMMANDS ===
-const secretThemeCommands = [
-    { id: 'theme-matrix', title: 'Theme: Matrix', desc: 'Enter the Matrix', icon: '🟢', action: () => document.documentElement.setAttribute('data-theme', 'matrix') },
-    { id: 'theme-vaporwave', title: 'Theme: Vaporwave', desc: 'Aesthetic vibes', icon: '🌸', action: () => document.documentElement.setAttribute('data-theme', 'vaporwave') },
-    { id: 'theme-pixel', title: 'Theme: Pixel Art', desc: '8-bit nostalgia', icon: '👾', action: () => document.documentElement.setAttribute('data-theme', 'pixel-art') },
-    { id: 'theme-retro', title: 'Theme: Retro 80s', desc: 'Neon synthwave', icon: '🌆', action: () => document.documentElement.setAttribute('data-theme', 'retro') },
-    { id: 'theme-minimal', title: 'Theme: Minimal', desc: 'Black & white', icon: '⚪', action: () => document.documentElement.setAttribute('data-theme', 'minimal') },
-    { id: 'theme-night', title: 'Theme: Night', desc: 'Dark mode++', icon: '🌙', action: () => document.documentElement.setAttribute('data-theme', 'night') }
-];
-
-// Merge con commands esistenti
-if (typeof commands !== 'undefined') {
-    commands.push(...secretThemeCommands);
 }

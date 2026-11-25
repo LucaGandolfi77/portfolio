@@ -3,7 +3,7 @@ const CACHE = './';
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js',
+  '../../top_buttons.js',
   '../../assets/favicon.svg'
 ];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(u => c.add(u)))).then(() => self.skipWaiting())));

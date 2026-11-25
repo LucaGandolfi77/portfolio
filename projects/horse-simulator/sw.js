@@ -14,7 +14,7 @@ var ASSETS = [
   './js/storage.js',
   './js/ui.js',
   './js/main.js',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', function (event) {

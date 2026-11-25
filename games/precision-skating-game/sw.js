@@ -19,7 +19,7 @@ const ASSETS = [
   './js/render.js',
   './js/audio.js',
   './js/ui.js',
-  '../top_buttons.js',
+  '../../top_buttons.js',
   '../../i18n/en.json',
   '../../i18n/it.json'
 ];

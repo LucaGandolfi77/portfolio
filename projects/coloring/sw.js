@@ -6,7 +6,7 @@ const ASSETS = [
   './index.html',
   './templates.js',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', e => e.waitUntil(

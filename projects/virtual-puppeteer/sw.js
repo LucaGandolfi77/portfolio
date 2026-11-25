@@ -17,7 +17,7 @@ var ASSETS = [
   './js/ui.js',
   '../vision-lab/js/vendor/mediapipe/vision_bundle.js',
   '../tracker/model/hand_landmarker.task',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE)

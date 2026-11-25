@@ -3,7 +3,7 @@ const CACHE = './';
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js',
+  '../../top_buttons.js',
   '../../manifest.json',
   '../../assets/apple-touch-icon.png'
 ];

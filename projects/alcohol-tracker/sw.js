@@ -4,7 +4,7 @@ const CACHE = VERSION;
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 
 self.addEventListener('install', function (e) {

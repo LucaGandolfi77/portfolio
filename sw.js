@@ -11,18 +11,12 @@ const CACHE_NAME = `portfolio-${BUILD_ID}`;
 const scopedStaticPaths = [
     './',
     'index.html',
-    // CSS della home: TUTTI i 14, non solo i primi due. Senza questi la
+    // CSS della home: tutti, non solo i primi due. Senza questi la
     // prima pagina offline e' senza layout.
     'assets/css/main.css',
     'assets/css/design-system.css',
-    'assets/css/secret-themes.css',
     'assets/css/animations.css',
-    'assets/css/recruiter-mode.css',
     'assets/css/cookies.css',
-    'assets/css/twin-mode.css',
-    'assets/css/nerve-center.css',
-    'assets/css/terminal-mode.css',
-    'assets/css/portfolio-xp.css',
     'assets/css/home-refresh.css',
     'assets/css/catalog.css',
     'assets/css/sections-modern.css',
@@ -32,11 +26,6 @@ const scopedStaticPaths = [
     'assets/js/projects-data.js',
     'assets/js/catalog-data.js',
     'assets/js/catalog-home.js',
-    'assets/js/portfolio-xp.js',
-    'assets/js/easter-eggs.js',
-    'assets/js/twin-mode.js',
-    'assets/js/nerve-center.js',
-    'assets/js/terminal-mode.js',
     'assets/js/cookies.js',
     'assets/js/reference-scene.js',
     // LCP: senza l'avatar il primo paint offline mostra un'immagine rotta.

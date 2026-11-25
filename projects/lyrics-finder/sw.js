@@ -2,7 +2,7 @@ const CACHE = 'pf-lyrics-shell-v1';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-192.png', './icons/icon-512.png',
-  '../_shared/tokens.css', '../_shared/base.css', '../_shared/shell.css', '../_shared/top_buttons.js',
+  '../_shared/tokens.css', '../_shared/base.css', '../_shared/shell.css', '../../top_buttons.js',
   './css/app.css',
   './js/config.js', './js/i18n.js', './js/storage.js', './js/search.js',
   './js/api.js', './js/audio.js', './js/ui.js', './js/main.js'

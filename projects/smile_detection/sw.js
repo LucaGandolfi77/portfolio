@@ -21,7 +21,7 @@ var ASSETS = [
   '../vision-lab/js/vendor/mediapipe/wasm/vision_wasm_nosimd_internal.js',
   '../vision-lab/js/vendor/mediapipe/wasm/vision_wasm_nosimd_internal.wasm',
   '../vision-lab/model/face_landmarker.task',
-  '../_shared/top_buttons.js'
+  '../../top_buttons.js'
 ];
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE)
