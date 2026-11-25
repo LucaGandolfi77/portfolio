@@ -5,11 +5,15 @@ const W = 240, H = 160;
 CANVAS.width = W; CANVAS.height = H;
 CTX.imageSmoothingEnabled = false;
 
+let viewScale = 1;
 function resizeCanvas(){
   const sw = window.innerWidth, sh = window.innerHeight;
-  const s = Math.min(Math.floor(sw/W), Math.floor(sh/H), 4);
+  const s = Math.max(1, Math.min(sw/W, sh/H, 4));
+  viewScale = s;
+  CANVAS._scale = s;
   CANVAS.style.width = (W*s)+'px';
   CANVAS.style.height = (H*s)+'px';
+  if(typeof resizeText === 'function') resizeText(s);
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -21,12 +25,13 @@ function updateCam(px, py){
 }
 
 let roomTransition = 0;
+const fogLayer = document.createElement('canvas');
+fogLayer.width = W; fogLayer.height = H;
+const fg = fogLayer.getContext('2d');
+
 function drawRoom(){
   const fogAmt = curZone.fog || 0;
   const m = curRoom.map;
-  const fogLayer = document.createElement('canvas');
-  fogLayer.width = W; fogLayer.height = H;
-  const fg = fogLayer.getContext('2d');
 
   const startX = Math.floor(cam.x/16);
   const startY = Math.floor(cam.y/16);
@@ -126,19 +131,17 @@ function drawHUD(){
   if(hudTimer < 10) return;
   const lp = Math.max(0, PLAYER.life / PLAYER.maxLife);
   document.getElementById('lfill').style.width = (lp*100)+'%';
-  document.getElementById('ltxt').textContent = PLAYER.life+'/'+PLAYER.maxLife;
+  document.getElementById('ltxt').textContent = 'LUCE '+PLAYER.life+'/'+PLAYER.maxLife;
   const np = Math.max(0, PLAYER.noxia / PLAYER.maxNoxia);
   document.getElementById('nfill').style.width = (np*100)+'%';
   if(STATE.flags.justPicked){
-    CTX.fillStyle = hex(PAL.gold);
-    CTX.font = '8px monospace';
-    CTX.fillText('Oggetto ottenuto!', W/2-50, 20);
+    text('Oggetto ottenuto!', W/2, 20, 9, hex(PAL.gold), 'center');
   }
 }
 
 function drawRoomBg(){
   const sky = curZone.sky || ['sky','butter'];
-  const c1 = hex(sky[0]), c2 = hex(sky[1]);
+  const c1 = hex(PAL[sky[0]] || sky[0]), c2 = hex(PAL[sky[1]] || sky[1]);
   const g = CTX.createLinearGradient(0,0,0,H);
   g.addColorStop(0, c1); g.addColorStop(1, c2);
   CTX.fillStyle = g;

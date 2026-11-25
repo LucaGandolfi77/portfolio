@@ -114,15 +114,10 @@ function drawBattle(){
   CTX.fillStyle = hex(PAL.ink);
   CTX.fillRect(0, H-40, W, 1);
 
-  CTX.fillStyle = hex(PAL.cream);
-  CTX.font = '10px monospace';
-
   if(BATTLE.phase === 'player'){
-    CTX.fillText('[Z] Attacca', 30, H-16);
+    text('[Z] Attacca', 30, H-14, 10, hex(PAL.fog));
   } else if(BATTLE.msg){
-    CTX.fillText(BATTLE.msg, 30, H-16);
+    text(BATTLE.msg, 30, H-14, 10, hex(PAL.fog));
   }
-
-  CTX.fillStyle = hex(PAL.gold);
-  CTX.fillText(PLAYER.life+'/'+PLAYER.maxLife, 20, H-28);
+  text(PLAYER.life+'/'+PLAYER.maxLife, 20, H-27, 9, hex(PAL.gold));
 }

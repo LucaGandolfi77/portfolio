@@ -18,6 +18,10 @@ function enterRoom(id, spawnX, spawnY){
   if(prev?.zone !== curRoom.zone){
     startAmb(curZone.song || 'hub');
   }
+  if(curRoom.id === 'finale' && GAME.phase === 'overworld'){
+    startStory('finale');
+    GAME.phase = 'story';
+  }
 }
 
 function isSolid(wx, wy){
@@ -54,14 +58,11 @@ function checkExit(){
 
 function checkDoors(){
   curRoom.doors?.forEach(d => {
-    if(STATE.flags[d.switch]) return;
     const dx = PLAYER.x - d.tx*16 - 8, dy = PLAYER.y - d.ty*16 - 8;
-    if(Math.abs(dx) < 12 && Math.abs(dy) < 12){
-      if(STATE.flags[d.switch]){
-        roomTransition = 40;
-        enterRoom(d.to, d.spawn.x, d.spawn.y);
-      }
-    }
+    if(Math.abs(dx) > 12 || Math.abs(dy) > 12) return;
+    if(!STATE.flags[d.switch]) return;
+    roomTransition = 40;
+    enterRoom(d.to, d.spawn.x, d.spawn.y);
   });
 }
 
@@ -186,5 +187,4 @@ function drawOverworld(){
   drawPlayer();
   drawHUD();
   drawTransition();
-  if(TEXTUI.visible) updateText();
 }

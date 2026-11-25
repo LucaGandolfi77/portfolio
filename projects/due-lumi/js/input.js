@@ -67,7 +67,11 @@ function onTouchStart(e){
   e.preventDefault();
   const t = e.changedTouches[0];
   touchId = t.identifier;
-  updateTouchDir(t);
+  const cv = document.getElementById('c');
+  const r = cv.getBoundingClientRect();
+  const dist = Math.hypot(t.clientX - (r.left + r.width/2), t.clientY - (r.top + r.height/2));
+  if(dist <= 12){ INPUT.a = true; pendingA = true; INPUT.ax = 0; INPUT.ay = 0; }
+  else updateTouchDir(t);
 }
 function onTouchMove(e){
   e.preventDefault();
@@ -78,7 +82,7 @@ function onTouchMove(e){
 function onTouchEnd(e){
   e.preventDefault();
   for(const t of e.changedTouches){
-    if(t.identifier===touchId){ touchId=null; INPUT.ax=0; INPUT.ay=0; }
+    if(t.identifier===touchId){ touchId=null; INPUT.ax=0; INPUT.ay=0; INPUT.a=false; }
   }
 }
 function updateTouchDir(t){
@@ -99,12 +103,17 @@ function updateTouchDir(t){
 /* merge touch into INPUT */
 function updateInput(){
   pollGamepad();
-  INPUT.ax = 0; INPUT.ay = 0;
-  if(INPUT.left) INPUT.ax = -1;
-  if(INPUT.right) INPUT.ax = 1;
-  if(INPUT.up) INPUT.ay = -1;
-  if(INPUT.down) INPUT.ay = 1;
+  let ax = INPUT.ax, ay = INPUT.ay;
+  if(INPUT.left) ax = -1;
+  if(INPUT.right) ax = 1;
+  if(INPUT.up) ay = -1;
+  if(INPUT.down) ay = 1;
+  INPUT.ax = ax; INPUT.ay = ay;
 }
 
-let prevA = false;
-function justPressedA(){ const v = INPUT.a && !prevA; prevA = INPUT.a; return v; }
+let prevA = false, pendingA = false;
+function justPressedA(){
+  const v = pendingA || (INPUT.a && !prevA);
+  prevA = INPUT.a; pendingA = false;
+  return v;
+}

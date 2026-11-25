@@ -4,12 +4,13 @@ let menuOpen = false;
 function toggleMenu(){
   menuOpen = !menuOpen;
   document.getElementById('menu').style.display = menuOpen ? 'block' : 'none';
+  document.body.classList.toggle('menu-open', menuOpen);
   if(menuOpen) updateMenu();
 }
 
 function updateMenu(){
   const el = document.getElementById('menuinner');
-  let h = '<h2>ventario</h2>';
+  let h = '<h2>Inventario</h2>';
   if(STATE.inventory.length === 0){
     h += '<div class="mi" style="color:#483d3b">(vuoto)</div>';
   } else {
