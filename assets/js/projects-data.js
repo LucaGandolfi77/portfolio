@@ -465,7 +465,7 @@ const PROJECTS_DATA = [
     "id": "book-writer",
     "title": "Book Writer",
     "description": "AI-powered novel generator — create full books chapter by chapter with Ollama, OpenAI or Google AI.",
-    "href": "book-writer/index.html",
+    "href": "projects/book-writer/index.html",
     "emoji": "📖",
     "badge": "AI Tool",
     "badgeColor": "#00d4ff"
