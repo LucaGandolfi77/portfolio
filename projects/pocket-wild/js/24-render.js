@@ -29,8 +29,12 @@ function render(){
   const t0x=Math.floor(camX/TILE),t0y=Math.floor(camY/TILE),t1x=Math.ceil((camX+CW)/TILE),t1y=Math.ceil((camY+CH)/TILE);
   for(let ty=t0y;ty<=t1y;ty++)for(let tx=t0x;tx<=t1x;tx++){
     const bm=biomeAt(tx,ty);
+    const rx=tx*TILE-camX,ry=ty*TILE-camY;
     ctx.fillStyle=sCols[bm];
-    ctx.fillRect(tx*TILE-camX,ty*TILE-camY,TILE+0.5,TILE+0.5);
+    ctx.fillRect(rx,ry,TILE+0.5,TILE+0.5);
+    /* leggera texture: due toni appena diversi, niente scacchiera */
+    ctx.fillStyle=hash2(tx,ty,SEED^0xabcd)<0.5?'rgba(255,255,255,.035)':'rgba(0,0,0,.045)';
+    ctx.fillRect(rx,ry,TILE+0.5,TILE+0.5);
     const o=tileObj(tx,ty);
     const px=tx*TILE+8-camX,py=ty*TILE+8-camY;
     if(o==='tree'){ctx.fillStyle='#1d4a2e';ctx.beginPath();ctx.arc(px,py,7,0,6.283);ctx.fill();ctx.fillStyle='#3f8f52';ctx.beginPath();ctx.arc(px,py-3,5,0,6.283);ctx.fill();}
@@ -39,20 +43,20 @@ function render(){
     else if(o==='bush'){ctx.fillStyle='#2f9e5a';ctx.beginPath();ctx.arc(px,py,5,0,6.283);ctx.fill();ctx.fillStyle='#52c96b';ctx.beginPath();ctx.arc(px-2,py-2,3,0,6.283);ctx.fill();}
     /* decorazioni biomi nuovi: fessure laviche e cristalli */
     const dec2=hash2(tx,ty,SEED^0xabc123);
-    if(bm==='volcano'&&dec2<0.07){
+    if(bm==='volcano'&&dec2<0.022){
       ctx.strokeStyle='#ff7a3f';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.moveTo(px-4,py+4);ctx.lineTo(px,py-2);ctx.lineTo(px+4,py+1);ctx.stroke();
-    }else if(bm==='crystal'&&dec2<0.1){
+    }else if(bm==='crystal'&&dec2<0.03){
       ctx.fillStyle='#a06bff';
       ctx.beginPath();ctx.moveTo(px,py-6);ctx.lineTo(px+4,py);ctx.lineTo(px,py+4);ctx.lineTo(px-4,py);ctx.closePath();ctx.fill();
       ctx.fillStyle='#c8b0ff';ctx.beginPath();ctx.moveTo(px,py-4);ctx.lineTo(px+2,py);ctx.lineTo(px,py+2);ctx.lineTo(px-2,py);ctx.closePath();ctx.fill();
     }
     /* decorazioni stagionali: fiori in primavera, foglie in autunno */
     const dec=hash2(tx,ty,SEED^0x5eed);
-    if(season===0&&dec<0.055&&!o&&bm!=='snow'&&bm!=='ocean'){
+    if(season===0&&dec<0.018&&!o&&bm!=='snow'&&bm!=='ocean'){
       ctx.fillStyle='#ffb8dc';ctx.beginPath();ctx.arc(px,py-2,2.4,0,6.283);ctx.fill();
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px,py-2,1,0,6.283);ctx.fill();
-    }else if(season===2&&dec<0.06&&!o&&(bm==='grass'||bm==='forest')){
+    }else if(season===2&&dec<0.02&&!o&&(bm==='grass'||bm==='forest')){
       ctx.fillStyle='#ff9e3f';ctx.beginPath();ctx.arc(px+1,py-1,1.8,0,6.283);ctx.fill();
       ctx.fillStyle='#e2573f';ctx.beginPath();ctx.arc(px-1,py+1,1.4,0,6.283);ctx.fill();
     }
@@ -126,11 +130,22 @@ function render(){
     ctx.beginPath();ctx.ellipse(p.x-camX,p.y-camY+26,10,4,0,0,6.283);ctx.fill();
   }
   const pBob=G.flying?Math.sin(performance.now()/180)*3:0;
-  drawPalShape(ctx,p.x-camX,p.y-camY+pBob,10,'#3ee6ff',0,p.dir,1.2);
-  ctx.strokeStyle='#fff';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(p.x-camX,p.y-camY+pBob);
-  ctx.lineTo(p.x+Math.cos(p.dir)*14-camX,p.y+Math.sin(p.dir)*14-camY+pBob);
+  const ppx=p.x-camX,ppy=p.y-camY+pBob;
+  /* il protagonista deve essere riconoscibile tra decine di Pal */
+  ctx.fillStyle='rgba(0,0,0,.32)';
+  ctx.beginPath();ctx.ellipse(ppx,ppy+13,11,4,0,0,6.283);ctx.fill();
+  const pulse=0.5+0.5*Math.sin(performance.now()/360);
+  ctx.strokeStyle='rgba(255,255,255,'+(0.35+0.35*pulse)+')';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(ppx,ppy,16+pulse*2,0,6.283);ctx.stroke();
+  ctx.fillStyle='#0b1020';ctx.beginPath();ctx.arc(ppx,ppy,14,0,6.283);ctx.fill();
+  drawPalShape(ctx,ppx,ppy,12,'#3ee6ff',0,p.dir,1.2);
+  ctx.strokeStyle='#fff';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(ppx,ppy);
+  ctx.lineTo(ppx+Math.cos(p.dir)*17,ppy+Math.sin(p.dir)*17);
   ctx.stroke();
+  ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillStyle='rgba(11,16,32,.8)';ctx.fillRect(ppx-15,ppy-32,30,12);
+  ctx.fillStyle='#fff';ctx.fillText('YOU',ppx,ppy-23);
   /* active pal */
   const ap=G.team[G.active];
   if(ap){

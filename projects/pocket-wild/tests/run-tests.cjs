@@ -614,11 +614,15 @@ console.log('— Fishing —');
 M.G.inv={rod:1,lure:0};M.G.fishing=null;
 M.G.player={x:100,y:100,dir:0,invT:0};
 /* posiziona vicino all'oceano: trova una riva */
-let shore=null;
+let shore=null,shoreDir=null;
 for(let ty=0;ty<200&&!shore;ty++)for(let tx=0;tx<200;tx++){
   if(M.biomeAt(tx,ty)==='ocean'){
     for(const[ox,oy]of[[1,0],[-1,0],[0,1],[0,-1]]){
-      if(M.biomeAt(tx+ox,ty+oy)!=='ocean'&&!M.solidAt((tx+ox)*M.TILE,(ty+oy)*M.TILE)){shore={x:(tx+ox)*M.TILE+8,y:(ty+oy)*M.TILE+8};break;}
+      if(M.biomeAt(tx+ox,ty+oy)!=='ocean'&&!M.solidAt((tx+ox)*M.TILE,(ty+oy)*M.TILE)){
+        shore={x:(tx+ox)*M.TILE+8,y:(ty+oy)*M.TILE+8};
+        shoreDir={x:-ox,y:-oy}; /* verso l'oceano, non nella direzione opposta */
+        break;
+      }
     }
   }
 }
@@ -665,7 +669,7 @@ M.G.player={x:shore.x,y:shore.y};
 M.G.team[0].x=M.G.player.x;M.G.team[0].y=M.G.player.y;
 let crossed=false;
 for(let i=0;i<200;i++){
-  M.G.stickVec={x:1,y:0};
+  M.G.stickVec=shoreDir||{x:1,y:0};
   M.stepSim(0.05);
   if(M.biomeAt(Math.floor(M.G.player.x/M.TILE),Math.floor(M.G.player.y/M.TILE))==='ocean'){crossed=true;break;}
 }

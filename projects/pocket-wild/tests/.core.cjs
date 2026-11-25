@@ -18,23 +18,37 @@ function setSeed(v){SEED=(v>>>0)||1;}
 function hash2(x,y,s){let h=s^Math.imul(x,374761393)^Math.imul(y,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return(h>>>0)/4294967296;}
 const BIOMES=['grass','forest','desert','snow','ocean','volcano','crystal'];
 const BIOME_COL={grass:'#3d8f4f',forest:'#2e6b3f',desert:'#c9a35f',snow:'#dbe6f2',ocean:'#2456a8',volcano:'#8a3a24',crystal:'#7a5ac8'};
+
+/* Valore di rumore interpolato: i biomi formano REGIONI continue invece di
+   cambiare ad ogni tile (che produceva una scacchiera illegibile). */
+function vnoise(x,y,salt,cell){
+  const gx=x/cell,gy=y/cell,x0=Math.floor(gx),y0=Math.floor(gy);
+  const fx=gx-x0,fy=gy-y0;
+  const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+  const a=hash2(x0,y0,salt),b=hash2(x0+1,y0,salt);
+  const c=hash2(x0,y0+1,salt),d=hash2(x0+1,y0+1,salt);
+  const top=a+(b-a)*sx,bot=c+(d-c)*sx;
+  return top+(bot-top)*sy;
+}
 function biomeAt(tx,ty){
-  const n=hash2(tx,ty,SEED);
-  if(n>0.86)return'ocean';
-  if(n<0.28)return'grass';
+  const n=vnoise(tx,ty,SEED,40)*0.97+hash2(tx,ty,SEED^0x77)*0.03;
+  if(n>0.66)return'ocean';
+  if(n<0.41)return'grass';
   if(n<0.46)return'forest';
-  if(n<0.62)return'desert';
-  if(n<0.74)return'snow';
-  if(n<0.82)return'volcano';
+  if(n<0.51)return'desert';
+  if(n<0.56)return'snow';
+  if(n<0.61)return'volcano';
   return'crystal';
 }
 function tileObj(tx,ty){
   if(biomeAt(tx,ty)==='ocean')return null;
+  /* Radure: le risorse crescono in piccoli gruppi, non su ogni tile. */
+  if(vnoise(tx,ty,SEED^0x1234,8)<0.42)return null;
   const n=hash2(tx,ty,SEED^0x9e3779b9);
-  if(n<0.09)return'tree';
-  if(n<0.15)return'rock';
-  if(n<0.21)return'berry';
-  if(n<0.26)return'bush';
+  if(n<0.04)return'tree';
+  if(n<0.06)return'rock';
+  if(n<0.08)return'berry';
+  if(n<0.10)return'bush';
   return null;
 }
 function solidAt(px,py){
@@ -1872,17 +1886,22 @@ function spawnEcho(){
   const pool=SPECIES.filter(s=>s.type==='void'||s.type==='fire');
   if(!pool.length)return;
   const sp=pool[Math.floor(Math.random()*pool.length)];
-  for(let t=0;t<40;t++){
-    const a=Math.random()*6.28,d=5+Math.random()*7;
-    const x=G.player.x+Math.cos(a)*d*TILE,y=G.player.y+Math.sin(a)*d*TILE;
-    if(solidAt(x,y)||biomeAt(Math.floor(x/TILE),Math.floor(y/TILE))==='ocean')continue;
-    const w=makeWild(sp,{x,y});
-    w.lv=8+Math.floor(Math.random()*6);scalePal(w,w.lv);
-    w.echo=true;w.fx=1;
-    G.seen[sp.id]=true;
-    G.wilds.push(w);
-    return;
+  /* cerca in anelli sempre più ampi: i biomi ora sono regioni continue,
+     quindi un ristretto cerchio casuale può cadere tutto nell'oceano. */
+  let spot=null;
+  for(let ring=2;ring<=14&&!spot;ring++){
+    for(let t=0;t<12;t++){
+      const a=Math.random()*6.28;
+      const x=G.player.x+Math.cos(a)*ring*TILE,y=G.player.y+Math.sin(a)*ring*TILE;
+      if(!solidAt(x,y)&&biomeAt(Math.floor(x/TILE),Math.floor(y/TILE))!=='ocean'){spot={x,y};break;}
+    }
   }
+  if(!spot)spot={x:G.player.x,y:G.player.y};
+  const w=makeWild(sp,spot);
+  w.lv=8+Math.floor(Math.random()*6);scalePal(w,w.lv);
+  w.echo=true;w.fx=1;
+  G.seen[sp.id]=true;
+  G.wilds.push(w);
 }
 function updateEvent(dt){
   if(G.event){
@@ -2509,8 +2528,12 @@ function render(){
   const t0x=Math.floor(camX/TILE),t0y=Math.floor(camY/TILE),t1x=Math.ceil((camX+CW)/TILE),t1y=Math.ceil((camY+CH)/TILE);
   for(let ty=t0y;ty<=t1y;ty++)for(let tx=t0x;tx<=t1x;tx++){
     const bm=biomeAt(tx,ty);
+    const rx=tx*TILE-camX,ry=ty*TILE-camY;
     ctx.fillStyle=sCols[bm];
-    ctx.fillRect(tx*TILE-camX,ty*TILE-camY,TILE+0.5,TILE+0.5);
+    ctx.fillRect(rx,ry,TILE+0.5,TILE+0.5);
+    /* leggera texture: due toni appena diversi, niente scacchiera */
+    ctx.fillStyle=hash2(tx,ty,SEED^0xabcd)<0.5?'rgba(255,255,255,.035)':'rgba(0,0,0,.045)';
+    ctx.fillRect(rx,ry,TILE+0.5,TILE+0.5);
     const o=tileObj(tx,ty);
     const px=tx*TILE+8-camX,py=ty*TILE+8-camY;
     if(o==='tree'){ctx.fillStyle='#1d4a2e';ctx.beginPath();ctx.arc(px,py,7,0,6.283);ctx.fill();ctx.fillStyle='#3f8f52';ctx.beginPath();ctx.arc(px,py-3,5,0,6.283);ctx.fill();}
@@ -2519,20 +2542,20 @@ function render(){
     else if(o==='bush'){ctx.fillStyle='#2f9e5a';ctx.beginPath();ctx.arc(px,py,5,0,6.283);ctx.fill();ctx.fillStyle='#52c96b';ctx.beginPath();ctx.arc(px-2,py-2,3,0,6.283);ctx.fill();}
     /* decorazioni biomi nuovi: fessure laviche e cristalli */
     const dec2=hash2(tx,ty,SEED^0xabc123);
-    if(bm==='volcano'&&dec2<0.07){
+    if(bm==='volcano'&&dec2<0.022){
       ctx.strokeStyle='#ff7a3f';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.moveTo(px-4,py+4);ctx.lineTo(px,py-2);ctx.lineTo(px+4,py+1);ctx.stroke();
-    }else if(bm==='crystal'&&dec2<0.1){
+    }else if(bm==='crystal'&&dec2<0.03){
       ctx.fillStyle='#a06bff';
       ctx.beginPath();ctx.moveTo(px,py-6);ctx.lineTo(px+4,py);ctx.lineTo(px,py+4);ctx.lineTo(px-4,py);ctx.closePath();ctx.fill();
       ctx.fillStyle='#c8b0ff';ctx.beginPath();ctx.moveTo(px,py-4);ctx.lineTo(px+2,py);ctx.lineTo(px,py+2);ctx.lineTo(px-2,py);ctx.closePath();ctx.fill();
     }
     /* decorazioni stagionali: fiori in primavera, foglie in autunno */
     const dec=hash2(tx,ty,SEED^0x5eed);
-    if(season===0&&dec<0.055&&!o&&bm!=='snow'&&bm!=='ocean'){
+    if(season===0&&dec<0.018&&!o&&bm!=='snow'&&bm!=='ocean'){
       ctx.fillStyle='#ffb8dc';ctx.beginPath();ctx.arc(px,py-2,2.4,0,6.283);ctx.fill();
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px,py-2,1,0,6.283);ctx.fill();
-    }else if(season===2&&dec<0.06&&!o&&(bm==='grass'||bm==='forest')){
+    }else if(season===2&&dec<0.02&&!o&&(bm==='grass'||bm==='forest')){
       ctx.fillStyle='#ff9e3f';ctx.beginPath();ctx.arc(px+1,py-1,1.8,0,6.283);ctx.fill();
       ctx.fillStyle='#e2573f';ctx.beginPath();ctx.arc(px-1,py+1,1.4,0,6.283);ctx.fill();
     }
@@ -2606,11 +2629,22 @@ function render(){
     ctx.beginPath();ctx.ellipse(p.x-camX,p.y-camY+26,10,4,0,0,6.283);ctx.fill();
   }
   const pBob=G.flying?Math.sin(performance.now()/180)*3:0;
-  drawPalShape(ctx,p.x-camX,p.y-camY+pBob,10,'#3ee6ff',0,p.dir,1.2);
-  ctx.strokeStyle='#fff';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(p.x-camX,p.y-camY+pBob);
-  ctx.lineTo(p.x+Math.cos(p.dir)*14-camX,p.y+Math.sin(p.dir)*14-camY+pBob);
+  const ppx=p.x-camX,ppy=p.y-camY+pBob;
+  /* il protagonista deve essere riconoscibile tra decine di Pal */
+  ctx.fillStyle='rgba(0,0,0,.32)';
+  ctx.beginPath();ctx.ellipse(ppx,ppy+13,11,4,0,0,6.283);ctx.fill();
+  const pulse=0.5+0.5*Math.sin(performance.now()/360);
+  ctx.strokeStyle='rgba(255,255,255,'+(0.35+0.35*pulse)+')';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(ppx,ppy,16+pulse*2,0,6.283);ctx.stroke();
+  ctx.fillStyle='#0b1020';ctx.beginPath();ctx.arc(ppx,ppy,14,0,6.283);ctx.fill();
+  drawPalShape(ctx,ppx,ppy,12,'#3ee6ff',0,p.dir,1.2);
+  ctx.strokeStyle='#fff';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(ppx,ppy);
+  ctx.lineTo(ppx+Math.cos(p.dir)*17,ppy+Math.sin(p.dir)*17);
   ctx.stroke();
+  ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillStyle='rgba(11,16,32,.8)';ctx.fillRect(ppx-15,ppy-32,30,12);
+  ctx.fillStyle='#fff';ctx.fillText('YOU',ppx,ppy-23);
   /* active pal */
   const ap=G.team[G.active];
   if(ap){

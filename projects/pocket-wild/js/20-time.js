@@ -11,17 +11,22 @@ function spawnEcho(){
   const pool=SPECIES.filter(s=>s.type==='void'||s.type==='fire');
   if(!pool.length)return;
   const sp=pool[Math.floor(Math.random()*pool.length)];
-  for(let t=0;t<40;t++){
-    const a=Math.random()*6.28,d=5+Math.random()*7;
-    const x=G.player.x+Math.cos(a)*d*TILE,y=G.player.y+Math.sin(a)*d*TILE;
-    if(solidAt(x,y)||biomeAt(Math.floor(x/TILE),Math.floor(y/TILE))==='ocean')continue;
-    const w=makeWild(sp,{x,y});
-    w.lv=8+Math.floor(Math.random()*6);scalePal(w,w.lv);
-    w.echo=true;w.fx=1;
-    G.seen[sp.id]=true;
-    G.wilds.push(w);
-    return;
+  /* cerca in anelli sempre più ampi: i biomi ora sono regioni continue,
+     quindi un ristretto cerchio casuale può cadere tutto nell'oceano. */
+  let spot=null;
+  for(let ring=2;ring<=14&&!spot;ring++){
+    for(let t=0;t<12;t++){
+      const a=Math.random()*6.28;
+      const x=G.player.x+Math.cos(a)*ring*TILE,y=G.player.y+Math.sin(a)*ring*TILE;
+      if(!solidAt(x,y)&&biomeAt(Math.floor(x/TILE),Math.floor(y/TILE))!=='ocean'){spot={x,y};break;}
+    }
   }
+  if(!spot)spot={x:G.player.x,y:G.player.y};
+  const w=makeWild(sp,spot);
+  w.lv=8+Math.floor(Math.random()*6);scalePal(w,w.lv);
+  w.echo=true;w.fx=1;
+  G.seen[sp.id]=true;
+  G.wilds.push(w);
 }
 function updateEvent(dt){
   if(G.event){
