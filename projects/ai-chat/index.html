@@ -125,19 +125,29 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
 
             try {
-                const res = await fetch('https://text.pollinations.ai/', {
+                const res = await fetch('https://text.pollinations.ai/openai', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ messages: history, seed: Math.floor(Date.now() / 1000) % 2147483647, model: 'openai' })
                 });
                 typing.remove();
                 if (!res.ok) {
-                    addMsg('⚠️ Errore ' + res.status + ' — riprova tra qualche secondo.', 'err');
+                    const retryAfter = res.headers.get('Retry-After');
+                    const retryText = retryAfter && /^\d+$/.test(retryAfter)
+                        ? ' Riprova tra ' + retryAfter + ' secondi.'
+                        : ' Riprova tra qualche secondo.';
+                    addMsg('⚠️ Errore ' + res.status + '.' + retryText, 'err');
                     history.pop();
                 } else {
-                    const reply = (await res.text()).trim() || '…';
-                    history.push({ role: 'assistant', content: reply });
-                    addMsg(reply, 'bot');
+                    const data = await res.json().catch(() => null);
+                    const reply = data?.choices?.[0]?.message?.content?.trim();
+                    if (!reply) {
+                        addMsg('⚠️ Risposta AI non valida. Riprova.', 'err');
+                        history.pop();
+                    } else {
+                        history.push({ role: 'assistant', content: reply });
+                        addMsg(reply, 'bot');
+                    }
                 }
             } catch (e) {
                 typing.remove();
