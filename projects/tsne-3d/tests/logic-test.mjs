@@ -176,7 +176,7 @@ run('catalog and root SW point to the new app', () => {
   ok(data.includes('"href": "projects/tsne-3d/index.html"'));
   ok(!data.includes('projects/tsne-3d/legacy-tsne-3d.html"'));
   const root = readFileSync(join(ROOT, '..', '..', 'sw.js'), 'utf8');
-  ok(root.includes("cacheName.indexOf('pf-tsne-') === 0"));
+  ok((root.includes("name.startsWith('portfolio-')") && root.includes('isNestedApp')));
 });
 
 for (const [n, fn] of cases) { total++; if (test(n, fn)) passed++; }

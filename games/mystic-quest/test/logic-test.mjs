@@ -151,7 +151,7 @@ run('catalog and root SW updated', () => {
   ok(catalog.includes("'games/mystic-quest/index.html'"));
   ok(catalog.includes('15 real stars'));
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
-  ok(sw.includes("cacheName.indexOf('pf-mystic-') === 0"));
+  ok((sw.includes("name.startsWith('portfolio-')") && sw.includes('isNestedApp')));
 });
 run('i18n keys used in JS all exist', () => {
   for (const f of ['main.js','ui.js','render.js','input.js','audio.js']) {

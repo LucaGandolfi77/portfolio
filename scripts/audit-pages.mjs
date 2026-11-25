@@ -15,14 +15,29 @@ const add = (level, file, code, message) => level.push(`${file}::${code}::${mess
 
 const read = rel => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const exists = rel => fs.existsSync(path.join(ROOT, rel));
-const ROOT_CATALOGUED = new Set(['projects/verso-il-17']);
+
+/* App compilate da scripts/build-site.mjs ("portfolio" nel package.json):
+   il loro output esiste solo in _site/, quindi i path pubblicati non si
+   controllano qui (li verifica la build stessa). */
+const BUILT = [];
+for (const section of ['games', 'projects']) {
+  for (const entry of fs.readdirSync(path.join(ROOT, section), { withFileTypes:true })) {
+    const pkg = path.join(ROOT, section, entry.name, 'package.json');
+    if (!entry.isDirectory() || !fs.existsSync(pkg)) continue;
+    const cfg = JSON.parse(fs.readFileSync(pkg, 'utf8')).portfolio;
+    if (cfg && cfg.publishAt) BUILT.push({ dir: `${section}/${entry.name}`, publishAt: cfg.publishAt });
+  }
+}
+const ROOT_CATALOGUED = new Set(BUILT.map(b => b.dir));
+const isBuilt = href => BUILT.some(b => href === b.publishAt || href.startsWith(b.publishAt + '/'));
 
 /* ---- catalog paths ---- */
 const catalogSources = ['assets/js/catalog-data.js', 'assets/js/projects-data.js'];
 const catalogText = catalogSources.map(read).join('\n');
-const hrefs = [...new Set([...catalogText.matchAll(/['"]((?:games|projects)\/[^'"]+)['"]/g)].map(m => m[1]))].sort();
+const hrefs = [...new Set([...catalogText.matchAll(/['"]((?:games|projects|verso-il-17)\/[^'"]+)['"]/g)].map(m => m[1]))].sort();
 
 for (const href of hrefs) {
+  if (isBuilt(href)) continue;
   let target = path.join(ROOT, href);
   if (fs.existsSync(target) && fs.statSync(target).isDirectory()) target = path.join(target, 'index.html');
   if (!fs.existsSync(target)) add(errors, href, 'catalog-path', 'catalog path does not resolve to an HTML file');
@@ -97,6 +112,32 @@ for (const section of ['games', 'projects']) {
       add(errors, rel, 'sw-cross-app-cleanup', 'activate deletes caches of other apps on the same origin');
     }
     if (/serviceWorker\.register\(\s*['"]\//.test(src)) add(errors, rel, 'sw-absolute', 'absolute SW path breaks on GitHub Pages');
+  }
+}
+
+/* ---- web app manifests ----
+ * JSON valido, start_url/scope relativi (un "/" punta alla radice del dominio
+ * e rompe l'installazione sotto /portfolio/), almeno un'icona per installarla.
+ */
+for (const section of ['games', 'projects']) {
+  for (const entry of fs.readdirSync(path.join(ROOT, section), { withFileTypes:true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
+    const dir = path.join(ROOT, section, entry.name);
+    for (const file of fs.readdirSync(dir)) {
+      if (!/^(manifest\.json|[\w.-]*\.webmanifest)$/.test(file) || file.startsWith('legacy-')) continue;
+      const rel = `${section}/${entry.name}/${file}`;
+      let m;
+      try { m = JSON.parse(read(rel)); } catch (e) { add(errors, rel, 'manifest-json', `invalid JSON: ${e.message}`); continue; }
+      for (const key of ['start_url', 'scope', 'id']) {
+        if (typeof m[key] === 'string' && m[key].startsWith('/')) add(errors, rel, 'manifest-absolute', `${key} "${m[key]}" is root-relative`);
+      }
+      const icons = Array.isArray(m.icons) ? m.icons : [];
+      if (!icons.length) add(warnings, rel, 'manifest-icons', 'no icons: the app is not installable');
+      for (const icon of icons) {
+        if (!icon.src || EXTERNAL.test(icon.src)) continue;
+        if (!fs.existsSync(path.resolve(dir, icon.src.split('?')[0]))) add(errors, rel, 'manifest-icon-missing', icon.src);
+      }
+    }
   }
 }
 

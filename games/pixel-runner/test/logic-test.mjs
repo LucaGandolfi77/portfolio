@@ -178,7 +178,7 @@ run('catalog and root SW updated', () => {
   ok(catalog.includes("'games/pixel-runner/index.html'"));
   ok(catalog.includes('six power-ups'));
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
-  ok(sw.includes("cacheName.indexOf('pf-pixel-runner-') === 0"));
+  ok((sw.includes("name.startsWith('portfolio-')") && sw.includes('isNestedApp')));
 });
 
 summary(passed, total);

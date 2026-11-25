@@ -23,99 +23,34 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     steps:
+      # Storia completa ma senza blob: serve a `git log` per il <lastmod> della
+      # sitemap, senza scaricare i contenuti delle versioni passate.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
 
-      # ---------------------------------------------------------------- PWA
-      # La PWA "Verso il 17 ottobre" è un progetto Vite: va compilata prima di
-      # pubblicare, perché `dist/` è in .gitignore e non esiste nel repository.
-      # La build finisce in /verso-il-17/ (radice della repo), quindi l'app sarà
-      # raggiungibile su https://<utente>.github.io/<repo>/verso-il-17/
-      # Node 22 è il minimo per due motivi:
-      #  - Vite 8 richiede ^20.19 || >=22.12
-      #  - i test usano `node --experimental-strip-types`, disponibile da Node 22.6
-      # Con Node 20 il passo dei test fallirebbe e bloccherebbe il deploy del sito.
+      # Node 22: Vite 8 richiede ^20.19 || >=22.12 e i test di verso-il-17
+      # usano `node --experimental-strip-types` (Node 22.6+).
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: projects/verso-il-17/package-lock.json
+          cache-dependency-path: |
+            projects/verso-il-17/package-lock.json
+            games/coverage-galaxy/package-lock.json
 
-      - name: Installa le dipendenze della PWA
-        working-directory: projects/verso-il-17
-        run: npm ci
-
-      - name: Test della PWA (bloccano il deploy se rossi)
-        working-directory: projects/verso-il-17
-        run: npm test
-
-      - name: Build della PWA
-        working-directory: projects/verso-il-17
-        # Il nome della repo viene letto da GitHub: se la rinomini, il percorso
-        # base si aggiorna da solo e l'app continua a funzionare.
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/verso-il-17/
-        run: npm run build:pages
-
-      # node_modules non deve finire nell'artefatto pubblicato: sono centinaia
-      # di MB e rallenterebbero (o farebbero fallire) il deploy.
-      - name: Rimuove node_modules dall'artefatto
-        run: rm -rf projects/verso-il-17/node_modules projects/verso-il-17/dist
-      # -------------------------------------------------------------------
-
-      # Italy Flight Sim: builda l'app in dist/ per verificare che ogni asset
-      # sia risolto, poi versiona il service worker pubblicato con lo SHA del
-      # commit (così gli iPhone dei visitatori ricevono gli aggiornamenti).
-      - name: Build Italy Flight Sim
+      # Costruisce _site/: solo i file del sito tracciati in git, le app Vite
+      # compilate (test inclusi), i service worker versionati con lo SHA del
+      # commit e la sitemap completa. labs/, docs/, tooling e segreti restano
+      # fuori. Il nome della repo arriva da GITHUB_REPOSITORY, quindi i base
+      # path seguono un eventuale rename.
+      - name: Build site
         env:
           BUILD_ID: ${{ github.sha }}
-        run: |
-          node games/italy-flight-sim/test/logic-test.mjs
-          node games/italy-flight-sim/build.mjs
-          rm -rf games/italy-flight-sim/dist
-          sed -i.bak "s/italy-flight-sim-v1/italy-flight-sim-${GITHUB_SHA}/g" games/italy-flight-sim/sw.js && rm -f games/italy-flight-sim/sw.js.bak
-
-      - name: Build Italy Glight Sim
-        env:
-          BUILD_ID: ${{ github.sha }}
-        run: |
-          node games/italy-glight-sim/test/logic-test.mjs
-          node games/italy-glight-sim/build.mjs
-          rm -rf games/italy-glight-sim/dist
-          sed -i.bak "s/italy-glight-sim-v1/italy-glight-sim-${GITHUB_SHA}/g" games/italy-glight-sim/sw.js && rm -f games/italy-glight-sim/sw.js.bak
-
-      - name: Build Italy 2D Flight Sim
-        env:
-          BUILD_ID: ${{ github.sha }}
-        run: |
-          node games/italy-2d-flight-sim/test/logic-test.mjs
-          node games/italy-2d-flight-sim/build.mjs
-          rm -rf games/italy-2d-flight-sim/dist
-          sed -i.bak "s/italy-2d-flight-sim-v1/italy-2d-flight-sim-${GITHUB_SHA}/g" games/italy-2d-flight-sim/sw.js && rm -f games/italy-2d-flight-sim/sw.js.bak
-
-      - name: Build Italy 3D Flight Sim
-        env:
-          BUILD_ID: ${{ github.sha }}
-        run: |
-          node games/italy-3d-flight-sim/test/logic-test.mjs
-          node games/italy-3d-flight-sim/build.mjs
-          rm -rf games/italy-3d-flight-sim/dist
-          sed -i.bak "s/italy-3d-flight-sim-v3/italy-3d-flight-sim-${GITHUB_SHA}/g" games/italy-3d-flight-sim/sw.js && rm -f games/italy-3d-flight-sim/sw.js.bak
-
-      # Il service worker usava una versione di cache fissa ('portfolio-v9'):
-      # finche' nessuno la toccava, i visitatori di ritorno continuavano a
-      # eseguire i bundle della volta in cui erano arrivati sul sito.
-      # Sostituendo il placeholder con il commit SHA, ogni deploy produce una
-      # cache nuova e le vecchie vengono eliminate all'evento 'activate'.
-      - name: Versiona il service worker
-        run: sed -i.bak "s/__BUILD_ID__/${GITHUB_SHA}/g" sw.js && rm -f sw.js.bak
-
-      # Il tooling di qualità non fa parte del sito pubblicato: vive in
-      # tools/quality (test, Playwright, baseline audit) e viene rimosso
-      # dalla copia usata per l'artefatto.
-      - name: Rimuove il tooling qualità dall'artefatto
-        run: rm -rf tools
+        run: node scripts/build-site.mjs
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -123,7 +58,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: _site
 
   deploy:
     environment:

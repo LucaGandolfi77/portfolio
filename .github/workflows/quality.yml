@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   static-and-unit:
-    name: Static audit + unit/DOM tests
+    name: Syntax, unit tests, audits
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,76 +21,18 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Syntax check
-        run: |
-          node --check projects/qr-studio/js/app.js
-          node --check projects/qr-studio/js/forms.js
-          node --check projects/qr-studio/js/i18n.js
-          node --check projects/qr-studio/js/qr-logic.js
-          node --check projects/qr-studio/js/qr-render.js
-          node --check projects/qr-studio/js/scanner.js
-          node --check projects/qr-studio/js/storage.js
-          node --check projects/qr-studio/sw.js
-          node --check projects/atlas/js/app.js
-          node --check projects/atlas/js/api.js
-          node --check projects/atlas/js/geo.js
-          node --check projects/atlas/js/i18n.js
-          node --check projects/atlas/js/storage.js
-          node --check projects/atlas/sw.js
-          node --check projects/vision-lab/js/app.js
-          node --check projects/vision-lab/js/vision.js
-          node --check projects/vision-lab/js/storage.js
-          node --check projects/vision-lab/js/i18n.js
-          node --check projects/vision-lab/sw.js
-          node --check projects/text-lab/js/app.js
-          node --check projects/text-lab/js/text.js
-          node --check projects/text-lab/js/storage.js
-          node --check projects/text-lab/js/i18n.js
-          node --check projects/text-lab/sw.js
-          for f in projects/cello-browser/pages.js projects/cello-browser/js/core/*.js projects/cello-browser/js/apps/*.js projects/cello-browser/js/*.js projects/cello-browser/sw.js; do node --check "$f"; done
-          for f in projects/due-lumi/js/*.js; do node --check "$f"; done
-          node --check scripts/audit-projects.mjs
-          node --check scripts/audit-pages.mjs
+      # Nessuna lista di file da mantenere a mano: gli script scoprono da soli
+      # ogni JS tracciato e ogni test(s)/ delle app in projects/ e games/.
+      - name: Syntax check (all tracked JS)
+        run: node scripts/check-syntax.mjs
 
-      - name: QR Studio + Atlas tests (logic, raster, DOM, structure)
-        run: node --test projects/qr-studio/tests/*.test.mjs projects/atlas/tests/*.test.mjs projects/vision-lab/tests/*.test.mjs projects/text-lab/tests/*.test.mjs
-
-      - name: Italy Flight Sim (syntax + logic tests)
-        run: |
-          for f in games/italy-flight-sim/js/*.js games/italy-flight-sim/build.mjs games/italy-flight-sim/preview.mjs games/italy-flight-sim/sw.js; do node --check "$f"; done
-          node games/italy-flight-sim/test/logic-test.mjs
-
-      - name: Italy Glight Sim (syntax + logic tests)
-        run: |
-          for f in games/italy-glight-sim/js/*.js games/italy-glight-sim/build.mjs games/italy-glight-sim/preview.mjs games/italy-glight-sim/sw.js; do node --check "$f"; done
-          node games/italy-glight-sim/test/logic-test.mjs
-
-      - name: Italy 2D Flight Sim (syntax + logic tests)
-        run: |
-          for f in games/italy-2d-flight-sim/js/*.js games/italy-2d-flight-sim/build.mjs games/italy-2d-flight-sim/preview.mjs games/italy-2d-flight-sim/sw.js; do node --check "$f"; done
-          node games/italy-2d-flight-sim/test/logic-test.mjs
-
-      - name: Italy 3D Flight Sim (syntax, logic, geodata)
-        run: |
-          for f in games/italy-3d-flight-sim/js/*.js games/italy-3d-flight-sim/build.mjs games/italy-3d-flight-sim/preview.mjs games/italy-3d-flight-sim/data/*.mjs games/italy-3d-flight-sim/sw.js; do node --check "$f"; done
-          node games/italy-3d-flight-sim/test/logic-test.mjs
-          node games/italy-3d-flight-sim/build.mjs
-          rm -rf games/italy-3d-flight-sim/dist
-
-      - name: NBA Broadcast Simulator (syntax + logic tests)
-        run: |
-          for f in projects/nba_simulator/js/*.js projects/nba_simulator/js/*/*.js projects/nba_simulator/sw.js; do node --check "$f"; done
-          node --test projects/nba_simulator/test/logic-test.mjs
-
-      - name: CelloOS (entry point + logic tests)
-        run: |
-          node projects/cello-browser/test/structure-test.mjs
-          node projects/cello-browser/test/logic-test.mjs
+      - name: Unit / logic tests (every app)
+        run: node scripts/run-tests.mjs
 
       - name: Projects audit (no new issues vs baseline)
         run: node scripts/audit-projects.mjs --baseline=tools/quality/audit-baseline.json
 
-      - name: GitHub Pages reachability audit
+      - name: GitHub Pages audit (catalog, manifests, service workers)
         run: node scripts/audit-pages.mjs --json
 
       - name: Upload health report
@@ -125,7 +67,7 @@ jobs:
         working-directory: tools/quality
         run: npx playwright install --with-deps chromium
 
-      - name: Run QR Studio E2E
+      - name: Run E2E
         working-directory: tools/quality
         env:
           CI: 'true'

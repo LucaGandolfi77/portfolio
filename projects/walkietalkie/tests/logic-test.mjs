@@ -105,7 +105,7 @@ run('catalog and root SW are updated', () => {
   ok(data.includes('"badge": "P2P Voice"'));
   ok(data.includes('mesh audio reale'));
   const root = readFileSync(join(ROOT, '..', '..', 'sw.js'), 'utf8');
-  ok(root.includes("cacheName.indexOf('pf-walkie-') === 0"));
+  ok((root.includes("name.startsWith('portfolio-')") && root.includes('isNestedApp')));
 });
 run('i18n keys used in JS all exist', () => {
   for (const f of ['main.js','ui.js']) {

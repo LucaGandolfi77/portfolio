@@ -295,7 +295,8 @@ test('catalogo, redirect legacy e service worker root', () => {
   assert.match(redirect, /name="robots" content="noindex, follow"/);
   assert.doesNotMatch(redirect, /https?:\/\/(?:unpkg|cdn|cdnjs)/);
 
-  assert.match(read('../../sw.js'), /pf-text-lab-/);
+  assert.match(read('../../sw.js'), /name\.startsWith\('portfolio-'\)/);
+  assert.match(read('../../sw.js'), /isNestedApp/);
 });
 
 test('sicurezza: nessun CDN e storage con prefisso', () => {

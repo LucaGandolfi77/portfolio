@@ -439,6 +439,7 @@ test('catalogo e redirect: una sola voce QR Studio, nessun doppione legacy', () 
   }
 
   const rootWorker = read('../../sw.js');
-  assert.match(rootWorker, /pf-qr-studio-/);
+  assert.match(rootWorker, /name\.startsWith\('portfolio-'\)/);
+  assert.match(rootWorker, /isNestedApp/);
 });
 

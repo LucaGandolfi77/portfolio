@@ -300,7 +300,8 @@ test('catalogo, redirect legacy e service worker root', () => {
     assert.doesNotMatch(source, /https?:\/\/(?:unpkg|cdn|cdnjs)/);
   }
 
-  assert.match(read('../../sw.js'), /pf-vision-lab-/);
+  assert.match(read('../../sw.js'), /name\.startsWith\('portfolio-'\)/);
+  assert.match(read('../../sw.js'), /isNestedApp/);
 });
 
 test('sicurezza: nessun CDN e storage con prefisso', () => {

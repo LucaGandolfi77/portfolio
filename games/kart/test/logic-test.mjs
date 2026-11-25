@@ -165,7 +165,7 @@ run('catalog and root SW updated', () => {
   ok(catalog.includes("'games/kart/index.html'"));
   ok(catalog.includes('12 karts'));
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
-  ok(sw.includes("cacheName.indexOf('pf-kart-') === 0"));
+  ok((sw.includes("name.startsWith('portfolio-')") && sw.includes('isNestedApp')));
 });
 run('i18n keys used in JS all exist', () => {
   for (const f of ['main.js','ui.js','render.js','input.js','audio.js']) {

@@ -42,7 +42,7 @@ await writeFile(htmlPath, html.replaceAll('../../top_buttons.js', './top_buttons
 
 const swPath = join(DIST, 'sw.js');
 let sw = await readFile(swPath, 'utf8');
-sw = sw.replace('italy-2d-flight-sim-v1', `italy-2d-flight-sim-${BUILD_ID}`)
+sw = sw.replace('italy-2d-flight-sim-__BUILD_ID__', `italy-2d-flight-sim-${BUILD_ID}`)
   .replaceAll("'../../top_buttons.js'", "'./top_buttons.js'")
   .replaceAll("'../_kit/", "'./_kit/");
 await writeFile(swPath, sw);
