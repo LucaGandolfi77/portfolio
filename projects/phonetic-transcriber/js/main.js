@@ -186,7 +186,7 @@ function bindEvents() {
       $('liveBtn').textContent = t('action.start');
       if (!blob) { setStatus($('liveStatus'), '', t('hint.live')); return; }
       try {
-        const samples = await prepareSamples(blob, $('liveWave'), $('liveSpectrum'), 'liveStatus');
+        const samples = await prepareSamples(blob, $('liveWave'), $('liveSpectrum'), $('liveStatus'));
         await transcribe(samples, $('liveOut'), $('liveStatus'), 'live');
       } catch (error) { setStatus($('liveStatus'), '', error.message); }
       return;
@@ -211,7 +211,7 @@ function bindEvents() {
     if (!currentFile) return;
     $('trBtn').disabled = true;
     try {
-      const samples = await prepareSamples(currentFile, $('fileWave'), $('fileSpectrum'), 'fileStatus');
+      const samples = await prepareSamples(currentFile, $('fileWave'), $('fileSpectrum'), $('fileStatus'));
       await transcribe(samples, $('fileOut'), $('fileStatus'), 'file');
     } catch (error) { setStatus($('fileStatus'), '', error.message); }
     $('trBtn').disabled = false;
@@ -260,7 +260,7 @@ async function loadFile(file) {
   $('trBtn').disabled = false;
   setStatus($('fileStatus'), '', t('hint.file'));
   try {
-    const samples = await prepareSamples(file, $('fileWave'), $('fileSpectrum'), 'fileStatus');
+    const samples = await prepareSamples(file, $('fileWave'), $('fileSpectrum'), $('fileStatus'));
     drawWave($('fileWave'), samples);
   } catch (error) { setStatus($('fileStatus'), '', error.message); }
 }

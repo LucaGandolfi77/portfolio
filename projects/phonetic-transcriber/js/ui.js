@@ -107,6 +107,8 @@ export function renderHistory(element, list, t, { onCopy, onDelete }) {
 }
 
 export function setStatus(element, kind, message) {
+  // Accetta anche un id: passare una stringa qui causava "Cannot create property 'className' on string".
+  if (typeof element === 'string') element = document.getElementById(element);
   if (!element) return;
   element.className = 'status ' + (kind || '');
   const label = element.querySelector('span');
