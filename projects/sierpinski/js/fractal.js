@@ -147,8 +147,22 @@ export function dragon(iters, turn = 90) {
   return { type: 'path', points: out, closed: false, count: out.length };
 }
 
+// Quanti elementi produce ogni forma per livello di profondita'. Il numero di
+// elementi cresce come rami^profondita': a profondita' 12 il triangolo di
+// Sierpinski genera mezzo milione di triangoli e il tappeto a 7 ne genera due
+// milioni, abbastanza da far crashare il browser (soprattutto su Mac/Retina).
+const BRANCH = { tri: 3, carpet: 8, vicsek: 5, dust: 4, tsquare: 4, koch: 4, htree: 4, ftree: 2 };
+export const MAX_ITEMS = 60000;
+
+export function fitDepth(branch, depth, max = MAX_ITEMS) {
+  let d = Math.max(0, depth | 0);
+  while (d > 0 && Math.pow(branch, d) > max) d--;
+  return d;
+}
+
 export function build(formId, params, seed = 12345) {
-  const P = params || {};
+  const P = { ...(params || {}) };
+  if (BRANCH[formId] && P.depth != null) P.depth = fitDepth(BRANCH[formId], P.depth);
   switch (formId) {
     case 'tri': return trianglePath(P.depth || 8, { ...P, seed });
     case 'carpet': return squares('carpet', P.depth || 5, P);

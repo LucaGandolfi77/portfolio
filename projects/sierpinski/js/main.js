@@ -24,9 +24,15 @@ let previewStart = performance.now(), reveal = 1;
 let pointers = new Map(), lastPinch = null, lastTap = 0, lastTapXY = null;
 
 function palette() { return PALETTES[settings.palette] || PALETTES.neon; }
+// La geometria si ricalcola solo quando cambiano forma, parametri o seme:
+// prima veniva rigenerata a ogni frame (60 volte al secondo, e due volte per
+// frame contando l'HUD), con milioni di oggetti allocati di continuo.
+let geoKey = '', geoVal = null;
 function geometry() {
   if (form.id === 'chaos') return null;
-  return build(form.id, params, seed);
+  const key = form.id + '|' + seed + '|' + JSON.stringify(params);
+  if (key !== geoKey) { geoKey = key; geoVal = build(form.id, params, seed); }
+  return geoVal;
 }
 function interact() { lastInteract = performance.now(); needsDraw = true; }
 
