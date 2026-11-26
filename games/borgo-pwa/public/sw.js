@@ -19,7 +19,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) =>
+        /* Only this game's old caches: every portfolio app shares the origin. */
+        Promise.all(keys.filter((key) => key !== CACHE && key.startsWith('borgo-san-donnino-')).map((key) => caches.delete(key)))
+      )
       .then(() => self.clients.claim())
   );
 });
