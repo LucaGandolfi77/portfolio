@@ -3,6 +3,15 @@
 
 const PROJECTS_DATA = [
   {
+    "id": "la-corona-e-la-testa-v2",
+    "title": "La Corona e la Testa 3D",
+    "description": "La leggenda di San Donnino rifatta in 3D con Three.js: 17 minuti girati dal vivo nel browser, con luci e ombre, nebbia e pioggia, cavalieri, il ponte romano sullo Stirone e il Duomo di Fidenza. La regia stacca da sola tra chi parla; dialoghi in italiano e inglese, musica originale.",
+    "href": "projects/la-corona-e-la-testa-v2/",
+    "emoji": "🏛️",
+    "badge": "Creative",
+    "badgeColor": "#c89a48"
+  },
+  {
     "id": "la-corona-e-la-testa",
     "title": "La Corona e la Testa",
     "description": "La leggenda di San Donnino, patrono di Fidenza, in un film animato di 15 minuti disegnato dal vivo: la corte di Massimiano, la fuga sulla via Emilia, lo Stirone, il miracolo e il Duomo. Dialoghi in italiano e inglese, musica originale, voce narrante facoltativa.",

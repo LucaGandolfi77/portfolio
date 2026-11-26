@@ -15,7 +15,7 @@
     type: 'project',
     category: categoryByBadge[project.badge] || 'engineering',
     technologies: [project.badge || 'JavaScript', 'HTML', 'CSS'],
-    featured: ['tiny-local-ai', 'p2p-walkie-talkie', 'daisy-field', 'book-writer', 'qr-studio', 'atlas', 'vision-lab', 'text-lab', 'les-miserables-film', 'la-corona-e-la-testa'].includes(project.id),
+    featured: ['tiny-local-ai', 'p2p-walkie-talkie', 'daisy-field', 'book-writer', 'qr-studio', 'atlas', 'vision-lab', 'text-lab', 'les-miserables-film', 'la-corona-e-la-testa', 'la-corona-e-la-testa-v2'].includes(project.id),
     requirements: /camera|face|ar|tracker|kinect/i.test(`${project.title} ${project.description}`) ? ['camera'] : [],
     status: 'live'
   }));
