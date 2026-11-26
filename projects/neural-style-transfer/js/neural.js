@@ -38,6 +38,20 @@ async function cachedModel(url, onProgress = () => {}) {
   return bytes.buffer;
 }
 
+/* Ridimensiona un buffer RGBA quadrato con il canvas (qualità alta). */
+async function resampleRgba(rgba, from, to) {
+  const src = document.createElement('canvas');
+  src.width = from; src.height = from;
+  src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba), from, from), 0, 0);
+  const dst = document.createElement('canvas');
+  dst.width = to; dst.height = to;
+  const cx = dst.getContext('2d');
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(src, 0, 0, to, to);
+  return cx.getImageData(0, 0, to, to).data;
+}
+
 export class NeuralEngine {
   constructor() {
     this.ort = null;
@@ -76,10 +90,26 @@ export class NeuralEngine {
       const ort = await this.loadRuntime();
       const session = await this.loadModel(style, onProgress);
       const inputName = session.inputNames[0];
-      const tensor = new ort.Tensor('float32', toNchw(rgba, size), [1, 3, size, size]);
-      const output = await session.run({ [inputName]: tensor });
-      const key = session.outputNames[0] || Object.keys(output)[0];
-      return fromNchw(output[key].data, size);
+      const key = session.outputNames[0];
+
+      // Una passata alla dimensione data: se il modello e' a dimensione fissa,
+      // ORT risponde con "Expected: N" (es. 224) e non accetta altro.
+      const pass = async (dim) => {
+        const work = dim === size ? rgba : await resampleRgba(rgba, size, dim);
+        const tensor = new ort.Tensor('float32', toNchw(work, dim), [1, 3, dim, dim]);
+        const output = await session.run({ [inputName]: tensor });
+        const out = fromNchw(output[key || Object.keys(output)[0]].data, dim);
+        return dim === size ? out : resampleRgba(out, dim, size);
+      };
+
+      try {
+        return await pass(size);
+      } catch (e) {
+        const m = /Expected:\s*(\d+)/.exec(String(e && e.message));
+        const fixed = m ? Number(m[1]) : 0;
+        if (!fixed || fixed === size) throw e;
+        return pass(fixed);
+      }
     } finally {
       this.busy = false;
     }
