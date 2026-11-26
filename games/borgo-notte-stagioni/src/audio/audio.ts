@@ -128,10 +128,11 @@ export class AudioEngine {
     this.sirenOsc.frequency.setTargetAtTime(hi ? 960 : 720, t, 0.02);
   }
 
-  horn(): void {
+  /** step 0: the notes sound together (a chord); otherwise one after another. */
+  horn(notes: number[] = [392, 494], step = 0): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    for (const f of [392, 494]) this.tone(f, t, 0.35, 0.08, 'square', this.sfx);
+    notes.forEach((f, i) => this.tone(f, t + i * step, step ? step * 0.9 : 0.35, 0.08, 'square', this.sfx));
   }
 
   crash(strength: number): void {

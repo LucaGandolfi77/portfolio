@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { NO_TUNE, tuneFactors, type Tune } from './workshop';
 import { GeoBatch, staticMaterial } from '../world/batch';
 import type { CollisionWorld } from '../data/colliders';
 
@@ -202,6 +203,8 @@ export class Vehicle {
   toughness = 1;
   /** Weather grip (rain, snow) for this frame. */
   gripScale = 1;
+  /** Officina modifications. */
+  tune: Tune = { ...NO_TUNE };
   /** Seconds left on fire (then burnt out), 0 when not burning. */
   burning = 0;
   burnt = false;
@@ -237,6 +240,34 @@ export class Vehicle {
     this.sync();
   }
 
+  /**
+   * New paint: every body vertex whose colour is the old paint (or a shade
+   * of it, for bumpers and trim) takes the same shade of the new one.
+   */
+  repaint(color: number): void {
+    if (color === this.color) return;
+    const from = new THREE.Color(this.color);
+    const to = new THREE.Color(color);
+    this.model.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const attr = o.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+      if (!attr) return;
+      const src = [from.r, from.g, from.b];
+      for (let i = 0; i < attr.count; i++) {
+        const c = [attr.getX(i), attr.getY(i), attr.getZ(i)];
+        const ks: number[] = [];
+        for (let j = 0; j < 3; j++) if (src[j] > 0.015) ks.push(c[j] / src[j]);
+        if (!ks.length) continue;
+        const kmin = Math.min(...ks), kmax = Math.max(...ks);
+        if (kmax - kmin > 0.05 || kmin < 0.2 || kmax > 1.3) continue;
+        const kk = (kmin + kmax) / 2;
+        attr.setXYZ(i, to.r * kk, to.g * kk, to.b * kk);
+      }
+      attr.needsUpdate = true;
+    });
+    this.color = color;
+  }
+
   get forwardX(): number {
     return Math.sin(this.heading);
   }
@@ -270,14 +301,15 @@ export class Vehicle {
     let speed = this.speed;
     let lateral = this.vx * fz - this.vz * fx;
     const control = this.wrecked ? NO_INPUT : input;
+    const k = tuneFactors(this.tune);
 
     /* Engine, brakes, reverse. */
     if (control.throttle > 0) {
-      const room = Math.max(0, 1 - speed / s.maxSpeed);
-      speed += s.accel * control.throttle * (0.35 + room * 0.85) * dt;
+      const room = Math.max(0, 1 - speed / (s.maxSpeed * k.top));
+      speed += s.accel * k.accel * control.throttle * (0.35 + room * 0.85) * dt;
     }
     if (control.brake > 0) {
-      if (speed > 0.6) speed -= 16 * control.brake * dt;
+      if (speed > 0.6) speed -= 16 * k.brake * control.brake * dt;
       else speed = Math.max(-s.maxSpeed * 0.3, speed - s.accel * 0.6 * control.brake * dt);
     }
     if (control.handbrake) speed -= Math.sign(speed) * Math.min(Math.abs(speed), 7 * dt);
@@ -296,7 +328,7 @@ export class Vehicle {
     /* Grip: the sideways slide decays; the handbrake lets the rear go. */
     /* Weight transfer: hard braking at speed lightens the rear (a little oversteer). */
     const transfer = control.brake > 0 && speed > 8 ? 0.75 : 1;
-    const grip = control.handbrake ? 1.2 : s.grip * this.gripScale * transfer;
+    const grip = control.handbrake ? 1.2 : s.grip * k.grip * this.gripScale * transfer;
     lateral *= Math.exp(-grip * dt);
     const nfx = Math.sin(this.heading);
     const nfz = Math.cos(this.heading);

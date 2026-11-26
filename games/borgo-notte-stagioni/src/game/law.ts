@@ -11,9 +11,53 @@ export const OFFENCE_WORDS: Record<Offence, string> = {
   redlight: 'Passaggio col rosso'
 };
 
+/** Seconds a passer-by takes to get the police on the phone. */
+export const REPORT_DELAY = 8;
+/** Farther than this from the scene when the call goes through: lost track. */
+export const REPORT_RANGE = 150;
+
+export type Witness = 'police' | 'people' | 'nobody';
+
+interface Report {
+  offence: Offence;
+  x: number;
+  z: number;
+  due: number;
+}
+
 export class Law {
   readonly alert = new Alert();
   private bustTimer = 0;
+  readonly pending: Report[] = [];
+
+  /**
+   * An offence at (x, z). Seen by a patrol: the alert rises now. Seen only by
+   * people: a call reaches the police after a few seconds, if you are still
+   * around. Seen by nobody: nothing happens. Returns the message to show.
+   */
+  witness(o: Offence, x: number, z: number, now: number, seen: Witness): string | null {
+    if (seen === 'police') return this.offence(o, now);
+    if (seen === 'nobody') return null;
+    if (this.pending.some((r) => r.offence === o && now - (r.due - REPORT_DELAY) < 3)) return null;
+    this.pending.push({ offence: o, x, z, due: now + REPORT_DELAY });
+    return `${OFFENCE_WORDS[o]}: un passante chiama la polizia…`;
+  }
+
+  /** Delivers the calls that are due; returns the messages to show. */
+  reports(now: number, player: { x: number; z: number }): string[] {
+    const out: string[] = [];
+    for (const r of [...this.pending]) {
+      if (now < r.due) continue;
+      this.pending.splice(this.pending.indexOf(r), 1);
+      if (Math.hypot(player.x - r.x, player.z - r.z) > REPORT_RANGE) {
+        out.push('La segnalazione arriva tardi: sei già lontano');
+        continue;
+      }
+      const msg = this.offence(r.offence, now);
+      if (msg) out.push(`Segnalazione: ${msg}`);
+    }
+    return out;
+  }
 
   /** Records an offence; returns the message to show, or null if it did not count. */
   offence(o: Offence, now: number): string | null {

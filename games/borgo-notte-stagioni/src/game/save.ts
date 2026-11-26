@@ -1,3 +1,5 @@
+import { cleanGarage, type StoredCar } from './workshop';
+import { SPECS } from './vehicle';
 /* Progress kept in localStorage; every access is guarded (private mode,
    blocked storage) and the game works without it. */
 
@@ -19,6 +21,8 @@ export interface SaveData {
   /** Indexes of the santini found. */
   santini: number[];
   introSeen: boolean;
+  /** Cars kept in the Corradi garage. */
+  garage: StoredCar[];
 }
 
 export const KEY = 'borgo-stagioni-save-v1';
@@ -35,7 +39,8 @@ export const DEFAULT_SAVE: SaveData = {
   day: 0,
   story: [],
   santini: [],
-  introSeen: false
+  introSeen: false,
+  garage: []
 };
 
 export interface StorageLike {
@@ -61,7 +66,8 @@ export function loadSave(store: StorageLike | null = storage()): SaveData {
       ...data,
       money: Number.isFinite(data.money) ? Math.max(0, Math.round(data.money as number)) : DEFAULT_SAVE.money,
       story: Array.isArray(data.story) ? data.story.filter((x) => typeof x === 'string') : [],
-      santini: Array.isArray(data.santini) ? data.santini.filter((x) => Number.isInteger(x)) : []
+      santini: Array.isArray(data.santini) ? data.santini.filter((x) => Number.isInteger(x)) : [],
+      garage: cleanGarage(data.garage, Object.keys(SPECS))
     };
   } catch {
     return { ...DEFAULT_SAVE };

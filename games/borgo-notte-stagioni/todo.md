@@ -177,20 +177,34 @@ Ancora da fare in questa sezione:
 
 ### 3.3 Polizia e conseguenze
 
-- [ ] **Livelli diversi davvero**: 1 pattuglia, 2 più pattuglie, 3 posti di
+- [x] **Livelli diversi davvero**: 1 pattuglia, 2 più pattuglie, 3 posti di
   blocco, 4 agenti a piedi, 5 elicottero con faro (originale, non copiato).
-- [ ] **Testimoni**: un reato visto solo dai pedoni arriva alla polizia con
+  *Fatto: `game/escalation.ts`. Il posto di blocco sono due auto di traverso
+  110-170 m davanti a te, con un agente. Al livello 4 arrivano fino a tre agenti
+  a piedi dalle pattuglie vicine, e contano per l'arresto. Al 5 c'è
+  l'elicottero, che ti tiene d'occhio entro 120 m col faro.*
+- [x] **Testimoni**: un reato visto solo dai pedoni arriva alla polizia con
   ritardo; se scappi prima non succede nulla.
-- [ ] **Nascondersi**: garage di casa o autolavaggio azzerano l'allerta se
+  *Fatto: la segnalazione arriva dopo 8 s e conta solo se sei ancora entro
+  150 m. Senza testimoni non succede niente.*
+- [x] **Nascondersi**: garage di casa o autolavaggio azzerano l'allerta se
   nessuna pattuglia ti vede entrare.
+  *Fatto per il Garage Corradi: la saracinesca azzera l'allerta se né le
+  pattuglie né l'elicottero ti vedono. Anche riverniciare l'auto in officina
+  azzera l'allerta, sempre se nessuno ti vede. L'autolavaggio resta da fare.*
 - [ ] **Multe e reputazione**: la città ricorda; troppi reati e i negozianti
   smettono di darti lavori.
 
 ### 3.4 Economia e progressione
 
-- [ ] **Garage di casa** dove salvare le auto rubate (3-6 posti).
-- [ ] **Officina che modifica**: vernice, cerchi, motore, sospensioni,
+- [x] **Garage di casa** dove salvare le auto rubate (3-6 posti).
+  *Fatto: 4 posti al Garage Corradi (faro blu, «G» sul radar). Le auto si
+  salvano con vernice, modifiche e danni.*
+- [x] **Officina che modifica**: vernice, cerchi, motore, sospensioni,
   clacson. Ogni miglioria costa e si vede.
+  *Fatto: `game/workshop.ts` e `ui/shop.ts`. Ci sono riparazione, 8 vernici e
+  tre livelli ciascuno per motore (accelerazione e punta), freni, assetto
+  (aderenza) e clacson (quattro suoni). Mancano i cerchi.*
 - [ ] **Proprietà da comprare**: il bar, un'edicola, un parcheggio. Rendono
   soldi ogni giorno di gioco e sbloccano lavori.
 - [ ] **Abilità che crescono con l'uso**: guida, resistenza, volo col
@@ -283,7 +297,7 @@ Ancora da fare:
 | A ✓ | Refactor di `game.ts`, dati fuori dal bundle, streaming dei blocchi | Fatto (vedi §4) |
 | B ✓ | Fisica con sospensioni, danni visibili, semafori, auto parcheggiate | Fatto (vedi §3.1) |
 | C ✓ | Preset Ultra desktop: grading, bloom, ombre, strade bagnate | Fatto (vedi §2) |
-| D | Polizia a livelli, testimoni, garage e officina con modifiche | Dà profondità al gioco libero |
+| D ✓ | Polizia a livelli, testimoni, garage e officina con modifiche | Fatto (vedi §3.3, §3.4) |
 | E | Pedoni con routine e frasi, arredo urbano, insegne | La città diventa viva |
 | F | Scelte nella storia, missioni dei personaggi, filmati in-engine | Rigiocabilità |
 | G | Moto, autobus, attività secondarie, gamepad | Varietà |

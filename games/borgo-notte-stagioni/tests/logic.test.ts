@@ -137,3 +137,34 @@ describe('car physics', () => {
     expect(world.isFree(car.x, car.z, 0.2)).toBe(true);
   });
 });
+
+import { Law, REPORT_DELAY, REPORT_RANGE } from '../src/game/law';
+
+describe('witnesses', () => {
+  it('a patrol raises the alert at once', () => {
+    const law = new Law();
+    expect(law.witness('carjack', 0, 0, 0, 'police')).toMatch(/allerta 1/);
+    expect(law.alert.level).toBe(1);
+  });
+
+  it('nobody saw it: nothing happens', () => {
+    const law = new Law();
+    expect(law.witness('knock', 0, 0, 0, 'nobody')).toBeNull();
+    expect(law.reports(100, { x: 0, z: 0 })).toHaveLength(0);
+    expect(law.alert.level).toBe(0);
+  });
+
+  it('a passer-by calls: the alert rises later, unless you got away', () => {
+    const law = new Law();
+    expect(law.witness('carjack', 0, 0, 0, 'people')).toMatch(/passante/);
+    expect(law.alert.level).toBe(0);
+    expect(law.reports(REPORT_DELAY - 1, { x: 0, z: 0 })).toHaveLength(0);
+    expect(law.reports(REPORT_DELAY, { x: 10, z: 0 })[0]).toMatch(/Segnalazione/);
+    expect(law.alert.level).toBe(1);
+
+    const away = new Law();
+    away.witness('knock', 0, 0, 0, 'people');
+    expect(away.reports(REPORT_DELAY, { x: REPORT_RANGE + 10, z: 0 })[0]).toMatch(/lontano/);
+    expect(away.alert.level).toBe(0);
+  });
+});

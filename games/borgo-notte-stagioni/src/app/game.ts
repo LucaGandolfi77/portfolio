@@ -16,7 +16,10 @@ import { VehicleFx } from '../game/vehicle-fx';
 import { TrafficSignals } from '../game/signals';
 import { Pedestrians } from '../game/peds';
 import { PoliceForce, type Offence } from '../game/police';
-import { Law } from '../game/law';
+import { Escalation } from '../game/escalation';
+import { GARAGE_SLOTS, HORNS, PAINT_COST, PAINTS, REPAIR_COST, buyMod, canHide, type ModKind } from '../game/workshop';
+import { renderGarage, renderWorkshop } from '../ui/shop';
+import { Law, type Witness } from '../game/law';
 import { Missions, TITLES, type MissionEvent, type Spot } from '../game/missions';
 import { JobsBoard } from '../game/jobs-board';
 import { Controls, type Action } from '../game/input';
@@ -72,7 +75,6 @@ const PRESETS: Record<Quality, Preset> = {
 /** Real-time seconds per in-game hour. */
 const HOUR = 60;
 const RELEASE: Spot = { x: 195, z: -103, name: 'Piazza della Repubblica' };
-const REPAIR_COST = 80;
 
 export class Game {
   private renderer: THREE.WebGLRenderer;
@@ -87,6 +89,7 @@ export class Game {
   private traffic: Traffic;
   private peds: Pedestrians;
   private police: PoliceForce;
+  private escalation: Escalation;
   private law = new Law();
   private ultra = false;
   private post: { render(dt: number, night: number, wet: number): void; setSize(w: number, h: number, r: number): void } | null = null;
@@ -109,13 +112,18 @@ export class Game {
   private save: SaveData;
   private quality: Quality;
   private mobile: boolean;
-  private state: 'title' | 'intro' | 'play' | 'pause' | 'map' | 'phone' | 'card' | 'busted' | 'credits' = 'title';
+  private state: 'title' | 'intro' | 'play' | 'pause' | 'map' | 'phone' | 'shop' | 'card' | 'busted' | 'credits' = 'title';
   private day = 0;
   private hours = 7.5;
   private last = performance.now();
   private bustedTimer = 0;
   private jobs: JobsBoard;
   private garageMarker: Marker;
+  private homeMarker: Marker;
+  private homeSpot = { x: 0, z: 0 };
+  private shopLatch: { x: number; z: number } | null = null;
+  private shopKind: 'officina' | 'garage' = 'officina';
+  private shopHidden = false;
   private saveTimer = 0;
   private beamTex: THREE.Texture;
   private fps = { frames: 0, time: 0, value: 60 };
@@ -184,6 +192,7 @@ export class Game {
     this.traffic.signals = this.signals;
     this.peds = new Pedestrians(this.scene, this.graph, preset.peds);
     this.police = new PoliceForce(this.scene, this.graph, this.world, this.beamTex);
+    this.escalation = new Escalation(this.scene, this.graph, this.world, this.beamTex);
     this.fx = new VehicleFx(this.scene);
     this.events = new SeasonEvents(this.scene, this.world, preset.crowd);
 
@@ -201,6 +210,15 @@ export class Game {
     this.jobs = new JobsBoard(this.scene, this.graph, this.missions);
     this.garageMarker = new Marker(0x7bdc8a, 3);
     this.scene.add(this.garageMarker.group);
+    this.homeMarker = new Marker(0x6fb4ff, 2.6);
+    this.scene.add(this.homeMarker.group);
+    {
+      const n = nearestOnGraph(this.graph, PLACES.garage.x, PLACES.garage.z, true);
+      const e = pointOnEdge(n.edge, n.d, true);
+      const off = n.edge.width / 2 + 1.5;
+      const side = { x: n.x - e.dz * off, z: n.z + e.dx * off };
+      this.homeSpot = this.world.isFree(side.x, side.z, 0.5) ? side : { x: n.x + e.dz * off, z: n.z - e.dx * off };
+    }
 
     this.walker = new Walker(this.scene, PLACES.stazione.x, PLACES.stazione.z, Math.PI);
     if (this.ultra) this.walker.rig.group.traverse((o) => (o.castShadow = o instanceof THREE.Mesh));
@@ -383,6 +401,8 @@ export class Game {
     const r = this.world.resolve(free, 0.35);
     this.walker.place(r.x, r.z, v.heading);
     this.chase.snap();
+    /* Starting beside the garage: it opens only once you come back to it. */
+    this.shopLatch = { x: r.x, z: r.z };
   }
 
   /* ---------------- UI ---------------- */
@@ -454,6 +474,11 @@ export class Game {
     $('map-close').addEventListener('click', () => this.setState('play'));
     $('phone-btn').addEventListener('click', () => this.setState('phone'));
     $('phone-close').addEventListener('click', () => this.setState('play'));
+    $('shop-close').addEventListener('click', () => this.setState('play'));
+    $('shop-body').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
+      if (b && !b.disabled) this.shopAction(b.dataset.act!);
+    });
     $('card-go').addEventListener('click', () => this.closeCard());
     $('credits-close').addEventListener('click', () => this.setState('play'));
     for (const b of document.querySelectorAll<HTMLButtonElement>('.phone-tabs button')) {
@@ -527,12 +552,14 @@ export class Game {
     $('map').hidden = next !== 'map';
     $('busted').hidden = next !== 'busted';
     $('phone').hidden = next !== 'phone';
+    $('shop').hidden = next !== 'shop';
     $('card').hidden = next !== 'card';
     $('credits').hidden = next !== 'credits';
     this.audio.suspend(next === 'pause' || next === 'map' || next === 'phone');
     if (next === 'pause') this.syncPauseLabels();
     if (next === 'map') this.radar.drawMap($<HTMLCanvasElement>('map-canvas'), this.px, this.pz, this.blips());
     if (next === 'phone') this.renderPhone();
+    if (next === 'shop') this.renderShop();
     this.last = performance.now();
   }
 
@@ -573,13 +600,33 @@ export class Game {
     return this.traffic.vehicles.some((v) => v.type === 'polizia' && v.driver === 'ai' && Math.hypot(v.x - x, v.z - z) < r);
   }
 
+  /** Patrols plus the cars of a roadblock. */
+  private get copCars(): Vehicle[] {
+    return [...this.police.patrols.map((p) => p.vehicle), ...this.escalation.vehicles];
+  }
+
+  private get now(): number {
+    return this.day * 24 * HOUR + this.hours * HOUR;
+  }
+
+  /**
+   * Who saw it? A patrol (or offences that only exist in front of one): the
+   * alert rises now. Only passers-by: one calls the police (delayed). Nobody:
+   * nothing happens.
+   */
   private offence(o: Offence): void {
-    const message = this.law.offence(o, this.day * 24 * HOUR + this.hours * HOUR);
+    const x = this.px, z = this.pz;
+    const always = o === 'ram' || o === 'police-car' || o === 'redlight' || o === 'speeding';
+    let seen: Witness = 'nobody';
+    if (always || this.policeNear(x, z, 60)) seen = 'police';
+    else if (this.peds.peds.some((p) => p.state !== 'down' && Math.hypot(p.x - x, p.z - z) < 28)) seen = 'people';
+    const message = this.law.witness(o, x, z, this.now, seen);
     if (message) this.ui.toast(message);
   }
 
   private checkBust(dt: number): void {
-    const patrols = this.police.patrols.map((p) => ({ x: p.vehicle.x, z: p.vehicle.z, speed: p.vehicle.speed }));
+    const patrols = this.copCars.map((v) => ({ x: v.x, z: v.z, speed: v.speed }));
+    for (const o of this.escalation.officers) patrols.push({ x: o.x, z: o.z, speed: 0 });
     const arrested = this.law.checkArrest(dt, patrols, {
       x: this.px,
       z: this.pz,
@@ -637,7 +684,7 @@ export class Game {
     }
     if (a === 'pause') {
       if (this.state === 'play') this.setState('pause');
-      else if (['pause', 'map', 'phone'].includes(this.state)) this.setState('play');
+      else if (['pause', 'map', 'phone', 'shop'].includes(this.state)) this.setState('play');
       return;
     }
     if (a === 'map') {
@@ -655,7 +702,7 @@ export class Game {
       if (this.car) this.leaveCar(false);
       else this.enterNearestCar();
     } else if (a === 'horn' && this.car) {
-      this.audio.horn();
+      this.honk();
       for (const p of this.peds.peds) {
         if (Math.hypot(p.x - this.car.x, p.z - this.car.z) < 14 && p.state === 'walk') {
           p.state = 'flee';
@@ -706,7 +753,7 @@ export class Game {
     let best: Vehicle | null = null;
     let bestD = 4.2;
     const story = new Set(this.story.vehicles());
-    const all = [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)].filter((v) => !story.has(v));
+    const all = [...this.traffic.vehicles, ...this.copCars].filter((v) => !story.has(v));
     for (const v of all) {
       const d = Math.hypot(v.x - this.walker.x, v.z - this.walker.z);
       if (d < bestD) {
@@ -741,11 +788,16 @@ export class Game {
     } else if (v.driver === 'police') {
       const patrol = this.police.patrols.find((p) => p.vehicle === v);
       if (patrol) this.police.patrols.splice(this.police.patrols.indexOf(patrol), 1);
+      this.escalation.release(v);
       this.traffic.loose.push(v);
       this.offence('police-car');
     } else if (!this.traffic.loose.includes(v)) {
       this.traffic.loose.push(v);
     }
+    this.enterCar(v);
+  }
+
+  private enterCar(v: Vehicle): void {
     v.driver = 'player';
     v.toughness = 1;
     this.car = v;
@@ -842,7 +894,7 @@ export class Game {
     const c = this.controls;
     c.relax(dt);
     const view = this.chase.forward();
-    const vehicles = [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)];
+    const vehicles = [...this.traffic.vehicles, ...this.copCars];
     const talking = this.dialogue.open;
     this.dialogue.update(dt);
 
@@ -896,13 +948,13 @@ export class Game {
     /* Suspension, fire timers and effects for everything near the camera. */
     const cam = this.chase.camera.position;
     /* Story cars also sit in the traffic list: count each car once. */
-    const near = [...new Set([...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle), ...this.story.vehicles()])];
+    const near = [...new Set([...this.traffic.vehicles, ...this.copCars, ...this.story.vehicles()])];
     for (const v of near) if (Math.abs(v.x - cam.x) < 160 && Math.abs(v.z - cam.z) < 160) v.animate(dt);
     this.fx.update(dt, near, cam);
     this.traffic.update(dt, { player, view, obstacles }, keep, () => {
       if (Math.random() < 0.3) this.audio.horn();
     });
-    this.peds.update(dt, player, [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)], (_ped, car) => {
+    this.peds.update(dt, player, [...this.traffic.vehicles, ...this.copCars], (_ped, car) => {
       if (car === this.car) this.offence('knock');
     });
 
@@ -910,11 +962,14 @@ export class Game {
       ? { x: this.car.x, z: this.car.z, vx: this.car.vx, vz: this.car.vz }
       : { x: this.walker.x, z: this.walker.z, vx: this.walker.vx, vz: this.walker.vz };
     this.police.update(dt, this.law.alert.level, target, view);
+    this.escalation.update(dt, this.law.alert.level, { ...target, onFoot: !this.car }, this.police.patrols.map((p) => p.vehicle));
     const before = this.law.alert.level;
-    if (this.law.alert.update(dt, this.police.sees(player.x, player.z)) && this.law.alert.level < before) {
+    const seen = this.police.sees(player.x, player.z) || this.escalation.sees(player.x, player.z);
+    if (this.law.alert.update(dt, seen) && this.law.alert.level < before) {
       this.ui.toast(this.law.alert.level === 0 ? 'Li hai seminati' : `Allerta ${this.law.alert.level}`);
     }
     this.checkBust(dt);
+    for (const m of this.law.reports(this.now, player)) this.ui.toast(m, 3);
 
     /* Story first; free jobs only between story missions. */
     this.story.update(dt);
@@ -968,28 +1023,109 @@ export class Game {
   }
 
   /** Seasonal events add their own jobs at the event square. */
-  /** Officina Stirone: stop in the green beacon to repair and save. */
+  /** Officina Stirone: stop in the green beacon and the workshop opens. */
   private garage(): void {
+    const t = performance.now() / 1000;
     const at = this.story.spot('officina');
     const k = { x: at.x + Math.cos(at.heading) * 3, z: at.z - Math.sin(at.heading) * 3 };
-    this.garageMarker.at(k.x, k.z).update(performance.now() / 1000);
+    this.garageMarker.at(k.x, k.z).update(t);
+    const g = this.homeSpot;
+    this.homeMarker.at(g.x, g.z).update(t);
+    const px = this.px, pz = this.pz;
     const v = this.car;
-    if (!v || Math.hypot(v.x - k.x, v.z - k.z) > 6 || Math.abs(v.speed) > 1) return;
-    if (this.ui.toastTimer > 0) return;
-    if (v.health < 99 || v.wrecked) {
-      if (this.save.money < REPAIR_COST) {
-        this.ui.toast(`Riparazione: servono € ${REPAIR_COST}`);
+    /* One visit opens the panel once: leave the beacon to open it again. */
+    if (this.shopLatch && Math.hypot(px - this.shopLatch.x, pz - this.shopLatch.z) > 9) this.shopLatch = null;
+    if (this.shopLatch) return;
+    if (v && Math.hypot(v.x - k.x, v.z - k.z) < 6 && Math.abs(v.speed) < 1) this.openShop('officina', k);
+    else if (Math.hypot(px - g.x, pz - g.z) < (v ? 6 : 3.5) && (!v || Math.abs(v.speed) < 1)) this.openShop('garage', g);
+  }
+
+  private openShop(kind: 'officina' | 'garage', at: { x: number; z: number }): void {
+    this.shopLatch = at;
+    this.shopKind = kind;
+    this.shopHidden = false;
+    if (kind === 'garage' && this.law.alert.level > 0) {
+      /* Doors down: lost them, unless a patrol or the helicopter is watching. */
+      const seen = this.police.sees(at.x, at.z) || this.escalation.sees(at.x, at.z);
+      if (!canHide(this.law.alert.level, seen)) {
+        this.ui.toast('Ti stanno guardando: seminali prima di entrare');
         return;
       }
+      this.law.alert.clear();
+      this.police.dismissAll();
+      this.escalation.clear();
+      this.shopHidden = true;
+    }
+    this.persist();
+    this.setState('shop');
+  }
+
+  private renderShop(): void {
+    const v = this.car;
+    $('shop-money').textContent = formatMoney(this.save.money);
+    if (this.shopKind === 'officina') {
+      $('shop-title').textContent = 'Officina Stirone';
+      $('shop-body').innerHTML = v ? renderWorkshop({ label: v.spec.label, health: v.health, color: v.color, tune: v.tune, wrecked: v.wrecked }, this.save.money) : '';
+    } else {
+      $('shop-title').textContent = 'Garage Corradi';
+      $('shop-body').innerHTML = renderGarage(this.save.garage, v ? { label: v.spec.label } : null, this.shopHidden);
+    }
+  }
+
+  private shopAction(act: string): void {
+    const v = this.car;
+    const [what, arg] = act.split(':');
+    if (what === 'repair' && v && this.save.money >= REPAIR_COST) {
       this.save.money -= REPAIR_COST;
       v.health = 100;
       v.wrecked = false;
+      this.audio.jingle(true);
+    } else if (what === 'mod' && v) {
+      const r = buyMod(v.tune, arg as ModKind, this.save.money);
+      if (!r) return;
+      v.tune = r.tune;
+      this.save.money = r.money;
+      if (arg === 'horn') this.honk();
+      else this.audio.jingle(true);
+    } else if (what === 'paint' && v && this.save.money >= PAINT_COST) {
+      const p = PAINTS[Number(arg)];
+      if (!p || p.color === v.color) return;
+      this.save.money -= PAINT_COST;
+      v.repaint(p.color);
+      /* A new colour is a new car to the police. */
+      if (this.law.alert.level > 0 && !this.police.sees(v.x, v.z)) this.law.alert.clear();
+      this.audio.jingle(true);
+    } else if (what === 'store' && v && this.save.garage.length < GARAGE_SLOTS) {
+      this.save.garage.push({ type: v.type, color: v.color, tune: { ...v.tune }, health: Math.max(10, v.health) });
+      this.leaveCar(true);
+      this.scene.remove(v.model);
+      const i = this.traffic.loose.indexOf(v);
+      if (i >= 0) this.traffic.loose.splice(i, 1);
+      this.ui.toast(`${v.spec.label} al sicuro in garage`, 2);
+    } else if (what === 'take' && !v) {
+      const c = this.save.garage[Number(arg)];
+      if (!c) return;
+      this.save.garage.splice(Number(arg), 1);
+      const n = nearestOnGraph(this.graph, this.homeSpot.x, this.homeSpot.z, true);
+      const e = pointOnEdge(n.edge, n.d, true);
+      const car = new Vehicle(c.type, n.x, n.z, Math.atan2(e.dx, e.dz), c.color, this.beamTex);
+      car.tune = { ...c.tune };
+      car.health = c.health;
+      this.scene.add(car.model);
+      this.traffic.loose.push(car);
       this.persist();
-      this.ui.toast(`Auto riparata (-€ ${REPAIR_COST}) · partita salvata`, 3);
-    } else {
-      this.persist();
-      this.ui.toast('Partita salvata', 2);
-    }
+      this.setState('play');
+      this.enterCar(car);
+      return;
+    } else return;
+    this.ui.bumpMoney();
+    this.persist();
+    this.renderShop();
+  }
+
+  private honk(): void {
+    const h = HORNS[this.car?.tune.horn ?? 0] ?? HORNS[0];
+    this.audio.horn(h.notes, h.step);
   }
 
   private applyNight(): void {
@@ -1022,6 +1158,7 @@ export class Game {
   private release(): void {
     this.law.alert.clear();
     this.police.dismissAll();
+    this.escalation.clear();
     const n = nearestOnGraph(this.graph, RELEASE.x, RELEASE.z, true);
     const r = this.world.resolve({ x: n.x + 3, z: n.z + 3 }, 0.35);
     this.walker.place(r.x, r.z, 0);
@@ -1070,7 +1207,10 @@ export class Game {
     const out: Blip[] = [...this.story.blips(), ...this.jobs.blips(!!this.story.running)];
     const g = this.story.spot('officina');
     out.push({ x: g.x, z: g.z, kind: 'home', label: 'O' });
-    for (const p of this.police.patrols) out.push({ x: p.vehicle.x, z: p.vehicle.z, kind: 'police' });
+    out.push({ x: this.homeSpot.x, z: this.homeSpot.z, kind: 'home', label: 'G' });
+    for (const v of this.copCars) out.push({ x: v.x, z: v.z, kind: 'police' });
+    const heli = this.escalation.helicopter;
+    if (heli) out.push({ x: heli.x, z: heli.z, kind: 'police', label: 'H' });
     return out;
   }
 
@@ -1123,7 +1263,7 @@ export class Game {
     let prompt = '';
     if (this.dialogue.open) prompt = '';
     else if (!this.car && !this.walker.airborne) {
-      const near = [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)].find((v) => Math.hypot(v.x - this.walker.x, v.z - this.walker.z) < 4.2);
+      const near = [...this.traffic.vehicles, ...this.copCars].find((v) => Math.hypot(v.x - this.walker.x, v.z - this.walker.z) < 4.2);
       if (near && !this.story.vehicles().includes(near)) prompt = `${this.mobile ? 'SALI' : 'E'} · ${SPECS[near.type].label}${near.driver === 'ai' || near.driver === 'police' ? ' (la rubi)' : ''}`;
       else {
         const kerb = this.parked.nearest(this.walker.x, this.walker.z, 4.2);

@@ -22,7 +22,8 @@ export type PersonLook =
   | 'conte'
   | 'smilzo'
   | 'ferrante'
-  | 'rina';
+  | 'rina'
+  | 'agente';
 
 /* Every moving part is one merged mesh with vertex colours, so a detailed
    figure costs ten draw calls. The optional joints (knees, elbows, head) let
@@ -259,6 +260,14 @@ const OUTFITS: Record<PersonLook, Outfit> = {
     hatColor: 0x3f5b63,
     hair: 0xc8c4bc,
     skin: 0xdcae88
+  },
+  agente: {
+    shirt: 0x1f2d4a,
+    trousers: 0x182033,
+    hat: 'cap',
+    hatColor: 0x121a2c,
+    hair: 0x2a2420,
+    boots: 0x111111
   },
   /* The traveller: linen shirt with rolled sleeves, a rust waistcoat, the red
      scarf, a straw hat banded in the same red and a leather satchel. */
@@ -547,7 +556,8 @@ export function setFar(rig: PersonRig, far: boolean): void {
 let shadowTexture: THREE.CanvasTexture | null = null;
 
 export function createBlobShadow(scale = 1): THREE.Mesh {
-  if (!shadowTexture) {
+  /* No canvas outside the browser (unit tests): a plain dark disc. */
+  if (!shadowTexture && typeof document !== 'undefined') {
     const canvas = document.createElement('canvas');
     canvas.width = 96;
     canvas.height = 96;
