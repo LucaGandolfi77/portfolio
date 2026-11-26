@@ -3,6 +3,15 @@
 
 const PROJECTS_DATA = [
   {
+    "id": "la-corona-e-la-testa",
+    "title": "La Corona e la Testa",
+    "description": "La leggenda di San Donnino, patrono di Fidenza, in un film animato di 15 minuti disegnato dal vivo: la corte di Massimiano, la fuga sulla via Emilia, lo Stirone, il miracolo e il Duomo. Dialoghi in italiano e inglese, musica originale, voce narrante facoltativa.",
+    "href": "projects/la-corona-e-la-testa/",
+    "emoji": "👑",
+    "badge": "Creative",
+    "badgeColor": "#e8b840"
+  },
+  {
     "id": "les-miserables-film",
     "title": "Les Misérables — Le Fil d'Or",
     "description": "Film animato di 28 minuti dal romanzo di Victor Hugo, disegnato dal vivo nel browser: personaggi illustrati, 68 scene, dialoghi in italiano e inglese, musica originale e voce narrante opzionale. Verticale o orizzontale, offline.",
