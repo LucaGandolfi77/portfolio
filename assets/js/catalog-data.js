@@ -15,7 +15,7 @@
     type: 'project',
     category: categoryByBadge[project.badge] || 'engineering',
     technologies: [project.badge || 'JavaScript', 'HTML', 'CSS'],
-    featured: ['tiny-local-ai', 'p2p-walkie-talkie', 'daisy-field', 'book-writer', 'qr-studio', 'atlas', 'vision-lab', 'text-lab'].includes(project.id),
+    featured: ['tiny-local-ai', 'p2p-walkie-talkie', 'daisy-field', 'book-writer', 'qr-studio', 'atlas', 'vision-lab', 'text-lab', 'les-miserables-film'].includes(project.id),
     requirements: /camera|face|ar|tracker|kinect/i.test(`${project.title} ${project.description}`) ? ['camera'] : [],
     status: 'live'
   }));

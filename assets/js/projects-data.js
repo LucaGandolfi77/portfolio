@@ -3,6 +3,15 @@
 
 const PROJECTS_DATA = [
   {
+    "id": "les-miserables-film",
+    "title": "Les Misérables — Le Fil d'Or",
+    "description": "Film animato di 28 minuti dal romanzo di Victor Hugo, disegnato dal vivo nel browser: personaggi illustrati, 68 scene, dialoghi in italiano e inglese, musica originale e voce narrante opzionale. Verticale o orizzontale, offline.",
+    "href": "projects/les-miserables-film/",
+    "emoji": "🕯️",
+    "badge": "Creative",
+    "badgeColor": "#e7bb68"
+  },
+  {
     "id": "atlas",
     "title": "Atlas — Weather & Distance",
     "description": "Interactive weather map, 7-day forecast and GPS distance calculator. EN/IT, local-first.",
