@@ -1,6 +1,8 @@
 /* Mystic Quest — realms, story, collectibles and EN/IT strings */
 export const VERSION = 1;
 export const WORLD = { w:420, h:640 };
+/* Fixed physics step (seconds). */
+export const STEP = 1 / 60;
 
 export const REALMS = [
   {

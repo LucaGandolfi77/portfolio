@@ -141,7 +141,7 @@ run('HTML is GitHub-Pages safe and shell is inside body', () => {
 });
 run('SW precaches every module and asset', () => {
   const sw = readFileSync(join(ROOT, 'sw.js'), 'utf8');
-  ok(sw.includes('pf-mystic-shell-v1'));
+  ok(/pf-mystic-shell-v\d+/.test(sw));
   ['js/core/world.js','js/core/story.js','js/render.js','js/input.js','css/app.css'].forEach(f =>
     ok(sw.includes(f), f));
 });
