@@ -419,16 +419,16 @@ const Render = (() => {
     }
 
     // checkpoints visivi lungo le lane
-    for (const ck of D.MAP.lanes.top.waypoints) {
+    for (const ck of D.MAP.lanes.top.waypoints_blue) {
       mc.fillStyle = 'rgba(40,80,160,0.06)';
       mc.beginPath();
-      mc.arc(ck.x, ck.y, 25, 0, Math.PI * 2);
+      mc.arc(ck[0], ck[1], 25, 0, Math.PI * 2);
       mc.fill();
     }
-    for (const ck of D.MAP.lanes.bot.waypoints) {
+    for (const ck of D.MAP.lanes.bot.waypoints_blue) {
       mc.fillStyle = 'rgba(160,40,40,0.06)';
       mc.beginPath();
-      mc.arc(ck.x, ck.y, 25, 0, Math.PI * 2);
+      mc.arc(ck[0], ck[1], 25, 0, Math.PI * 2);
       mc.fill();
     }
 

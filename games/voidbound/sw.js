@@ -1,7 +1,7 @@
 // Cache cleanup: delete only older versions of THIS app's cache (same name
 // stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
 // (lucagandolfi77.github.io) and their caches must not be touched.
-const CACHE = 'voidbound-v2';
+const CACHE = 'voidbound-v3';
 const URLS = [
   './', './index.html', './style.css', './manifest.webmanifest',
   './js/data.js', './js/sprites.js', './js/game.js', './js/ai.js', './js/render.js', './js/main.js',
