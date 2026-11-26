@@ -269,3 +269,5 @@ const AudioSys = (() => {
     stopMusic
   };
 })();
+
+export default AudioSys;

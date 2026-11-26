@@ -5,7 +5,7 @@
    Cache-first for vendored Three.js, network-first for source. */
 'use strict';
 
-const CACHE_NAME = 'echoes-v1';
+const CACHE_NAME = 'echoes-v2';
 const PRECACHE = [
   './',
   './index.html',

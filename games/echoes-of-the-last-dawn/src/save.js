@@ -159,3 +159,5 @@ const SaveSys = (() => {
     MAX_SLOTS
   };
 })();
+
+export default SaveSys;
