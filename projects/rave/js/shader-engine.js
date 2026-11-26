@@ -10,6 +10,15 @@ const QUAD = new Float32Array([
   -1,  1, 0, 0,
    1,  1, 1, 0
 ]);
+// Stesso quad con la v invertita: usato per scrivere nei framebuffer intermedi.
+// Senza questo, il FBO memorizza il frame capovolto e la ricomposizione lo
+// mostra a testa in giu' (su qualunque camera, il Mac lo notava di piu').
+const QUAD_FBO = new Float32Array([
+  -1, -1, 0, 0,
+   1, -1, 1, 0,
+  -1,  1, 0, 1,
+   1,  1, 1, 1
+]);
 
 export class ShaderEngine {
   constructor(canvas) {
@@ -38,6 +47,9 @@ export class ShaderEngine {
     this.buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
+    this.fboBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fboBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, QUAD_FBO, gl.STATIC_DRAW);
 
     this.videoTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.videoTexture);
@@ -137,9 +149,9 @@ export class ShaderEngine {
     this.fboB = this._makeFbo();
   }
 
-  _bindQuad(program) {
+  _bindQuad(program, buffer = this.buffer) {
     const gl = this.gl;
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     if (program.aPos >= 0) {
       gl.enableVertexAttribArray(program.aPos);
       gl.vertexAttribPointer(program.aPos, 2, gl.FLOAT, false, 16, 0);
@@ -156,7 +168,7 @@ export class ShaderEngine {
     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.framebuffer : null);
     gl.viewport(0, 0, this.width, this.height);
     gl.useProgram(program.program);
-    this._bindQuad(program);
+    this._bindQuad(program, this.fboBuffer);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.videoTexture);
     if (program.uTex) gl.uniform1i(program.uTex, 0);
@@ -247,6 +259,7 @@ export class ShaderEngine {
     });
     this.gl.deleteTexture(this.videoTexture);
     this.gl.deleteBuffer(this.buffer);
+    this.gl.deleteBuffer(this.fboBuffer);
     this.ready = false;
   }
 }
