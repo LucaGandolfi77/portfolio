@@ -1,7 +1,7 @@
 /* Progress kept in localStorage; every access is guarded (private mode,
    blocked storage) and the game works without it. */
 
-export type Quality = 'bassa' | 'media' | 'alta';
+export type Quality = 'bassa' | 'media' | 'alta' | 'ultra';
 
 export interface SaveData {
   money: number;

@@ -192,6 +192,8 @@ interface Cell {
  * and a phone only keeps the neighbourhood in memory.
  */
 export class CityStream implements CityRender {
+  /** Ultra preset: city meshes cast and receive the sun's shadows. */
+  static shadows = false;
   readonly group = new THREE.Group();
   readonly materials: CityMaterials;
   readonly lampGlow: THREE.MeshBasicMaterial;
@@ -289,6 +291,13 @@ export class CityStream implements CityRender {
       this.trees.push(c.batch);
     }
     if (c.lamps.length) objects.push(...lampMeshes(c.lamps, this.shared, this.lampGlow, this.lampBulb));
+    if (CityStream.shadows) {
+      for (const o of objects) {
+        const lamps = o instanceof THREE.InstancedMesh && (o.material === this.lampGlow || o.material === this.lampBulb);
+        o.castShadow = !lamps;
+        o.receiveShadow = !(o instanceof THREE.InstancedMesh);
+      }
+    }
     for (const o of objects) this.group.add(o);
     c.objects = objects;
   }

@@ -180,6 +180,8 @@ export interface DriveInput {
 export const NO_INPUT: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false };
 
 export class Vehicle {
+  /** Ultra preset: cars cast the sun's shadows. */
+  static castShadows = false;
   readonly id = nextId++;
   readonly type: VehicleType;
   readonly spec: VehicleSpec;
@@ -226,6 +228,9 @@ export class Vehicle {
     this.z = z;
     this.heading = heading;
     this.model = buildCarModel(type, color, beamTexture);
+    if (Vehicle.castShadows) this.model.traverse((o) => {
+      if (o instanceof THREE.Mesh && o.material !== LIGHTS.beam) o.castShadow = true;
+    });
     this.chassis = this.model.userData.chassis as THREE.Group;
     this.bodyMesh = (this.model.userData.body as THREE.Mesh) ?? null;
     this.prevHeading = heading;

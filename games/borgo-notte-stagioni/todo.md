@@ -106,7 +106,21 @@ Una GPU integrata recente regge bloom, grading e ombre a 60 fps. Le voci
 - **No:** SSAO, SSR, luci dinamiche multiple, ombre su tutta la città.
   Scaldano il telefono, consumano batteria e fanno crollare i fps.
 
-**Consiglio:** aggiungere un preset **Ultra** solo desktop (rilevato
+**Fatto (fase C, 26 novembre 2026):** preset **Ultra** solo desktop (scelto
+in automatico con almeno 8 core): bloom su finestre, lampioni, fari e fuoco
+(più forte di notte); color grading "Bassa padana" (colori un po' spenti,
+ombre fredde e luci calde, vignetta, grana); ombre del sole in tempo reale
+attorno al giocatore (mappa 2048, aggiornata a fotogrammi alterni, spente di
+notte); strade e tetti bagnati che riflettono il cielo sotto la pioggia. Il
+modulo di post-processing (20 KB) si scarica solo in Ultra. Sotto i 33 fps
+per sei secondi Ultra spegne da solo effetti e ombre. In tutti i preset
+l'asfalto si scurisce quando piove.
+
+Ancora possibile: materiali PBR con normal map sulle facciate, SSAO, luci
+dinamiche dei lampioni; un preset **Alta+** per telefoni recenti (solo
+grading e bloom leggero).
+
+~~Consiglio:~~ aggiungere un preset **Ultra** solo desktop (rilevato
 automaticamente e attivabile a mano), e un preset **Alta+** per telefoni
 recenti con solo grading e bloom leggero. Il resto della grafica resta
 com'è, che è il motivo per cui gira ovunque.
@@ -268,7 +282,7 @@ Ancora da fare:
 |---|---|---|
 | A ✓ | Refactor di `game.ts`, dati fuori dal bundle, streaming dei blocchi | Fatto (vedi §4) |
 | B ✓ | Fisica con sospensioni, danni visibili, semafori, auto parcheggiate | Fatto (vedi §3.1) |
-| C | Preset Ultra desktop: grading, bloom, ombre CSM, strade bagnate | Salto visivo grande a costo contenuto |
+| C ✓ | Preset Ultra desktop: grading, bloom, ombre, strade bagnate | Fatto (vedi §2) |
 | D | Polizia a livelli, testimoni, garage e officina con modifiche | Dà profondità al gioco libero |
 | E | Pedoni con routine e frasi, arredo urbano, insegne | La città diventa viva |
 | F | Scelte nella storia, missioni dei personaggi, filmati in-engine | Rigiocabilità |

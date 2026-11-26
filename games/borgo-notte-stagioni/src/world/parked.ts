@@ -164,6 +164,7 @@ export function planParking(): ParkedCar[] {
 }
 
 export class ParkedCars {
+  static shadows = false;
   private cells = new Map<string, Cell>();
   private material = staticMaterial();
   private m = new THREE.Matrix4();
@@ -222,6 +223,8 @@ export class ParkedCars {
     geo.computeBoundingSphere();
     cell.mesh = new THREE.Mesh(geo, this.material);
     cell.mesh.matrixAutoUpdate = false;
+    cell.mesh.castShadow = ParkedCars.shadows;
+    cell.mesh.receiveShadow = ParkedCars.shadows;
     this.scene.add(cell.mesh);
   }
 

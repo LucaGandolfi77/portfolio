@@ -42,6 +42,9 @@ export interface Environment {
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   night: number;
+  /** Current sky colours (for the wet-street reflections). */
+  skyTop: THREE.Color;
+  skyHorizon: THREE.Color;
   /** cloud 0..1 dims the sun; fog 0..1 pulls the fog in and greys it. */
   update(hours: number, centre: THREE.Vector3, weather?: { cloud: number; fog: number }): void;
 }
@@ -97,6 +100,8 @@ export function createEnvironment(scene: THREE.Scene, farDistance: number): Envi
     sun,
     hemi,
     night: 0,
+    skyTop: uniforms.top.value,
+    skyHorizon: uniforms.horizon.value,
     update(hours: number, centre: THREE.Vector3, weather = { cloud: 0, fog: 0 }) {
       const h = ((hours % 24) + 24) % 24;
       let i = 0;

@@ -64,7 +64,9 @@ interface Preset {
 const PRESETS: Record<Quality, Preset> = {
   bassa: { scale: 0.5, traffic: 7, peds: 5, far: 300, crowd: 6 },
   media: { scale: 0.72, traffic: 12, peds: 8, far: 380, crowd: 9 },
-  alta: { scale: 1, traffic: 18, peds: 13, far: 470, crowd: 14 }
+  alta: { scale: 1, traffic: 18, peds: 13, far: 470, crowd: 14 },
+  /* Desktop only: bloom, colour grade, sun shadows, wet reflections. */
+  ultra: { scale: 1, traffic: 20, peds: 15, far: 540, crowd: 16 }
 };
 
 /** Real-time seconds per in-game hour. */
@@ -86,6 +88,12 @@ export class Game {
   private peds: Pedestrians;
   private police: PoliceForce;
   private law = new Law();
+  private ultra = false;
+  private post: { render(dt: number, night: number, wet: number): void; setSize(w: number, h: number, r: number): void } | null = null;
+  private skyTex: THREE.CanvasTexture | null = null;
+  private skyTimer = 0;
+  private slow = 0;
+  private frameNo = 0;
   private parked!: ParkedCars;
   private signals!: TrafficSignals;
   private lastCarPos = { x: 0, z: 0 };
@@ -129,7 +137,9 @@ export class Game {
     this.mobile = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
     this.save = loadSave();
     const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
-    this.quality = this.save.quality ?? (this.mobile ? (memory <= 4 ? 'bassa' : 'media') : 'alta');
+    const cores = navigator.hardwareConcurrency ?? 4;
+    this.quality = this.save.quality ?? (this.mobile ? (memory <= 4 ? 'bassa' : 'media') : cores >= 8 ? 'ultra' : 'alta');
+    if (this.mobile && this.quality === 'ultra') this.quality = 'alta';
     const preset = PRESETS[this.quality];
 
     const canvas = $<HTMLCanvasElement>('canvas');
@@ -137,6 +147,15 @@ export class Game {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    this.ultra = this.quality === 'ultra';
+    if (this.ultra) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.renderer.shadowMap.autoUpdate = false;
+      CityStream.shadows = true;
+      ParkedCars.shadows = true;
+      Vehicle.castShadows = true;
+    }
     this.applyQuality();
 
     this.progress(0.1, 'Disegno le facciate…');
@@ -151,6 +170,7 @@ export class Game {
     this.chase = new ChaseCamera(innerWidth / innerHeight, preset.far);
     this.env = createEnvironment(this.scene, preset.far);
     this.look = new SeasonLook(this.city);
+    if (this.ultra) this.setupUltra();
     this.weather = new Weather(this.scene, this.mobile);
 
     this.progress(0.6, 'Traccio le strade…');
@@ -183,6 +203,7 @@ export class Game {
     this.scene.add(this.garageMarker.group);
 
     this.walker = new Walker(this.scene, PLACES.stazione.x, PLACES.stazione.z, Math.PI);
+    if (this.ultra) this.walker.rig.group.traverse((o) => (o.castShadow = o instanceof THREE.Mesh));
     this.story = new StoryRunner(this.host(), this.save.story);
     this.santini = new Santini(this.scene, this.graph, this.world, this.save.santini);
 
@@ -285,8 +306,66 @@ export class Game {
 
   private resize(): void {
     this.renderer.setSize(innerWidth, innerHeight, false);
+    this.post?.setSize(innerWidth, innerHeight, this.renderer.getPixelRatio());
     this.chase.camera.aspect = innerWidth / innerHeight;
     this.chase.camera.updateProjectionMatrix();
+  }
+
+  /** Ultra: sun shadows near the player, wet-street sky reflections, post effects. */
+  private setupUltra(): void {
+    const sun = this.env.sun;
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const cam = sun.shadow.camera as THREE.OrthographicCamera;
+    cam.left = cam.bottom = -85;
+    cam.right = cam.top = 85;
+    cam.near = 1;
+    cam.far = 420;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.04;
+    /* A small painted sky for the reflections, refreshed every few seconds. */
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 64;
+    this.skyTex = new THREE.CanvasTexture(c);
+    this.skyTex.mapping = THREE.EquirectangularReflectionMapping;
+    this.skyTex.colorSpace = THREE.SRGBColorSpace;
+    const m = this.city.materials.all;
+    for (const mat of [m.asphalt, m.pavers, m.flat, m.tiles]) {
+      mat.envMap = this.skyTex;
+      mat.combine = THREE.MixOperation;
+      mat.reflectivity = 0;
+      mat.needsUpdate = true;
+    }
+    this.look.reflect = true;
+    void import('../world/post').then(({ PostFx }) => {
+      this.post = new PostFx(this.renderer, this.scene, this.chase.camera);
+      this.post.setSize(innerWidth, innerHeight, this.renderer.getPixelRatio());
+    });
+  }
+
+  private paintSky(): void {
+    if (!this.skyTex) return;
+    const c = this.skyTex.image as HTMLCanvasElement;
+    const g = c.getContext('2d')!;
+    const grad = g.createLinearGradient(0, 0, 0, c.height);
+    /* A wet street mirrors a darker sky than the one above. */
+    const dim = (c: THREE.Color, k: number): string => `#${c.clone().multiplyScalar(k).getHexString()}`;
+    grad.addColorStop(0, dim(this.env.skyTop, 0.6));
+    grad.addColorStop(0.48, dim(this.env.skyHorizon, 0.5));
+    grad.addColorStop(0.52, '#3a3a3e');
+    grad.addColorStop(1, '#1a1a1c');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, c.width, c.height);
+    this.skyTex.needsUpdate = true;
+  }
+
+  /** Too slow for Ultra: switch the extras off and keep playing. */
+  private lighten(): void {
+    this.post = null;
+    this.env.sun.castShadow = false;
+    this.renderer.shadowMap.needsUpdate = true;
+    this.ui.toast('Ultra alleggerito: effetti e ombre spenti per fluidità', 4);
   }
 
   /** Twenty holy cards hidden around town, at real places. */
@@ -385,10 +464,17 @@ export class Game {
       });
     }
     $('quality').addEventListener('click', () => {
-      const order: Quality[] = ['bassa', 'media', 'alta'];
-      this.quality = order[(order.indexOf(this.quality) + 1) % 3];
+      const order: Quality[] = this.mobile ? ['bassa', 'media', 'alta'] : ['bassa', 'media', 'alta', 'ultra'];
+      const before = this.quality;
+      this.quality = order[(order.indexOf(this.quality) + 1) % order.length];
       this.save.quality = this.quality;
       this.persist();
+      if (before === 'ultra' || this.quality === 'ultra') {
+        /* Shadows and post effects are set up at start: restart to apply. */
+        $('quality').textContent = 'Riavvio la grafica…';
+        setTimeout(() => location.reload(), 300);
+        return;
+      }
       this.applyQuality();
       this.resize();
       this.syncPauseLabels();
@@ -718,7 +804,24 @@ export class Game {
     const cam = this.chase.camera.position;
     this.city.update(cam.x, cam.z, PRESETS[this.quality].far + 40, this.state === 'intro' || this.state === 'title' ? 14 : 6);
     this.parked.update(cam.x, cam.z, PRESETS[this.quality].far * 0.7);
-    this.renderer.render(this.scene, this.chase.camera);
+    if (this.ultra) {
+      this.frameNo++;
+      /* Shadows near the player, refreshed every other frame, off at night. */
+      this.env.sun.castShadow = this.env.night < 0.85 && this.post !== null;
+      if (this.frameNo % 2 === 0) this.renderer.shadowMap.needsUpdate = true;
+      this.skyTimer -= dt;
+      if (this.skyTimer <= 0) {
+        this.skyTimer = 4;
+        this.paintSky();
+      }
+      /* Under 33 fps for six seconds of play: lighten. */
+      if (this.post && this.state === 'play') {
+        this.slow = this.fps.value < 33 ? this.slow + dt : 0;
+        if (this.slow > 6) this.lighten();
+      }
+    }
+    if (this.post) this.post.render(dt, this.env.night, this.weather.wet);
+    else this.renderer.render(this.scene, this.chase.camera);
     this.fps.frames++;
     this.fps.time += dt;
     if (this.fps.time > 1) {
@@ -828,7 +931,7 @@ export class Game {
 
     /* Seasons, weather, events. */
     this.weather.update(dt, dh, season, this.chase.camera.position);
-    this.look.apply(season, this.weather.snow);
+    this.look.apply(season, this.weather.snow, this.weather.wet);
     const events = activeEvents(this.day, this.hours);
     for (const e of events) if (!this.eventsNow.some((x) => x.id === e.id)) this.ui.banner(e.name, `${e.place.name} · ${e.blurb}`, 4.5);
     this.eventsNow = events;

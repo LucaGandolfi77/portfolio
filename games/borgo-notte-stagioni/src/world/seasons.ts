@@ -21,6 +21,8 @@ export class SeasonLook {
   private snowApplied = -1;
   private base = new Map<THREE.Material, THREE.Color>();
   private snowy: THREE.MeshLambertMaterial[];
+  /** Ultra: wet surfaces mirror the sky (an environment map). */
+  reflect = false;
 
   constructor(private city: CityRender) {
     const m = city.materials.all;
@@ -28,7 +30,8 @@ export class SeasonLook {
     for (const mat of this.snowy) this.base.set(mat, mat.color.clone());
   }
 
-  apply(season: Season, snow: number): void {
+  /** wet 0..1 (rain): streets darken; with `reflect` (Ultra) they also mirror the sky. */
+  apply(season: Season, snow: number, wet = 0): void {
     {
       const palette = PALETTES[season];
       const color = new THREE.Color();
@@ -57,8 +60,10 @@ export class SeasonLook {
       }
     }
     const level = Math.round(snow * 20) / 20;
-    if (level !== this.snowApplied) {
-      this.snowApplied = level;
+    const damp = Math.round(wet * 20) / 20;
+    const key = level * 100 + damp;
+    if (key !== this.snowApplied) {
+      this.snowApplied = key;
       /* The colour multiplies the texture, so darker textures need a bigger
          lift to read as white (values above 1 are fine in linear space). */
       const m = this.city.materials.all;
@@ -69,6 +74,9 @@ export class SeasonLook {
         const amount = mat === m.asphalt ? level * 0.35 : level * 0.85;
         const target = new THREE.Color(0.95, 0.97, 1).multiplyScalar(lift.get(mat) ?? 1);
         mat.color.copy(this.base.get(mat)!).lerp(target, amount);
+        /* Rain darkens streets and pavements (less under snow). */
+        if (mat === m.asphalt || mat === m.pavers || mat === m.flat || mat === m.tiles) mat.color.multiplyScalar(1 - damp * (1 - level) * 0.35);
+        if (this.reflect && 'reflectivity' in mat) mat.reflectivity = damp * (1 - level) * (mat === m.asphalt ? 0.24 : mat === m.pavers ? 0.14 : 0.08);
         /* A faint glow of its own, so snow still reads at dusk and at night. */
         mat.emissive.setRGB(0.1, 0.11, 0.14).multiplyScalar(amount);
       }
