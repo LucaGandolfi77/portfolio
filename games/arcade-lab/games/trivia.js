@@ -53,6 +53,7 @@ window.Games.trivia = function (ctx) {
         }
         document.getElementById('triv-score').textContent = s;
         setTimeout(function () {
+          if (!w.isConnected) return; /* switched to another game */
           n++;
           if (n < 5) {
             show();

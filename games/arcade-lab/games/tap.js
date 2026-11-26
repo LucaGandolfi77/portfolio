@@ -50,6 +50,8 @@ window.Games.tap = function (ctx) {
     clearInterval(timer);
     if (ctx.Session) ctx.Session.trackStart('tap');
     timer = setInterval(function () {
+      /* The player switched to another game: stop this timer. */
+      if (!target.isConnected) { clearInterval(timer); return; }
       t--;
       document.getElementById('tap-time').textContent = t;
       if (t <= 0) {

@@ -45,6 +45,8 @@ window.Games.wordlock = function(ctx) {
     timeRemaining = 30;
     showHint = false;
     timerInterval = setInterval(function() {
+      /* The player switched to another game: stop this timer. */
+      if (!timerDisplay.isConnected) { clearInterval(timerInterval); return; }
       timeRemaining--;
       timerDisplay.textContent = timeRemaining + 's';
 

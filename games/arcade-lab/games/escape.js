@@ -46,6 +46,7 @@ window.Games.escape = function (ctx) {
           if (ctx.Audio) ctx.Audio.fail();
         }
         setTimeout(function () {
+          if (!b.isConnected) return; /* switched to another game */
           n++;
           if (n < 3) {
             show();
@@ -67,8 +68,11 @@ window.Games.escape = function (ctx) {
     clearInterval(timer);
     if (ctx.Session) ctx.Session.trackStart('escape');
     timer = setInterval(function () {
+      var clock = document.getElementById('esc-time');
+      /* The player switched to another game: stop this timer. */
+      if (!clock) { clearInterval(timer); return; }
       t--;
-      document.getElementById('esc-time').textContent = t;
+      clock.textContent = t;
       if (!t) clearInterval(timer);
     }, 1000);
     show();

@@ -61,6 +61,8 @@ window.Games.typing = function(ctx) {
     if (timerInterval) clearInterval(timerInterval);
     startTime = Date.now();
     timerInterval = setInterval(function() {
+      /* The player switched to another game: stop this timer. */
+      if (!timerDisplay.isConnected) { clearInterval(timerInterval); return; }
       elapsedTime = (Date.now() - startTime) / 1000;
       updateDisplays();
     }, 100);

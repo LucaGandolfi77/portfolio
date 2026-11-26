@@ -338,7 +338,12 @@
     if (typeof gameFn === 'function') {
       var ctx = {
         stage: stage,
-        head: buildGameHead,
+        /* Draws the header and body into the stage (and returns the HTML). */
+        head: function (num, title, tag, copy, body) {
+          var html = buildGameHead(num, title, tag, copy, body);
+          stage.innerHTML = html;
+          return html;
+        },
         Audio: window.Audio || null,
         Save: window.Save || null,
         I18n: window.I18n || null,

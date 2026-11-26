@@ -18,6 +18,7 @@ window.Games.physics = function (ctx) {
   var bounces = 0, running = false;
 
   function frame() {
+    if (!c.isConnected) return; /* switched to another game: stop the loop */
     x.fillStyle = '#0b1014';
     x.fillRect(0, 0, c.width, c.height);
     x.fillStyle = '#68c2b1';
