@@ -4,7 +4,7 @@
 /* Arena Royale 2.3 — app shell offline */
 "use strict";
 
-const CACHE = "arena-v3";
+const CACHE = "arena-v4";
 const ASSETS = [
   "./",
   "./index.html",

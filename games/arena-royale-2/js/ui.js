@@ -15,7 +15,8 @@ const ids = [
   'pickupBar', 'pickupFill', 'pickupLabel', 'killFeed', 'damageDir', 'fpsBox',
   'records', 'endTitle', 'endInfo', 'endKills', 'endStats', 'endRecords',
   'soundBtn', 'soundBtn2', 'langBtn', 'pauseBtn', 'pausedOverlay', 'endOverlay',
-  'startOverlay', 'vignette', 'toast', 'toastText'
+  'startOverlay', 'vignette', 'toast', 'toastText',
+  'startBtn', 'status', 'resumeBtn', 'quitBtn', 'restartBtn'
 ];
 
 export const el = {};
@@ -133,9 +134,12 @@ export function updateHud() {
   }
   if (el.switchBtn) {
     el.switchBtn.classList.toggle('hidden', !p.gunWeapon);
-    el.switchBtn.textContent = p.weapon === 'fists'
-      ? '🔫 ' + WEAPONS[p.gunWeapon].name
-      : '👊 ' + t('fists');
+    /* Without a gun the button is hidden and there is no name to show. */
+    if (p.gunWeapon) {
+      el.switchBtn.textContent = p.weapon === 'fists'
+        ? '🔫 ' + WEAPONS[p.gunWeapon].name
+        : '👊 ' + t('fists');
+    }
   }
 
   const storm = G.storm;
