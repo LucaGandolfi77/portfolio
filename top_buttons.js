@@ -62,8 +62,9 @@ if (!document.getElementById('site-top-bar')) {
     });
 
     // Create or reuse language selector (select with options like index.html)
-    // Remove older language controls if present
-    ['siteLangBtn','langBtn','siteLangSelect'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
+    // Remove older site-wide language controls if present. A page's own
+    // #langBtn belongs to that page (several games have one): leave it alone.
+    ['siteLangBtn','siteLangSelect'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
 
     function getLang() { try { return localStorage.getItem('site_lang') || (localStorage.getItem('lang') || 'en'); } catch (e) { return 'en'; } }
     function setLang(v){ try { localStorage.setItem('site_lang', v); localStorage.setItem('lang', v); } catch(e){} updateLangUI(); }

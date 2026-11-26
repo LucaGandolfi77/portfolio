@@ -1,7 +1,7 @@
 // Cache cleanup: delete only older versions of THIS app's cache (same name
 // stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
 // (lucagandolfi77.github.io) and their caches must not be touched.
-const CACHE = 'forza4-v2';
+const CACHE = 'forza4-v3';
 const ASSETS = [
   './index.html', './styles.css',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable.png', './icons/icon.svg',

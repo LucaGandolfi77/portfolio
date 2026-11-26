@@ -1,5 +1,5 @@
 /* Service Worker — Cozy Coloring Book */
-const CACHE = 'coloring_book-pwa-v1';
+const CACHE = 'coloring_book-pwa-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', '../../top_buttons.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(u => c.add(u)))).then(() => self.skipWaiting()));
