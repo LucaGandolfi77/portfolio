@@ -9,15 +9,18 @@ var NotificationService = {
   init() {
     if (this.initialized) return;
     this.initialized = true;
-    this.requestPermission();
+    // Il permesso NON si chiede qui: i browser lo bloccano senza un gesto
+    // dell'utente. Lo chiede la schermata di consenso (app.js, #perm-allow).
+    if ('Notification' in window && Notification.permission === 'granted') {
+      this.scheduleReminder();
+    }
   },
 
   requestPermission() {
-    if (!('Notification' in window)) return;
-    Notification.requestPermission().then(p => {
-      if (p === 'granted') {
-        this.scheduleReminder();
-      }
+    if (!('Notification' in window)) return Promise.resolve('unsupported');
+    return Notification.requestPermission().then(p => {
+      if (p === 'granted') this.scheduleReminder();
+      return p;
     });
   },
 

@@ -181,25 +181,17 @@ const App = {
     this.settings.theme = theme;
   },
 
+  // Un solo programmatore di promemoria: NotificationService (js/notification.js).
+  // Qui si mostra solo la schermata di consenso, al primo avvio.
   setupNotifications() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      this.scheduleReminder();
-    }
-  },
-
-  scheduleReminder() {
-    // Simple hourly reminder
-    if (Notification.permission === 'granted') {
-      setInterval(() => {
-        new Notification('Hourly Wellness Widget', {
-          body: 'Tempo per una pausa di respirazione di 60 secondi.',
-          icon: '/icons/icon-192.png',
-          tag: 'hourly-break',
-          renotify: false,
-        });
-      }, 60 * 60 * 1000); // Every hour
-    }
+    const screen = gid('perm-screen');
+    if (!screen || !('Notification' in window) || Notification.permission !== 'default') return;
+    screen.hidden = false;
+    const close = () => { screen.hidden = true; };
+    gid('perm-allow').addEventListener('click', () => {
+      NotificationService.requestPermission().finally(close);
+    });
+    gid('perm-skip2').addEventListener('click', close);
   },
 
   setupWidget() {
