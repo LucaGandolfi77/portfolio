@@ -1,0 +1,81 @@
+import * as THREE from 'three';
+import { SKY_SUN_DIRECTION } from './sky';
+
+const FOG_GOLDEN = new THREE.Color(0xf0cfa2);
+const FOG_DUSK = new THREE.Color(0x75545c);
+const SUN_GOLDEN = new THREE.Color(0xffd4a0);
+const SUN_DUSK = new THREE.Color(0xff9c66);
+const HEMI_SKY_GOLDEN = new THREE.Color(0xffe2b8);
+const HEMI_SKY_DUSK = new THREE.Color(0x8494c4);
+const HEMI_GROUND_GOLDEN = new THREE.Color(0x6f5d46);
+const HEMI_GROUND_DUSK = new THREE.Color(0x3c3444);
+
+export interface LightingRig {
+  sun: THREE.DirectionalLight;
+  hemi: THREE.HemisphereLight;
+  ambient: THREE.AmbientLight;
+  lanterns: THREE.PointLight[];
+  setDusk(t: number): void;
+  setShadowCenter(x: number, z: number): void;
+}
+
+export function createLighting(scene: THREE.Scene, mobile: boolean): LightingRig {
+  scene.fog = new THREE.Fog(FOG_GOLDEN.getHex(), 100, 720);
+
+  const hemi = new THREE.HemisphereLight(HEMI_SKY_GOLDEN, HEMI_GROUND_GOLDEN, 1.35);
+  scene.add(hemi);
+
+  const ambient = new THREE.AmbientLight(0xfff1d8, 0.22);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(SUN_GOLDEN, 2.9);
+  sun.target.position.set(-160, 0, 100);
+  sun.position.copy(SKY_SUN_DIRECTION).multiplyScalar(300).add(sun.target.position);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(mobile ? 2048 : 4096, mobile ? 2048 : 4096);
+  sun.shadow.camera.left = -360;
+  sun.shadow.camera.right = 360;
+  sun.shadow.camera.top = 340;
+  sun.shadow.camera.bottom = -340;
+  sun.shadow.camera.near = 20;
+  sun.shadow.camera.far = 760;
+  sun.shadow.bias = -0.0008;
+  sun.shadow.normalBias = 0.06;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  const setShadowCenter = (x: number, z: number): void => {
+    sun.target.position.set(x, 0, z);
+    sun.position.copy(SKY_SUN_DIRECTION).multiplyScalar(300).add(sun.target.position);
+    sun.shadow.camera.updateProjectionMatrix();
+  };
+  setShadowCenter(-160, 100);
+
+  const lanterns: THREE.PointLight[] = [];
+  for (const [x, z] of [
+    [-297, -4],
+    [15, -21],
+    [175, -110]
+  ] as const) {
+    const light = new THREE.PointLight(0xffb46e, 0, 44, 2);
+    light.position.set(x, 4.2, z);
+    scene.add(light);
+    lanterns.push(light);
+  }
+
+  const setDusk = (t: number): void => {
+    const amount = THREE.MathUtils.clamp(t, 0, 1);
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.copy(FOG_GOLDEN).lerp(FOG_DUSK, amount);
+    }
+    sun.color.copy(SUN_GOLDEN).lerp(SUN_DUSK, amount);
+    sun.intensity = THREE.MathUtils.lerp(2.9, 0.9, amount);
+    hemi.color.copy(HEMI_SKY_GOLDEN).lerp(HEMI_SKY_DUSK, amount);
+    hemi.groundColor.copy(HEMI_GROUND_GOLDEN).lerp(HEMI_GROUND_DUSK, amount);
+    hemi.intensity = THREE.MathUtils.lerp(1.35, 0.8, amount);
+    ambient.intensity = THREE.MathUtils.lerp(0.22, 0.34, amount);
+    for (const light of lanterns) light.intensity = 28 * amount;
+  };
+
+  return { sun, hemi, ambient, lanterns, setDusk, setShadowCenter };
+}

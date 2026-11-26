@@ -63,7 +63,8 @@ for (const href of hrefs) {
   let rel = href;
   let abs = path.join(ROOT, rel);
   if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) rel = path.join(rel, 'index.html');
-  if (!exists(rel) || SKIP_HTML.test(rel)) continue;
+  // Le app con build: il loro HTML e' sorgente (es. /src/main.ts, public/); la build lo riscrive.
+  if (!exists(rel) || SKIP_HTML.test(rel) || isBuilt(href)) continue;
   const html = read(rel);
   for (const m of html.matchAll(/(?:src|href)="([^"]+)"/gi)) {
     const url = m[1].trim();
