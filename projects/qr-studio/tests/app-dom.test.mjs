@@ -39,7 +39,15 @@ await import(pathToFileURL(join(APP, 'js', 'app.js')).href + '?smoke=' + Date.no
 
 const $ = (selector) => harness.document.querySelector(selector);
 const $$ = (selector) => harness.document.querySelectorAll(selector);
-const tick = (ms = 40) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+/* Wait for a condition instead of a fixed delay: CI runners are slower and run
+   the qr-studio test files in parallel, so a 40 ms sleep is not always enough. */
+const until = async (condition, timeout = 3000) => {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeout) throw new Error('timed out waiting for the app');
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+};
 const fire = (element, type) => element.dispatchEvent({ type, target: element });
 const settings = () => JSON.parse(harness.localStorage.getItem('pf.qr.settings'));
 const history = () => JSON.parse(harness.localStorage.getItem('pf.qr.history') || '[]');
@@ -87,7 +95,7 @@ test('anteprima live: URL, matrice, badge e link apribile', async () => {
   const input = $('#field-url');
   input.value = 'example.com';
   fire(input, 'input');
-  await tick(260);
+  await until(() => $('#previewStage').classList.contains('has-code'));
 
   const stage = $('#previewStage');
   assert.equal(stage.classList.contains('has-code'), true);
@@ -150,10 +158,11 @@ test('salvataggio, cronologia e download PNG/SVG', async () => {
   assert.equal($('.qr-history__item .pf-badge').textContent, 'Link');
 
   const before = harness.document.__clicks.filter((link) => link.download).length;
+  const saved = () => harness.document.__clicks.filter((link) => link.download).length;
   $('#pngBtn').click();
-  await tick();
+  await until(() => saved() >= before + 1);
   $('#svgBtn').click();
-  await tick();
+  await until(() => saved() >= before + 2);
 
   const downloads = harness.document.__clicks.filter((link) => link.download);
   assert.equal(downloads.length, before + 2);
@@ -214,7 +223,7 @@ test('cronologia: riuso, eliminazione e svuotamento', async () => {
   $('#tab-history').click();
   actions = $$('#historyList .qr-history__actions button');
   actions[3].click();
-  await tick();
+  await until(() => $('#historyList').children.length === 0);
   assert.equal($('#historyList').children.length, 0);
   assert.equal($('#historyEmpty').hidden, false);
   assert.equal(history().length, 0);
@@ -223,7 +232,7 @@ test('cronologia: riuso, eliminazione e svuotamento', async () => {
   $('#saveBtn').click();
   assert.equal($('#historyList').children.length, 1);
   $('#clearHistoryBtn').click();
-  await tick();
+  await until(() => $('#historyList').children.length === 0);
   assert.equal($('#historyList').children.length, 0);
   assert.deepEqual(history(), []);
   assert.equal($('.pf-toast').textContent, 'Cronologia svuotata');
@@ -247,7 +256,7 @@ test('reset stile e gestione errore fotocamera non supportata', async () => {
 
   $('#tab-scan').click();
   $('#scanStart').click();
-  await tick();
+  await until(() => $('#scanStatusBadge').dataset.state === 'error');
   assert.equal($('#scanStatusBadge').dataset.state, 'error');
   assert.equal($('#scanStatusBadge').textContent, 'Error');
   assert.match($('.pf-toast').textContent, /does not support camera access/i);

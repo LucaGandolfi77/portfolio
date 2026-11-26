@@ -165,11 +165,19 @@ run('mesh forms full peer graph and broadcasts chat', async () => {
   const channel = await host.startHost(stream);
   const a = new WalkieNetwork(h, {}), b = new WalkieNetwork(h, {});
   await a.join(channel, stream); await b.join(channel, stream);
-  await new Promise(r => setTimeout(r, 60));
+  /* Poll instead of a fixed 60 ms: a busy CI runner can be slower. */
+  const until = async (cond, timeout = 3000) => {
+    const start = Date.now();
+    while (!cond()) {
+      if (Date.now() - start > timeout) throw new Error('timed out');
+      await new Promise(r => setTimeout(r, 5));
+    }
+  };
+  await until(() => host.records.size === 2 && a.records.size === 2 && b.records.size === 2);
   eq(host.records.size, 2); eq(a.records.size, 2); eq(b.records.size, 2);
   ok([...b.records.keys()].includes(a.selfId) && [...a.records.keys()].includes(b.selfId));
   a.sendChat('ping');
-  await new Promise(r => setTimeout(r, 30));
+  await until(() => seen.length === 2);
   eq(seen.length, 2);
   ok(seen.every(s => s.endsWith(':ping')));
   host.close(); a.close(); b.close();
