@@ -4,15 +4,23 @@ const App = {
   timerInterval: null,
   timerRemaining: 1500,
   init() {
-    Mixer.init();
+    // I listener prima di tutto il resto: una eccezione in init non deve
+    // lasciare i pulsanti senza gestore (era il caso di setupTimer, mai definito).
     this.setupTabs();
-    this.setupTimer();
+    gid('btn-play').addEventListener('click', () => this.play('rain'));
+    gid('btn-stop').addEventListener('click', () => this.stop());
+    gid('btn-timer').addEventListener('click', () => this.toggleTimer());
     this.loadPresets();
-    gid('btn-play').addEventListener('click', () => {
-      Mixer.startAmbient('rain'); // default ambient
-      gid('status').textContent = 'Ambient attivo — zero server';
-    });
-    document.getElementById('btn-timer').addEventListener('click', () => this.toggleTimer());
+    Mixer.init();
+  },
+  play(type, label) {
+    Mixer.startAmbient(type);
+    const names = { rain: 'Pioggia', forest: 'Foresta', ocean: 'Mare', fire: 'Fuoco' };
+    gid('status').textContent = 'In riproduzione: ' + (label || names[type] || type);
+  },
+  stop() {
+    Mixer.stop();
+    gid('status').textContent = 'Fermo.';
   },
   setupTabs() {
     document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
@@ -29,7 +37,7 @@ const App = {
       const card = document.createElement('div');
       card.className = 'preset-card';
       card.innerHTML = `<h3>${p.name}</h3><p>${p.desc}</p>`;
-      card.addEventListener('click', () => Mixer.startAmbient(p.type));
+      card.addEventListener('click', () => this.play(p.type, p.name));
       grid.appendChild(card);
     });
   },
