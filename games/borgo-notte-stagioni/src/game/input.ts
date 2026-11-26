@@ -3,7 +3,7 @@
  * layer (ui/touch.ts) writes into the same fields as the keyboard.
  */
 
-export type Action = 'enter' | 'horn' | 'radio' | 'camera' | 'pause' | 'map' | 'job';
+export type Action = 'enter' | 'horn' | 'radio' | 'camera' | 'pause' | 'map' | 'job' | 'jetpack';
 
 export class Controls {
   /** On foot: x right, y forward. In a car: steer, throttle/brake. */
@@ -13,6 +13,8 @@ export class Controls {
   touchBrake = false;
   touchHandbrake = false;
   touchRun = false;
+  touchUp = false;
+  touchDown = false;
   /** Camera orbit offset from dragging (radians), eased back to zero. */
   orbit = 0;
   pitch = 0;
@@ -55,7 +57,8 @@ export class Controls {
       Escape: 'pause',
       KeyP: 'pause',
       KeyM: 'map',
-      KeyJ: 'job'
+      KeyJ: 'job',
+      KeyG: 'jetpack'
     };
     const action = map[e.code];
     if (action) {
@@ -121,6 +124,15 @@ export class Controls {
     const k = (this.key('KeyA', 'ArrowLeft') ? 1 : 0) - (this.key('KeyD', 'ArrowRight') ? 1 : 0);
     if (k !== 0) return k;
     return -this.stickX;
+  }
+
+  /** Jetpack: climb (Space, SU) and descend (Q or Ctrl, GIÙ). */
+  get ascend(): boolean {
+    return this.key('Space') || this.touchUp;
+  }
+
+  get descend(): boolean {
+    return this.key('KeyQ', 'ControlLeft', 'ControlRight') || this.touchDown;
   }
 
   get handbrake(): boolean {

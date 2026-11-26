@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FIDENZA } from '../data/fidenza';
 import { CollisionWorld, buildCityColliders } from '../data/colliders';
 import { buildRoadGraph, nearestOnGraph, pointOnEdge, type RoadGraph } from '../data/roads';
+import { HeightField } from '../data/heights';
 import { createTextures } from '../world/textures';
 import { buildCity, type CityRender } from '../world/city';
 import { createEnvironment, type Environment } from '../world/environment';
@@ -73,6 +74,8 @@ export class Game {
   private city: CityRender;
   private world: CollisionWorld;
   private graph: RoadGraph;
+  private roofs: HeightField;
+  private jetHint = false;
   private traffic: Traffic;
   private peds: Pedestrians;
   private police: PoliceForce;
@@ -144,6 +147,7 @@ export class Game {
     this.progress(0.6, 'Traccio le strade…');
     this.world = new CollisionWorld(buildCityColliders());
     this.graph = buildRoadGraph(FIDENZA.roads);
+    this.roofs = new HeightField(FIDENZA.meta.view, FIDENZA.buildings);
     this.traffic = new Traffic(this.scene, this.graph, this.world, this.beamTex, preset.traffic);
     this.peds = new Pedestrians(this.scene, this.graph, preset.peds);
     this.police = new PoliceForce(this.scene, this.graph, this.world, this.beamTex);
@@ -635,6 +639,17 @@ export class Game {
       this.save.station = this.audio.station;
       this.save.radioOn = this.audio.radioOn;
       this.radioToast();
+    } else if (a === 'jetpack') {
+      if (this.car) {
+        this.toast('Scendi dall\'auto per usare il jetpack');
+        return;
+      }
+      this.walker.toggleJet();
+      this.touch.setMode(this.walker.flying ? 'fly' : 'foot');
+      if (this.walker.flying && !this.jetHint) {
+        this.jetHint = true;
+        this.toast(this.mobile ? 'Jetpack: SU sale, GIÙ scende, TURBO accelera' : 'Jetpack: Spazio sale, Q scende, Shift accelera, G spegne', 4);
+      } else if (!this.walker.flying) this.toast('Jetpack spento');
     } else if (a === 'camera') {
       this.chase.mode = this.chase.mode === 'near' ? 'far' : 'near';
     }
@@ -662,6 +677,10 @@ export class Game {
   }
 
   private enterNearestCar(): void {
+    if (this.walker.airborne) {
+      this.toast(this.walker.flying ? 'Atterra prima (Q o GIÙ fino a terra)' : 'Scendi in strada per salire in auto');
+      return;
+    }
     let best: Vehicle | null = null;
     let bestD = 4.2;
     const story = new Set(this.story.vehicles());
@@ -699,7 +718,7 @@ export class Game {
     v.toughness = 1;
     this.car = v;
     this.walker.visible = false;
-    this.touch.setMode(true);
+    this.touch.setMode('car');
     $('dash').hidden = false;
     $('vehicle-name').textContent = v.spec.label;
     this.audio.radioOn = this.save.radioOn;
@@ -717,7 +736,7 @@ export class Game {
     const r = this.world.resolve(spot, 0.35);
     this.walker.place(r.x, r.z, v.heading);
     this.walker.visible = true;
-    this.touch.setMode(false);
+    this.touch.setMode('foot');
     $('dash').hidden = true;
     if (!silent && this.missions.active && this.missions.active.offer.kind !== 'fuga') this.toast('Torna in auto per continuare il lavoro');
   }
@@ -794,7 +813,9 @@ export class Game {
       if (v.speed > 25 && this.police.sees(v.x, v.z)) this.offence('speeding');
       if (v.wrecked && this.toastTimer <= 0) this.toast('Auto distrutta: scendi (E)');
     } else if (!talking) {
-      this.walker.update(dt, c, view, this.world, vehicles);
+      this.walker.update(dt, c, view, this.world, vehicles, this.roofs);
+      const mode = this.walker.flying ? 'fly' : 'foot';
+      if ($('touch').dataset.mode !== mode) this.touch.setMode(mode);
     }
 
     for (const p of this.police.patrols) {
@@ -805,7 +826,7 @@ export class Game {
     }
 
     const player = { x: this.px, z: this.pz };
-    const obstacles = this.car ? [] : [player];
+    const obstacles = this.car || this.walker.airborne ? [] : [player];
     const keep = new Set<Vehicle>([...(this.car ? [this.car] : []), ...this.story.vehicles()]);
     for (const v of this.traffic.vehicles) v.gripScale = this.weather.grip;
     this.traffic.update(dt, { player, view, obstacles }, keep, () => {
@@ -854,7 +875,9 @@ export class Game {
       this.audio.setEngine(rpm * 0.9 + (c.throttle ? 0.1 : 0), c.throttle, true);
       this.audio.radioOn = this.save.radioOn;
     } else {
-      this.audio.setEngine(0, 0, false);
+      /* The jetpack hums through the engine voice. */
+      if (this.walker.flying) this.audio.setEngine(0.55 + Math.min(1, this.walker.speed / 32) * 0.45, c.ascend ? 1 : 0.4, true);
+      else this.audio.setEngine(0, 0, false);
       if (this.audio.radioOn) this.audio.radioOn = false;
     }
     const nearest = this.police.patrols.reduce((m, p) => Math.min(m, Math.hypot(p.vehicle.x - player.x, p.vehicle.z - player.z)), Infinity);
@@ -862,7 +885,7 @@ export class Game {
 
     const t = this.car
       ? { x: this.car.x, y: 0, z: this.car.z, heading: this.car.heading, speed: this.car.speed, driving: true }
-      : { x: this.walker.x, y: 0, z: this.walker.z, heading: this.walker.heading, speed: this.walker.speed, driving: false };
+      : { x: this.walker.x, y: this.walker.y, z: this.walker.z, heading: this.walker.heading, speed: this.walker.speed, driving: this.walker.flying };
     this.chase.update(dt, t, c.orbit, c.pitch, this.world);
     this.env.update(solarHours(this.hours, season), this.chase.camera.position, this.weather);
     this.applyNight();
@@ -903,6 +926,7 @@ export class Game {
       if (!s.mesh.visible) return;
       s.mesh.rotation.y = t * 1.6 + i;
       s.mesh.position.y = 1.4 + Math.sin(t * 2 + i) * 0.15;
+      if (!this.car && this.walker.y > 4) return;
       if (Math.hypot(s.x - this.px, s.z - this.pz) < (this.car ? 4.5 : 2.6)) {
         s.mesh.visible = false;
         this.save.santini.push(i);
@@ -964,6 +988,7 @@ export class Game {
       const d = Math.hypot(p.vehicle.x - this.px, p.vehicle.z - this.pz);
       if (d < (this.car ? 7 : 5) && Math.abs(p.vehicle.speed) < 5) close++;
     }
+    if (!this.car && this.walker.airborne) close = 0;
     const stopped = this.car ? Math.abs(this.car.speed) < 1.5 : true;
     if (close > 0 && stopped) this.bustTimer += dt;
     else this.bustTimer = Math.max(0, this.bustTimer - dt * 2);
@@ -1103,6 +1128,17 @@ export class Game {
       job.hidden = true;
     }
 
+    if (!this.car) {
+      const air = this.walker.flying || this.walker.airborne;
+      const dash = $('dash');
+      dash.hidden = !air;
+      if (air) {
+        $('speed').textContent = String(Math.round(this.walker.speed * 3.6));
+        $('vehicle-name').textContent = `Jetpack · ${Math.round(this.walker.y)} m`;
+        $('health').style.width = '100%';
+        $('health').style.background = '#6ad1ff';
+      }
+    }
     if (this.car) {
       $('speed').textContent = String(Math.round(Math.abs(this.car.speed) * 3.6));
       const h = $('health');
@@ -1112,10 +1148,10 @@ export class Game {
 
     let prompt = '';
     if (this.dialogue.open) prompt = '';
-    else if (!this.car) {
+    else if (!this.car && !this.walker.airborne) {
       const near = [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)].find((v) => Math.hypot(v.x - this.walker.x, v.z - this.walker.z) < 4.2);
       if (near && !this.story.vehicles().includes(near)) prompt = `${this.mobile ? 'SALI' : 'E'} · ${SPECS[near.type].label}${near.driver === 'ai' || near.driver === 'police' ? ' (la rubi)' : ''}`;
-    } else if (!this.missions.active && !this.story.running) {
+    } else if (this.car && !this.missions.active && !this.story.running) {
       const offer = this.missions.offers.find((o) => Math.hypot(o.x - this.car!.x, o.z - this.car!.z) < 20);
       if (offer) prompt = `Fermati nel segnale: ${offer.special ?? TITLES[offer.kind]} per ${offer.to.name}`;
     }

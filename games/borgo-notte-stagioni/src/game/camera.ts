@@ -46,7 +46,8 @@ export class ChaseCamera {
     let d = this.distance;
     const dx = Math.sin(this.yaw);
     const dz = Math.cos(this.yaw);
-    for (let s = 1.5; s <= this.distance; s += 0.75) {
+    /* Above the roofs (jetpack) there is nothing to bump into. */
+    for (let s = 1.5; target.y < 30 && s <= this.distance; s += 0.75) {
       if (!world.isFree(target.x + dx * s, target.z + dz * s, 0.25)) {
         d = Math.max(1.6, s - 0.6);
         break;

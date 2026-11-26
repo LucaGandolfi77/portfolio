@@ -41,6 +41,9 @@ export class TouchControls {
     hold('t-brake', (v) => (controls.touchBrake = v));
     hold('t-hand', (v) => (controls.touchHandbrake = v));
     hold('t-run', (v) => (controls.touchRun = v));
+    hold('t-run2', (v) => (controls.touchRun = v));
+    hold('t-up', (v) => (controls.touchUp = v));
+    hold('t-down', (v) => (controls.touchDown = v));
 
     const tap = (id: string, action: Action): void => {
       const el = root.querySelector<HTMLElement>(`#${id}`);
@@ -54,10 +57,12 @@ export class TouchControls {
     tap('t-enter2', 'enter');
     tap('t-horn', 'horn');
     tap('t-radio', 'radio');
+    tap('t-jet', 'jetpack');
+    tap('t-jet2', 'jetpack');
   }
 
-  setMode(driving: boolean): void {
-    this.root.dataset.mode = driving ? 'car' : 'foot';
+  setMode(mode: 'car' | 'foot' | 'fly'): void {
+    this.root.dataset.mode = mode;
   }
 
   private onStickDown = (e: PointerEvent): void => {

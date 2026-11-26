@@ -48,6 +48,7 @@ AI rival, tailing at the right distance, chase and ram, collect, escape.
   the title screen).
 - A phone (`J` or TEL): story, calendar with upcoming events, contacts,
   collection and stats.
+- A jetpack (`G` or JET): fly anywhere over the map, `Space`/SU to climb, `Q`/GIÙ to descend, `Shift`/TURBO for speed. Roof heights come from the measured building heights, so you can land and walk on roofs; walls stop you only below their roof line.
 - 20 holy cards (santini) hidden near the town's landmarks.
 - Officina Stirone (green beacon): repair the car and save.
 - Everything from BORGO NOTTE: traffic, pedestrians, police alert, free
