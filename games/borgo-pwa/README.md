@@ -4,7 +4,7 @@ An open-world walk through **Fidenza** at golden hour, built with the same low-p
 
 The walk now reaches the northern agricultural and railway district, **Le Azalee**, the southern sports district, the recovered churches and parks, the western district of **Luce** and the **Parco dello Stirone**, and it also follows the **Via Francigena**, the pilgrim road that crosses Fidenza, before going indoors: **Monica, San Lazzaro, Gran Madre, Museo Musini, Parco Vittorio Veneto, Parco della Pace, Corea, Luce, San Paolo, Sant’Antonio, Parco dello Stirone, Bosco dei Pioppi, Le Azalee, Centro Commerciale Fidenza, Parco delle Azalee, Skatepark Fidenza, Aermacchi MB-326, Centro Sportivo Cigala, Stadio Ballotta, Centro Sportivo Ballotta, PalaPratizzoli, Piscina coperta, Piazza La Pira, Giardino di Charlie, Istituto Agrario “S.Solari”, Scalo di Fidenza, Parco Nord, Sacro Cuore, Parco gli Olmi, Santa Maria Annunziata, San Michele, Parco De Gasperi, Parcobaleno, Sale del Museo Musini, Galleria del Centro and Atrio della Stazione, Campo del PalaPratizzoli, Corsie della Piscina, Sala del Teatro Magnani, Sala del Consiglio, Tavola del Pellegrino, Bancone del Bar Diana, Pietra del Ponte, Pietra della Porta, Pietra del Duomo, Pietra di Matteotti, Belvedere del Centro, Belvedere dello Stirone, Belvedere della Stazione, Belvedere del Parco and Belvedere dello Stadio**. Thirty-three **Timbri del Pellegrino** reward the new districts, while the historic centre, the twelve mosaic memories and the seven main characters stay intact.
 
-The city layout, street names and public landmarks are derived from **OpenStreetMap** data (© OpenStreetMap contributors, **ODbL 1.0**). Characters, dialogue, descriptions, code, textures and all 3D geometry are original.
+The city layout, street names and public landmarks are derived from **OpenStreetMap** data (© OpenStreetMap contributors, **ODbL 1.0**). Building heights come from the **DBTR** of Regione Emilia-Romagna (class *Unità volumetrica*, field `H_uvl`, measured from the regional DTM/DSM; © Regione Emilia-Romagna, **CC BY 4.0**). Characters, dialogue, descriptions, code, textures and all 3D geometry are original.
 
 ## Play
 
@@ -76,6 +76,7 @@ The script reads the tracked OSM-derived snapshot `fidenza-city-v3/data/city.jso
 
 - **Source:** [OpenStreetMap](https://www.openstreetmap.org/) via Overpass, snapshot from `fidenza-city-v3/data/city.json`.
 - **License:** [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) — the derived database remains subject to ODbL.
+- **Heights:** `node scripts/dbtr-heights.mjs fetch` queries the public DBTR WMS (GetFeatureInfo, layer `UVL_Unita_volumetrica`) for points inside each footprint and caches the answers in `data/dbtr-heights.json`; `node scripts/dbtr-heights.mjs apply` writes the median `H_uvl` into `src/data/fidenza.json`. Buildings with no match keep the inferred height.
 - **Attribution:** “© OpenStreetMap contributors” is shown in the title screen, map, pause menu and README.
 - **Data changes:** the derived database is `src/data/fidenza.json`; the source snapshot and its full attribution are in `fidenza-city-v3/data/ATTRIBUTION.md`.
 - Public street and landmark names come from OSM; businesses and characters are fictional.

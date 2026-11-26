@@ -21,6 +21,14 @@ export interface FidenzaMeta {
     railways: number;
     waterways?: number;
   };
+  /** Measured heights (DBTR Regione Emilia-Romagna), see scripts/dbtr-heights.mjs. */
+  heights?: {
+    source: string;
+    attribution: string;
+    license: string;
+    measured: number;
+    inferred: number;
+  };
 }
 
 export interface FidenzaBuilding {

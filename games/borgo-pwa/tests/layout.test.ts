@@ -98,6 +98,21 @@ describe('Fidenza data', () => {
     expect(FIDENZA.meta.source).toContain('Overpass');
   });
 
+  it('uses measured DBTR heights and credits Regione Emilia-Romagna (CC BY 4.0)', () => {
+    const heights = FIDENZA.meta.heights;
+    expect(heights?.license).toBe('CC-BY-4.0');
+    expect(heights?.attribution).toContain('Regione Emilia-Romagna');
+    expect(heights!.measured).toBeGreaterThan(FIDENZA.buildings.length * 0.6);
+    for (const b of FIDENZA.buildings) {
+      expect(b.h).toBeGreaterThanOrEqual(2.5);
+      expect(b.h).toBeLessThanOrEqual(60);
+    }
+    // The OSM-only data had every landmark at about 9 m.
+    const height = (id: string) => FIDENZA.buildings.find((b) => b.landmark === id)!.h;
+    expect(height('teatro')).toBeGreaterThanOrEqual(15);
+    expect(height('granmadre')).toBeGreaterThan(20);
+  });
+
   it('keeps every id unique', () => {
     expect(new Set(FIDENZA.buildings.map((b) => b.id)).size).toBe(FIDENZA.buildings.length);
     expect(new Set(FIDENZA.roads.map((r) => r.id)).size).toBe(FIDENZA.roads.length);

@@ -324,7 +324,8 @@ function addGenericBuilding(batch: TriBatch, building: FidenzaBuilding, collisio
   const pts = building.poly;
   const count = pts.length / 2;
   const ccw = signedArea(pts) > 0;
-  const wall = wallColor(building);
+  const tower = isTower(building);
+  const wall = tower ? 0xd8c8ac : wallColor(building);
   const roof = roofColor(building);
   const candidates: EdgeCandidate[] = [];
 
@@ -358,16 +359,67 @@ function addGenericBuilding(batch: TriBatch, building: FidenzaBuilding, collisio
     }
   }
 
+  if (tower) {
+    addTowerTop(batch, building, pts, candidates);
+    return;
+  }
   addRoof(batch, building, pts, roof);
   addWindowsAndDoor(batch, building, candidates);
   addLandmarkDetails(batch, building);
+}
+
+/* A slender, tall DBTR volume (a bell tower such as the Duomo's): stone,
+   belfry openings and a pyramid cap instead of apartment windows. */
+const CHURCHES = FIDENZA.buildings.filter(
+  (b) => b.kind === 'church' || /^(Chiesa|Cattedrale|Santuario|Oratorio)\b/.test(b.name)
+);
+
+function isTower(building: FidenzaBuilding): boolean {
+  if (building.landmark || building.area >= 70 || building.h <= 14) return false;
+  return CHURCHES.some((church) => Math.hypot(church.x - building.x, church.z - building.z) < 30);
+}
+
+function addTowerTop(batch: TriBatch, building: FidenzaBuilding, pts: number[], edges: EdgeCandidate[]): void {
+  const count = pts.length / 2;
+  const centre = centroid(pts);
+  const bbox = boundsOf(pts);
+  const rise = Math.min(6, Math.max(2.5, Math.min(bbox.maxX - bbox.minX, bbox.maxZ - bbox.minZ) * 0.9));
+  for (let i = 0; i < count; i++) {
+    const j = (i + 1) % count;
+    batch.tri(
+      pts[i * 2], building.h + 0.1, pts[i * 2 + 1],
+      pts[j * 2], building.h + 0.1, pts[j * 2 + 1],
+      centre.x, building.h + rise, centre.z,
+      0x7b7a70
+    );
+  }
+  /* Edges are collected only where the street is free; a tower may stand
+     against the church, so fall back to every edge of the footprint. */
+  const sides: EdgeCandidate[] = edges.length > 0 ? edges : [];
+  if (sides.length === 0) {
+    const ccw = signedArea(pts) > 0;
+    for (let i = 0; i < count; i++) {
+      const j = (i + 1) % count;
+      const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[j * 2], bz = pts[j * 2 + 1];
+      const length = Math.hypot(bx - ax, bz - az);
+      if (length < 2) continue;
+      const sign = ccw ? 1 : -1;
+      sides.push({ ax, az, bx, bz, length, ox: (sign * (bz - az)) / length, oz: (sign * -(bx - ax)) / length, ry: Math.atan2(-(bz - az), bx - ax) });
+    }
+  }
+  for (const edge of sides) {
+    const x = (edge.ax + edge.bx) / 2 + edge.ox * 0.06;
+    const z = (edge.az + edge.bz) / 2 + edge.oz * 0.06;
+    batch.box(Math.min(1.6, edge.length * 0.4), 2.6, 0.12, x, building.h - 2.4, z, 0x2b241c, edge.ry);
+  }
 }
 
 function addRoof(batch: TriBatch, building: FidenzaBuilding, pts: number[], roof: number): void {
   const count = pts.length / 2;
   const bbox = boundsOf(pts);
   const minDim = Math.min(bbox.maxX - bbox.minX, bbox.maxZ - bbox.minZ);
-  const flat = building.h > 13 || count > 12 || building.area > 750 || building.kind === 'industrial';
+  // Measured heights put many historic houses above 13 m: keep their pitched roofs.
+  const flat = building.h > 22 || count > 12 || building.area > 750 || building.kind === 'industrial';
   if (flat) {
     batch.polygonTop(pts, building.h + 0.16, roof);
     return;
@@ -419,7 +471,8 @@ function addWindowsAndDoor(
     batch.box(1.5, 0.1, 0.55, x + doorEdge.ox * 0.22, 0.05, z + doorEdge.oz * 0.22, STONE, doorEdge.ry);
   }
 
-  const floors = Math.min(4, Math.max(1, Math.floor((building.h - 1.8) / 3)));
+  // Measured DBTR heights reach 20-25 m on the apartment blocks: up to 8 window rows.
+  const floors = Math.min(8, Math.max(1, Math.floor((building.h - 1.8) / 3)));
   const central =
     Math.hypot(building.x + 280, building.z - 5) < 170 ||
     Math.hypot(building.x - 15, building.z + 21) < 140;
