@@ -4,7 +4,7 @@ import { CollisionWorld, buildCityColliders } from '../data/colliders';
 import { buildRoadGraph, nearestOnGraph, pointOnEdge, type RoadGraph } from '../data/roads';
 import { HeightField } from '../data/heights';
 import { createTextures } from '../world/textures';
-import { buildCity, type CityRender } from '../world/city';
+import { CityStream } from '../world/city';
 import { createEnvironment, type Environment } from '../world/environment';
 import { Marker } from '../world/markers';
 import { Weather, WEATHER_LABEL, type WeatherKind } from '../world/weather';
@@ -13,8 +13,10 @@ import { SeasonEvents } from '../world/events';
 import { collideVehicles, LIGHTS, NO_INPUT, SPECS, Vehicle } from '../game/vehicle';
 import { Traffic } from '../game/traffic';
 import { Pedestrians } from '../game/peds';
-import { Alert, PoliceForce, type Offence } from '../game/police';
+import { PoliceForce, type Offence } from '../game/police';
+import { Law } from '../game/law';
 import { Missions, TITLES, type MissionEvent, type Spot } from '../game/missions';
+import { JobsBoard } from '../game/jobs-board';
 import { Controls, type Action } from '../game/input';
 import { ChaseCamera } from '../game/camera';
 import { Walker } from '../game/player';
@@ -28,15 +30,17 @@ import {
   SEASON_LABEL,
   seasonOf,
   solarHours,
-  upcoming,
   type Season,
   type SeasonEvent
 } from '../game/calendar';
-import { CAST, CHAPTERS, PLACES } from '../game/story';
+import { CHAPTERS, PLACES } from '../game/story';
 import { AudioEngine, STATIONS } from '../audio/audio';
 import { Radar, type Blip } from '../ui/radar';
 import { TouchControls } from '../ui/touch';
 import { Dialogue } from '../ui/dialogue';
+import { Notices } from '../ui/notices';
+import { renderPhone, type PhoneTab } from '../ui/phone';
+import { Santini } from '../world/santini';
 import { Intro } from './intro';
 import { StoryRunner, type StoryHost } from './story-runner';
 
@@ -64,14 +68,13 @@ const PRESETS: Record<Quality, Preset> = {
 const HOUR = 60;
 const RELEASE: Spot = { x: 195, z: -103, name: 'Piazza della Repubblica' };
 const REPAIR_COST = 80;
-const SANTINI = 20;
 
 export class Game {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private chase: ChaseCamera;
   private env: Environment;
-  private city: CityRender;
+  private city: CityStream;
   private world: CollisionWorld;
   private graph: RoadGraph;
   private roofs: HeightField;
@@ -79,7 +82,8 @@ export class Game {
   private traffic: Traffic;
   private peds: Pedestrians;
   private police: PoliceForce;
-  private alert = new Alert();
+  private law = new Law();
+  private ui = new Notices();
   private missions: Missions;
   private controls: Controls;
   private touch: TouchControls;
@@ -94,13 +98,9 @@ export class Game {
   private day = 0;
   private hours = 7.5;
   private last = performance.now();
-  private bustTimer = 0;
   private bustedTimer = 0;
-  private markers = new Map<number, Marker>();
-  private targetMarker: Marker;
+  private jobs: JobsBoard;
   private garageMarker: Marker;
-  private bannerTimer = 0;
-  private toastTimer = 0;
   private saveTimer = 0;
   private beamTex: THREE.Texture;
   private fps = { frames: 0, time: 0, value: 60 };
@@ -112,7 +112,7 @@ export class Game {
   private intro = new Intro();
   private cardDone: (() => void) | null = null;
   private eventsNow: SeasonEvent[] = [];
-  private santini: Array<{ x: number; z: number; mesh: THREE.Mesh }> = [];
+  private santini!: Santini;
   private phoneTab = 'storia';
   private objectiveText: string | null = null;
   private objectiveTime: number | null = null;
@@ -137,8 +137,10 @@ export class Game {
     this.beamTex = textures.glow;
     LIGHTS.beam.map = textures.glow;
     this.progress(0.3, 'Costruisco Fidenza…');
-    this.city = buildCity(textures);
+    this.city = new CityStream(textures);
     this.scene.add(this.city.group);
+    /* The neighbourhood of the start, built now; the rest streams in. */
+    this.city.update(PLACES.stazione.x, PLACES.stazione.z, preset.far * 0.6, Infinity);
     this.chase = new ChaseCamera(innerWidth / innerHeight, preset.far);
     this.env = createEnvironment(this.scene, preset.far);
     this.look = new SeasonLook(this.city);
@@ -164,15 +166,13 @@ export class Game {
       }
     }
     this.missions = new Missions(spots, this.graph);
-    this.targetMarker = new Marker(0xffd23f, 3.6);
-    this.targetMarker.group.visible = false;
-    this.scene.add(this.targetMarker.group);
+    this.jobs = new JobsBoard(this.scene, this.graph, this.missions);
     this.garageMarker = new Marker(0x7bdc8a, 3);
     this.scene.add(this.garageMarker.group);
 
     this.walker = new Walker(this.scene, PLACES.stazione.x, PLACES.stazione.z, Math.PI);
     this.story = new StoryRunner(this.host(), this.save.story);
-    this.placeSantini();
+    this.santini = new Santini(this.scene, this.graph, this.world, this.save.santini);
 
     this.controls = new Controls(canvas);
     this.controls.on((a) => this.onAction(a));
@@ -208,12 +208,12 @@ export class Game {
         this.objectiveTime = time ?? null;
         this.objectiveExtra = extra ?? '';
       },
-      banner: (t, d, s) => this.banner(t, d, s),
-      toast: (t) => this.toast(t),
+      banner: (t, d, s) => this.ui.banner(t, d, s),
+      toast: (t) => this.ui.toast(t),
       chapterCard: (title, text, done) => this.card(title, text, done),
       money: (n) => {
         this.save.money += n;
-        this.bumpMoney();
+        this.ui.bumpMoney();
       },
       sound: (k) => (k === 'tick' ? this.audio.checkpoint() : this.audio.jingle(k === 'ok')),
       setClock: (h) => {
@@ -224,10 +224,10 @@ export class Game {
       jumpSeason: (season) => this.jumpSeason(season),
       season: () => seasonOf(this.day),
       raiseAlert: (level) => {
-        this.alert.level = Math.max(this.alert.level, level);
-        this.alert.hidden = 0;
+        this.law.alert.level = Math.max(this.law.alert.level, level);
+        this.law.alert.hidden = 0;
       },
-      alertLevel: () => this.alert.level,
+      alertLevel: () => this.law.alert.level,
       addVehicle: (v) => {
         this.scene.add(v.model);
         this.traffic.loose.push(v);
@@ -278,53 +278,6 @@ export class Game {
   }
 
   /** Twenty holy cards hidden around town, at real places. */
-  private placeSantini(): void {
-    const c = document.createElement('canvas');
-    c.width = 64;
-    c.height = 96;
-    const g = c.getContext('2d')!;
-    g.fillStyle = '#f2e6c4';
-    g.fillRect(0, 0, 64, 96);
-    g.strokeStyle = '#c9a64b';
-    g.lineWidth = 6;
-    g.strokeRect(4, 4, 56, 88);
-    g.fillStyle = '#7a4a2a';
-    g.beginPath();
-    g.arc(32, 36, 14, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#ffd23f';
-    g.beginPath();
-    g.arc(32, 36, 18, Math.PI, 0);
-    g.lineWidth = 3;
-    g.strokeStyle = '#ffd23f';
-    g.stroke();
-    g.fillStyle = '#7a4a2a';
-    g.fillRect(20, 54, 24, 26);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
-    const geo = new THREE.PlaneGeometry(0.6, 0.9);
-    const candidates = [...FIDENZA.places.map((p) => ({ x: p.x, z: p.z })), ...Object.values(PLACES).map((p) => ({ x: p.x + 9, z: p.z - 7 }))];
-    const chosen: Array<{ x: number; z: number }> = [];
-    for (const p of candidates) {
-      if (chosen.length >= SANTINI) break;
-      const n = nearestOnGraph(this.graph, p.x, p.z, true);
-      const dir = pointOnEdge(n.edge, n.d, true);
-      const off = n.edge.width / 2 + 1.4;
-      const x = n.x - dir.dz * off, z = n.z + dir.dx * off;
-      if (!this.world.isFree(x, z, 0.4)) continue;
-      if (chosen.some((q) => Math.hypot(q.x - x, q.z - z) < 60)) continue;
-      chosen.push({ x, z });
-    }
-    chosen.forEach((p, i) => {
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(p.x, 1.4, p.z);
-      mesh.visible = !this.save.santini.includes(i);
-      this.scene.add(mesh);
-      this.santini.push({ x: p.x, z: p.z, mesh });
-    });
-  }
-
   /** On foot beside a parked taxi at the start of a session. */
   private placePlayer(fromStart: boolean): void {
     const at = fromStart ? PLACES.stazione : PLACES.garage;
@@ -365,7 +318,7 @@ export class Game {
     this.audio.radioOn = this.save.radioOn;
     this.placePlayer(fromStart);
     this.setState('play');
-    if (fromStart) this.banner('Fidenza', 'Lo zio Ottavio ti aspetta: segui il segnale blu.', 4);
+    if (fromStart) this.ui.banner('Fidenza', 'Lo zio Ottavio ti aspetta: segui il segnale blu.', 4);
   }
 
   private bindUi(): void {
@@ -378,7 +331,7 @@ export class Game {
         this.story.done = [];
         this.day = 0;
         this.hours = 6;
-        this.santini.forEach((s) => (s.mesh.visible = true));
+        this.santini.reset();
         this.persist();
       }
       if (fresh || !this.save.introSeen) {
@@ -504,70 +457,48 @@ export class Game {
   }
 
   private renderPhone(): void {
-    const body = $('phone-body');
-    const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-    let html = '';
-    if (this.phoneTab === 'storia') {
-      const list = this.story.summary();
-      let chapter = '';
-      for (const m of list) {
-        if (m.chapter !== chapter) {
-          chapter = m.chapter;
-          html += `${html.includes('<ul>') ? '</ul>' : ''}<h3>${esc(chapter)}</h3><ul>`;
-        }
-        html += `<li class="${m.state === 'fatta' ? 'done' : m.state === 'attuale' ? 'now' : ''}">${esc(m.title)}${m.state === 'attuale' ? ' <span class="muted">· segnale blu</span>' : ''}</li>`;
-      }
-      html += '</ul>';
-    } else if (this.phoneTab === 'calendario') {
-      const season = seasonOf(this.day);
-      html += `<h3>${esc(dateLabel(this.day))}</h3><p>${esc(PHASE_LABEL[phaseOf(this.hours, season)])} · ${formatClock(this.hours)} · ${esc(WEATHER_LABEL[this.weather.kind])}</p>`;
-      if (this.eventsNow.length) html += `<h3>Adesso</h3><ul>${this.eventsNow.map((e) => `<li class="now"><b>${esc(e.name)}</b> · ${esc(e.place.name)}<br><span class="muted">${esc(e.blurb)}</span></li>`).join('')}</ul>`;
-      html += `<h3>Prossimi eventi</h3><ul>${upcoming(this.day, this.hours, 4)
-        .map((u) => `<li><b>${esc(u.event.name)}</b> · ${esc(dateLabel(u.day))}, dalle ${u.event.from}:00<br><span class="muted">${esc(u.event.place.name)}</span></li>`)
-        .join('')}</ul>`;
-    } else if (this.phoneTab === 'contatti') {
-      html += '<ul>';
-      for (const c of Object.values(CAST)) {
-        if (c.id === 'dario') continue;
-        html += `<li><span class="who" style="color:${c.color}">●</span> <span class="who">${esc(c.name)}</span> <span class="muted">${esc(c.role)}</span><br>${esc(c.bio)}</li>`;
-      }
-      html += '</ul>';
-    } else {
-      const found = this.save.santini.length;
-      html += `<h3>Santini</h3><p>${found}/${this.santini.length} trovati · €50 ciascuno. Sono vicino ai luoghi famosi della città.</p>`;
-      html += `<h3>Statistiche</h3><ul><li>Soldi: ${formatMoney(this.save.money)}</li><li>Lavori extra: ${this.save.jobs}</li><li>Missioni della storia: ${this.story.done.length}/12</li><li>Fermato dalla polizia: ${this.save.busted} volte</li>${this.save.bestRace ? `<li>Corsa migliore: ${this.save.bestRace} s</li>` : ''}</ul>`;
+    $('phone-body').innerHTML = renderPhone(this.phoneTab as PhoneTab, {
+      missions: this.story.summary(),
+      day: this.day,
+      hours: this.hours,
+      weather: this.weather.kind,
+      events: this.eventsNow,
+      save: this.save,
+      santiniTotal: this.santini.total,
+      storyDone: this.story.done.length
+    });
+  }
+
+  private offence(o: Offence): void {
+    const message = this.law.offence(o, this.day * 24 * HOUR + this.hours * HOUR);
+    if (message) this.ui.toast(message);
+  }
+
+  private checkBust(dt: number): void {
+    const patrols = this.police.patrols.map((p) => ({ x: p.vehicle.x, z: p.vehicle.z, speed: p.vehicle.speed }));
+    const arrested = this.law.checkArrest(dt, patrols, {
+      x: this.px,
+      z: this.pz,
+      inCar: !!this.car,
+      speed: this.car ? this.car.speed : 0,
+      airborne: this.walker.airborne
+    });
+    if (arrested) this.busted();
+  }
+
+  private pickSantini(): void {
+    const i = this.santini.update(this.px, this.pz, this.car ? 4.5 : 2.6, this.car !== null || this.walker.y <= 4);
+    if (i < 0) return;
+    this.save.santini.push(i);
+    this.save.money += 50;
+    this.ui.bumpMoney();
+    this.audio.jingle(true);
+    this.ui.toast(`Santino ${this.save.santini.length}/${this.santini.total} · +€ 50`);
+    if (this.save.santini.length === this.santini.total) {
+      this.save.money += 1000;
+      this.ui.banner('Collezione completa', 'Tutti i santini di Fidenza: +€ 1.000', 4);
     }
-    body.innerHTML = html;
-  }
-
-  private banner(title: string, detail = '', seconds = 3.2): void {
-    const el = $('banner');
-    el.innerHTML = '';
-    el.append(title);
-    if (detail) {
-      const small = document.createElement('small');
-      small.textContent = detail;
-      el.append(small);
-    }
-    el.hidden = false;
-    el.style.animation = 'none';
-    void el.offsetWidth;
-    el.style.animation = '';
-    this.bannerTimer = seconds;
-  }
-
-  private toast(text: string, seconds = 2.2): void {
-    const el = $('toast');
-    el.textContent = text;
-    el.hidden = false;
-    this.toastTimer = seconds;
-  }
-
-  private bumpMoney(): void {
-    const money = $('money');
-    money.classList.remove('bump');
-    void money.offsetWidth;
-    money.classList.add('bump');
+    this.persist();
   }
 
   private persist(): void {
@@ -641,44 +572,31 @@ export class Game {
       this.radioToast();
     } else if (a === 'jetpack') {
       if (this.car) {
-        this.toast('Scendi dall\'auto per usare il jetpack');
+        this.ui.toast('Scendi dall\'auto per usare il jetpack');
         return;
       }
       this.walker.toggleJet();
       this.touch.setMode(this.walker.flying ? 'fly' : 'foot');
       if (this.walker.flying && !this.jetHint) {
         this.jetHint = true;
-        this.toast(this.mobile ? 'Jetpack: SU sale, GIÙ scende, TURBO accelera' : 'Jetpack: Spazio sale, Q scende, Shift accelera, G spegne', 4);
-      } else if (!this.walker.flying) this.toast('Jetpack spento');
+        this.ui.toast(this.mobile ? 'Jetpack: SU sale, GIÙ scende, TURBO accelera' : 'Jetpack: Spazio sale, Q scende, Shift accelera, G spegne', 4);
+      } else if (!this.walker.flying) this.ui.toast('Jetpack spento');
     } else if (a === 'camera') {
       this.chase.mode = this.chase.mode === 'near' ? 'far' : 'near';
     }
   }
 
   private radioToast(): void {
-    if (!this.audio.radioOn) this.toast('Radio spenta');
+    if (!this.audio.radioOn) this.ui.toast('Radio spenta');
     else {
       const s = STATIONS[this.audio.station];
-      this.toast(`${s.name} ${s.freq} · ${s.genre}`, 2.8);
-    }
-  }
-
-  private offence(o: Offence): void {
-    if (this.alert.add(o, this.day * 24 * HOUR + this.hours * HOUR)) {
-      const words: Record<Offence, string> = {
-        carjack: 'Auto rubata',
-        knock: 'Pedone investito',
-        ram: 'Speronamento',
-        speeding: 'Eccesso di velocità',
-        'police-car': 'Auto della polizia rubata'
-      };
-      this.toast(`${words[o]}: allerta ${this.alert.level}`);
+      this.ui.toast(`${s.name} ${s.freq} · ${s.genre}`, 2.8);
     }
   }
 
   private enterNearestCar(): void {
     if (this.walker.airborne) {
-      this.toast(this.walker.flying ? 'Atterra prima (Q o GIÙ fino a terra)' : 'Scendi in strada per salire in auto');
+      this.ui.toast(this.walker.flying ? 'Atterra prima (Q o GIÙ fino a terra)' : 'Scendi in strada per salire in auto');
       return;
     }
     let best: Vehicle | null = null;
@@ -693,11 +611,11 @@ export class Game {
       }
     }
     if (!best) {
-      this.toast('Nessuna auto vicina');
+      this.ui.toast('Nessuna auto vicina');
       return;
     }
     if (best.wrecked) {
-      this.toast('Quest\'auto non parte più');
+      this.ui.toast('Quest\'auto non parte più');
       return;
     }
     const v = best;
@@ -738,7 +656,7 @@ export class Game {
     this.walker.visible = true;
     this.touch.setMode('foot');
     $('dash').hidden = true;
-    if (!silent && this.missions.active && this.missions.active.offer.kind !== 'fuga') this.toast('Torna in auto per continuare il lavoro');
+    if (!silent && this.missions.active && this.missions.active.offer.kind !== 'fuga') this.ui.toast('Torna in auto per continuare il lavoro');
   }
 
   /* ---------------- frame ---------------- */
@@ -769,6 +687,8 @@ export class Game {
       this.applyNight();
     }
     if (this.state === 'card' || this.dialogue.open) this.dialogue.update(dt);
+    const cam = this.chase.camera.position;
+    this.city.update(cam.x, cam.z, PRESETS[this.quality].far + 40, this.state === 'intro' || this.state === 'title' ? 14 : 6);
     this.renderer.render(this.scene, this.chase.camera);
     this.fps.frames++;
     this.fps.time += dt;
@@ -811,7 +731,7 @@ export class Game {
       }
       v.sync();
       if (v.speed > 25 && this.police.sees(v.x, v.z)) this.offence('speeding');
-      if (v.wrecked && this.toastTimer <= 0) this.toast('Auto distrutta: scendi (E)');
+      if (v.wrecked && this.ui.toastTimer <= 0) this.ui.toast('Auto distrutta: scendi (E)');
     } else if (!talking) {
       this.walker.update(dt, c, view, this.world, vehicles, this.roofs);
       const mode = this.walker.flying ? 'fly' : 'foot';
@@ -839,24 +759,23 @@ export class Game {
     const target = this.car
       ? { x: this.car.x, z: this.car.z, vx: this.car.vx, vz: this.car.vz }
       : { x: this.walker.x, z: this.walker.z, vx: this.walker.vx, vz: this.walker.vz };
-    this.police.update(dt, this.alert.level, target, view);
-    const before = this.alert.level;
-    if (this.alert.update(dt, this.police.sees(player.x, player.z)) && this.alert.level < before) {
-      this.toast(this.alert.level === 0 ? 'Li hai seminati' : `Allerta ${this.alert.level}`);
+    this.police.update(dt, this.law.alert.level, target, view);
+    const before = this.law.alert.level;
+    if (this.law.alert.update(dt, this.police.sees(player.x, player.z)) && this.law.alert.level < before) {
+      this.ui.toast(this.law.alert.level === 0 ? 'Li hai seminati' : `Allerta ${this.law.alert.level}`);
     }
     this.checkBust(dt);
 
     /* Story first; free jobs only between story missions. */
     this.story.update(dt);
     const health = this.car ? this.car.health : 100;
-    const input = { x: player.x, z: player.z, inVehicle: !!this.car, speed: this.car ? Math.abs(this.car.speed) : 0, health, alert: this.alert.level };
+    const input = { x: player.x, z: player.z, inVehicle: !!this.car, speed: this.car ? Math.abs(this.car.speed) : 0, health, alert: this.law.alert.level };
     if (!this.story.running) {
-      this.missions.refresh(player);
-      this.eventJobs();
-      if (!this.missions.active && this.alert.level >= 3 && this.car) this.onMission(this.missions.startEscape(this.alert.level, input));
+      this.jobs.refresh(player, this.eventsNow);
+      if (!this.missions.active && this.law.alert.level >= 3 && this.car) this.onMission(this.missions.startEscape(this.law.alert.level, input));
       for (const e of this.missions.update(dt, input)) this.onMission(e);
     }
-    this.syncMarkers();
+    this.jobs.sync(!!this.story.running);
     this.pickSantini();
     this.garage();
 
@@ -864,7 +783,7 @@ export class Game {
     this.weather.update(dt, dh, season, this.chase.camera.position);
     this.look.apply(season, this.weather.snow);
     const events = activeEvents(this.day, this.hours);
-    for (const e of events) if (!this.eventsNow.some((x) => x.id === e.id)) this.banner(e.name, `${e.place.name} · ${e.blurb}`, 4.5);
+    for (const e of events) if (!this.eventsNow.some((x) => x.id === e.id)) this.ui.banner(e.name, `${e.place.name} · ${e.blurb}`, 4.5);
     this.eventsNow = events;
     this.events.update(dt, events, this.hours, this.chase.camera.position);
 
@@ -881,7 +800,7 @@ export class Game {
       if (this.audio.radioOn) this.audio.radioOn = false;
     }
     const nearest = this.police.patrols.reduce((m, p) => Math.min(m, Math.hypot(p.vehicle.x - player.x, p.vehicle.z - player.z)), Infinity);
-    this.audio.setSiren(this.alert.level > 0 ? Math.max(0, 1 - nearest / 120) : 0);
+    this.audio.setSiren(this.law.alert.level > 0 ? Math.max(0, 1 - nearest / 120) : 0);
 
     const t = this.car
       ? { x: this.car.x, y: 0, z: this.car.z, heading: this.car.heading, speed: this.car.speed, driving: true }
@@ -899,48 +818,6 @@ export class Game {
   }
 
   /** Seasonal events add their own jobs at the event square. */
-  private eventJobs(): void {
-    const kinds: Record<SeasonEvent['id'], 'consegna' | 'taxi'> = {
-      fiori: 'consegna',
-      'notte-bianca': 'taxi',
-      'san-donnino': 'taxi',
-      natale: 'consegna',
-      capodanno: 'taxi'
-    };
-    for (const e of this.eventsNow) {
-      if (this.missions.offers.some((o) => o.special === e.name) || this.missions.active?.offer.special === e.name) continue;
-      const n = nearestOnGraph(this.graph, e.place.x + 14, e.place.z + 10, true);
-      const from = { x: n.x, z: n.z, name: e.place.name };
-      const pool = FIDENZA.places.filter((p) => Math.hypot(p.x - from.x, p.z - from.z) > 250);
-      const dest = pool[Math.floor(Math.random() * pool.length)] ?? FIDENZA.places[0];
-      const d = nearestOnGraph(this.graph, dest.x, dest.z, true);
-      this.missions.offers.push({ id: 10_000 + Math.floor(Math.random() * 1e6), kind: kinds[e.id], x: from.x, z: from.z, from, to: { x: d.x, z: d.z, name: dest.name }, special: e.name });
-    }
-    /* Event jobs disappear when the event ends. */
-    this.missions.offers = this.missions.offers.filter((o) => !o.special || this.eventsNow.some((e) => e.name === o.special));
-  }
-
-  private pickSantini(): void {
-    const t = performance.now() / 1000;
-    this.santini.forEach((s, i) => {
-      if (!s.mesh.visible) return;
-      s.mesh.rotation.y = t * 1.6 + i;
-      s.mesh.position.y = 1.4 + Math.sin(t * 2 + i) * 0.15;
-      if (!this.car && this.walker.y > 4) return;
-      if (Math.hypot(s.x - this.px, s.z - this.pz) < (this.car ? 4.5 : 2.6)) {
-        s.mesh.visible = false;
-        this.save.santini.push(i);
-        this.save.money += 50;
-        this.bumpMoney();
-        this.audio.jingle(true);
-        this.toast(`Santino ${this.save.santini.length}/${this.santini.length} · +€ 50`);
-        if (this.save.santini.length === this.santini.length) this.banner('Collezione completa', 'Tutti i santini di Fidenza: +€ 1.000', 4);
-        if (this.save.santini.length === this.santini.length) this.save.money += 1000;
-        this.persist();
-      }
-    });
-  }
-
   /** Officina Stirone: stop in the green beacon to repair and save. */
   private garage(): void {
     const at = this.story.spot('officina');
@@ -948,20 +825,20 @@ export class Game {
     this.garageMarker.at(k.x, k.z).update(performance.now() / 1000);
     const v = this.car;
     if (!v || Math.hypot(v.x - k.x, v.z - k.z) > 6 || Math.abs(v.speed) > 1) return;
-    if (this.toastTimer > 0) return;
+    if (this.ui.toastTimer > 0) return;
     if (v.health < 99 || v.wrecked) {
       if (this.save.money < REPAIR_COST) {
-        this.toast(`Riparazione: servono € ${REPAIR_COST}`);
+        this.ui.toast(`Riparazione: servono € ${REPAIR_COST}`);
         return;
       }
       this.save.money -= REPAIR_COST;
       v.health = 100;
       v.wrecked = false;
       this.persist();
-      this.toast(`Auto riparata (-€ ${REPAIR_COST}) · partita salvata`, 3);
+      this.ui.toast(`Auto riparata (-€ ${REPAIR_COST}) · partita salvata`, 3);
     } else {
       this.persist();
-      this.toast('Partita salvata', 2);
+      this.ui.toast('Partita salvata', 2);
     }
   }
 
@@ -978,23 +855,6 @@ export class Game {
     LIGHTS.red.color.set(on ? 0x301010 : 0xff2a2a);
   }
 
-  private checkBust(dt: number): void {
-    if (this.alert.level === 0) {
-      this.bustTimer = 0;
-      return;
-    }
-    let close = 0;
-    for (const p of this.police.patrols) {
-      const d = Math.hypot(p.vehicle.x - this.px, p.vehicle.z - this.pz);
-      if (d < (this.car ? 7 : 5) && Math.abs(p.vehicle.speed) < 5) close++;
-    }
-    if (!this.car && this.walker.airborne) close = 0;
-    const stopped = this.car ? Math.abs(this.car.speed) < 1.5 : true;
-    if (close > 0 && stopped) this.bustTimer += dt;
-    else this.bustTimer = Math.max(0, this.bustTimer - dt * 2);
-    if (this.bustTimer > (this.car ? 2.2 : 1.6)) this.busted();
-  }
-
   private busted(): void {
     const fine = bustedFine(this.save.money);
     this.save.money -= fine;
@@ -1004,14 +864,13 @@ export class Game {
     if (this.missions.active) this.missions.fail(this.missions.active, 'polizia');
     if (this.story.running) this.story.fail('Fermato dalla polizia');
     this.leaveCar(true);
-    this.bustTimer = 0;
     this.bustedTimer = 3.2;
     this.audio.jingle(false);
     this.setState('busted');
   }
 
   private release(): void {
-    this.alert.clear();
+    this.law.alert.clear();
     this.police.dismissAll();
     const n = nearestOnGraph(this.graph, RELEASE.x, RELEASE.z, true);
     const r = this.world.resolve({ x: n.x + 3, z: n.z + 3 }, 0.35);
@@ -1032,11 +891,11 @@ export class Game {
             : a.offer.kind === 'fuga'
               ? 'La polizia ti sta addosso: seminala'
               : `Carico a bordo: consegnalo a ${a.offer.to.name}`;
-      this.banner(title, text);
+      this.ui.banner(title, text);
       this.audio.checkpoint();
     } else if (e.type === 'checkpoint') {
       this.audio.checkpoint();
-      this.toast(`Checkpoint · ne mancano ${e.left}`, 1.2);
+      this.ui.toast(`Checkpoint · ne mancano ${e.left}`, 1.2);
     } else if (e.type === 'completed') {
       const bonus = a.offer.special ? Math.round(e.reward * 0.5) : 0;
       const total = e.reward + e.bonus + bonus;
@@ -1047,53 +906,18 @@ export class Game {
         if (this.save.bestRace === null || time < this.save.bestRace) this.save.bestRace = Math.round(time);
       }
       this.persist();
-      this.banner(`${title}: fatto`, `+${formatMoney(total)}`);
-      this.bumpMoney();
+      this.ui.banner(`${title}: fatto`, `+${formatMoney(total)}`);
+      this.ui.bumpMoney();
       this.audio.jingle(true);
     } else if (e.type === 'failed') {
       const why = { tempo: 'Tempo scaduto', auto: 'Auto distrutta', polizia: 'Fermato dalla polizia', abbandono: 'Lavoro abbandonato' }[e.reason];
-      this.banner(`${title}: fallito`, why);
+      this.ui.banner(`${title}: fallito`, why);
       this.audio.jingle(false);
     }
   }
 
-  private syncMarkers(): void {
-    const t = performance.now() / 1000;
-    const active = this.missions.active;
-    const hide = !!active || !!this.story.running;
-    const live = new Set<number>();
-    for (const o of this.missions.offers) {
-      live.add(o.id);
-      let m = this.markers.get(o.id);
-      if (!m) {
-        m = new Marker(o.special ? 0xff4fa0 : 0xff8a3d).at(o.x, o.z);
-        this.markers.set(o.id, m);
-        this.scene.add(m.group);
-      }
-      m.group.visible = !hide;
-      m.update(t);
-    }
-    for (const [id, m] of this.markers) {
-      if (!live.has(id)) {
-        this.scene.remove(m.group);
-        this.markers.delete(id);
-      }
-    }
-    if (active && active.stage !== 'escape' && !this.story.running) {
-      this.targetMarker.group.visible = true;
-      this.targetMarker.at(active.target.x, active.target.z).update(t);
-    } else {
-      this.targetMarker.group.visible = false;
-    }
-  }
-
   private blips(): Blip[] {
-    const out: Blip[] = [...this.story.blips()];
-    const active = this.missions.active;
-    if (active && active.stage !== 'escape' && !this.story.running) out.push({ x: active.target.x, z: active.target.z, kind: 'target' });
-    if (!active && !this.story.running) {
-      for (const o of this.missions.offers) out.push({ x: o.x, z: o.z, kind: 'offer', label: o.special ? '★' : o.kind === 'consegna' ? 'C' : o.kind === 'taxi' ? 'T' : 'R' });
-    }
+    const out: Blip[] = [...this.story.blips(), ...this.jobs.blips(!!this.story.running)];
     const g = this.story.spot('officina');
     out.push({ x: g.x, z: g.z, kind: 'home', label: 'O' });
     for (const p of this.police.patrols) out.push({ x: p.vehicle.x, z: p.vehicle.z, kind: 'police' });
@@ -1107,8 +931,8 @@ export class Game {
     const ev = this.eventsNow[0];
     $('when').textContent = `${SEASON_LABEL[season]} · ${PHASE_LABEL[phaseOf(this.hours, season)]} · ${WEATHER_LABEL[this.weather.kind as WeatherKind]}${ev ? ` · ${ev.name}` : ''}`;
     const alert = $('alert');
-    alert.classList.toggle('on', this.alert.level > 0);
-    alert.querySelectorAll('i').forEach((bar, i) => bar.classList.toggle('lit', i < this.alert.level));
+    alert.classList.toggle('on', this.law.alert.level > 0);
+    alert.querySelectorAll('i').forEach((bar, i) => bar.classList.toggle('lit', i < this.law.alert.level));
 
     /* Objective panel: the story step, or the free job. */
     const job = $('job');
@@ -1117,13 +941,13 @@ export class Game {
       job.hidden = false;
       $('job-kind').textContent = this.story.running.mission.title;
       $('job-text').textContent = this.objectiveExtra ? `${this.objectiveText} · ${this.objectiveExtra}` : this.objectiveText;
-      this.timer(this.objectiveTime);
+      this.ui.timer(this.objectiveTime);
     } else if (active && !this.story.running) {
       job.hidden = false;
       $('job-kind').textContent = active.offer.special ?? TITLES[active.offer.kind];
       $('job-text').textContent =
         active.stage === 'escape' ? 'Fai scendere l\'allerta a zero' : active.stage === 'race' ? `Checkpoint ${active.index + 1}/${active.checkpoints.length}` : `→ ${active.target.name}`;
-      this.timer(active.timeLeft);
+      this.ui.timer(active.timeLeft);
     } else {
       job.hidden = true;
     }
@@ -1159,27 +983,9 @@ export class Game {
     pe.hidden = !prompt;
     if (prompt) pe.textContent = prompt;
 
-    if (this.bannerTimer > 0) {
-      this.bannerTimer -= dt;
-      if (this.bannerTimer <= 0) $('banner').hidden = true;
-    }
-    if (this.toastTimer > 0) {
-      this.toastTimer -= dt;
-      if (this.toastTimer <= 0) $('toast').hidden = true;
-    }
+    this.ui.tick(dt);
     const yaw = Math.atan2(-this.chase.forward().x, -this.chase.forward().z);
     const heading = this.car ? this.car.heading : this.walker.heading;
     this.radar.draw(this.px, this.pz, yaw, heading, this.blips(), dt, this.car ? Math.max(0.6, 1 - Math.abs(this.car.speed) / 60) : 1.4);
-  }
-
-  private timer(seconds: number | null): void {
-    const el = $('job-timer');
-    if (seconds === null || !Number.isFinite(seconds)) {
-      el.textContent = '';
-      return;
-    }
-    const left = Math.max(0, Math.ceil(seconds));
-    el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-    el.classList.toggle('low', left <= 10);
   }
 }

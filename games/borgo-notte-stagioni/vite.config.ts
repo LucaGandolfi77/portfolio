@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   base: './',
@@ -7,11 +7,14 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: false,
-    chunkSizeWarningLimit: 1600,
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: { three: ['three'] }
       }
     }
+  },
+  test: {
+    setupFiles: ['tests/setup.ts']
   }
 });

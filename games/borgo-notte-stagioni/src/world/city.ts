@@ -168,42 +168,158 @@ export interface CityRender {
   trees: TreeBatch[];
 }
 
-export function buildCity(tex: TextureSet): CityRender {
-  const materials = createMaterials(tex);
-  const chunks = new Map<string, Map<Surface, MeshBuilder>>();
-  const builder = (x: number, z: number, s: Surface): MeshBuilder => {
-    const k = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`;
-    let c = chunks.get(k);
-    if (!c) chunks.set(k, (c = new Map()));
-    let b = c.get(s);
-    if (!b) c.set(s, (b = new MeshBuilder()));
-    return b;
-  };
+type Builder = (x: number, z: number, s: Surface) => MeshBuilder;
 
-  for (const b of FIDENZA.buildings) addBuilding(b, builder);
-  addGround(builder);
-
-  const group = new THREE.Group();
-  group.name = 'city';
-  for (const parts of chunks.values()) {
-    for (const [surface, mb] of parts) if (!mb.empty) group.add(mb.build(materials.all[surface]));
-  }
-
-  const lampGlow = new THREE.MeshBasicMaterial({
-    map: tex.glow,
-    color: 0xffb460,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-  const lampBulb = new THREE.MeshBasicMaterial({ color: 0x55504a });
-  const trees = addTrees(group);
-  addLamps(group, lampGlow, lampBulb);
-  return { group, materials, lampGlow, lampBulb, trees };
+interface Cell {
+  key: string;
+  cx: number;
+  cz: number;
+  buildings: FidenzaBuilding[];
+  areas: typeof FIDENZA.areas;
+  roads: Array<{ road: (typeof FIDENZA.roads)[number]; index: number }>;
+  rails: typeof FIDENZA.railways;
+  waters: typeof FIDENZA.waterways;
+  trees: typeof FIDENZA.trees;
+  lamps: Array<[number, number]>;
+  objects: THREE.Object3D[] | null;
+  batch: TreeBatch | null;
 }
 
-function addBuilding(b: FidenzaBuilding, builder: (x: number, z: number, s: Surface) => MeshBuilder): void {
+/*
+ * Streaming town: everything is sorted into 320 m cells once (cheap); a
+ * cell's meshes are built when it comes within the view radius, a few
+ * milliseconds per frame, and released when it leaves. Startup is faster
+ * and a phone only keeps the neighbourhood in memory.
+ */
+export class CityStream implements CityRender {
+  readonly group = new THREE.Group();
+  readonly materials: CityMaterials;
+  readonly lampGlow: THREE.MeshBasicMaterial;
+  readonly lampBulb: THREE.MeshBasicMaterial;
+  /** Tree batches of the cells currently built (SeasonLook recolours them). */
+  readonly trees: TreeBatch[] = [];
+  private cells = new Map<string, Cell>();
+  private shared: SharedGeometry;
+
+  constructor(tex: TextureSet) {
+    this.group.name = 'city';
+    this.materials = createMaterials(tex);
+    this.lampGlow = new THREE.MeshBasicMaterial({
+      map: tex.glow,
+      color: 0xffb460,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    this.lampBulb = new THREE.MeshBasicMaterial({ color: 0x55504a });
+    this.shared = sharedGeometry();
+    const cell = (x: number, z: number): Cell => {
+      const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+      const key = `${cx},${cz}`;
+      let c = this.cells.get(key);
+      if (!c) {
+        c = { key, cx, cz, buildings: [], areas: [], roads: [], rails: [], waters: [], trees: [], lamps: [], objects: null, batch: null };
+        this.cells.set(key, c);
+      }
+      return c;
+    };
+    const v = FIDENZA.meta.view;
+    for (let x = Math.floor(v.minX / CHUNK) * CHUNK; x < v.maxX; x += CHUNK) {
+      for (let z = Math.floor(v.minZ / CHUNK) * CHUNK; z < v.maxZ; z += CHUNK) cell(x + 1, z + 1);
+    }
+    for (const b of FIDENZA.buildings) cell(b.x, b.z).buildings.push(b);
+    for (const a of FIDENZA.areas) {
+      const c = centroid(a.poly);
+      cell(c.x, c.z).areas.push(a);
+    }
+    FIDENZA.roads.forEach((road, index) => cell(road.pts[0], road.pts[1]).roads.push({ road, index }));
+    for (const r of FIDENZA.railways) cell(r.pts[0], r.pts[1]).rails.push(r);
+    for (const w of FIDENZA.waterways) cell(w.pts[0], w.pts[1]).waters.push(w);
+    for (const t of FIDENZA.trees) cell(t.x, t.z).trees.push(t);
+    for (const l of lampSpots()) cell(l[0], l[1]).lamps.push(l);
+  }
+
+  get builtCells(): number {
+    let n = 0;
+    for (const c of this.cells.values()) if (c.objects) n++;
+    return n;
+  }
+
+  /** Builds missing cells near (x, z), nearest first, within a time budget; drops far ones. */
+  update(x: number, z: number, radius: number, budgetMs = 6): void {
+    const start = performance.now();
+    const distance = (c: Cell): number => {
+      const dx = Math.max(0, Math.abs(x - (c.cx + 0.5) * CHUNK) - CHUNK / 2);
+      const dz = Math.max(0, Math.abs(z - (c.cz + 0.5) * CHUNK) - CHUNK / 2);
+      return Math.hypot(dx, dz);
+    };
+    const wanted: Cell[] = [];
+    for (const c of this.cells.values()) {
+      const d = distance(c);
+      if (!c.objects && d <= radius) wanted.push(c);
+      else if (c.objects && d > radius + CHUNK * 0.75) this.release(c);
+    }
+    wanted.sort((a, b) => distance(a) - distance(b));
+    for (const c of wanted) {
+      this.build(c);
+      if (performance.now() - start > budgetMs) break;
+    }
+  }
+
+  private build(c: Cell): void {
+    const parts = new Map<Surface, MeshBuilder>();
+    const builder: Builder = (_x, _z, s) => {
+      let b = parts.get(s);
+      if (!b) parts.set(s, (b = new MeshBuilder()));
+      return b;
+    };
+    addBaseTile(c.cx * CHUNK, c.cz * CHUNK, builder);
+    for (const a of c.areas) addArea(a, builder);
+    for (const { road, index } of c.roads) addRoad(road, index, builder);
+    for (const r of c.rails) ribbon(builder(0, 0, 'gravel').color(0xffffff), r.pts, 3.4, 0.04, 6);
+    for (const w of c.waters) ribbon(builder(0, 0, 'water').color(0xffffff), w.pts, Math.max(3, w.w), 0.02, 10);
+    for (const b of c.buildings) addBuilding(b, builder);
+    const objects: THREE.Object3D[] = [];
+    for (const [surface, mb] of parts) if (!mb.empty) objects.push(mb.build(this.materials.all[surface]));
+    if (c.trees.length) {
+      const t = treeMeshes(c.trees, this.shared);
+      objects.push(t.crowns, t.trunks);
+      c.batch = { crowns: t.crowns, trees: c.trees };
+      this.trees.push(c.batch);
+    }
+    if (c.lamps.length) objects.push(...lampMeshes(c.lamps, this.shared, this.lampGlow, this.lampBulb));
+    for (const o of objects) this.group.add(o);
+    c.objects = objects;
+  }
+
+  private release(c: Cell): void {
+    for (const o of c.objects ?? []) {
+      this.group.remove(o);
+      if (o instanceof THREE.InstancedMesh) o.dispose();
+      else if (o instanceof THREE.Mesh) o.geometry.dispose();
+    }
+    c.objects = null;
+    if (c.batch) {
+      this.trees.splice(this.trees.indexOf(c.batch), 1);
+      c.batch = null;
+    }
+  }
+
+  /** Builds every cell now (tests, or a desktop that wants it all). */
+  buildAll(): void {
+    for (const c of this.cells.values()) if (!c.objects) this.build(c);
+  }
+}
+
+/** Kept for callers that want the whole town at once. */
+export function buildCity(tex: TextureSet): CityStream {
+  const city = new CityStream(tex);
+  city.buildAll();
+  return city;
+}
+
+function addBuilding(b: FidenzaBuilding, builder: Builder): void {
   const pts = b.poly;
   const n = pts.length / 2;
   if (n < 3) return;
@@ -247,7 +363,7 @@ function addBuilding(b: FidenzaBuilding, builder: (x: number, z: number, s: Surf
   addRoof(b, builder, ccw);
 }
 
-function addRoof(b: FidenzaBuilding, builder: (x: number, z: number, s: Surface) => MeshBuilder, ccw: boolean): void {
+function addRoof(b: FidenzaBuilding, builder: Builder, ccw: boolean): void {
   const pts = b.poly;
   const n = pts.length / 2;
   const flat = b.h > 20 || n > 12 || b.area > 900 || b.kind === 'industrial';
@@ -360,95 +476,101 @@ function polygonFill(mb: MeshBuilder, poly: number[], y: number, uv: number): vo
   }
 }
 
-function addGround(builder: (x: number, z: number, s: Surface) => MeshBuilder): void {
+function addBaseTile(x: number, z: number, builder: Builder): void {
   const v = FIDENZA.meta.view;
-  /* Base ground tiles, one per chunk cell so they cull with the rest. */
-  for (let x = Math.floor(v.minX / CHUNK) * CHUNK; x < v.maxX; x += CHUNK) {
-    for (let z = Math.floor(v.minZ / CHUNK) * CHUNK; z < v.maxZ; z += CHUNK) {
-      const x0 = Math.max(x, v.minX - 400), x1 = Math.min(x + CHUNK, v.maxX + 400);
-      const z0 = Math.max(z, v.minZ - 400), z1 = Math.min(z + CHUNK, v.maxZ + 400);
-      const mb = builder(x + 1, z + 1, 'dirt').color(0xb9b49a);
-      upTri(mb, [x0, -0.02, z0, x0 / 12, z0 / 12], [x1, -0.02, z0, x1 / 12, z0 / 12], [x1, -0.02, z1, x1 / 12, z1 / 12]);
-      upTri(mb, [x0, -0.02, z0, x0 / 12, z0 / 12], [x1, -0.02, z1, x1 / 12, z1 / 12], [x0, -0.02, z1, x0 / 12, z1 / 12]);
-    }
+  const x0 = Math.max(x, v.minX - 400), x1 = Math.min(x + CHUNK, v.maxX + 400);
+  const z0 = Math.max(z, v.minZ - 400), z1 = Math.min(z + CHUNK, v.maxZ + 400);
+  const mb = builder(x + 1, z + 1, 'dirt').color(0xb9b49a);
+  upTri(mb, [x0, -0.02, z0, x0 / 12, z0 / 12], [x1, -0.02, z0, x1 / 12, z0 / 12], [x1, -0.02, z1, x1 / 12, z1 / 12]);
+  upTri(mb, [x0, -0.02, z0, x0 / 12, z0 / 12], [x1, -0.02, z1, x1 / 12, z1 / 12], [x0, -0.02, z1, x0 / 12, z1 / 12]);
+}
+
+function addArea(a: (typeof FIDENZA.areas)[number], builder: Builder): void {
+  const c = centroid(a.poly);
+  let surface: Surface = 'pavers';
+  let color = 0xffffff;
+  let y = 0.005;
+  if (['park', 'grass', 'forest', 'cemetery'].includes(a.kind)) surface = 'grass';
+  else if (a.kind === 'sport') {
+    surface = 'grass';
+    color = 0xbfe0a0;
+  } else if (a.kind === 'farmland') {
+    surface = 'dirt';
+    color = 0xd8d0a0;
+  } else if (a.kind === 'parking') {
+    surface = 'asphalt';
+    color = 0xc8c8c8;
+    y = 0.012;
   }
-  for (const a of FIDENZA.areas) {
-    const c = centroid(a.poly);
-    let surface: Surface = 'pavers';
-    let color = 0xffffff;
-    let y = 0.005;
-    if (['park', 'grass', 'forest', 'cemetery'].includes(a.kind)) surface = 'grass';
-    else if (a.kind === 'sport') {
-      surface = 'grass';
-      color = 0xbfe0a0;
-    } else if (a.kind === 'farmland') {
-      surface = 'dirt';
-      color = 0xd8d0a0;
-    } else if (a.kind === 'parking') {
-      surface = 'asphalt';
-      color = 0xc8c8c8;
-      y = 0.012;
-    }
-    polygonFill(builder(c.x, c.z, surface).color(color), a.poly, y, surface === 'asphalt' ? 30 : surface === 'pavers' ? 3 : 8);
+  polygonFill(builder(c.x, c.z, surface).color(color), a.poly, y, surface === 'asphalt' ? 30 : surface === 'pavers' ? 3 : 8);
+}
+
+function addRoad(road: (typeof FIDENZA.roads)[number], index: number, builder: Builder): void {
+  const c = { x: road.pts[0], z: road.pts[1] };
+  const lift = (index % 7) * 0.0015;
+  if (VEHICULAR.has(road.kind) || road.kind === 'service') {
+    if (road.kind !== 'service') ribbon(builder(c.x, c.z, 'pavers').color(0xd8cfbf), road.pts, road.w + 3.2, 0.03 + lift, 4);
+    ribbon(builder(c.x, c.z, 'asphalt').color(road.kind === 'service' ? 0xc0c0c0 : 0xffffff), road.pts, road.w, 0.06 + lift, 8);
+  } else {
+    ribbon(builder(c.x, c.z, 'pavers').color(0xe6dccb), road.pts, Math.max(1.6, road.w), 0.045 + lift, 3);
   }
-  FIDENZA.roads.forEach((road, index) => {
-    const c = { x: road.pts[0], z: road.pts[1] };
-    const lift = (index % 7) * 0.0015;
-    if (VEHICULAR.has(road.kind) || road.kind === 'service') {
-      if (road.kind !== 'service') ribbon(builder(c.x, c.z, 'pavers').color(0xd8cfbf), road.pts, road.w + 3.2, 0.03 + lift, 4);
-      ribbon(builder(c.x, c.z, 'asphalt').color(road.kind === 'service' ? 0xc0c0c0 : 0xffffff), road.pts, road.w, 0.06 + lift, 8);
-    } else {
-      ribbon(builder(c.x, c.z, 'pavers').color(0xe6dccb), road.pts, Math.max(1.6, road.w), 0.045 + lift, 3);
-    }
-  });
-  for (const r of FIDENZA.railways) ribbon(builder(r.pts[0], r.pts[1], 'gravel').color(0xffffff), r.pts, 3.4, 0.04, 6);
-  for (const w of FIDENZA.waterways) ribbon(builder(w.pts[0], w.pts[1], 'water').color(0xffffff), w.pts, Math.max(3, w.w), 0.02, 10);
 }
 
 /* ---------------- trees and lamps (instanced per chunk) ---------------- */
 
-function addTrees(group: THREE.Group): TreeBatch[] {
-  const batches: TreeBatch[] = [];
-  const crownGeo = new THREE.IcosahedronGeometry(1, 0);
-  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1, 5);
-  trunkGeo.translate(0, 0.5, 0);
-  const crownMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
-  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b5a44 });
-  const byChunk = new Map<string, typeof FIDENZA.trees>();
-  for (const t of FIDENZA.trees) {
-    const k = `${Math.floor(t.x / CHUNK)},${Math.floor(t.z / CHUNK)}`;
-    if (!byChunk.has(k)) byChunk.set(k, []);
-    byChunk.get(k)!.push(t);
-  }
+interface SharedGeometry {
+  crownGeo: THREE.BufferGeometry;
+  trunkGeo: THREE.BufferGeometry;
+  crownMat: THREE.MeshLambertMaterial;
+  trunkMat: THREE.MeshLambertMaterial;
+  poleGeo: THREE.BufferGeometry;
+  headGeo: THREE.BufferGeometry;
+  poolGeo: THREE.BufferGeometry;
+  poleMat: THREE.MeshLambertMaterial;
+}
+
+function sharedGeometry(): SharedGeometry {
+  return {
+    crownGeo: new THREE.IcosahedronGeometry(1, 0),
+    trunkGeo: new THREE.CylinderGeometry(0.16, 0.24, 1, 5).translate(0, 0.5, 0),
+    crownMat: new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
+    trunkMat: new THREE.MeshLambertMaterial({ color: 0x6b5a44 }),
+    poleGeo: new THREE.BoxGeometry(0.14, 6, 0.14).translate(0, 3, 0),
+    headGeo: new THREE.BoxGeometry(0.5, 0.18, 0.3).translate(0, 6, 0),
+    poolGeo: new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2).translate(0, 0.09, 0),
+    poleMat: new THREE.MeshLambertMaterial({ color: 0x3a3c3e })
+  };
+}
+
+const GREENS = [0x5d7040, 0x6d7c48, 0x4f6538, 0x7a8a50, 0x66763f];
+
+function treeMeshes(trees: typeof FIDENZA.trees, g: SharedGeometry): { crowns: THREE.InstancedMesh; trunks: THREE.InstancedMesh } {
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
   const p = new THREE.Vector3();
   const color = new THREE.Color();
-  const greens = [0x5d7040, 0x6d7c48, 0x4f6538, 0x7a8a50, 0x66763f];
-  for (const trees of byChunk.values()) {
-    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, trees.length);
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
-    trees.forEach((t, i) => {
-      const h = Math.max(5, Math.min(14, t.h));
-      const r = h * 0.3;
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (t.x * 7 + t.z * 3) % 6.28);
-      m.compose(p.set(t.x, h * 0.62, t.z), q, s.set(r, r * 0.9, r));
-      crowns.setMatrixAt(i, m);
-      color.set(greens[Math.abs(Math.round(t.x * 3 + t.z)) % greens.length]);
-      crowns.setColorAt(i, color);
-      m.compose(p.set(t.x, 0, t.z), q, s.set(1, h * 0.5, 1));
-      trunks.setMatrixAt(i, m);
-    });
-    crowns.computeBoundingSphere();
-    trunks.computeBoundingSphere();
-    group.add(crowns, trunks);
-    batches.push({ crowns, trees });
-  }
-  return batches;
+  const up = new THREE.Vector3(0, 1, 0);
+  const crowns = new THREE.InstancedMesh(g.crownGeo, g.crownMat, trees.length);
+  const trunks = new THREE.InstancedMesh(g.trunkGeo, g.trunkMat, trees.length);
+  trees.forEach((t, i) => {
+    const h = Math.max(5, Math.min(14, t.h));
+    const r = h * 0.3;
+    q.setFromAxisAngle(up, (t.x * 7 + t.z * 3) % 6.28);
+    m.compose(p.set(t.x, h * 0.62, t.z), q, s.set(r, r * 0.9, r));
+    crowns.setMatrixAt(i, m);
+    color.set(GREENS[Math.abs(Math.round(t.x * 3 + t.z)) % GREENS.length]);
+    crowns.setColorAt(i, color);
+    m.compose(p.set(t.x, 0, t.z), q, s.set(1, h * 0.5, 1));
+    trunks.setMatrixAt(i, m);
+  });
+  crowns.computeBoundingSphere();
+  trunks.computeBoundingSphere();
+  return { crowns, trunks };
 }
 
-function addLamps(group: THREE.Group, glow: THREE.MeshBasicMaterial, bulb: THREE.MeshBasicMaterial): void {
+/** Street lamps every 34 m, alternating sides, along the vehicular streets. */
+function lampSpots(): Array<[number, number]> {
   const spots: Array<[number, number]> = [];
   for (const road of FIDENZA.roads) {
     if (!VEHICULAR.has(road.kind)) continue;
@@ -470,29 +592,21 @@ function addLamps(group: THREE.Group, glow: THREE.MeshBasicMaterial, bulb: THREE
       if (carry < 0) carry += 34;
     }
   }
-  const byChunk = new Map<string, Array<[number, number]>>();
-  for (const s of spots) {
-    const k = `${Math.floor(s[0] / CHUNK)},${Math.floor(s[1] / CHUNK)}`;
-    if (!byChunk.has(k)) byChunk.set(k, []);
-    byChunk.get(k)!.push(s);
-  }
-  const poleGeo = new THREE.BoxGeometry(0.14, 6, 0.14).translate(0, 3, 0);
-  const headGeo = new THREE.BoxGeometry(0.5, 0.18, 0.3).translate(0, 6, 0);
-  const poolGeo = new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2).translate(0, 0.09, 0);
-  const poleMat = new THREE.MeshLambertMaterial({ color: 0x3a3c3e });
+  return spots;
+}
+
+function lampMeshes(list: Array<[number, number]>, g: SharedGeometry, glow: THREE.MeshBasicMaterial, bulb: THREE.MeshBasicMaterial): THREE.InstancedMesh[] {
   const m = new THREE.Matrix4();
-  for (const list of byChunk.values()) {
-    const poles = new THREE.InstancedMesh(poleGeo, poleMat, list.length);
-    const heads = new THREE.InstancedMesh(headGeo, bulb, list.length);
-    const pools = new THREE.InstancedMesh(poolGeo, glow, list.length);
-    list.forEach(([x, z], i) => {
-      m.makeTranslation(x, 0, z);
-      poles.setMatrixAt(i, m);
-      heads.setMatrixAt(i, m);
-      pools.setMatrixAt(i, m);
-    });
-    for (const mesh of [poles, heads, pools]) mesh.computeBoundingSphere();
-    pools.renderOrder = 3;
-    group.add(poles, heads, pools);
-  }
+  const poles = new THREE.InstancedMesh(g.poleGeo, g.poleMat, list.length);
+  const heads = new THREE.InstancedMesh(g.headGeo, bulb, list.length);
+  const pools = new THREE.InstancedMesh(g.poolGeo, glow, list.length);
+  list.forEach(([x, z], i) => {
+    m.makeTranslation(x, 0, z);
+    poles.setMatrixAt(i, m);
+    heads.setMatrixAt(i, m);
+    pools.setMatrixAt(i, m);
+  });
+  for (const mesh of [poles, heads, pools]) mesh.computeBoundingSphere();
+  pools.renderOrder = 3;
+  return [poles, heads, pools];
 }

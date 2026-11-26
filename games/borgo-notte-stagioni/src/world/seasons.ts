@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Season } from '../game/calendar';
-import type { CityRender } from './city';
+import type { CityRender, TreeBatch } from './city';
 
 /*
  * The town through the year: crowns change colour and size (blossom in
@@ -16,7 +16,8 @@ const PALETTES: Record<Season, number[]> = {
 };
 
 export class SeasonLook {
-  private current: Season | null = null;
+  /** Season last painted on each tree batch (cells stream in and out). */
+  private painted = new WeakMap<TreeBatch, Season>();
   private snowApplied = -1;
   private base = new Map<THREE.Material, THREE.Color>();
   private snowy: THREE.MeshLambertMaterial[];
@@ -28,8 +29,7 @@ export class SeasonLook {
   }
 
   apply(season: Season, snow: number): void {
-    if (season !== this.current) {
-      this.current = season;
+    {
       const palette = PALETTES[season];
       const color = new THREE.Color();
       const m = new THREE.Matrix4();
@@ -37,6 +37,8 @@ export class SeasonLook {
       const q = new THREE.Quaternion();
       const s = new THREE.Vector3();
       for (const batch of this.city.trees) {
+        if (this.painted.get(batch) === season) continue;
+        this.painted.set(batch, season);
         batch.trees.forEach((t, i) => {
           const pick = Math.abs(Math.round(t.x * 3 + t.z * 7)) % palette.length;
           color.set(palette[pick]);

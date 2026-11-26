@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { RoadEdge, RoadGraph } from '../data/roads';
 import { nearestOnGraph, nextEdge, pointOnEdge } from '../data/roads';
-import { animateIdle, animateWalk, createBlobShadow, createPerson, type PersonLook, type PersonRig } from '../world/person';
+import { addFarMesh, animateIdle, animateWalk, createBlobShadow, createPerson, setFar, type PersonLook, type PersonRig } from '../world/person';
 import type { Vehicle } from './vehicle';
 
 /*
@@ -44,6 +44,7 @@ export class Pedestrians {
 
   private create(look: PersonLook, edge: RoadEdge, d: number, fromA: boolean, side: number): Ped {
     const rig = createPerson(look);
+    addFarMesh(rig);
     const shadow = createBlobShadow(0.8);
     this.scene.add(rig.group, shadow);
     const ped: Ped = {
@@ -99,6 +100,8 @@ export class Pedestrians {
 
     for (const ped of this.peds) {
       const rig = ped.rig;
+      /* Far walkers become one static mesh (a fallen one stays detailed). */
+      setFar(rig, ped.state === 'walk' && Math.hypot(ped.x - player.x, ped.z - player.z) > 35);
       if (ped.state === 'down') {
         ped.timer -= dt;
         rig.group.rotation.x = THREE.MathUtils.lerp(rig.group.rotation.x, -Math.PI / 2, Math.min(1, dt * 8));

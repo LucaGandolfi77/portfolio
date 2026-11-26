@@ -4,7 +4,7 @@
 // __BUILD_ID__ viene sostituito con lo SHA del commit dal deploy del portfolio:
 // ogni deploy ha una cache nuova e activate elimina le vecchie di questo gioco.
 const CACHE = 'borgo-stagioni-__BUILD_ID__';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './data/fidenza.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

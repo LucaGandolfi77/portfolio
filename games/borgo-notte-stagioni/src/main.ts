@@ -1,5 +1,6 @@
 import './styles.css';
 import { Game } from './app/game';
+import { loadFidenza } from './data/fidenza';
 
 function fail(error: unknown): void {
   console.error('[BORGO NOTTE]', error);
@@ -7,16 +8,24 @@ function fail(error: unknown): void {
   if (text) text.textContent = 'Serve un browser con WebGL attivo per giocare.';
 }
 
-function boot(): void {
+async function boot(): Promise<void> {
   try {
+    const bar = document.getElementById('load-bar');
+    const text = document.getElementById('load-text');
+    if (text) text.textContent = 'Scarico la mappa di Fidenza…';
+    await loadFidenza('./data/fidenza.json', (p) => {
+      if (bar) bar.style.width = `${Math.round(p * 10)}%`;
+    });
+    /* Let the progress bar paint before the heavy build starts. */
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
     new Game();
   } catch (error) {
     fail(error);
   }
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-else boot();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => void boot(), { once: true });
+else void boot();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   addEventListener('load', () => {

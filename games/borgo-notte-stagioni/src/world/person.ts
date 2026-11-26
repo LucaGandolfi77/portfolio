@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GeoBatch } from './batch';
 
 export type PersonLook =
@@ -38,6 +39,8 @@ export interface PersonRig {
   leftForearm?: THREE.Group;
   rightForearm?: THREE.Group;
   head?: THREE.Group;
+  /** One-mesh stand-in for far away (see setFar). */
+  far?: THREE.Mesh;
 }
 
 interface Outfit {
@@ -510,6 +513,35 @@ export function createPerson(look: PersonLook): PersonRig {
     rightForearm: forearms[1],
     head
   };
+}
+
+/*
+ * Level of detail: the whole figure merged into one mesh in its rest pose.
+ * Far away it replaces the ten animated parts (one draw call, no posing).
+ */
+export function addFarMesh(rig: PersonRig): void {
+  rig.group.updateMatrixWorld(true);
+  const inverse = new THREE.Matrix4().copy(rig.group.matrixWorld).invert();
+  const parts: THREE.BufferGeometry[] = [];
+  rig.body.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const g = o.geometry.clone();
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, o.matrixWorld));
+    parts.push(g);
+  });
+  const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  if (!merged) return;
+  const far = new THREE.Mesh(merged, materials().flat);
+  far.visible = false;
+  rig.group.add(far);
+  rig.far = far;
+}
+
+export function setFar(rig: PersonRig, far: boolean): void {
+  if (!rig.far || rig.far.visible === far) return;
+  rig.far.visible = far;
+  rig.body.visible = !far;
 }
 
 let shadowTexture: THREE.CanvasTexture | null = null;

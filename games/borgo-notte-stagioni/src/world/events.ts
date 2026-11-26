@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GeoBatch, glowMaterial, staticMaterial } from './batch';
 import type { CollisionWorld } from '../data/colliders';
 import { EVENTS, type SeasonEvent } from '../game/calendar';
-import { animateIdle, createPerson, type PersonLook, type PersonRig } from './person';
+import { addFarMesh, animateIdle, createPerson, setFar, type PersonLook, type PersonRig } from './person';
 
 /*
  * Seasonal events in town: stalls, lights, a stage, lanterns, a Christmas
@@ -132,6 +132,7 @@ export class SeasonEvents {
       if (on && d.crowd.length === 0 && Math.hypot(centre.x - EVENTS.find((e) => e.id === id)!.place.x, centre.z - EVENTS.find((e) => e.id === id)!.place.z) < 260) {
         d.spots.slice(0, this.crowdSize).forEach((p, i) => {
           const rig = createPerson(CROWD[i % CROWD.length]);
+          addFarMesh(rig);
           rig.group.position.set(p.x + 1, 0, p.z + 1);
           rig.group.rotation.y = i * 1.7;
           this.scene.add(rig.group);
@@ -142,7 +143,11 @@ export class SeasonEvents {
         for (const r of d.crowd) this.scene.remove(r.group);
         d.crowd.length = 0;
       }
-      d.crowd.forEach((r, i) => animateIdle(r, this.t + i, 0.8));
+      d.crowd.forEach((r, i) => {
+        const far = Math.hypot(r.group.position.x - centre.x, r.group.position.z - centre.z) > 40;
+        setFar(r, far);
+        if (!far) animateIdle(r, this.t + i, 0.8);
+      });
     }
     this.active = now;
     /* Fireworks from 23:55 to 00:30 at Capodanno. */
