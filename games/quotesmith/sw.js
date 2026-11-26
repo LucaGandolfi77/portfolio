@@ -1,7 +1,7 @@
 // Cache cleanup: delete only older versions of THIS app's cache (same name
 // stem, e.g. 'app-v1' -> 'app-v2'). Other PWAs share the origin
 // (lucagandolfi77.github.io) and their caches must not be touched.
-const CACHE_NAME = 'quotesmith-v9';
+const CACHE_NAME = 'quotesmith-v10';
 const ASSETS = [
   './', './index.html', './style.css', './engine.js', './data.js', './script.js',
   './src/touch.js', './src/save.js', './src/analytics.js', './quotes.json', './manifest.webmanifest', './icons/icon.svg',

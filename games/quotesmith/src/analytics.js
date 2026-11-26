@@ -48,3 +48,4 @@ const QuoteSmithAnalytics = (() => {
 
   return { track, exportEvents, clearEvents, getEventCount };
 })();
+window.QuoteSmithAnalytics = QuoteSmithAnalytics;

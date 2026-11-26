@@ -207,3 +207,4 @@ const QuoteSmithSave = (() => {
     DEFAULT,
   };
 })();
+window.QuoteSmithSave = QuoteSmithSave;
