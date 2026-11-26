@@ -170,6 +170,19 @@ export class CollisionWorld {
     }
   }
 
+  /** Removes a static collider (a parked car that was driven away). */
+  remove(collider: Collider): void {
+    const box = colliderBounds(collider);
+    for (let ix = Math.floor(box.minX / GRID); ix <= Math.floor(box.maxX / GRID); ix++) {
+      for (let iz = Math.floor(box.minZ / GRID); iz <= Math.floor(box.maxZ / GRID); iz++) {
+        const bucket = this.grid.get(`${ix},${iz}`);
+        if (!bucket) continue;
+        const i = bucket.indexOf(collider);
+        if (i >= 0) bucket.splice(i, 1);
+      }
+    }
+  }
+
   /** Parked vehicles and other moving obstacles. They are few, so a linear scan is cheap. */
   setDynamic(colliders: Collider[]): void {
     this.dynamicColliders = colliders;

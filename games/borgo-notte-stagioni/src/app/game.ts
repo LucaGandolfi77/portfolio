@@ -12,6 +12,8 @@ import { SeasonLook } from '../world/seasons';
 import { SeasonEvents } from '../world/events';
 import { collideVehicles, LIGHTS, NO_INPUT, SPECS, Vehicle } from '../game/vehicle';
 import { Traffic } from '../game/traffic';
+import { VehicleFx } from '../game/vehicle-fx';
+import { TrafficSignals } from '../game/signals';
 import { Pedestrians } from '../game/peds';
 import { PoliceForce, type Offence } from '../game/police';
 import { Law } from '../game/law';
@@ -41,6 +43,7 @@ import { Dialogue } from '../ui/dialogue';
 import { Notices } from '../ui/notices';
 import { renderPhone, type PhoneTab } from '../ui/phone';
 import { Santini } from '../world/santini';
+import { ParkedCars, planParking } from '../world/parked';
 import { Intro } from './intro';
 import { StoryRunner, type StoryHost } from './story-runner';
 
@@ -83,6 +86,10 @@ export class Game {
   private peds: Pedestrians;
   private police: PoliceForce;
   private law = new Law();
+  private parked!: ParkedCars;
+  private signals!: TrafficSignals;
+  private lastCarPos = { x: 0, z: 0 };
+  private fx!: VehicleFx;
   private ui = new Notices();
   private missions: Missions;
   private controls: Controls;
@@ -147,12 +154,17 @@ export class Game {
     this.weather = new Weather(this.scene, this.mobile);
 
     this.progress(0.6, 'Traccio le strade…');
-    this.world = new CollisionWorld(buildCityColliders());
+    const parking = planParking();
+    this.world = new CollisionWorld(buildCityColliders(parking.map((c) => c.collider)));
+    this.parked = new ParkedCars(this.scene, parking);
     this.graph = buildRoadGraph(FIDENZA.roads);
     this.roofs = new HeightField(FIDENZA.meta.view, FIDENZA.buildings);
     this.traffic = new Traffic(this.scene, this.graph, this.world, this.beamTex, preset.traffic);
+    this.signals = new TrafficSignals(this.scene, this.graph);
+    this.traffic.signals = this.signals;
     this.peds = new Pedestrians(this.scene, this.graph, preset.peds);
     this.police = new PoliceForce(this.scene, this.graph, this.world, this.beamTex);
+    this.fx = new VehicleFx(this.scene);
     this.events = new SeasonEvents(this.scene, this.world, preset.crowd);
 
     const spots: Spot[] = FIDENZA.places.map((p) => {
@@ -469,6 +481,12 @@ export class Game {
     });
   }
 
+  /** A patrol (chasing or just on its rounds) within `r` metres. */
+  private policeNear(x: number, z: number, r: number): boolean {
+    if (this.police.sees(x, z) && this.police.patrols.some((p) => Math.hypot(p.vehicle.x - x, p.vehicle.z - z) < r)) return true;
+    return this.traffic.vehicles.some((v) => v.type === 'polizia' && v.driver === 'ai' && Math.hypot(v.x - x, v.z - z) < r);
+  }
+
   private offence(o: Offence): void {
     const message = this.law.offence(o, this.day * 24 * HOUR + this.hours * HOUR);
     if (message) this.ui.toast(message);
@@ -610,6 +628,16 @@ export class Game {
         bestD = d;
       }
     }
+    /* A parked car closer than any moving one: break in and drive off. */
+    const kerb = this.parked.nearest(this.walker.x, this.walker.z, bestD);
+    if (kerb) {
+      this.parked.take(kerb, this.world);
+      const stolen = new Vehicle(kerb.type, kerb.x, kerb.z, kerb.heading, kerb.color, this.beamTex);
+      this.scene.add(stolen.model);
+      this.traffic.loose.push(stolen);
+      if (this.police.sees(kerb.x, kerb.z)) this.offence('carjack');
+      best = stolen;
+    }
     if (!best) {
       this.ui.toast('Nessuna auto vicina');
       return;
@@ -623,7 +651,7 @@ export class Game {
       this.traffic.release(v);
       const sx = v.x - v.forwardZ * 1.8, sz = v.z + v.forwardX * 1.8;
       this.peds.spawnLeaving(sx, sz, sx - v.forwardZ * 12, sz + v.forwardX * 12);
-      this.offence('carjack');
+      this.offence(v.type === 'polizia' ? 'police-car' : 'carjack');
     } else if (v.driver === 'police') {
       const patrol = this.police.patrols.find((p) => p.vehicle === v);
       if (patrol) this.police.patrols.splice(this.police.patrols.indexOf(patrol), 1);
@@ -689,6 +717,7 @@ export class Game {
     if (this.state === 'card' || this.dialogue.open) this.dialogue.update(dt);
     const cam = this.chase.camera.position;
     this.city.update(cam.x, cam.z, PRESETS[this.quality].far + 40, this.state === 'intro' || this.state === 'title' ? 14 : 6);
+    this.parked.update(cam.x, cam.z, PRESETS[this.quality].far * 0.7);
     this.renderer.render(this.scene, this.chase.camera);
     this.fps.frames++;
     this.fps.time += dt;
@@ -717,12 +746,15 @@ export class Game {
     if (this.car) {
       const v = this.car;
       v.gripScale = this.weather.grip;
-      const input = talking ? { ...NO_INPUT, brake: 1 } : { throttle: c.throttle, brake: c.brake, steer: c.steer, handbrake: c.handbrake };
+      /* During a dialogue the car holds still (brake alone would reverse it). */
+      const input = talking ? { ...NO_INPUT, handbrake: true } : { throttle: c.throttle, brake: c.brake, steer: c.steer, handbrake: c.handbrake };
       const impact = v.update(input, dt, this.world);
       if (impact > 4) this.audio.crash(impact);
+      if (impact > 7) this.fx.crash(v.x + v.forwardX * v.spec.length * 0.4, v.z + v.forwardZ * v.spec.length * 0.4, impact, v.color);
       for (const other of vehicles) {
         if (other === v || Math.abs(other.x - v.x) > 8 || Math.abs(other.z - v.z) > 8) continue;
         const hit = collideVehicles(v, other);
+        if (hit > 7) this.fx.crash((v.x + other.x) / 2, (v.z + other.z) / 2, hit, other.color);
         if (hit > 2) {
           this.audio.crash(hit);
           if (other.driver === 'ai' && !this.story.vehicles().includes(other)) this.traffic.knock(other);
@@ -730,8 +762,16 @@ export class Game {
         }
       }
       v.sync();
-      if (v.speed > 25 && this.police.sees(v.x, v.z)) this.offence('speeding');
-      if (v.wrecked && this.ui.toastTimer <= 0) this.ui.toast('Auto distrutta: scendi (E)');
+      if (v.speed > 25 && this.policeNear(v.x, v.z, 45)) this.offence('speeding');
+      if (Math.abs(v.speed) > 5 && this.signals.ranRed(this.lastCarPos, v) && this.policeNear(v.x, v.z, 70)) this.offence('redlight');
+      this.lastCarPos = { x: v.x, z: v.z };
+      if (v.burning > 0 && this.ui.toastTimer <= 0) this.ui.toast('L\'auto prende fuoco: scendi! (E)');
+      else if (v.wrecked && this.ui.toastTimer <= 0) this.ui.toast('Auto distrutta: scendi (E)');
+      if (v.burnt) {
+        /* Stayed inside until the end: thrown out, shaken but fine. */
+        this.leaveCar(true);
+        this.walker.knock();
+      }
     } else if (!talking) {
       this.walker.update(dt, c, view, this.world, vehicles, this.roofs);
       const mode = this.walker.flying ? 'fly' : 'foot';
@@ -749,6 +789,13 @@ export class Game {
     const obstacles = this.car || this.walker.airborne ? [] : [player];
     const keep = new Set<Vehicle>([...(this.car ? [this.car] : []), ...this.story.vehicles()]);
     for (const v of this.traffic.vehicles) v.gripScale = this.weather.grip;
+    this.signals.update(dt);
+    /* Suspension, fire timers and effects for everything near the camera. */
+    const cam = this.chase.camera.position;
+    /* Story cars also sit in the traffic list: count each car once. */
+    const near = [...new Set([...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle), ...this.story.vehicles()])];
+    for (const v of near) if (Math.abs(v.x - cam.x) < 160 && Math.abs(v.z - cam.z) < 160) v.animate(dt);
+    this.fx.update(dt, near, cam);
     this.traffic.update(dt, { player, view, obstacles }, keep, () => {
       if (Math.random() < 0.3) this.audio.horn();
     });
@@ -975,6 +1022,10 @@ export class Game {
     else if (!this.car && !this.walker.airborne) {
       const near = [...this.traffic.vehicles, ...this.police.patrols.map((p) => p.vehicle)].find((v) => Math.hypot(v.x - this.walker.x, v.z - this.walker.z) < 4.2);
       if (near && !this.story.vehicles().includes(near)) prompt = `${this.mobile ? 'SALI' : 'E'} · ${SPECS[near.type].label}${near.driver === 'ai' || near.driver === 'police' ? ' (la rubi)' : ''}`;
+      else {
+        const kerb = this.parked.nearest(this.walker.x, this.walker.z, 4.2);
+        if (kerb) prompt = `${this.mobile ? 'SALI' : 'E'} · ${SPECS[kerb.type].label} parcheggiata`;
+      }
     } else if (this.car && !this.missions.active && !this.story.running) {
       const offer = this.missions.offers.find((o) => Math.hypot(o.x - this.car!.x, o.z - this.car!.z) < 20);
       if (offer) prompt = `Fermati nel segnale: ${offer.special ?? TITLES[offer.kind]} per ${offer.to.name}`;

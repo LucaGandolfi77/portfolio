@@ -47,6 +47,8 @@ export function buildCarModel(type: VehicleType, color: number, beamTexture: THR
   const L = s.length, W = s.width, H = s.height;
   const g = new THREE.Group();
   const body = new GeoBatch();
+  /* Wheels stay on the road; the chassis above them pitches and rolls. */
+  const wheels = new GeoBatch();
   const glass = 0x26333a;
   const dark = 0x1d1d1f;
   const wheelR = type === 'furgone' ? 0.38 : 0.33;
@@ -58,7 +60,7 @@ export function buildCarModel(type: VehicleType, color: number, beamTexture: THR
     body.box(W, 0.45, L - 1.2, 0, clear + 0.3, -0.5, shade(color, 0.85));
     body.box(W, 0.35, 0.08, 0, clear + 0.6, -L / 2 + 0.1, shade(color, 0.7));
     for (const [x, z] of [[0, L / 2 - 0.45], [-W / 2 + 0.12, -L / 2 + 0.55], [W / 2 - 0.12, -L / 2 + 0.55]]) {
-      body.cylinder(wheelR, wheelR, 0.18, 10, x, wheelR, z, dark, 0, 0, Math.PI / 2);
+      wheels.cylinder(wheelR, wheelR, 0.18, 10, x, wheelR, z, dark, 0, 0, Math.PI / 2);
     }
   } else {
     const bodyH = type === 'furgone' ? H * 0.55 : H * 0.48;
@@ -112,14 +114,20 @@ export function buildCarModel(type: VehicleType, color: number, beamTexture: THR
     const wx = W / 2 - 0.12;
     for (const wz of [L / 2 - 0.75, -L / 2 + 0.75]) {
       for (const sx of [-1, 1]) {
-        body.cylinder(wheelR, wheelR, 0.24, 10, sx * wx, wheelR, wz, dark, 0, 0, Math.PI / 2);
-        body.cylinder(wheelR * 0.55, wheelR * 0.55, 0.25, 8, sx * wx, wheelR, wz, 0x8a8c8e, 0, 0, Math.PI / 2);
+        wheels.cylinder(wheelR, wheelR, 0.24, 10, sx * wx, wheelR, wz, dark, 0, 0, Math.PI / 2);
+        wheels.cylinder(wheelR * 0.55, wheelR * 0.55, 0.25, 8, sx * wx, wheelR, wz, 0x8a8c8e, 0, 0, Math.PI / 2);
       }
     }
   }
   bodyMaterial ??= staticMaterial();
+  const chassis = new THREE.Group();
+  g.add(chassis);
   const mesh = body.build(bodyMaterial);
-  if (mesh) g.add(mesh);
+  if (mesh) chassis.add(mesh);
+  const wheelMesh = wheels.build(bodyMaterial);
+  if (wheelMesh) g.add(wheelMesh);
+  g.userData.chassis = chassis;
+  g.userData.body = mesh;
 
   /* Lights. */
   const lightY = clearY(type) + 0.45;
@@ -131,8 +139,8 @@ export function buildCarModel(type: VehicleType, color: number, beamTexture: THR
   }
   const headMesh = head.build(LIGHTS.head);
   const tailMesh = tail.build(LIGHTS.tail);
-  if (headMesh) g.add(headMesh);
-  if (tailMesh) g.add(tailMesh);
+  if (headMesh) chassis.add(headMesh);
+  if (tailMesh) chassis.add(tailMesh);
   if (type === 'polizia') {
     const blue = new GeoBatch();
     const red = new GeoBatch();
@@ -141,8 +149,8 @@ export function buildCarModel(type: VehicleType, color: number, beamTexture: THR
     red.box(0.42, 0.14, 0.24, 0.25, top, -L * 0.05, 0xffffff);
     const b = blue.build(LIGHTS.blue);
     const r = red.build(LIGHTS.red);
-    if (b) g.add(b);
-    if (r) g.add(r);
+    if (b) chassis.add(b);
+    if (r) chassis.add(r);
   }
   /* Headlight beams on the road, faded in at night. */
   if (beamTexture) {
@@ -192,6 +200,22 @@ export class Vehicle {
   toughness = 1;
   /** Weather grip (rain, snow) for this frame. */
   gripScale = 1;
+  /** Seconds left on fire (then burnt out), 0 when not burning. */
+  burning = 0;
+  burnt = false;
+  private glassCracked = false;
+  /* Suspension: pitch, roll, heave with their speeds (spring-damper). */
+  private pitch = 0;
+  private roll = 0;
+  private heave = 0;
+  private vPitch = 0;
+  private vRoll = 0;
+  private vHeave = 0;
+  private prevSpeed = 0;
+  private prevHeading = 0;
+  private readonly chassis: THREE.Group;
+  private readonly bodyMesh: THREE.Mesh | null;
+  private rest: Float32Array | null = null;
   color: number;
 
   constructor(type: VehicleType, x: number, z: number, heading: number, color: number, beamTexture: THREE.Texture | null) {
@@ -202,6 +226,9 @@ export class Vehicle {
     this.z = z;
     this.heading = heading;
     this.model = buildCarModel(type, color, beamTexture);
+    this.chassis = this.model.userData.chassis as THREE.Group;
+    this.bodyMesh = (this.model.userData.body as THREE.Mesh) ?? null;
+    this.prevHeading = heading;
     this.sync();
   }
 
@@ -262,7 +289,9 @@ export class Vehicle {
     this.heading += this.yawRate * dt;
 
     /* Grip: the sideways slide decays; the handbrake lets the rear go. */
-    const grip = control.handbrake ? 1.2 : s.grip * this.gripScale;
+    /* Weight transfer: hard braking at speed lightens the rear (a little oversteer). */
+    const transfer = control.brake > 0 && speed > 8 ? 0.75 : 1;
+    const grip = control.handbrake ? 1.2 : s.grip * this.gripScale * transfer;
     lateral *= Math.exp(-grip * dt);
     const nfx = Math.sin(this.heading);
     const nfz = Math.cos(this.heading);
@@ -292,6 +321,7 @@ export class Vehicle {
         this.vx -= ux * into * 1.35;
         this.vz -= uz * into * 1.35;
         impact = Math.max(impact, -into);
+        if (-into > 3) this.dent(cx - ux * this.radius, cz - uz * this.radius, ux, uz, -into);
       }
     }
     if (impact > 4) this.damage(impact * 1.4);
@@ -301,13 +331,116 @@ export class Vehicle {
   damage(amount: number): void {
     this.health = Math.max(0, this.health - amount * this.toughness);
     if (this.health <= 0) this.wrecked = true;
+    if (this.health < 12 && !this.burning && !this.burnt) this.burning = 9;
+    if (this.health < 60) this.crackGlass();
+  }
+
+  /**
+   * Dents the body where it was hit: vertices near the contact point move
+   * inward (at most 35 cm from their original place) and get a little
+   * darker. (x, z) is the contact in world space, (dx, dz) points into the car.
+   */
+  dent(x: number, z: number, dx: number, dz: number, impact: number): void {
+    const mesh = this.bodyMesh;
+    if (!mesh) return;
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const col = mesh.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    const p = pos.array as Float32Array;
+    this.rest ??= p.slice();
+    const c = Math.cos(this.heading), s = Math.sin(this.heading);
+    const wx = x - this.x, wz = z - this.z;
+    const lx = wx * c - wz * s, lz = wx * s + wz * c;
+    const ldx = dx * c - dz * s, ldz = dx * s + dz * c;
+    const radius = 0.8 + Math.min(0.8, impact * 0.04);
+    const depth = Math.min(0.22, impact * 0.014);
+    for (let i = 0; i < p.length; i += 3) {
+      const d = Math.hypot(p[i] - lx, p[i + 2] - lz);
+      if (d >= radius || p[i + 1] < 0.15) continue;
+      const f = 1 - d / radius;
+      let nx = p[i] + ldx * depth * f;
+      let nz = p[i + 2] + ldz * depth * f;
+      const ox = nx - this.rest[i], oz = nz - this.rest[i + 2];
+      const off = Math.hypot(ox, oz);
+      if (off > 0.35) {
+        nx = this.rest[i] + (ox / off) * 0.35;
+        nz = this.rest[i + 2] + (oz / off) * 0.35;
+      }
+      p[i] = nx;
+      p[i + 2] = nz;
+      p[i + 1] -= depth * f * 0.25;
+      if (col) {
+        const k = 1 - f * 0.12;
+        col.setXYZ(i / 3, col.getX(i / 3) * k, col.getY(i / 3) * k, col.getZ(i / 3) * k);
+      }
+    }
+    pos.needsUpdate = true;
+    if (col) col.needsUpdate = true;
+    mesh.geometry.computeBoundingSphere();
+    this.vHeave += Math.min(1.2, impact * 0.05);
+  }
+
+  /** Below 60% the windows turn milky with cracks. */
+  private crackGlass(): void {
+    if (this.glassCracked || !this.bodyMesh) return;
+    this.glassCracked = true;
+    const col = this.bodyMesh.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    if (!col) return;
+    const glass = new THREE.Color(0x26333a);
+    const cracked = new THREE.Color(0x8c999e);
+    for (let i = 0; i < col.count; i++) {
+      if (Math.abs(col.getX(i) - glass.r) + Math.abs(col.getY(i) - glass.g) + Math.abs(col.getZ(i) - glass.b) < 0.01) {
+        col.setXYZ(i, cracked.r, cracked.g, cracked.b);
+      }
+    }
+    col.needsUpdate = true;
+  }
+
+  /** The fire is out: a charred shell that does not drive. */
+  burnOut(): void {
+    this.burning = 0;
+    this.burnt = true;
+    this.wrecked = true;
+    this.health = 0;
+    const col = this.bodyMesh?.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    if (!col) return;
+    for (let i = 0; i < col.count; i++) col.setXYZ(i, col.getX(i) * 0.18 + 0.01, col.getY(i) * 0.16 + 0.01, col.getZ(i) * 0.15 + 0.01);
+    col.needsUpdate = true;
+  }
+
+  /**
+   * Suspension and fire timer, from how the velocity changed since the last
+   * frame (works for physics cars and for lane-following traffic alike).
+   */
+  animate(dt: number): void {
+    if (dt <= 0) return;
+    const speed = this.speed;
+    const longA = THREE.MathUtils.clamp((speed - this.prevSpeed) / dt, -40, 40);
+    let dh = this.heading - this.prevHeading;
+    dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+    const latA = THREE.MathUtils.clamp((dh / dt) * speed, -30, 30);
+    this.prevSpeed = speed;
+    this.prevHeading = this.heading;
+    /* Nose dives when braking, squats when accelerating; leans out of bends. */
+    const tPitch = THREE.MathUtils.clamp(-longA * 0.011, -0.08, 0.08);
+    const tRoll = THREE.MathUtils.clamp(latA * 0.0065, -0.09, 0.09);
+    this.vPitch += ((tPitch - this.pitch) * 60 - this.vPitch * 9) * dt;
+    this.vRoll += ((tRoll - this.roll) * 50 - this.vRoll * 8) * dt;
+    this.vHeave += ((0 - this.heave) * 70 - this.vHeave * 7) * dt;
+    this.pitch += this.vPitch * dt;
+    this.roll += this.vRoll * dt;
+    this.heave = THREE.MathUtils.clamp(this.heave + this.vHeave * dt, -0.15, 0.2);
+    this.chassis.rotation.x = this.pitch;
+    this.chassis.rotation.z = this.roll;
+    this.chassis.position.y = this.heave;
+    if (this.burning > 0) {
+      this.burning -= dt;
+      if (this.burning <= 0) this.burnOut();
+    }
   }
 
   sync(): void {
     this.model.position.set(this.x, 0, this.z);
     this.model.rotation.y = this.heading;
-    /* A little body roll in corners. */
-    this.model.rotation.z = THREE.MathUtils.clamp(-this.yawRate * this.speed * 0.004, -0.06, 0.06);
   }
 }
 
@@ -336,6 +469,11 @@ export function collideVehicles(a: Vehicle, b: Vehicle): number {
         b.vx += (j / mb) * nx;
         b.vz += (j / mb) * nz;
         impact = Math.max(impact, -rel);
+        if (-rel > 3) {
+          const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+          a.dent(mx, mz, -nx, -nz, -rel);
+          b.dent(mx, mz, nx, nz, -rel);
+        }
       }
     }
   }

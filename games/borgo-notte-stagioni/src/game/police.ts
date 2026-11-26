@@ -6,14 +6,15 @@ import { SPECS, Vehicle } from './vehicle';
 
 /* ---------------- alert level (pure logic) ---------------- */
 
-export type Offence = 'carjack' | 'knock' | 'ram' | 'speeding' | 'police-car';
+export type Offence = 'carjack' | 'knock' | 'ram' | 'speeding' | 'police-car' | 'redlight';
 
 const OFFENCE_HEAT: Record<Offence, number> = {
   carjack: 1,
   knock: 1,
   ram: 1,
   speeding: 1,
-  'police-car': 2
+  'police-car': 2,
+  redlight: 1
 };
 
 export class Alert {
@@ -30,7 +31,7 @@ export class Alert {
   add(offence: Offence, now: number): boolean {
     /* The same kind of offence counts once every few seconds. */
     const last = this.recent.get(offence) ?? -Infinity;
-    if (now - last < (offence === 'speeding' ? 20 : 3)) return false;
+    if (now - last < (offence === 'speeding' || offence === 'redlight' ? 20 : 3)) return false;
     this.recent.set(offence, now);
     const before = this.level;
     this.level = Math.min(5, this.level + OFFENCE_HEAT[offence]);

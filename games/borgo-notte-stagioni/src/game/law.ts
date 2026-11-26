@@ -7,7 +7,8 @@ export const OFFENCE_WORDS: Record<Offence, string> = {
   knock: 'Pedone investito',
   ram: 'Speronamento',
   speeding: 'Eccesso di velocità',
-  'police-car': 'Auto della polizia rubata'
+  'police-car': 'Auto della polizia rubata',
+  redlight: 'Passaggio col rosso'
 };
 
 export class Law {

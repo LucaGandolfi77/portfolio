@@ -3,6 +3,7 @@ import type { RoadEdge, RoadGraph } from '../data/roads';
 import { nextEdge, pointOnEdge } from '../data/roads';
 import type { CollisionWorld } from '../data/colliders';
 import { NO_INPUT, SPECS, Vehicle, type VehicleType } from './vehicle';
+import type { TrafficSignals } from './signals';
 
 /*
  * Civilian traffic. While calm, a car rides its lane along the road graph
@@ -21,7 +22,8 @@ const SPEED: Record<string, number> = {
   living_street: 6
 };
 
-const MIX: VehicleType[] = ['utilitaria', 'utilitaria', 'utilitaria', 'berlina', 'berlina', 'familiare', 'familiare', 'furgone', 'taxi', 'sportiva', 'motocarro'];
+/* A patrol now and then on its rounds: it can witness red lights and speeding. */
+const MIX: VehicleType[] = ['utilitaria', 'utilitaria', 'utilitaria', 'berlina', 'berlina', 'familiare', 'familiare', 'furgone', 'taxi', 'sportiva', 'motocarro', 'polizia'];
 
 export interface TrafficCar {
   vehicle: Vehicle;
@@ -46,6 +48,8 @@ export class Traffic {
   /** Cars that were taken out of traffic (parked, abandoned, the player's). */
   readonly loose: Vehicle[] = [];
   target: number;
+  /** Traffic lights, if the town has them. */
+  signals: TrafficSignals | null = null;
   private rand: () => number;
 
   constructor(
@@ -174,6 +178,13 @@ export class Traffic {
       const ahead = pointOnEdge(car.edge, Math.min(car.edge.length, car.d + 8), car.fromA);
       const turn = Math.abs(Math.atan2(now.dx * ahead.dz - now.dz * ahead.dx, now.dx * ahead.dx + now.dz * ahead.dz));
       if (car.edge.length - car.d < 10) limit = Math.min(limit, 7);
+      /* Stop at the line on red, and on amber unless already close. */
+      const toEnd = car.edge.length - car.d;
+      /* Past the line (under 8 m) a car clears the junction instead of stopping in it. */
+      if (this.signals && toEnd < 34 && toEnd > 8) {
+        const light = this.signals.state(car.fromA ? car.edge.b : car.edge.a, car.edge.id);
+        if (light === 'red' || (light === 'amber' && toEnd > 14)) limit = Math.min(limit, Math.max(0, (toEnd - 9) * 0.9));
+      }
       limit = Math.min(limit, car.cruise * (1 - Math.min(0.6, turn)));
       const speed = THREE.MathUtils.lerp(v.speed, limit, Math.min(1, dt * (limit < v.speed ? 3 : 1)));
       car.d += speed * dt;

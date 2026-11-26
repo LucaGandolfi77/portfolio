@@ -117,18 +117,32 @@ com'è, che è il motivo per cui gira ovunque.
 
 ### 3.1 Guida (la cosa più importante)
 
-- [ ] **Fisica con sospensioni**: quattro ruote con molle, beccheggio in
-  frenata e accelerazione, rollio in curva, salto sui dossi.
-- [ ] **Danni visibili**: parti della carrozzeria che si staccano (paraurti,
-  cofano), vetri crepati, fumo dal motore sotto il 30%, fuoco sotto il 10%.
+Fatto il 26 novembre 2026 (fase B):
+
+- [x] Sospensioni: beccheggio in frenata e accelerazione, rollio in curva,
+  rimbalzo negli urti (molla-smorzatore sul telaio, ruote ferme a terra);
+  in frenata forte il retrotreno si alleggerisce.
+- [x] Danni visibili: la carrozzeria si ammacca nel punto d'impatto
+  (vertici spostati fino a 35 cm), detriti del colore dell'auto, vetri
+  incrinati sotto il 60%, fumo sotto il 35%, fuoco sotto il 12% fino al
+  rottame bruciato (chi resta dentro viene sbalzato fuori).
+- [x] Semafori in 48 incroci della rete principale, due fasi, rispettati dal
+  traffico; passare col rosso davanti a una pattuglia alza l'allerta.
+- [x] ~1.600 auto parcheggiate lungo le strade larghe, in streaming, solide e
+  rubabili (allerta solo se una pattuglia vede).
+- [x] Pattuglie nel traffico normale, testimoni di rosso ed eccesso di velocità.
+- Corretto: durante i dialoghi l'auto andava in retromarcia da sola.
+
+Ancora da fare in questa sezione:
+
+- [ ] **Dossi e cordoli**: salto sui dossi, scossone salendo sul marciapiede.
+- [ ] **Parti che si staccano** (paraurti, cofano) come oggetti a terra.
 - [ ] **Più veicoli**: scooter e moto (inclinazione in curva), autobus di
   linea su un percorso reale, camion della nettezza urbana all'alba,
   trattore in periferia, bicicletta.
 - [ ] **Sgommate e segni** sull'asfalto, polvere sullo sterrato, spruzzi
   sotto la pioggia.
 - [ ] **Clacson e reazioni**: il traffico suona se gli tagli la strada.
-- [ ] **Semafori veri** agli incroci principali, rispettati dall'IA (passare
-  col rosso davanti a una pattuglia alza l'allerta).
 - [ ] **Telecamera dal cofano** e vista interna.
 
 ### 3.2 Città viva
@@ -253,7 +267,7 @@ Ancora da fare:
 | Fase | Contenuto | Perché prima |
 |---|---|---|
 | A ✓ | Refactor di `game.ts`, dati fuori dal bundle, streaming dei blocchi | Fatto (vedi §4) |
-| B | Fisica con sospensioni, danni visibili, semafori, auto parcheggiate | È la sensazione di guida che fa "GTA" |
+| B ✓ | Fisica con sospensioni, danni visibili, semafori, auto parcheggiate | Fatto (vedi §3.1) |
 | C | Preset Ultra desktop: grading, bloom, ombre CSM, strade bagnate | Salto visivo grande a costo contenuto |
 | D | Polizia a livelli, testimoni, garage e officina con modifiche | Dà profondità al gioco libero |
 | E | Pedoni con routine e frasi, arredo urbano, insegne | La città diventa viva |
