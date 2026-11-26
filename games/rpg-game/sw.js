@@ -1,4 +1,4 @@
-const CACHE = 'pf-rpg-game-shell-v1';
+const CACHE = 'pf-rpg-game-shell-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-192.png', './icons/icon-512.png',

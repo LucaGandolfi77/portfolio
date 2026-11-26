@@ -30,7 +30,7 @@ export function spawnEnemies(zone, count, seed = 7) {
     /* keep the starting area clear */
     if (distance({ x, y }, { x: 410, y: 300 }) < 170) { x += 140; y += 90; }
     list.push({
-      id: def.id + '-' + i, defId: def.id, x: clamp({ x, y }).x, y: clamp({ x, y }).y,
+      id: def.id + '-' + i, defId: def.id, def, x: clamp({ x, y }).x, y: clamp({ x, y }).y,
       hp: def.hp, maxHp: def.hp, alive: true, hitFlash: 0, attackCd: 0, wander: r() * Math.PI * 2
     });
   }
