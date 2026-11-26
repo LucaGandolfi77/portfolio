@@ -8,7 +8,11 @@ const WALLS = [0xf1e6d0, 0xf8f2e2, 0xe9cdb4, 0xdbc08d, 0xefe0c5, 0xe3c8ac];
 const TRIM = 0xf8f1e2;
 const WINDOW = 0x283033;
 const DOOR = 0x4b3b28;
-const ROOFS = [0xb15f42, 0xa9573e, 0x9e5b45, 0xb96845];
+const ROOFS = [0xb15f42, 0xa9573e, 0x9e5b45, 0xb96845, 0x95503a, 0xc0714d, 0xa3644a, 0x8c4c38];
+/* Facades of the historic centre, after the AGEA 2023 orthophoto and the
+   usual Emilian palette: ochre, salmon, brick red, yellow, old rose. */
+const HISTORIC_WALLS = [0xe6bf7a, 0xe2a585, 0xcf8463, 0xecd496, 0xf1e4c8, 0xe7c2ab, 0xdcc29a, 0xd99a6c, 0xefd9b0];
+const SHUTTERS = [0x4f6b4a, 0x5d7356, 0x6b4a32, 0x7a6a52, 0x4c5f5a];
 const STONE = 0xcabda6;
 const STONE_DARK = 0xb7aa91;
 const looseSigns: THREE.Mesh[] = [];
@@ -325,6 +329,7 @@ function addGenericBuilding(batch: TriBatch, building: FidenzaBuilding, collisio
   const count = pts.length / 2;
   const ccw = signedArea(pts) > 0;
   const tower = isTower(building);
+  const central = !tower && isCentral(building);
   const wall = tower ? 0xd8c8ac : wallColor(building);
   const roof = roofColor(building);
   const candidates: EdgeCandidate[] = [];
@@ -349,6 +354,11 @@ function addGenericBuilding(batch: TriBatch, building: FidenzaBuilding, collisio
     batch.wallQuad(ax, az, bx, bz, 0, 0.75, ox, oz, shade(wall, -0.12));
     batch.wallQuad(ax, az, bx, bz, 0.75, Math.max(0.8, building.h - 0.32), ox, oz, wall);
     batch.wallQuad(ax, az, bx, bz, Math.max(0.8, building.h - 0.32), building.h, ox, oz, TRIM);
+    if (central && building.h > 6.5 && length > 1.5) {
+      /* String course between the ground floor and the first floor. */
+      const o = 0.05;
+      batch.wallQuad(ax + ox * o, az + oz * o, bx + ox * o, bz + oz * o, 3.32, 3.52, ox, oz, shade(TRIM, -0.04));
+    }
 
     if (length >= 3.2) {
       const mx = (ax + bx) / 2 + ox * 1.4;
@@ -425,6 +435,22 @@ function addRoof(batch: TriBatch, building: FidenzaBuilding, pts: number[], roof
     return;
   }
 
+  /* Eaves: the roof overhangs the walls by about half a metre; the underside
+     is drawn darker so the cornice reads from the street. */
+  const eave = offsetRing(pts, 0.45);
+  const under = shade(roof, -0.35);
+  for (let i = 0; i < count; i++) {
+    const j = (i + 1) % count;
+    quadDown(
+      batch,
+      pts[i * 2], building.h, pts[i * 2 + 1],
+      pts[j * 2], building.h, pts[j * 2 + 1],
+      eave[j * 2], building.h - 0.05, eave[j * 2 + 1],
+      eave[i * 2], building.h - 0.05, eave[i * 2 + 1],
+      under
+    );
+  }
+  const base = eave;
   const centre = centroid(pts);
   const factor = Math.max(0.34, 1 - 1.9 / Math.max(3, minDim));
   const rise = Math.min(2.2, Math.max(0.9, minDim * 0.14));
@@ -437,12 +463,12 @@ function addRoof(batch: TriBatch, building: FidenzaBuilding, pts: number[], roof
   for (let i = 0; i < count; i++) {
     const j = (i + 1) % count;
     batch.quadUp(
-      pts[i * 2],
-      building.h,
-      pts[i * 2 + 1],
-      pts[j * 2],
-      building.h,
-      pts[j * 2 + 1],
+      base[i * 2],
+      building.h - 0.05,
+      base[i * 2 + 1],
+      base[j * 2],
+      building.h - 0.05,
+      base[j * 2 + 1],
       inner[j * 2],
       building.h + rise,
       inner[j * 2 + 1],
@@ -473,9 +499,8 @@ function addWindowsAndDoor(
 
   // Measured DBTR heights reach 20-25 m on the apartment blocks: up to 8 window rows.
   const floors = Math.min(8, Math.max(1, Math.floor((building.h - 1.8) / 3)));
-  const central =
-    Math.hypot(building.x + 280, building.z - 5) < 170 ||
-    Math.hypot(building.x - 15, building.z + 21) < 140;
+  const central = isCentral(building);
+  const shutter = SHUTTERS[hashOf(building.id, 7) % SHUTTERS.length];
 
   for (const edge of candidates.slice(0, 2)) {
     const count = Math.min(3, Math.max(1, Math.floor(edge.length / 3.4)));
@@ -489,6 +514,12 @@ function addWindowsAndDoor(
         batch.box(0.62, 0.98, 0.1, x, y, z, WINDOW, edge.ry);
         if (central) {
           batch.box(0.86, 0.07, 0.2, x + edge.ox * 0.02, y - 0.56, z + edge.oz * 0.02, TRIM, edge.ry);
+          /* Open shutters on both sides of the window. */
+          const ux = (edge.bx - edge.ax) / edge.length;
+          const uz = (edge.bz - edge.az) / edge.length;
+          for (const side of [-0.5, 0.5]) {
+            batch.box(0.3, 1.02, 0.05, x + ux * side + edge.ox * 0.02, y, z + uz * side + edge.oz * 0.02, shutter, edge.ry);
+          }
         }
       }
     }
@@ -1067,11 +1098,70 @@ function generateLamps(collision: CollisionWorld): Array<{ x: number; z: number 
   return lamps;
 }
 
+function hashOf(id: string, seed: number): number {
+  let hash = seed;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+/* The historic centre: around the Duomo and around Piazza Garibaldi. */
+function isCentral(building: FidenzaBuilding): boolean {
+  return Math.hypot(building.x + 280, building.z - 5) < 170 || Math.hypot(building.x - 15, building.z + 21) < 140;
+}
+
+/* Outward offset of a polygon ring (mitred, clamped at sharp corners). */
+function offsetRing(pts: number[], d: number): number[] {
+  const count = pts.length / 2;
+  const sign = signedArea(pts) > 0 ? 1 : -1;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const p = (i - 1 + count) % count;
+    const n = (i + 1) % count;
+    const e1x = pts[i * 2] - pts[p * 2];
+    const e1z = pts[i * 2 + 1] - pts[p * 2 + 1];
+    const e2x = pts[n * 2] - pts[i * 2];
+    const e2z = pts[n * 2 + 1] - pts[i * 2 + 1];
+    const l1 = Math.hypot(e1x, e1z) || 1;
+    const l2 = Math.hypot(e2x, e2z) || 1;
+    const n1x = (sign * e1z) / l1;
+    const n1z = (-sign * e1x) / l1;
+    const n2x = (sign * e2z) / l2;
+    const n2z = (-sign * e2x) / l2;
+    let mx = n1x + n2x;
+    let mz = n1z + n2z;
+    const ml = Math.hypot(mx, mz);
+    if (ml < 1e-6) {
+      mx = n1x;
+      mz = n1z;
+    } else {
+      mx /= ml;
+      mz /= ml;
+    }
+    const len = Math.min(d * 2.5, d / Math.max(0.35, mx * n1x + mz * n1z));
+    out.push(pts[i * 2] + mx * len, pts[i * 2 + 1] + mz * len);
+  }
+  return out;
+}
+
+/** Like quadUp, with the visible side facing down (eave undersides). */
+function quadDown(
+  batch: TriBatch,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+  dx: number, dy: number, dz: number,
+  color: number
+): void {
+  const ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+  if (ny < 0) batch.quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color);
+  else batch.quad(ax, ay, az, dx, dy, dz, cx, cy, cz, bx, by, bz, color);
+}
+
 function wallColor(building: FidenzaBuilding): number {
   if (building.kind === 'church') return 0xf3ead8;
   if (building.kind === 'industrial' || building.kind === 'garage') return 0xc9bda9;
-  let hash = 0;
-  for (let i = 0; i < building.id.length; i++) hash = (hash * 31 + building.id.charCodeAt(i)) >>> 0;
+  const hash = hashOf(building.id, 0);
+  if (isCentral(building)) return HISTORIC_WALLS[hash % HISTORIC_WALLS.length];
   return WALLS[hash % WALLS.length];
 }
 

@@ -3,7 +3,7 @@ import type { CollisionWorld } from '../data/colliders';
 import type { WorldBounds } from '../data/types';
 import { createFlightMotion, stepFlight, type FlightMotion } from '../game/travel';
 import { moveAndCollide } from './collision';
-import { animateIdle, animateWalk, createBlobShadow, createPerson, type PersonRig } from '../world/person';
+import { animateIdle, animateWalk, createBlobShadow, createPerson, setJoints, type PersonRig } from '../world/person';
 
 const WALK_SPEED = 3.15;
 const RUN_SPEED = 5.45;
@@ -116,6 +116,7 @@ export class Player {
     this.rig.leftArm.rotation.x = -0.55 + sway * 0.05;
     this.rig.rightArm.rotation.x = -0.55 - sway * 0.05;
     this.rig.body.position.y = 0;
+    setJoints(this.rig, [0.45 + sway * 0.05, 0.3 - sway * 0.05], [-0.35, -0.35]);
     const thrust = Math.abs(vertical) > 0.05 ? 1 : 0.45;
     for (const flame of this.flames) {
       flame.scale.set(1, thrust * (0.8 + Math.abs(sway) * 0.25), 1);
@@ -220,6 +221,7 @@ export class Player {
       this.rig.leftArm.rotation.x = -0.5;
       this.rig.rightArm.rotation.x = -0.5;
       this.rig.body.position.y = 0;
+      setJoints(this.rig, [0.7, 0.25], [-0.6, -0.6]);
     } else {
       this.idleTime += dt;
       animateIdle(this.rig, this.idleTime);

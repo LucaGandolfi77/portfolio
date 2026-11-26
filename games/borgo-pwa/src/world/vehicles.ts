@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { CircleCollider } from '../data/colliders';
 import type { VehicleKind, VehicleSpec } from '../data/types';
 import { createVehicleMotion, vehicleCollider, type VehicleMotion } from '../game/travel';
-import { createBlobShadow, createPerson, type PersonRig } from './person';
+import { createBlobShadow, createPerson, setJoints, type PersonRig } from './person';
 import { GeoBatch, glowMaterial, staticMaterial } from './batch';
 
 export interface VehicleSnapshotLike {
@@ -200,6 +200,7 @@ function createBike(color: number): VehicleModel {
   rider.leftArm.rotation.x = -0.78;
   rider.rightArm.rotation.x = -0.78;
   rider.body.position.y = 0.08;
+  setJoints(rider, [1.35, 1.1], [-0.45, -0.45]);
   rider.group.visible = false;
   group.add(rider.group);
 
