@@ -218,8 +218,8 @@ export const UI = {
   journalPlaces: { it: 'Luoghi di Fidenza', en: 'Places of Fidenza' },
   placeDiscovered: { it: 'Luogo scoperto', en: 'Place discovered' },
   mapAttribution: {
-    it: 'Mappa: © OpenStreetMap contributors (ODbL) · Altezze: DBTR © Regione Emilia-Romagna (CC BY 4.0)',
-    en: 'Map: © OpenStreetMap contributors (ODbL) · Heights: DBTR © Regione Emilia-Romagna (CC BY 4.0)'
+    it: 'Mappa © OpenStreetMap contributors (ODbL) · DBTR © Regione Emilia-Romagna (CC BY 4.0) · Ortofoto AGEA 2023',
+    en: 'Map © OpenStreetMap contributors (ODbL) · DBTR © Regione Emilia-Romagna (CC BY 4.0) · AGEA 2023 orthophoto'
   },
   close: { it: 'Chiudi', en: 'Close' },
   activeQuests: { it: 'In corso', en: 'In progress' },

@@ -77,6 +77,9 @@ The script reads the tracked OSM-derived snapshot `fidenza-city-v3/data/city.jso
 - **Source:** [OpenStreetMap](https://www.openstreetmap.org/) via Overpass, snapshot from `fidenza-city-v3/data/city.json`.
 - **License:** [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) — the derived database remains subject to ODbL.
 - **Heights:** `node scripts/dbtr-heights.mjs fetch` queries the public DBTR WMS (GetFeatureInfo, layer `UVL_Unita_volumetrica`) for points inside each footprint and caches the answers in `data/dbtr-heights.json`; `node scripts/dbtr-heights.mjs apply` writes the median `H_uvl` into `src/data/fidenza.json`. Buildings with no match keep the inferred height.
+- **Roofs and trees:** `node scripts/ortho-features.mjs` samples the AGEA 2023 orthophoto (WMS of Regione Emilia-Romagna) inside every footprint for the roof colour, and plants trees where the orthophoto shows tree crowns (green, rough, darker than lawns) away from buildings, streets, pitches and the game's interaction points; OSM tree rows are planted every 7 m.
+- **Street widths:** `node scripts/street-widths.mjs` measures the real carriageway across each street on the DBTR vehicular surface (class ACS) and keeps the OSM width in `wOsm`.
+- **Check against the official maps:** `node scripts/map-report.mjs` compares the footprints with the cadastre (Agenzia delle Entrate, CC BY 4.0) and the DBTR at 1 m and writes `data/map-report.json` (precision, coverage, IoU). WMS tiles are cached in `.cache/wms`.
 - **Attribution:** “© OpenStreetMap contributors” is shown in the title screen, map, pause menu and README.
 - **Data changes:** the derived database is `src/data/fidenza.json`; the source snapshot and its full attribution are in `fidenza-city-v3/data/ATTRIBUTION.md`.
 - Public street and landmark names come from OSM; businesses and characters are fictional.

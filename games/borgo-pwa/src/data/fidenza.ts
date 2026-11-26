@@ -42,6 +42,8 @@ export interface FidenzaBuilding {
   landmark: string | null;
   /** Flat [x,z,x,z,…] ring, local metres. */
   poly: number[];
+  /** Roof colour sampled from the AGEA 2023 orthophoto (0xRRGGBB). */
+  roof?: number;
 }
 
 export interface FidenzaRoad {
@@ -51,6 +53,8 @@ export interface FidenzaRoad {
   w: number;
   /** Flat [x,z,x,z,…] polyline. */
   pts: number[];
+  /** Width from OpenStreetMap before the DBTR measurement (scripts/street-widths.mjs). */
+  wOsm?: number;
 }
 
 export interface FidenzaArea {
@@ -67,6 +71,8 @@ export interface FidenzaTree {
   z: number;
   h: number;
   leaf: string;
+  /** 'osm' (natural=tree), 'osm-row' (natural=tree_row), 'ortho' (canopy in the AGEA 2023 orthophoto). */
+  source?: 'osm' | 'osm-row' | 'ortho';
 }
 
 export interface FidenzaFurniture {

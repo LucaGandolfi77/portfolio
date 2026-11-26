@@ -101,58 +101,10 @@ export function drawFullMap(
 
   drawTown(ctx, view, state, true, waypoint);
 
-  ctx.save();
-  ctx.font = '600 13px Georgia, "Times New Roman", serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (const street of STREET_LABELS) {
-    const x = view.ox + street.x * view.scale;
-    const y = view.oy + street.z * view.scale;
-    ctx.fillStyle = 'rgba(58,47,35,0.5)';
-    ctx.font = 'italic 11px Georgia, "Times New Roman", serif';
-    ctx.fillText(street.name, x, y);
-  }
-  ctx.font = '600 14px Georgia, "Times New Roman", serif';
-  const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
-  for (const place of DISCOVERIES) {
-    if (place.interior) continue;
-    if (!detail && FULL_MAP_MINOR.has(place.id)) continue;
-    const x = view.ox + place.x * view.scale;
-    const y = view.oy + place.z * view.scale - 9;
-    ctx.beginPath();
-    ctx.arc(x, y + 9, 3.2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(58,47,35,0.7)';
-    ctx.fill();
-    const label = pick(place.name, lang);
-    const width = ctx.measureText(label).width + 10;
-    let box: { x: number; y: number; w: number; h: number } | null = null;
-    for (const offset of [0, -20, 20, -38, 38]) {
-      const candidate = { x: x - width / 2, y: y - 9 + offset, w: width, h: 18 };
-      if (
-        !placed.some(
-          (other) =>
-            candidate.x < other.x + other.w &&
-            candidate.x + candidate.w > other.x &&
-            candidate.y < other.y + other.h &&
-            candidate.y + candidate.h > other.y
-        )
-      ) {
-        box = candidate;
-        break;
-      }
-    }
-    if (!box) continue;
-    placed.push(box);
-    ctx.fillStyle = 'rgba(242,230,206,0.82)';
-    ctx.fillRect(box.x, box.y, box.w, box.h);
-    ctx.fillStyle = 'rgba(58,47,35,0.88)';
-    ctx.fillText(label, x, box.y + 9);
-  }
-  ctx.restore();
-
   drawFrancigena(ctx, view, state);
   drawPhotoSpots(ctx, view);
   drawBelvedereSpots(ctx, view);
+  drawPlaceLabels(ctx, view, lang, detail, player);
   drawPlayer(ctx, player, heading, view, 9);
 
   ctx.fillStyle = INK;
@@ -375,6 +327,102 @@ function drawTown(
   if (waypoint) {
     marker(ctx, view, waypoint.x, waypoint.z, full ? 7 : 4.5);
   }
+}
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+const overlaps = (a: Rect, b: Rect): boolean =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/* Street names, then place names. Icons (photo spots, belvedere, Francigena
+   stages, the player) are reserved first so no name hides them; a name that
+   cannot sit next to its point moves further away with a thin leader line. */
+function drawPlaceLabels(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  lang: Language,
+  detail: boolean,
+  player: MapPoint
+): void {
+  const size = ctx.canvas.width;
+  const at = (p: { x: number; z: number }): [number, number] => [view.ox + p.x * view.scale, view.oy + p.z * view.scale];
+  const reserved: Rect[] = [];
+  const reserve = (p: { x: number; z: number }, r: number): void => {
+    const [x, y] = at(p);
+    reserved.push({ x: x - r, y: y - r, w: r * 2, h: r * 2 });
+  };
+  for (const spot of PHOTO_SPOTS) reserve(spot, 6);
+  for (const spot of BELVEDERE_SPOTS) reserve(spot, 8);
+  for (const stage of FRANCIGENA_STAGES) reserve(stage, 11);
+  reserve(player, 12);
+  /* The north arrow in the top-right corner. */
+  reserved.push({ x: size - 46, y: 6, w: 40, h: 40 });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const placed: Rect[] = [];
+  const free = (r: Rect): boolean =>
+    r.x >= 2 && r.y >= 2 && r.x + r.w <= size - 2 && r.y + r.h <= size - 2 &&
+    !placed.some((o) => overlaps(r, o)) && !reserved.some((o) => overlaps(r, o));
+
+  ctx.font = 'italic 11px Georgia, "Times New Roman", serif';
+  for (const street of STREET_LABELS) {
+    const [x, y] = at(street);
+    const w = ctx.measureText(street.name).width + 4;
+    const rect = { x: x - w / 2, y: y - 7, w, h: 14 };
+    if (!free(rect)) continue;
+    placed.push(rect);
+    ctx.fillStyle = 'rgba(58,47,35,0.5)';
+    ctx.fillText(street.name, x, y);
+  }
+
+  ctx.font = '600 14px Georgia, "Times New Roman", serif';
+  for (const place of DISCOVERIES) {
+    if (place.interior) continue;
+    if (!detail && FULL_MAP_MINOR.has(place.id)) continue;
+    const [px, py] = at(place);
+    const label = pick(place.name, lang);
+    const w = ctx.measureText(label).width + 10;
+    const h = 18;
+    /* Above, below, right, left, then further out. */
+    const options: Array<[number, number]> = [
+      [0, -h / 2 - 9], [0, h / 2 + 7], [w / 2 + 8, 0], [-w / 2 - 8, 0],
+      [0, -h * 1.6 - 9], [0, h * 1.6 + 7], [w / 2 + 8, -h], [-w / 2 - 8, -h],
+      [w / 2 + 8, h], [-w / 2 - 8, h], [0, -h * 2.7 - 9], [0, h * 2.7 + 7]
+    ];
+    let chosen: Rect | null = null;
+    let index = 0;
+    for (; index < options.length; index++) {
+      const [dx, dy] = options[index];
+      const rect = { x: px + dx - w / 2, y: py + dy - h / 2, w, h };
+      if (free(rect)) {
+        chosen = rect;
+        break;
+      }
+    }
+    ctx.beginPath();
+    ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(58,47,35,0.7)';
+    ctx.fill();
+    if (!chosen) continue;
+    placed.push(chosen);
+    if (index >= 4) {
+      const cx = Math.max(chosen.x, Math.min(px, chosen.x + chosen.w));
+      const cy = Math.max(chosen.y, Math.min(py, chosen.y + chosen.h));
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(cx, cy);
+      ctx.strokeStyle = 'rgba(58,47,35,0.55)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(242,230,206,0.9)';
+    ctx.fillRect(chosen.x, chosen.y, chosen.w, chosen.h);
+    ctx.fillStyle = 'rgba(58,47,35,0.9)';
+    ctx.fillText(label, chosen.x + chosen.w / 2, chosen.y + h / 2);
+  }
+  ctx.restore();
 }
 
 function drawFrancigena(

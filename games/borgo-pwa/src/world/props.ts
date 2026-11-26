@@ -13,6 +13,10 @@ const LEAF_LIGHT = 0x7f8e56;
 const LEAF_DARK = 0x596941;
 const OLIVE_BARK = 0x766b52;
 
+function shadeLeaf(color: number): number {
+  return new THREE.Color(color).multiplyScalar(0.82).getHex();
+}
+
 export function addProp(batch: GeoBatch, glow: GeoBatch, prop: PropSpec): THREE.Object3D | null {
   const scale = prop.scale ?? 1;
   const rot = prop.rot ?? 0;
@@ -93,6 +97,25 @@ export function addProp(batch: GeoBatch, glow: GeoBatch, prop: PropSpec): THREE.
       for (let i = 0; i < 5; i++) {
         const angle = (i / 5) * Math.PI * 2;
         box(0.42, 0.12, 0.3, Math.sin(angle) * 0.7, 0.06, Math.cos(angle) * 0.7, STONE_DARK, angle);
+      }
+      return null;
+    }
+
+    /* A light tree for the canopies traced from the orthophoto: thousands of
+       them, so a plain trunk and three crowns in a tint that varies by spot. */
+    case 'canopy': {
+      const tint = Math.abs(Math.sin(prop.x * 12.9898 + prop.z * 78.233)) % 1;
+      const leaf = tint < 0.33 ? LEAF : tint < 0.66 ? LEAF_DARK : 0x667a44;
+      const light = tint < 0.5 ? LEAF_LIGHT : 0x8a9a5c;
+      cyl(0.2 * scale, 0.28 * scale, 3 * scale, 5, 0, 1.5 * scale, 0, 0x6f6450);
+      const crowns = [
+        [0, 4.7, 0, 1.75, leaf],
+        [0.95, 4.0, 0.35, 1.2, light],
+        [-0.85, 4.2, -0.4, 1.25, shadeLeaf(leaf)]
+      ] as const;
+      for (const [lx, ly, lz, r, color] of crowns) {
+        const [x, z] = place(lx * scale, lz * scale);
+        batch.sphere(r * scale, x, ly * scale, z, color, 0, 0.85);
       }
       return null;
     }

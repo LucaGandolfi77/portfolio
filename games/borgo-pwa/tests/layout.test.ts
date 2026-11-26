@@ -98,6 +98,35 @@ describe('Fidenza data', () => {
     expect(FIDENZA.meta.source).toContain('Overpass');
   });
 
+  it('plants real trees outside every building', () => {
+    expect(FIDENZA.trees.length).toBeGreaterThan(1000);
+    const inside = (x: number, z: number, poly: number[]): boolean => {
+      let hit = false;
+      for (let i = 0, j = poly.length - 2; i < poly.length; j = i, i += 2) {
+        const zi = poly[i + 1];
+        const zj = poly[j + 1];
+        if (zi > z !== zj > z && x < ((poly[j] - poly[i]) * (z - zi)) / (zj - zi) + poly[i]) hit = !hit;
+      }
+      return hit;
+    };
+    for (const tree of FIDENZA.trees) {
+      if (!tree.source || tree.source === 'osm') continue;
+      for (const b of FIDENZA.buildings) {
+        if (Math.abs(b.x - tree.x) > 60 || Math.abs(b.z - tree.z) > 60) continue;
+        expect(inside(tree.x, tree.z, b.poly), `tree at ${tree.x},${tree.z} inside ${b.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('has roof colours from the orthophoto and measured street widths', () => {
+    const roofs = FIDENZA.buildings.filter((b) => b.roof !== undefined).length;
+    expect(roofs).toBeGreaterThan(FIDENZA.buildings.length * 0.9);
+    for (const road of FIDENZA.roads) {
+      expect(road.w).toBeGreaterThanOrEqual(0.5);
+      expect(road.w).toBeLessThanOrEqual(16);
+    }
+  });
+
   it('uses measured DBTR heights and credits Regione Emilia-Romagna (CC BY 4.0)', () => {
     const heights = FIDENZA.meta.heights;
     expect(heights?.license).toBe('CC-BY-4.0');

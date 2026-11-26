@@ -25,6 +25,7 @@ export type QuestPhase = 'locked' | 'available' | 'active' | 'objective' | 'done
 export type PropKind =
   | 'olive'
   | 'plane'
+  | 'canopy'
   | 'cypress'
   | 'lantern'
   | 'bench'

@@ -86,7 +86,7 @@ export function buildWorld(scene: THREE.Scene, mobile: boolean): World {
   for (const [index, tree] of city.trees.entries()) {
     addProp(batch, glow, {
       id: `tree-${index}`,
-      kind: 'plane',
+      kind: tree.kind,
       x: tree.x,
       z: tree.z,
       scale: THREE.MathUtils.clamp(tree.h / 7.5, 0.7, 1.55)

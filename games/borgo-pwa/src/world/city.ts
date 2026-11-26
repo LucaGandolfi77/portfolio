@@ -21,7 +21,7 @@ export interface CityRender {
   ground: THREE.Mesh;
   buildings: THREE.Mesh[];
   signs: THREE.Mesh[];
-  trees: Array<{ x: number; z: number; h: number; kind: 'plane' }>;
+  trees: Array<{ x: number; z: number; h: number; kind: 'plane' | 'canopy' }>;
   furniture: Array<{ type: string; x: number; z: number }>;
   lamps: Array<{ x: number; z: number }>;
 }
@@ -111,7 +111,14 @@ export function buildCity(scene: THREE.Scene, collision: CollisionWorld): CityRe
     ground,
     buildings,
     signs,
-    trees: FIDENZA.trees.map((tree) => ({ x: tree.x, z: tree.z, h: tree.h, kind: 'plane' as const })),
+    /* OSM trees keep the detailed plane tree; the orthophoto canopies and the
+       OSM tree rows use the light 'canopy' tree. */
+    trees: FIDENZA.trees.map((tree) => ({
+      x: tree.x,
+      z: tree.z,
+      h: tree.h,
+      kind: !tree.source || tree.source === 'osm' ? ('plane' as const) : ('canopy' as const)
+    })),
     furniture: FIDENZA.furniture.map((item) => ({ type: item.type, x: item.x, z: item.z })),
     lamps
   };
@@ -1165,7 +1172,16 @@ function wallColor(building: FidenzaBuilding): number {
   return WALLS[hash % WALLS.length];
 }
 
+const HSL = { h: 0, s: 0, l: 0 };
 function roofColor(building: FidenzaBuilding): number {
+  if (building.roof !== undefined) {
+    /* The aerial photo is hazy: lift the saturation a little so the real
+       colour still sits in the golden-hour palette. */
+    const color = new THREE.Color(building.roof);
+    color.getHSL(HSL);
+    color.setHSL(HSL.h, Math.min(1, HSL.s * 1.7 + 0.08), THREE.MathUtils.clamp(HSL.l * 0.86, 0.18, 0.58));
+    return color.getHex();
+  }
   let hash = 0;
   for (let i = 0; i < building.id.length; i++) hash = (hash * 17 + building.id.charCodeAt(i)) >>> 0;
   return ROOFS[hash % ROOFS.length];
