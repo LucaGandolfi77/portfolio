@@ -1119,13 +1119,13 @@ GAME.init = function () {
     if (!webgl) {
       var warn = document.getElementById('webglWarn');
       if (warn) warn.classList.remove('hidden');
+      return;
     }
+    GAME.initInput();
+    GAME.initTouchButtons();
+    UI.init();
+    UI.showLogin();
   });
-
-  GAME.initInput();
-  GAME.initTouchButtons();
-  UI.init();
-  UI.showLogin();
 };
 
 GAME.initTouchButtons = function () {

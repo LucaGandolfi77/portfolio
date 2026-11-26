@@ -32,14 +32,25 @@ SPRITE.adminColor = '#ffd54a';
 
 RND.init = function (containerEl, onReady) {
   var isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  var app = new PIXI.Application({
+  // Pixi v8: il renderer si crea in modo asincrono con app.init().
+  var app = new PIXI.Application();
+  app.init({
     background: '#05070d',
     resizeTo: window,
     antialias: true,
     resolution: Math.min(window.devicePixelRatio || 1, isMobile ? 2 : 2),
     autoDensity: true,
     powerPreference: 'high-performance'
+  }).then(function () {
+    RND.build(containerEl, app);
+    if (onReady) onReady(true);
+  }).catch(function (err) {
+    console.warn('Renderer non disponibile:', err);
+    if (onReady) onReady(false);
   });
+};
+
+RND.build = function (containerEl, app) {
   containerEl.appendChild(app.canvas);   // Pixi v8: .view è stato rimosso
   RND.app = app;
 
@@ -70,19 +81,8 @@ RND.init = function (containerEl, onReady) {
 
   window.addEventListener('resize', function () { RND.onResize(); });
 
-  if (typeof PIXI !== 'undefined' && !app.renderer.type) {
-    // WebGL non disponibile: PIXI.Application lancia già errore prima di qui
-  }
   RND.ready = true;
-  if (onReady) onReady(isWebGLAvailable());
 };
-
-function isWebGLAvailable() {
-  try {
-    var c = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl')));
-  } catch (e) { return false; }
-}
 
 RND.onResize = function () {
   if (!RND.ready) return;
@@ -164,7 +164,7 @@ RND.buildBlackhole = function () {
   c.position.set(BH.x, BH.y);
 
   // alone gravitazionale (gradiente radiale pre-renderizzato)
-  var glowTex = RND.radialTexture(420, ['rgba(124,92,255,0.30)', 'rgba(124,92,255,0)']);
+  var glowTex = RND.radialTexture(420, [[0, 'rgba(124,92,255,0.30)'], [1, 'rgba(124,92,255,0)']]);
   var glow = new PIXI.Sprite(glowTex);
   glow.anchor.set(0.5);
   glow.width = glow.height = 900;
@@ -573,12 +573,12 @@ RND.sync = function (dt, p) {
   var s = RND.screenSize();
   var viewW = s.w / RND.zoom, viewH = s.h / RND.zoom;
 
-  // camera che segue il giocatore (clampata ai bordi del mondo)
-  var camX, camY;
-  if (viewW >= DATA.WORLD_W) camX = (DATA.WORLD_W - viewW) / 2;
-  else camX = Math.max(0, Math.min(DATA.WORLD_W - viewW, p.x - viewW / 2));
-  if (viewH >= DATA.WORLD_H) camY = (DATA.WORLD_H - viewH) / 2;
-  else camY = Math.max(0, Math.min(DATA.WORLD_H - viewH, p.y - viewH / 2));
+  // camera che segue il giocatore: (camX, camY) è il punto del mondo al
+  // centro dello schermo, clampato per non mostrare oltre i bordi
+  var camX = viewW >= DATA.WORLD_W ? DATA.WORLD_W / 2
+    : Math.max(viewW / 2, Math.min(DATA.WORLD_W - viewW / 2, p.x));
+  var camY = viewH >= DATA.WORLD_H ? DATA.WORLD_H / 2
+    : Math.max(viewH / 2, Math.min(DATA.WORLD_H - viewH / 2, p.y));
   RND.camX = camX; RND.camY = camY;
 
   RND.world.scale.set(RND.zoom);
