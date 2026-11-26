@@ -150,6 +150,27 @@ function checkCdn(url) {
   return null;
 }
 
+/**
+ * The folder of a Vite app, when `file` is its index.html. Vite serves what is
+ * in public/ from the page's own folder and resolves /src/… from the app root.
+ */
+function viteRoot(file) {
+  const dir = path.dirname(file);
+  if (path.basename(file) !== 'index.html') return null;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    return pkg.dependencies?.vite || pkg.devDependencies?.vite ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A Vite page registers its service worker from the bundled sources. */
+function registersFromSources(app) {
+  const entry = path.join(app, 'src', 'main.ts');
+  return fs.existsSync(entry) && /serviceWorker\.register/.test(fs.readFileSync(entry, 'utf8'));
+}
+
 function analyse(file) {
   const source = fs.readFileSync(file, 'utf8');
   const rel = path.relative(REPO_ROOT, file).split(path.sep).join('/');
@@ -163,7 +184,8 @@ function analyse(file) {
   const h1Count = (source.match(/<h1\b/gi) || []).length;
   const canonical = /<link\b[^>]*rel\s*=\s*["']canonical["']/i.test(source);
   const manifest = /<link\b[^>]*rel\s*=\s*["']manifest["']/i.test(source) || /rel=["']manifest["']/i.test(source);
-  const serviceWorker = /serviceWorker/.test(source);
+  const app = viteRoot(file);
+  const serviceWorker = /serviceWorker/.test(source) || (!!app && registersFromSources(app));
   const topButtons = /top_buttons\.js/.test(source);
   const projectShell = /data-project-shell/.test(source);
   const inlineScripts = [];
@@ -203,7 +225,8 @@ function analyse(file) {
     } else {
       target = path.resolve(path.dirname(file), clean);
     }
-    if (!fs.existsSync(target)) {
+    const fromVite = !!app && fs.existsSync(path.join(app, absolute ? '' : 'public', clean.replace(/^\//, '')));
+    if (!fs.existsSync(target) && !fromVite) {
       add(issues, absolute ? 'info' : 'error', absolute ? 'absolute-ref' : 'missing-ref',
         `Riferimento locale ${absolute ? 'assoluto ' : ''}non trovato: ${raw}`, lineOf(source, rm.index));
     }
