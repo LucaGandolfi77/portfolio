@@ -1,0 +1,247 @@
+import { BRICK_PALETTE } from './brickPalette';
+import type { CommunityQuestDef, HouseAddonDef, PlotDef, PlotThemeId } from './types';
+
+export interface ThemeStyle {
+  id: PlotThemeId;
+  name: string;
+  wallColor: number;
+  roofColor: number;
+  trimColor: number;
+}
+
+export const PLOT_THEMES: Record<PlotThemeId, ThemeStyle> = {
+  frontier: {
+    id: 'frontier',
+    name: 'Wilds Timber',
+    wallColor: BRICK_PALETTE.warmSand,
+    roofColor: BRICK_PALETTE.terracotta,
+    trimColor: BRICK_PALETTE.forestGreen,
+  },
+  prehistoric: {
+    id: 'prehistoric',
+    name: 'Dino Jungle',
+    wallColor: BRICK_PALETTE.limeGreen,
+    roofColor: BRICK_PALETTE.sunsetOrange,
+    trimColor: BRICK_PALETTE.brightYellow,
+  },
+  cyber: {
+    id: 'cyber',
+    name: 'Cyber-Neon',
+    wallColor: BRICK_PALETTE.charcoal,
+    roofColor: BRICK_PALETTE.royalPurple,
+    trimColor: BRICK_PALETTE.visorCyan,
+  },
+  carnival: {
+    id: 'carnival',
+    name: 'Block Carnival',
+    wallColor: BRICK_PALETTE.pureWhite,
+    roofColor: BRICK_PALETTE.brightRed,
+    trimColor: BRICK_PALETTE.brightYellow,
+  },
+};
+
+export const THEME_LIST: PlotThemeId[] = ['frontier', 'prehistoric', 'cyber', 'carnival'];
+
+export const HOUSE_ADDONS: HouseAddonDef[] = [
+  { id: 'none', nameEn: 'Standard Roof', nameIt: 'Tetto Standard', costPips: 0, icon: '🏠' },
+  { id: 'solar-array', nameEn: 'Solar Panels', nameIt: 'Pannelli Solari', costPips: 180, icon: '☀️' },
+  { id: 'hero-banner', nameEn: 'Hero Banner', nameIt: 'Stendardo Eroi', costPips: 150, icon: '🚩' },
+  { id: 'firework-tower', nameEn: 'Firework Spire', nameIt: 'Torre Fuochi', costPips: 260, icon: '🎆' },
+  { id: 'crystal-garden', nameEn: 'Crystal Garden', nameIt: 'Giardino Cristalli', costPips: 220, icon: '💎' },
+];
+
+export const HUB_PLOTS: PlotDef[] = [
+  {
+    id: 'hero-lodge',
+    name: 'Hero Lodge',
+    category: 'house',
+    position: [-9, 0, -6],
+    unlockCubes: 0,
+    buildCostPips: 150,
+    defaultTheme: 'frontier',
+  },
+  {
+    id: 'gadget-forge',
+    name: 'Elemental Forge',
+    category: 'facility',
+    position: [9, 0, -6],
+    unlockCubes: 0,
+    buildCostPips: 250,
+    defaultTheme: 'cyber',
+  },
+  {
+    id: 'wardrobe-booth',
+    name: 'Wardrobe Pavilion',
+    category: 'house',
+    position: [-11, 0, 5],
+    unlockCubes: 0,
+    buildCostPips: 200,
+    defaultTheme: 'carnival',
+  },
+  {
+    id: 'snack-plaza',
+    name: 'Snack-Cart Plaza',
+    category: 'facility',
+    position: [11, 0, 5],
+    unlockCubes: 1,
+    buildCostPips: 350,
+    defaultTheme: 'carnival',
+  },
+  {
+    id: 'block-windmill',
+    name: 'Block Windmill',
+    category: 'facility',
+    position: [-14, 0, -1],
+    unlockCubes: 1,
+    buildCostPips: 320,
+    defaultTheme: 'frontier',
+  },
+  {
+    id: 'botanic-dome',
+    name: 'Botanic Greenhouse',
+    category: 'facility',
+    position: [14, 0, -1],
+    unlockCubes: 2,
+    buildCostPips: 420,
+    defaultTheme: 'prehistoric',
+  },
+  {
+    id: 'beacon-lighthouse',
+    name: 'Beacon Lighthouse',
+    category: 'landmark',
+    position: [-10, 0, 12],
+    unlockCubes: 2,
+    buildCostPips: 500,
+    defaultTheme: 'carnival',
+  },
+  {
+    id: 'star-observatory',
+    name: 'Star Observatory',
+    category: 'landmark',
+    position: [10, 0, 12],
+    unlockCubes: 3,
+    buildCostPips: 620,
+    defaultTheme: 'cyber',
+  },
+  {
+    id: 'dino-coaster',
+    name: 'Block Coaster',
+    category: 'landmark',
+    position: [-5, 0, -12],
+    unlockCubes: 3,
+    buildCostPips: 680,
+    defaultTheme: 'prehistoric',
+  },
+  {
+    id: 'sky-monument',
+    name: 'Sanctuary Spire',
+    category: 'landmark',
+    position: [5, 0, -12],
+    unlockCubes: 4,
+    buildCostPips: 900,
+    defaultTheme: 'cyber',
+  },
+];
+
+export const COMMUNITY_QUESTS: CommunityQuestDef[] = [
+  {
+    id: 'q-first-hunt',
+    category: 'hunt',
+    titleKey: 'quest.firstHunt.title',
+    descKey: 'quest.firstHunt.desc',
+    target: 5,
+    rewardCubes: 1,
+    rewardPips: 300,
+    metric: 'beasts_defeated',
+  },
+  {
+    id: 'q-weak-striker',
+    category: 'hunt',
+    titleKey: 'quest.weakStriker.title',
+    descKey: 'quest.weakStriker.desc',
+    target: 6,
+    rewardCubes: 1,
+    rewardPips: 400,
+    metric: 'weakpoints_broken',
+  },
+  {
+    id: 'q-elemental-pro',
+    category: 'hunt',
+    titleKey: 'quest.elementalPro.title',
+    descKey: 'quest.elementalPro.desc',
+    target: 4,
+    rewardCubes: 2,
+    rewardPips: 500,
+    metric: 'elemental_reactions',
+  },
+  {
+    id: 'q-explore-regions',
+    category: 'explore',
+    titleKey: 'quest.exploreRegions.title',
+    descKey: 'quest.exploreRegions.desc',
+    target: 4,
+    rewardCubes: 2,
+    rewardPips: 600,
+    metric: 'regions_discovered',
+  },
+  {
+    id: 'q-activate-towers',
+    category: 'explore',
+    titleKey: 'quest.activateTowers.title',
+    descKey: 'quest.activateTowers.desc',
+    target: 3,
+    rewardCubes: 2,
+    rewardPips: 700,
+    metric: 'towers_activated',
+  },
+  {
+    id: 'q-treasure-hunter',
+    category: 'explore',
+    titleKey: 'quest.treasureHunter.title',
+    descKey: 'quest.treasureHunter.desc',
+    target: 5,
+    rewardCubes: 1,
+    rewardPips: 550,
+    metric: 'chests_opened',
+  },
+  {
+    id: 'q-village-architect',
+    category: 'village',
+    titleKey: 'quest.architect.title',
+    descKey: 'quest.architect.desc',
+    target: 3,
+    rewardCubes: 1,
+    rewardPips: 450,
+    metric: 'plots_customized',
+  },
+  {
+    id: 'q-pip-hoarder',
+    category: 'village',
+    titleKey: 'quest.pipHoarder.title',
+    descKey: 'quest.pipHoarder.desc',
+    target: 1500,
+    rewardCubes: 1,
+    rewardPips: 600,
+    metric: 'pips_collected',
+  },
+  {
+    id: 'q-apex-slayer',
+    category: 'boss',
+    titleKey: 'quest.apexSlayer.title',
+    descKey: 'quest.apexSlayer.desc',
+    target: 1,
+    rewardCubes: 3,
+    rewardPips: 1000,
+    metric: 'bosses_defeated',
+  },
+  {
+    id: 'q-boss-legend',
+    category: 'boss',
+    titleKey: 'quest.bossLegend.title',
+    descKey: 'quest.bossLegend.desc',
+    target: 4,
+    rewardCubes: 4,
+    rewardPips: 2000,
+    metric: 'bosses_defeated',
+  },
+];
