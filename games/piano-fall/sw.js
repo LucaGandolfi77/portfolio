@@ -28,5 +28,14 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => caches.match('./index.html')));
     return;
   }
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  // Stale-while-revalidate: answer from the cache at once, refresh it in the
+  // background, so a new deploy reaches players on their next visit even if
+  // the cache name did not change.
+  e.respondWith(caches.open(CACHE).then((c) => c.match(e.request).then((hit) => {
+    const fresh = fetch(e.request).then((r) => {
+      if (r.ok && new URL(e.request.url).origin === location.origin) c.put(e.request, r.clone());
+      return r;
+    }).catch(() => hit);
+    return hit || fresh;
+  })));
 });
