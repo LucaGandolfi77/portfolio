@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { AIRPORTS, MISSIONS, PLANES, STR, TOURS, WORLD } from '../js/config.js';
 import { initLandmarks, landmarksData } from '../js/landmarks.js';
 import { geoToWorld, worldToGeo, elevationAt, terrainHeight, initGeo, insideItaly } from '../js/geo.js';
-import { createFlight, headingDegrees, landingCheck, stepFlight, runwayDirection } from '../js/flight.js';
+import { airportPosition, createFlight, headingDegrees, landingCheck, stepFlight, runwayDirection } from '../js/flight.js';
 import { createTraffic, stepTraffic } from '../js/traffic.js';
 import { FlightGame } from '../js/game.js';
 
@@ -125,7 +125,7 @@ run('all airports and mission stops are valid', () => {
 
 run('aircraft start airborne at their real airport', () => {
   const f = createFlight(plane, rome);
-  const p = geoToWorld(rome.lon, rome.lat);
+  const p = airportPosition(rome);
   near(f.x, p.x, 0.001); near(f.z, p.z, 0.001);
   eq(f.fuel, plane.fuel);
   ok(f.y > f.ground);
@@ -154,7 +154,7 @@ run('boost increases speed and burns extra fuel', () => {
 });
 
 run('landing checks real runway alignment, height and speed', () => {
-  const p = geoToWorld(rome.lon, rome.lat);
+  const p = airportPosition(rome);
   const r = runwayDirection(rome);
   const good = { x: p.x, z: p.z, y: terrainHeight(p.x, p.z) + 6, heading: rome.rwy * Math.PI / 180, speed: 30, pitch: 0.05 };
   eq(landingCheck(good, plane, rome), 'ok');
@@ -181,7 +181,7 @@ run('mission checkpoint advances and completes at the last stop', () => {
   eq(game.targetIndex, 1);
   eq(game.targetAirport().code, 'NAP');
   const nap = AIRPORTS.find(a => a.code === 'NAP');
-  const p = geoToWorld(nap.lon, nap.lat);
+  const p = airportPosition(nap);
   game.state.x = p.x; game.state.z = p.z;
   game.state.y = terrainHeight(p.x, p.z) + 5;
   game.state.heading = nap.rwy * Math.PI / 180;

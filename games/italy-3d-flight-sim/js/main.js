@@ -11,12 +11,15 @@ import { initLandmarks, landmarksData } from './landmarks.js';
 import { initGeo, vectorData, geoToWorld, worldPolygon, terrainHeight } from './geo.js';
 import { FlightGame } from './game.js';
 import { createRenderer } from './render.js';
+import { flightModelFor } from './flight.js';
+import { drawAttitude } from './instruments.js';
+import * as COCKPIT from './cockpit-audio.js';
 import { loadImagery } from './imagery.js';
 import { initBuildingsData } from './buildings.js';
 
 const SAVE_KEY = 'italy3dFlightSim.save.v1';
 const DEFAULTS = {
-  plane: 'cessna', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high',
+  plane: 'cessna', flightModel: 'real', startMode: 'runway', freeDestination: '', sound: true, lang: 'en', freeAirport: 'FCO', quality: 'high',
   imagery: true, mapMode: false, visual: 'happy', timeMode: 'cycle', weather: 'clear',
   bests: {}, stats: { flights: 0, landings: 0, crashes: 0 }
 };
@@ -33,6 +36,7 @@ const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2,
 const canvas = $('game');
 const minimap = $('minimap');
 const mctx = minimap.getContext('2d');
+const actx = $('attitude').getContext('2d');
 const hud = $('hud');
 const toast = $('toast');
 let view3d = null;
@@ -85,6 +89,8 @@ function buildAirports() {
   const lang = i18n.getLang();
   $('freeAirport').innerHTML = AIRPORTS.map(a => `<option value="${a.code}">${loc(a.name, lang)} (${a.code})</option>`).join('');
   $('freeAirport').value = save.freeAirport || 'FCO';
+  $('freeDestination').innerHTML = `<option value="">${t('nearest')}</option>` + $('freeAirport').innerHTML;
+  $('freeDestination').value = game.freeDestination;
 }
 
 function refreshUI() {
@@ -95,6 +101,14 @@ function refreshUI() {
   $('resultTitle').textContent = t('missionDone');
   $('qualityVal').textContent = game.quality === 'high' ? t('high') : t('low');
   $('pauseView').textContent = t(game.view);
+  const modelText = t(game.flightModel === 'real' ? 'realistic' : 'arcade') +
+    (game.flightModel === 'real' && flightModelFor(game.plane, 'real') !== 'real' ? ` (${t('arcadeOnly')})` : '');
+  $('modelVal').textContent = modelText;
+  $('modelPauseVal').textContent = modelText;
+  $('startVal').textContent = t(game.startMode === 'runway' ? 'startRunway' : 'startAir');
+  $('btnStart').classList.toggle('hidden', flightModelFor(game.plane, game.flightModel) !== 'real');
+  $('trimUp').setAttribute('aria-label', t('trimUp'));
+  $('trimDown').setAttribute('aria-label', t('trimDown'));
   const happy = save.visual === 'happy';
   $('imageryVal').textContent = !happy && save.imagery ? t('on') : t('off');
   $('mapModeVal').textContent = !happy && save.mapMode ? t('on') : t('off');
@@ -109,7 +123,7 @@ showScreen('loading');
 const keys = new Set();
 const joy = { x: 0, y: 0 };
 let joyActive = false, joyId = null, joyStart = { x: 0, y: 0 };
-let throttle = 0.72, thrHold = 0, barDrag = false, boostHeld = false;
+let throttle = 0.72, thrHold = 0, barDrag = false, boostHeld = false, trimHold = 0;
 
 canvas.addEventListener('pointerdown', e => {
   AUDIO.resume();
@@ -152,6 +166,12 @@ bindHold('thrUp', 1); bindHold('thrDown', -1);
 $('btnBoost').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); AUDIO.resume(); boostHeld = true; $('btnBoost').setPointerCapture(e.pointerId); });
 $('btnBoost').addEventListener('pointerup', () => { boostHeld = false; });
 $('btnBoost').addEventListener('pointercancel', () => { boostHeld = false; });
+for (const [id, dir] of [['trimUp', 1], ['trimDown', -1]]) {
+  const el = $(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); AUDIO.resume(); trimHold = dir; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointerup', () => { trimHold = 0; });
+  el.addEventListener('pointercancel', () => { trimHold = 0; });
+}
 const thrBar = $('thrBar');
 function barSet(e) { const r = thrBar.getBoundingClientRect(); setThrottle(1 - (e.clientX - r.left) / r.width); }
 thrBar.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); barDrag = true; barSet(e); thrBar.setPointerCapture(e.pointerId); });
@@ -161,6 +181,7 @@ thrBar.addEventListener('pointerup', () => { barDrag = false; });
 window.addEventListener('keydown', e => {
   if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   if (!e.repeat && (e.key === 'v' || e.key === 'V')) cycleView();
+  if (!e.repeat) cockpitKey(e.key.toLowerCase());
   if (!e.repeat && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) togglePause();
   keys.add(e.key);
 });
@@ -170,6 +191,30 @@ const anyKey = arr => arr.some(k => keys.has(k));
 const KEY_LEFT = ['ArrowLeft', 'a', 'A'], KEY_RIGHT = ['ArrowRight', 'd', 'D'];
 const KEY_UP = ['ArrowUp', 'w', 'W'], KEY_DOWN = ['ArrowDown', 's', 'S'];
 const KEY_THR_UP = ['e', 'E', 'Shift'], KEY_THR_DOWN = ['q', 'Q', 'Control'];
+const KEY_YAW_LEFT = ['z', 'Z'], KEY_YAW_RIGHT = ['x', 'X'];
+const KEY_TRIM_UP = ['r', 'R'], KEY_TRIM_DOWN = ['f', 'F'];
+// Keys are all-or-nothing, so in the realistic model they use part of the elevator travel.
+const KEY_ELEVATOR_REAL = 0.6;
+const axis = (plus, minus) => (anyKey(plus) ? 1 : 0) - (anyKey(minus) ? 1 : 0);
+
+/* ---------- cockpit switches ---------- */
+const SWITCHES = {
+  c: () => game.cycleFlaps(),
+  g: () => game.toggleGear(),
+  h: () => game.toggleAutopilot(),
+  n: () => game.toggleNav(),
+  i: () => game.adjustAltitude(1),
+  k: () => game.adjustAltitude(-1),
+  l: () => { if (game.lineUp()) setThrottle(0); }
+};
+function cockpitKey(key) { if (game.mode === 'play') SWITCHES[key]?.(); }
+for (const [id, key] of [['btnFlaps', 'c'], ['btnGear', 'g'], ['btnAp', 'h'], ['btnNav', 'n'], ['apUp', 'i'], ['apDown', 'k'], ['btnLineUp', 'l']]) {
+  $(id).addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation(); AUDIO.resume(); AUDIO.sfx.tap();
+    cockpitKey(key);
+    e.currentTarget.blur(); // keep Space for the brakes
+  });
+}
 
 /* ---------- actions ---------- */
 function cycleView() { game.cycleView(); refreshUI(); AUDIO.sfx.tap(); }
@@ -178,10 +223,11 @@ function togglePause() {
   else if (game.mode === 'pause') { game.resume(); showScreen(null); lastMode = game.mode; }
 }
 function beginFlying() {
-  AUDIO.init(save.sound); AUDIO.resume();
-  throttle = 0.72;
+  AUDIO.init(save.sound); AUDIO.resume(); COCKPIT.unlock();
+  const onRunway = !!game.state?.onGround;
+  throttle = onRunway ? 0 : 0.72;
   showScreen(null);
-  game.say(save.visual === 'happy' ? t('happyHint') : t('howto1'), '', 5000);
+  game.say(onRunway ? t('takeoffHint') : save.visual === 'happy' ? t('happyHint') : t('howto1'), '', 5000);
   if (view3d) view3d.setPlane(game.plane);
   lastMode = game.mode;
 }
@@ -189,6 +235,11 @@ $('btnFree').addEventListener('click', () => {
   const code = $('freeAirport').value || 'FCO';
   save.freeAirport = code; persist();
   game.startFree(code); beginFlying();
+});
+$('freeDestination').addEventListener('change', e => game.setDestination(e.target.value));
+$('btnStart').addEventListener('click', () => {
+  game.setStartMode(game.startMode === 'runway' ? 'air' : 'runway');
+  refreshUI(); AUDIO.sfx.tap();
 });
 $('btnMissions').addEventListener('click', () => showScreen('missions'));
 $('btnHangar').addEventListener('click', () => showScreen('hangar'));
@@ -250,6 +301,12 @@ $('btnWeather').addEventListener('click', () => {
   persist(); refreshUI();
   if (view3d) view3d.setWeather(save.weather);
 });
+function toggleModel() {
+  game.setFlightModel(game.flightModel === 'real' ? 'arcade' : 'real');
+  refreshUI(); AUDIO.sfx.tap();
+}
+$('btnModel').addEventListener('click', toggleModel);
+$('btnModelPause').addEventListener('click', toggleModel);
 $('btnQuality').addEventListener('click', () => {
   game.setQuality(game.quality === 'high' ? 'low' : 'high');
   save.quality = game.quality; persist(); refreshUI();
@@ -318,13 +375,21 @@ function update(dt) {
   if (thrHold) setThrottle(throttle + thrHold * dt * 0.55);
   if (game.mode !== 'play' && game.mode !== 'pause') return;
   const turn = (anyKey(KEY_RIGHT) ? 1 : 0) - (anyKey(KEY_LEFT) ? 1 : 0) + joy.x;
-  const pitch = (anyKey(KEY_UP) ? 1 : 0) - (anyKey(KEY_DOWN) ? 1 : 0) - joy.y;
+  const keyScale = game.state?.model === 'real' ? KEY_ELEVATOR_REAL : 1;
+  const pitch = axis(KEY_UP, KEY_DOWN) * keyScale - joy.y;
   if (anyKey(KEY_THR_UP)) setThrottle(throttle + dt * 0.4);
   if (anyKey(KEY_THR_DOWN)) setThrottle(throttle - dt * 0.4);
+  const crashes = game.stats.crashes;
+  const engaged = !!game.autopilot;
   game.update(dt, {
     turn: clamp(turn, -1, 1), pitch: clamp(pitch, -1, 1),
+    yaw: axis(KEY_YAW_RIGHT, KEY_YAW_LEFT),
+    trim: clamp(axis(KEY_TRIM_UP, KEY_TRIM_DOWN) + trimHold, -1, 1),
     throttle, brake: keys.has(' '), boost: boostHeld || anyKey(['b', 'B'])
   });
+  // The autopilot owns the throttle while engaged; a respawn on the runway idles it.
+  if (engaged && game.autopilot) setThrottle(game.state.throttle);
+  if (game.stats.crashes !== crashes && game.state?.onGround) setThrottle(0);
   if (game.mode !== lastMode) {
     lastMode = game.mode;
     if (game.mode === 'play') showScreen(null);
@@ -334,6 +399,8 @@ function update(dt) {
       const r = game.result;
       $('resultTime').textContent = fmt(r.time);
       $('resultUsed').textContent = `${r.used}%`;
+      $('resultGradeBox').classList.toggle('hidden', !r.grade);
+      if (r.grade) $('resultGrade').textContent = `${r.grade.score}/100`;
       $('resultBest').textContent = `${fmt(r.best)}${r.isNew ? ' ★' : ''}`;
       const nextList = game.mission?.kind === 'tour' ? TOURS : MISSIONS;
       $('btnNext').classList.toggle('hidden', nextList.findIndex(m => m.id === game.mission.id) >= nextList.length - 1);
@@ -357,14 +424,39 @@ function draw() {
     $('hudHdg').textContent = String(h.hdg).padStart(3, '0') + '°';
     $('hudVs').textContent = (h.vs > 0 ? '+' : '') + h.vs;
     $('hudNext').textContent = h.next;
-    $('hudDist').textContent = h.dist.toFixed(1) + ' ' + t('km');
+    $('hudDist').textContent = h.dist === null ? '—' : h.dist.toFixed(0) + ' ' + t('km');
     $('hudStep').textContent = h.progress;
     $('thrVal').textContent = Math.round(throttle * 100) + '%';
     $('thrFill').style.width = Math.round(throttle * 100) + '%';
     $('hudFuel').classList.toggle('low', h.fuel < 20);
     $('boostBadge').classList.toggle('hidden', !h.boosting);
     $('viewTag').textContent = t(h.view);
+    $('simPanel').classList.toggle('hidden', !h.real);
+    if (h.real) {
+      drawAttitude(actx, h);
+      $('hudMsl').textContent = h.msl;
+      $('flapsVal').textContent = ['UP', '1', 'FULL'][h.flaps];
+      $('gearVal').textContent = t(h.gear ? 'gearDown' : 'gearUp');
+      $('btnGear').disabled = !h.retractable || h.onGround;
+      $('btnAp').classList.toggle('on', !!h.autopilot);
+      $('btnAp').disabled = h.onGround;
+      $('btnNav').disabled = h.onGround;
+      $('btnNav').classList.toggle('on', h.autopilot?.mode === 'nav');
+      for (const id of ['apUp', 'apDown']) $(id).disabled = !h.autopilot;
+      $('btnLineUp').classList.toggle('hidden', !h.canLineUp);
+      $('apStatus').textContent = h.autopilot
+        ? `${t(h.autopilot.mode === 'nav' ? 'apNav' : 'apHdg')} ${String(h.autopilot.heading).padStart(3, '0')}° · ALT ${h.autopilot.altitude}`
+        : '';
+      $('hudG').textContent = h.g.toFixed(1);
+      $('hudAoa').textContent = h.aoa.toFixed(0) + '°';
+      $('hudTrim').textContent = (h.trim > 0 ? '+' : '') + h.trim.toFixed(1) + '°';
+    }
   }
+  COCKPIT.update(game.mode === 'play' && save.sound && game.state ? {
+    power: game.state.spool ?? game.state.throttle, speed: game.state.speed,
+    jet: game.plane.kind !== 'prop' && game.plane.kind !== 'heli',
+    stall: game.state.stallWarn, gear: game.state.gearWarn
+  } : null);
   const showToast = playing && Date.now() < game.toast.until;
   toast.textContent = showToast ? game.toast.text : '';
   toast.className = 'toast ' + (showToast ? game.toast.kind : '') + (showToast ? '' : ' hidden');

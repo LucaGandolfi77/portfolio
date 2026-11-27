@@ -1,7 +1,8 @@
 /* Italy 3D Flight Sim — real-data Three.js world (terrain, water, cities, airports) */
 
 import * as THREE from '../../_vendor/three.module.js';
-import { AIRPORTS, WORLD } from './config.js';
+import { WORLD } from './config.js';
+import { RUNWAY, airfields, onAirfield } from './airfields.js';
 import { elevationAt, geoToWorld, terrainHeight, vectorData, worldPolygon, insideItaly } from './geo.js';
 import { seededRandom } from '../../_kit/core.js';
 import { buildRealBuildings, buildCityLights, realCityCenters } from './buildings.js';
@@ -215,7 +216,7 @@ function buildVegetation(group, quality, visual) {
     const { lon, lat } = { lon: WORLD.minLon + (x + WORLD.width / 2) / WORLD.width * (WORLD.maxLon - WORLD.minLon), lat: WORLD.minLat - (z - WORLD.depth / 2) / WORLD.depth * (WORLD.maxLat - WORLD.minLat) };
     if (!insideItaly(lon, lat)) continue;
     const h = elevationAt(lon, lat);
-    if (h < 80 || h > 1700) continue;
+    if (h < 80 || h > 1700 || onAirfield(x, z)) continue;
     dummy.position.set(x, terrainHeight(x, z), z);
     dummy.rotation.y = rng() * Math.PI;
     const s = 0.6 + rng() * 0.9;
@@ -248,7 +249,7 @@ function buildHappyDetails(group, quality) {
     const lon = WORLD.minLon + (x + WORLD.width / 2) / WORLD.width * (WORLD.maxLon - WORLD.minLon);
     const lat = WORLD.minLat - (z - WORLD.depth / 2) / WORLD.depth * (WORLD.maxLat - WORLD.minLat);
     if (!insideItaly(lon, lat)) continue;
-    if (elevationAt(lon, lat) < 5 || elevationAt(lon, lat) > 320) continue;
+    if (elevationAt(lon, lat) < 5 || elevationAt(lon, lat) > 320 || onAirfield(x, z)) continue;
     dummy.position.set(x, terrainHeight(x, z), z);
     const s = 0.6 + rng() * 0.8;
     dummy.scale.set(s, s, s);
@@ -315,6 +316,7 @@ function buildCities(group, vectors, quality) {
       const x = minX + rng() * (maxX - minX);
       const z = minZ + rng() * (maxZ - minZ);
       const h = (6 + rng() * 46) * scale;
+      if (onAirfield(x, z)) continue;
       dummy.position.set(x, terrainHeight(x, z), z);
       dummy.scale.set(0.7 + rng() * 0.9, h, 0.7 + rng() * 0.9);
       dummy.rotation.y = rng() * Math.PI;
@@ -333,32 +335,82 @@ function buildCities(group, vectors, quality) {
   }
 }
 
+function runwayNumber(heading) {
+  const n = Math.round(((heading * 180 / Math.PI) % 360 + 360) % 360 / 10) || 36;
+  return String(n).padStart(2, '0');
+}
+
+function numberDecal(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = '700 84px ui-monospace, monospace';
+  ctx.fillStyle = '#f4f7fb';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 64, 64);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 12),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/* Runways run along local -Z (the stored heading) and are returned with their PAPI lamps. */
 function buildAirports(group) {
   const runwayMat = new THREE.MeshStandardMaterial({ color: '#3b4550', roughness: 1 });
   const markMat = new THREE.MeshBasicMaterial({ color: '#f4f7fb' });
-  for (const a of AIRPORTS) {
-    const p = geoToWorld(a.lon, a.lat);
-    const y = terrainHeight(p.x, p.z) + 1.2;
-    const angle = a.rwy * Math.PI / 180;
+  const terminalMat = new THREE.MeshStandardMaterial({ color: '#8fa7b8' });
+  const lampGeo = new THREE.SphereGeometry(0.9, 8, 6);
+  const edgeMat = new THREE.PointsMaterial({ color: '#fff2b0', size: 2.4 });
+  const half = RUNWAY.half, width = RUNWAY.width;
+  const papi = [];
+  const flat = (w, l, x, z, y = 0.5) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, l), markMat);
+    m.position.set(x, y, z);
+    return m;
+  };
+  for (const f of airfields()) {
     const g = new THREE.Group();
-    g.position.set(p.x, y, p.z);
-    g.rotation.y = -angle;
-    const rwy = new THREE.Mesh(new THREE.BoxGeometry(12, 1.2, 120), runwayMat);
+    g.position.set(f.x, f.elevation, f.z);
+    g.rotation.y = -f.heading;
+    const rwy = new THREE.Mesh(new THREE.BoxGeometry(width, 0.5, half * 2), runwayMat);
+    rwy.position.y = 0.2;
     g.add(rwy);
-    for (let i = -4; i <= 4; i++) {
-      const mark = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 8), markMat);
-      mark.position.set(0, 0.8, i * 12);
-      g.add(mark);
+    for (let z = -half + 34; z <= half - 34; z += 14) g.add(flat(0.7, 7, 0, z));
+    const edge = [];
+    for (let z = -half; z <= half; z += 12) edge.push(-width / 2 - 0.6, 0.9, z, width / 2 + 0.6, 0.9, z);
+    const edgeGeo = new THREE.BufferGeometry();
+    edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edge, 3));
+    g.add(new THREE.Points(edgeGeo, edgeMat));
+    for (const end of [1, -1]) {
+      // end = 1 is approached heading along the runway heading, from local +Z.
+      for (let x = -7; x <= 7; x += 2.8) if (Math.abs(x) > 1) g.add(flat(1.2, 8, x, end * (half - 6)));
+      const number = numberDecal(runwayNumber(f.heading + (end > 0 ? 0 : Math.PI)));
+      number.position.set(0, 0.6, end * (half - 19));
+      number.rotation.z = end > 0 ? 0 : Math.PI;
+      g.add(number);
+      for (const side of [-1, 1]) g.add(flat(2.2, 9, side * 4.5, end * (half - RUNWAY.aim - 8)));
+      const lamps = [];
+      for (let i = 0; i < 4; i++) {
+        const lamp = new THREE.Mesh(lampGeo, new THREE.MeshBasicMaterial({ color: '#ff4040' }));
+        lamp.position.set(-end * (width / 2 + 4 + i * 3), 1, end * (half - RUNWAY.aim));
+        g.add(lamp);
+        lamps.push(lamp);
+      }
+      papi.push({ code: f.code, end, lamps });
     }
-    const terminal = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 16), new THREE.MeshStandardMaterial({ color: '#8fa7b8' }));
-    terminal.position.set(24, 4, -30);
-    g.add(terminal);
+    const terminal = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 26), terminalMat);
+    terminal.position.set(26, 3, 20);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.6, 16, 8), terminalMat);
+    tower.position.set(26, 8, -4);
+    g.add(terminal, tower);
     group.add(g);
-    const label = labelSprite(a.code, '#ffd166');
+    const label = labelSprite(f.code, '#ffd166');
     label.scale.set(44, 11, 1);
-    label.position.set(p.x, y + 55, p.z);
+    label.position.set(f.x, f.elevation + 55, f.z);
     group.add(label);
   }
+  return papi;
 }
 
 export function createWorld(scene, quality = 'high', imageryTexture = null, visual = 'happy') {
@@ -374,6 +426,6 @@ export function createWorld(scene, quality = 'high', imageryTexture = null, visu
   buildCities(group, vectors, quality);
   const realBuildings = buildRealBuildings(group, quality);
   const cityLights = buildCityLights(group);
-  buildAirports(group);
-  return { group, terrain, sea, coast, happy, realBuildings, cityLights };
+  const papi = buildAirports(group);
+  return { group, terrain, sea, coast, happy, realBuildings, cityLights, papi };
 }

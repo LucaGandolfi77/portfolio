@@ -3,6 +3,7 @@
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
 import { geoToWorld, terrainHeight } from './geo.js';
+import { onAirfield } from './airfields.js';
 
 const BUILD_SCALE = 0.34;
 let data = null;
@@ -25,6 +26,7 @@ export function buildCityLights(group) {
       for (const p of ring) { lon += p[0]; lat += p[1]; }
       lon /= ring.length; lat /= ring.length;
       const p = geoToWorld(lon, lat);
+      if (onAirfield(p.x, p.z, 110, 20)) continue;
       positions.push(p.x, terrainHeight(p.x, p.z) + 4, p.z);
     }
   }
@@ -56,6 +58,7 @@ export function buildRealBuildings(group, quality = 'high') {
       let cx = 0, cz = 0;
       for (const p of pts) { cx += p.x; cz += p.z; }
       cx /= pts.length; cz /= pts.length;
+      if (onAirfield(cx, cz, 110, 20)) continue;
       const base = terrainHeight(cx, cz);
       const top = base + Math.max(2, height * BUILD_SCALE);
       const contour = pts.map(p => new THREE.Vector2(p.x, p.z));

@@ -1,6 +1,7 @@
 /* Italy 3D Flight Sim — geographic coordinate and elevation helpers (pure) */
 
 import { WORLD } from './config.js';
+import { initAirfields, flattenHeight } from './airfields.js';
 
 let heightData = null;
 let meta = null;
@@ -28,6 +29,7 @@ export function initGeo(heightBuffer, metaJson, vectorJson) {
     }
   }
   smoothed = smooth;
+  initAirfields(naturalHeight, geoToWorld);
 }
 
 let smoothed = null;
@@ -63,6 +65,11 @@ export function elevationAt(lon, lat) {
 }
 
 export function terrainHeight(x, z) {
+  return flattenHeight(x, z, naturalHeight(x, z));
+}
+
+/* Elevation from the data alone, before the airfields are levelled. */
+export function naturalHeight(x, z) {
   const { lon, lat } = worldToGeo(x, z);
   const e = elevationAt(lon, lat);
   return e > 0 ? Math.max(1.5, e * WORLD.elevScale) : 0;
@@ -80,6 +87,13 @@ export function pointInRing(lon, lat, ring) {
 export function insideItaly(lon, lat) {
   if (!vectors) return false;
   return vectors.coastline.some(ring => pointInRing(lon, lat, ring));
+}
+
+export function distanceKm(a, b) {
+  const rad = Math.PI / 180;
+  const h = Math.sin((b.lat - a.lat) * rad / 2) ** 2
+    + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lon - a.lon) * rad / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
 }
 
 export function worldPolygon(ring) {

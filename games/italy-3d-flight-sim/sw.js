@@ -7,7 +7,7 @@ const ASSETS = [
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable.png',
   './data/italy-height.bin', './data/italy-meta.json', './data/italy-vector.json',
   './data/imagery-manifest.json', './data/imagery-list.json', './data/buildings.json', './data/landmarks.json',
-  './js/config.js', './js/geo.js', './js/flight.js', './js/terrain.js', './js/planes.js',
+  './js/config.js', './js/geo.js', './js/flight.js', './js/flight-model.js', './js/airfields.js', './js/autopilot.js', './js/instruments.js', './js/cockpit-audio.js', './js/terrain.js', './js/planes.js',
   './js/render.js', './js/traffic.js', './js/game.js', './js/main.js',
   './js/imagery.js', './js/buildings.js', './js/landmarks.js',
   '../_vendor/three.module.js', '../../top_buttons.js',

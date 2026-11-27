@@ -3,6 +3,7 @@
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
 import { terrainHeight } from './geo.js';
+import { GLIDE_SLOPE, RUNWAY, airfields, runwayCoords } from './airfields.js';
 import { createWorld, terrainColor, happyColor } from './terrain.js';
 import { createPlaneMesh, animatePlane } from './planes.js';
 import { createLandmarks } from './landmarks.js';
@@ -159,6 +160,8 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
       trafficMeshes[i].rotation.set(0, -t.heading, 0);
     }
 
+    updatePapi(s);
+
     // Real city buildings are only drawn near the aircraft.
     const range = quality === 'low' ? 480 : 760;
     for (const mesh of world.realBuildings || []) {
@@ -167,6 +170,12 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     }
 
     const forward = tempV.set(Math.sin(s.heading) * Math.cos(s.pitch), Math.sin(s.pitch), -Math.cos(s.heading) * Math.cos(s.pitch));
+    // In the realistic model the cockpit view banks with the aircraft.
+    const banked = game.view === 'cockpit' && s.model === 'real';
+    camera.up.set(0, 1, 0);
+    if (banked) camera.up.applyQuaternion(planeMesh.quaternion);
+    // The eye sits inside the airframe there, so the external model would block the view.
+    planeMesh.visible = !banked;
     if (game.view === 'overview') {
       camera.fov = 55;
       tempLook.set(0, 0, 0);
@@ -174,8 +183,11 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
       camera.lookAt(tempLook);
     } else if (game.view === 'cockpit') {
       camera.fov = 78;
-      tempLook.copy(planeMesh.position).add(forward.clone().multiplyScalar(160)).add(new THREE.Vector3(0, 8, 0));
-      camera.position.lerp(planeMesh.position.clone().add(forward.clone().multiplyScalar(L_COCKPIT(game.plane))).add(new THREE.Vector3(0, 3, 0)), Math.min(1, dt * 12));
+      tempLook.copy(planeMesh.position).add(forward.clone().multiplyScalar(160)).addScaledVector(camera.up, 8);
+      const eye = planeMesh.position.clone().add(forward.clone().multiplyScalar(L_COCKPIT(game.plane))).addScaledVector(camera.up, 3);
+      // A banking cockpit is fixed to the airframe; smoothing it would make it swim.
+      if (banked) camera.position.copy(eye);
+      else camera.position.lerp(eye, Math.min(1, dt * 12));
       camera.lookAt(tempLook);
     } else {
       camera.fov = 70;
@@ -186,6 +198,18 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     }
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
+  }
+
+  /* PAPI: more red lamps the lower you are, two red and two white on the path. */
+  function updatePapi(s) {
+    for (const set of world.papi || []) {
+      const field = airfields().find(f => f.code === set.code);
+      const distance = RUNWAY.aim - RUNWAY.half - runwayCoords(field, s.x, s.z).along * set.end;
+      if (distance < 5 || distance > 700) continue;
+      const ratio = (s.y - field.elevation - 1.5) / (distance * GLIDE_SLOPE);
+      const white = [0.72, 0.9, 1.1, 1.3].filter(limit => ratio > limit).length;
+      set.lamps.forEach((lamp, i) => lamp.material.color.set(i < white ? '#ffffff' : '#ff4040'));
+    }
   }
 
   function applyVisual() {
