@@ -13,8 +13,13 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 - **Happy mode by default**: sunny semi-real look with vivid green terrain, flower meadows, more trees, cheerful pastel buildings, turquoise water, animated ripples, birds, rainbows and boost confetti. Switch to SATELLITE or MAP MODE in the pause menu at any time.
 - **Real imagery**: EOX Sentinel‑2 cloudless 2016 tiles (CC BY 4.0) are bundled offline and draped over the terrain.
 - **Real places**: OSM building footprints for 12 major Italian cities are extruded into 3D; other urban areas use instanced buildings from Natural Earth polygons.
-- **Real airports**: 15 Italian airports at their actual coordinates with oriented runways.
-- **Flight simulation**: 6DoF-lite physics with pitch/roll/yaw, speed, stall, fuel, boost, ground collision, chase/cockpit/overview cameras, artificial-horizon HUD, day/night lighting, clouds and AI traffic.
+- **15 airfields** with level ground, numbered runways at approximate real headings, edge lights, tower and working PAPI lamps. Several are nudged a few units so they do not sit on a landmark.
+- **Two flight models**: *realistic* (default) for the seven fixed-wing aircraft, or *arcade*. Switch in the menu or while paused. The helicopter and starships are always arcade.
+- **Realistic model**: lift, drag, thrust and weight; air that thins with height; bank-to-turn; angle-of-attack stalls (with alpha limiters on the A320 and fighters); g limits; elevator trim, rudder, airbrake and wheel brakes. HUD shows IAS, G, angle of attack and trim. Z/X rudder, R/F trim, Space brake.
+- **Whole flights**: start on the runway, take off with flaps, fly, then land and brake to a stop. Landings are graded 0–100 on sink rate, centreline, alignment and touchdown zone.
+- **Cockpit**: attitude indicator with localiser and glide-slope needles, flaps, retractable gear with warning, engine sound and stall horn.
+- **Autopilot**: heading, altitude and speed hold, plus navigation to the next stop or the chosen free-flight destination.
+- **Also**: fuel, boost, ground collision, chase/cockpit/overview cameras, day/night lighting, clouds and AI traffic.
 - **11 craft**, free flight, six airport missions and five landmark tours over 12 real Italian monuments (Colosseum, Duomi, Leaning Tower, Vesuvius, Etna…).
 - **Atmosphere**: day/dusk/night cycle with city lights after dark, and clear/cloudy/foggy weather presets. Satellite tiles are loaded lazily only when you switch to satellite mode.
 
@@ -37,3 +42,24 @@ npm run preview    # http://localhost:8000/
 ```
 
 `build.mjs` copies the app, the vendored Three.js module, the shared kit modules it uses and the geodata into `dist/`, rewrites relative imports, and stamps the service-worker cache with `BUILD_ID`. `dist/` is gitignored.
+
+## Controls (realistic model)
+
+| Key | Action |
+|---|---|
+| W/S, A/D or left stick | Pitch and roll |
+| Q/E | Throttle |
+| Z/X | Rudder (also steers on the ground) |
+| R/F | Elevator trim |
+| Space | Airbrake and wheel brakes |
+| C / G | Flaps / landing gear |
+| H / N | Autopilot / navigation mode |
+| I / K | Held altitude up / down |
+| L | Line up on the nearest runway when stopped |
+| V / P | Camera / pause |
+
+Every switch also has an on-screen button.
+
+## Flight model notes
+
+`js/flight-model.js`, `js/airfields.js` and `js/autopilot.js` are pure logic; per-aircraft figures are the `aero` blocks in `js/config.js`. One world unit is one metre of height and airspeed, while the map is far more compressed: horizontal travel is halved in flight and slowed to a fifth near the ground (`motionFactor`), so turns and runway rolls fit. Air density uses `ATMOS_METRES_PER_UNIT`. The distance readout is in real kilometres, so it does not match the airspeed over time. The tests in `test/` check every aircraft headlessly, including a take-off, a flown approach and a graded landing.
