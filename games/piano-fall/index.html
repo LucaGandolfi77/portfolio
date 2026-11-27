@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Piano Fall</title>
+<meta name="description" content="Pianoforte a note che cadono: 54 canzoni (pop originali, classica, popolari, Natale, jazz) con accompagnamento, modalità pratica e ascolto, file MIDI e tastiere MIDI. PWA offline.">
+<meta name="theme-color" content="#0d0b14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Piano Fall">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="../_kit/a11y.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="fall" aria-hidden="true"></canvas>
+<div id="keys" aria-label="Piano"></div>
+
+<div id="hud" class="hud hidden">
+  <div class="stat"><span class="lbl" data-i18n="score">Punti</span><span id="score" class="val">0</span></div>
+  <div class="center">
+    <div id="songName" class="song"></div>
+    <div class="progress"><div id="progressFill" class="progress-fill"></div></div>
+  </div>
+  <div class="right-cluster">
+    <span id="combo" class="combo hidden"></span>
+    <span id="acc" class="acc">—</span>
+    <button id="btnSound" class="icon-btn" type="button" aria-label="Mute">🔊</button>
+    <button id="btnPause" class="icon-btn" type="button" aria-label="Pause">⏸</button>
+  </div>
+</div>
+
+<!-- library -->
+<div id="menu" class="overlay">
+  <div class="panel library">
+    <header class="lib-head">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">🎹</span>
+        <div><h1 class="title">PIANO FALL</h1><p class="subtitle" data-i18n="tagline"></p></div>
+      </div>
+      <div class="head-btns">
+        <button id="btnLang" class="icon-btn small-txt" type="button" aria-label="Language">IT</button>
+        <button id="btnSoundMenu" class="icon-btn" type="button" aria-label="Mute">🔊</button>
+        <button id="btnSettings" class="icon-btn" type="button" aria-label="Settings">⚙️</button>
+      </div>
+    </header>
+    <div class="lib-tools">
+      <input id="search" type="search" autocomplete="off" enterkeyhint="search">
+      <span id="starsTotal" class="stars-total"></span>
+    </div>
+    <nav id="tabs" class="tabs"></nav>
+    <div id="songList" class="song-list"></div>
+    <div class="lib-foot">
+      <button id="btnFreestyle" class="btn" type="button">🎵&nbsp; <span data-i18n="freestyle"></span></button>
+      <button id="btnMidi" class="btn dashed" type="button">📂&nbsp; <span data-i18n="loadMidi"></span></button>
+      <a class="btn ghost" href="../../games.html">← <span data-i18n="home"></span></a>
+    </div>
+    <input id="midiFile" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" hidden>
+    <div id="midiStatus" class="midi-status" role="status" aria-live="polite"></div>
+    <p class="credits" data-i18n="credits"></p>
+  </div>
+</div>
+
+<!-- song card -->
+<div id="detail" class="overlay hidden">
+  <div class="panel detail">
+    <div id="dCat" class="eyebrow"></div>
+    <h2 id="dTitle" class="title small"></h2>
+    <p id="dBy" class="subtitle"></p>
+    <div id="dMeta" class="meta-row"></div>
+    <div id="modes" class="modes"></div>
+    <div class="opt-row"><span data-i18n="speed"></span><div id="speeds" class="seg"></div></div>
+    <div class="opt-row"><span data-i18n="backing"></span><div id="bandSeg" class="seg"></div></div>
+    <button id="btnStart" class="btn primary" type="button"></button>
+    <div class="row-btns">
+      <button id="btnDetailBack" class="btn ghost" type="button">← <span data-i18n="back"></span></button>
+      <button id="btnDelete" class="btn ghost danger hidden" type="button">✕ MIDI</button>
+    </div>
+  </div>
+</div>
+
+<!-- settings -->
+<div id="settings" class="overlay hidden">
+  <div class="panel detail">
+    <h2 class="title small" data-i18n="settings"></h2>
+    <div class="set-label" data-i18n="keyboard"></div>
+    <div id="sizeChoices" class="size-grid"></div>
+    <p id="sizeNote" class="setting-note"></p>
+    <div class="opt-row"><span data-i18n="labels"></span><div id="labelsSeg" class="seg"></div></div>
+    <div class="opt-row"><span data-i18n="kbdHints"></span><div id="hintsSeg" class="seg"></div></div>
+    <div class="opt-row"><span data-i18n="volume"></span><input id="volume" type="range" min="0" max="100" step="5"></div>
+    <div class="opt-row col"><span data-i18n="midiMode"></span><div id="midiModeSeg" class="seg stack"></div></div>
+    <div class="opt-row"><span data-i18n="midiInput"></span><button id="btnMidiIn" class="btn mini" type="button" data-i18n="midiConnect"></button></div>
+    <p id="midiInStatus" class="setting-note"></p>
+    <div class="opt-row"><span data-i18n="language"></span><div id="langSeg" class="seg"></div></div>
+    <p class="audio-hint" data-i18n="iosHint"></p>
+    <button id="btnSettingsClose" class="btn primary" type="button" data-i18n="done"></button>
+  </div>
+</div>
+
+<div id="paused" class="overlay hidden">
+  <div class="panel narrow">
+    <h2 class="title small" data-i18n="paused"></h2>
+    <button id="btnResume" class="btn primary" type="button">▶&nbsp; <span data-i18n="resume"></span></button>
+    <button id="btnQuit" class="btn ghost" type="button">🏠&nbsp; <span data-i18n="menu"></span></button>
+  </div>
+</div>
+
+<div id="results" class="overlay hidden">
+  <div class="panel narrow">
+    <div id="rGrade" class="grade"></div>
+    <h2 id="rTitle" class="title small"></h2>
+    <div id="rStars" class="big-stars"></div>
+    <div id="rNew" class="new-best hidden" data-i18n="newBest"></div>
+    <div id="rScore" class="result-score">0</div>
+    <div id="rGrid" class="result-grid"></div>
+    <button id="btnRetry" class="btn primary" type="button">↻&nbsp; <span data-i18n="retry"></span></button>
+    <div class="row-btns">
+      <button id="btnMenu" class="btn ghost" type="button">🏠&nbsp; <span data-i18n="menu"></span></button>
+      <button id="btnNext" class="btn ghost" type="button"><span data-i18n="next"></span>&nbsp; →</button>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" class="rotate hidden">
+  <div class="rotate-inner">🔄<br><span data-i18n="rotate"></span><small data-i18n="rotateHint"></small></div>
+</div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
