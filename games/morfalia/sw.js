@@ -1,6 +1,6 @@
 /* ===== MORFALIA · Offline Service Worker ===== */
 const CACHE_PREFIX = 'morfalia-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v1.0.0`;
+const CACHE_NAME = `${CACHE_PREFIX}v2.0.0-3d`;
 
 const ASSETS = [
   './',
@@ -9,6 +9,7 @@ const ASSETS = [
   './manifest.webmanifest',
   './icons/icon-192.svg',
   './icons/icon-512.svg',
+  './vendor/three.module.js',
   './src/main.js',
   './src/data/config.js',
   './src/data/items.js',
@@ -19,7 +20,8 @@ const ASSETS = [
   './src/engine/storage.js',
   './src/engine/worldgen.js',
   './src/engine/simulation.js',
-  './src/engine/renderer.js',
+  './src/engine/models3d.js',
+  './src/engine/renderer3d.js',
   './src/ui/input.js',
   './src/ui/hud.js'
 ];

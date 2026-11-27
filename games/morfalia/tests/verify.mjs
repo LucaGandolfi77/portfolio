@@ -20,6 +20,7 @@ import { HABITATS } from '../src/data/habitats.js';
 import { CHAPTERS, QUESTS, LORE_LOGS } from '../src/data/story.js';
 import { createInitialState, GameSimulation } from '../src/engine/simulation.js';
 import { saveGame, loadGame } from '../src/engine/storage.js';
+import { createMimoMesh, createProfessorMesh, createBiominoMesh, createObjectMesh } from '../src/engine/models3d.js';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -41,7 +42,7 @@ const forbidden = ['pokemon', 'pokémon', 'pokopia', 'ditto', 'tangrowth', 'bulb
 function walkFiles(dir) {
   const out = [];
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (ent.name === 'tests') continue;
+    if (ent.name === 'tests' || ent.name === 'vendor') continue;
     const p = path.join(dir, ent.name);
     if (ent.isDirectory()) out.push(...walkFiles(p));
     else out.push(p);
@@ -172,7 +173,27 @@ for (let i = 0; i < 4; i++) {
 assert.ok(sim.state.discoveredHabitats.includes('hab_serra_professore'), 'Finale habitat must register');
 assert.ok(sim.state.befriended.includes('astralio'), 'Astralio must arrive for the finale');
 
-console.log('ALL MORFALIA VERIFICATION CHECKS PASSED!');
+// 5. Verify 3D procedural sculpture builders (Mimo, Prof, all 24 Biomini, all object types)
+assert.ok(createMimoMesh().children.length > 0);
+assert.ok(createProfessorMesh().children.length > 0);
+for (const bio of BIOMINI) {
+  assert.ok(createBiominoMesh(bio).children.length > 0, `3D Biomino mesh failed: ${bio.id}`);
+}
+const sampleObjs = [
+  { type: 'sanctuary', repaired: false }, { type: 'sanctuary', repaired: true },
+  { type: 'lore_capsule', read: false }, { type: 'terrarium' },
+  { type: 'crop', cropId: 'strawberry', stage: 2 },
+  { type: 'dead_tree' }, { type: 'boulder' }, { type: 'bramble' },
+  { type: 'campfire', lit: true }, { type: 'windmill' }, { type: 'fountain' },
+  { type: 'wood_house' }, { type: 'prof_greenhouse' }, { type: 'crystal_pillar' },
+  { type: 'mushroom_lamp' }, { type: 'generator', powered: true }, { type: 'street_lamp', powered: true },
+  { type: 'node_wood' }, { type: 'node_crystal' }, { type: 'node_berry' }
+];
+for (const o of sampleObjs) {
+  assert.ok(createObjectMesh(o).children.length > 0, `3D Object mesh failed: ${o.type}`);
+}
+
+console.log('ALL MORFALIA 3D VERIFICATION CHECKS PASSED!');
 console.log({
   regions: REGIONS.length,
   biomini: BIOMINI.length,

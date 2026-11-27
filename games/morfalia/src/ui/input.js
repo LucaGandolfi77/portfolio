@@ -102,16 +102,23 @@ export class InputController {
   }
 
   getMoveVector() {
-    let dx = 0;
-    let dy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
-    if (dx === 0 && dy === 0 && this.joystick.active) {
-      dx = this.joystick.dx;
-      dy = this.joystick.dy;
+    let sx = 0;
+    let sy = 0;
+    if (this.keys.has('w') || this.keys.has('arrowup')) sy -= 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown')) sy += 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft')) sx -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright')) sx += 1;
+    if (sx === 0 && sy === 0 && this.joystick.active) {
+      sx = this.joystick.dx;
+      sy = this.joystick.dy;
     }
-    return { dx, dy };
+    if (sx === 0 && sy === 0) return { dx: 0, dy: 0 };
+    const yaw = this.renderer && this.renderer.getCameraYaw ? this.renderer.getCameraYaw() : 0;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    return {
+      dx: sx * c + sy * s,
+      dy: -sx * s + sy * c
+    };
   }
 }

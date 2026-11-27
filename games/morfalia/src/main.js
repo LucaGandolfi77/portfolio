@@ -1,6 +1,6 @@
-/* ===== MORFALIA · Bootstrap & Main Game Loop ===== */
+/* ===== MORFALIA 3D · Bootstrap & Main Game Loop ===== */
 import { createInitialState, GameSimulation } from './engine/simulation.js';
-import { WorldRenderer } from './engine/renderer.js';
+import { WorldRenderer3D } from './engine/renderer3d.js';
 import { InputController } from './ui/input.js';
 import { HudController } from './ui/hud.js';
 import { hasSave, getSaveSummary, loadGame, clearSave, saveGame } from './engine/storage.js';
@@ -12,6 +12,7 @@ let renderer = null;
 let input = null;
 let hud = null;
 let running = false;
+let previewSim = null;
 let lastTs = 0;
 let hudTickTimer = 0;
 let deferredPrompt = null;
@@ -43,7 +44,10 @@ function setupInstallPrompt() {
 function startSession(loadedState = null) {
   const state = loadedState || createInitialState();
   const canvas = document.getElementById('game-canvas');
-  if (!renderer) renderer = new WorldRenderer(canvas);
+  const overlay = document.getElementById('overlay-canvas');
+  if (!renderer) renderer = new WorldRenderer3D(canvas, overlay);
+  renderer.camAngleIndex = 0;
+  renderer.targetCamYaw = 0;
 
   sim = new GameSimulation(state, {
     onToast: (msg, gold) => hud && hud.toast(msg, gold),
@@ -75,36 +79,37 @@ function startSession(loadedState = null) {
   hud.showHud();
   sound.unlock();
 
-  // Trigger Chapter 1 opening story on fresh game
   if (!state.seenChapters.includes(1)) {
     sim.triggerChapterIntro(1);
     saveGame(state);
   }
 
   running = true;
-  lastTs = performance.now();
-  requestAnimationFrame(loop);
 }
 
 function loop(ts) {
-  if (!running) return;
   const dt = Math.min(0.05, Math.max(0.001, (ts - lastTs) / 1000));
   lastTs = ts;
 
-  if (!hud.isModalOpen()) {
-    const mv = input.getMoveVector();
-    if (mv.dx !== 0 || mv.dy !== 0) {
-      sim.movePlayerBy(mv.dx, mv.dy, dt);
+  if (running && sim && renderer && hud) {
+    if (!hud.isModalOpen()) {
+      const mv = input.getMoveVector();
+      if (mv.dx !== 0 || mv.dy !== 0) {
+        sim.movePlayerBy(mv.dx, mv.dy, dt);
+      }
+      sim.update(dt);
     }
-    sim.update(dt);
-  }
+    renderer.render(sim, dt, input.joystick);
 
-  renderer.render(sim, dt, input.joystick);
-
-  hudTickTimer += dt;
-  if (hudTickTimer >= 0.45) {
-    hudTickTimer = 0;
-    hud.refreshHud();
+    hudTickTimer += dt;
+    if (hudTickTimer >= 0.45) {
+      hudTickTimer = 0;
+      hud.refreshHud();
+    }
+  } else if (renderer && previewSim) {
+    // Gentle orbiting 3D diorama preview behind the title screen!
+    renderer.targetCamYaw += dt * 0.14;
+    renderer.render(previewSim, dt, null);
   }
 
   requestAnimationFrame(loop);
@@ -134,15 +139,20 @@ function init() {
   setupInstallPrompt();
   refreshTitleScreen();
 
-  // Preview animated canvas gently behind title screen
   const canvas = document.getElementById('game-canvas');
-  const previewRenderer = new WorldRenderer(canvas);
-  const previewSim = new GameSimulation(createInitialState());
-  previewRenderer.render(previewSim, 0.016);
+  const overlay = document.getElementById('overlay-canvas');
+  renderer = new WorldRenderer3D(canvas, overlay);
+  previewSim = new GameSimulation(createInitialState());
 
   window.addEventListener('resize', () => {
     if (renderer) renderer.resize();
-    else previewRenderer.resize();
+  });
+
+  document.getElementById('btn-cam-rotate').addEventListener('click', () => {
+    if (renderer) {
+      renderer.rotateCamera();
+      hud && hud.toast('🎥 Visuale 3D ruotata');
+    }
   });
 
   document.getElementById('btn-continue').addEventListener('click', () => {
@@ -162,6 +172,9 @@ function init() {
     if (!hud) hud = new HudController(previewSim, null);
     hud.openPanel('help');
   });
+
+  lastTs = performance.now();
+  requestAnimationFrame(loop);
 }
 
 document.addEventListener('DOMContentLoaded', init);
