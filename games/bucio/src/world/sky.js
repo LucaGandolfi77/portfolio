@@ -161,15 +161,14 @@ export function buildLights(group) {
   sun.position.set(...sky.sunPos);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 10;
-  sun.shadow.camera.far = 300;
-  const d = 78;
-  sun.shadow.camera.left = -d;
-  sun.shadow.camera.right = d;
-  sun.shadow.camera.top = d;
-  sun.shadow.camera.bottom = -d;
-  sun.shadow.bias = -0.0016;
-  sun.shadow.normalBias = 0.045;
+  sun.shadow.camera.near = 20;
+  sun.shadow.camera.far = 420;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.radius = 2.5; // bordi morbidi (PCF con disco di Vogel)
+  // ombre leggere: sotto c'è sempre la luce del cielo, mai nero pieno
+  sun.shadow.intensity = sky.shadowIntensity ?? 0.82;
+  sun.userData.dir = new THREE.Vector3(...sky.sunPos).normalize();
+  sun.userData.extent = 0;
   group.add(sun);
   group.add(sun.target);
 
@@ -180,4 +179,45 @@ export function buildLights(group) {
   if (sky.stars) addStars(group, sky);
 
   return { hemi, sun, bounce };
+}
+
+/**
+ * Le ombre seguono lo sguardo. Il riquadro d'ombra del sole si centra su
+ * quello che inquadra la camera e si allarga con lo zoom: da piccolo il buco
+ * ha ombre fitte e nitide, da grande copre tutta la città che vede. Prima era
+ * fisso al centro della mappa (±78 m) e altrove le ombre sparivano.
+ *
+ * Il centro scatta di un texel alla volta, così le ombre non tremolano
+ * mentre la camera scorre.
+ */
+export function aimSun(lights, look, viewDist, { size = 2048, soft = 2.5 } = {}) {
+  if (!lights) return;
+  const sun = lights.sun;
+  const shadow = sun.shadow;
+  if (shadow.mapSize.x !== size) {
+    shadow.mapSize.set(size, size);
+    shadow.map?.dispose();
+    shadow.map = null;
+  }
+  shadow.radius = soft;
+  // mezza larghezza del riquadro: ~quello che si vede, arrotondato a 4 m
+  const want = Math.min(170, Math.max(26, viewDist * 1.45));
+  const extent = Math.ceil(want / 4) * 4;
+  const cam = shadow.camera;
+  if (extent !== sun.userData.extent) {
+    sun.userData.extent = extent;
+    cam.left = -extent;
+    cam.right = extent;
+    cam.top = extent;
+    cam.bottom = -extent;
+    cam.updateProjectionMatrix();
+    // più il riquadro è grande, più il texel è largo: il bias lo segue
+    shadow.normalBias = (extent * 2 / size) * 1.6;
+  }
+  const texel = (extent * 2) / size;
+  const x = Math.round(look.x / texel) * texel;
+  const z = Math.round(look.z / texel) * texel;
+  sun.target.position.set(x, look.y, z);
+  sun.position.copy(sun.userData.dir).multiplyScalar(200).add(sun.target.position);
+  sun.target.updateMatrixWorld();
 }

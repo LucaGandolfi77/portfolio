@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { withCloudShadows } from './cloudlight.js';
 
 /** Palette mediterranea low-poly: sabbia, calce, terracotta, verde palma, mare. */
 export const P = {
@@ -53,10 +54,12 @@ export function applyPalette(overrides) {
 
 /** Materiale condiviso per tutti i props low-poly (un solo draw call per tipo). */
 export function propMaterial() {
-  return new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    flatShading: true,
-  });
+  return withCloudShadows(
+    new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      flatShading: true,
+    })
+  );
 }
 
 /** Vernicia una geometria con un colore pieno (vertex color + alpha 1). */

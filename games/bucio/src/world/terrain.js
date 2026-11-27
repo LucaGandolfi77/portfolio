@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { withCloudShadows } from './cloudlight.js';
 import { P, c } from './palette.js';
 import { MAP, shoreZ, groundY, ROADS, PONDS } from './layout.js';
 import { clamp, smoothstep, makeRng } from '../core/utils.js';
@@ -82,7 +83,7 @@ export function buildTerrain() {
 
   const mesh = new THREE.Mesh(
     geo,
-    new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })
+    withCloudShadows(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }))
   );
   mesh.receiveShadow = true;
   mesh.name = 'terreno';
@@ -111,13 +112,15 @@ export function buildSea() {
     colors[i * 3 + 2] = col.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const mat = new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    flatShading: true,
-    transparent: true,
-    opacity: 0.86,
-    depthWrite: false,
-  });
+  const mat = withCloudShadows(
+    new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.86,
+      depthWrite: false,
+    })
+  );
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 1;
   mesh.name = 'mare';
@@ -213,7 +216,7 @@ export function buildFoam() {
 /** Marciapiedi chiari lungo le strade: un tocco di leggibilità. */
 export function buildSidewalks() {
   const group = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: c(P.stone), flatShading: true });
+  const mat = withCloudShadows(new THREE.MeshLambertMaterial({ color: c(P.stone), flatShading: true }));
   for (const r of ROADS) {
     const geo =
       r.axis === 'x'

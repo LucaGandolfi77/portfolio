@@ -80,7 +80,8 @@ export class PropWorld {
       const count = Math.max(3, Math.round(d.count * this.density));
       const mesh = new THREE.InstancedMesh(...this._look(d), count);
       mesh.castShadow = true;
-      mesh.receiveShadow = false;
+      // anche gli oggetti ricevono ombra: il palazzo la getta sull'auto accanto
+      mesh.receiveShadow = true;
       mesh.frustumCulled = false;
       mesh.count = count;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

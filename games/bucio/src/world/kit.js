@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { withCloudShadows } from './cloudlight.js';
 
 /**
  * I kit modellati in Blender (blender/build_kit.py → public/models/kit-<tema>.glb):
@@ -121,6 +122,7 @@ export function kitMaterial() {
         );
     };
     material.customProgramCacheKey = () => 'bucio-kit-glow';
+    withCloudShadows(material);
   }
   return material;
 }

@@ -18,7 +18,8 @@ import {
   buildOpenSea,
   animateSea,
 } from './world/terrain.js';
-import { buildSky, buildClouds, buildLights, animateSky } from './world/sky.js';
+import { buildSky, buildClouds, buildLights, animateSky, aimSun } from './world/sky.js';
+import { cloudUniforms } from './world/cloudlight.js';
 import { PropWorld } from './world/propworld.js';
 import { loadKit, kitReady, kitSize } from './world/kit.js';
 import { SPAWNS } from './world/layout.js';
@@ -67,6 +68,7 @@ scene.add(visuals, lightRig);
 
 let sea = null;
 let clouds = null;
+let lights = null;
 
 function disposeChildren(group) {
   const dead = [];
@@ -106,7 +108,9 @@ function buildVisuals() {
   visuals.add(buildSky());
   clouds = buildClouds();
   visuals.add(clouds);
-  buildLights(lightRig);
+  lights = buildLights(lightRig);
+  // le ombre delle nuvole: solo dove ci sono nuvole sopra il paese e c'è sole
+  cloudUniforms.uCloudStrength.value = currentTheme().sky.cloudShadow ?? 0;
 }
 
 /* ================================================================== il gioco */
@@ -178,6 +182,7 @@ const debug = {
   powers,
   world: null,
   director: null,
+  clouds: cloudUniforms,
   autopilot: null,
   start: () => startMatch(),
   theme: (id) => chooseTheme(id, { silent: true }),
@@ -465,6 +470,7 @@ let hudAcc = 0;
 function step(dt, t) {
   if (sea) animateSea(sea, t);
   if (clouds) animateSky(clouds, dt);
+  cloudUniforms.uCloudTime.value = t;
 
   if (state === 'playing' && director) {
     steer();
@@ -503,6 +509,8 @@ function step(dt, t) {
   fx.update(dt);
   hud.update(dt);
   if (world && state === 'playing') minimap.update(dt, holes, world.golds, t);
+  const q = QUALITY[engine.quality];
+  aimSun(lights, cam.look, cam.dist, { size: q.shadowSize, soft: q.soft ?? 1.5 });
 }
 
 /** Tiene il buco sotto il puntatore del mouse, o segue tasti/dita. */

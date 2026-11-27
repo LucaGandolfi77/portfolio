@@ -5,8 +5,8 @@ import * as THREE from 'three';
  * preset di qualità (che il menu può cambiare al volo).
  */
 export const QUALITY = {
-  high: { label: 'Alta', dpr: 2, shadows: true, shadowSize: 2048, density: 1, antialias: true },
-  med: { label: 'Media', dpr: 1.5, shadows: true, shadowSize: 1024, density: 0.78, antialias: true },
+  high: { label: 'Alta', dpr: 2, shadows: true, shadowSize: 2048, soft: 2.5, density: 1, antialias: true },
+  med: { label: 'Media', dpr: 1.5, shadows: true, shadowSize: 1024, soft: 1.5, density: 0.78, antialias: true },
   low: { label: 'Bassa', dpr: 1, shadows: false, shadowSize: 512, density: 0.5, antialias: false },
 };
 

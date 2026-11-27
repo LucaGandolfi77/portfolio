@@ -182,6 +182,21 @@ Simula il gioco senza render e verifica che il Continente sia davvero più
 grande, che i rivali divorati spariscano, che l'ultimo buco in piedi chiuda la
 partita e che la modalità Città sia rimasta identica a prima.
 
+### Luce, ombre e nuvole
+
+- Le **ombre del sole seguono la camera**: il riquadro d'ombra si centra su
+  quello che si vede e si allarga con lo zoom (26–170 m), così le ombre
+  restano nitide da piccoli e coprono tutta la città da grandi, in qualunque
+  punto della mappa. Il centro scatta di un texel alla volta: niente
+  tremolio mentre si scorre.
+- Ombre morbide (PCF con disco di Vogel, raggio dalla qualità grafica) e mai
+  nere: la luce del cielo resta. Anche gli oggetti ricevono ombra.
+- **Le nuvole proiettano ombra a terra** (`src/world/cloudlight.js`): macchie
+  morbide che scorrono col vento su terreno, mare, strade e su ogni oggetto,
+  procedurale o di Blender. Abbassano solo la luce diretta del sole, come
+  sotto una nuvola vera. Ogni scenario dosa la sua (`sky.cloudShadow`): niente
+  ombre di nuvole di notte, sulla Luna o sopra il mare di nuvole del Giardino.
+
 ### Perché è veloce
 
 - Ogni tipo di oggetto è **una geometria fusa e un `InstancedMesh`**:
