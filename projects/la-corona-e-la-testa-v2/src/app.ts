@@ -7,6 +7,7 @@ import { effectsBetween } from './film/cues';
 import { SHOT_VIEWS } from './film/shots';
 import { SPEAKERS } from './film/script';
 import { clamp } from './film/util';
+import { loadKit } from './film/three/assets';
 
 type StringKey =
   | 'tagline'
@@ -68,8 +69,8 @@ const STRINGS: Record<StringKey, { en: string; it: string }> = {
   beginSilent: { en: 'Watch in silence', it: 'Guarda in silenzio' },
   resume: { en: 'Resume', it: 'Riprendi' },
   posterNote: {
-    en: 'About 17 minutes · shot live in 3D · no video files',
-    it: 'Circa 17 minuti · girato in 3D in tempo reale · nessun file video',
+    en: 'About 21 minutes · shot live in 3D · no video files',
+    it: 'Circa 21 minuti · girato in 3D in tempo reale · nessun file video',
   },
   contentNote: { en: 'Content note', it: 'Avviso sui contenuti' },
   chapters: { en: 'CHAPTERS', it: 'CAPITOLI' },
@@ -994,10 +995,14 @@ async function boot(): Promise<void> {
     document.fonts?.load('500 42px "Cormorant Garamond Variable"'),
     document.fonts?.load('600 14px "Inter Variable"'),
   ].filter(Boolean) as Promise<unknown>[];
+  /* The sculpted kit must be in before the first set is built (sets are
+     cached); without it the film falls back to its primitive shapes. */
+  const kitReady = loadKit();
   await Promise.race([
     Promise.all(fontTasks).catch(() => undefined),
     new Promise((resolve) => window.setTimeout(resolve, 2200)),
   ]);
+  await kitReady;
 
   renderer.resize();
   renderer.renderPoster();

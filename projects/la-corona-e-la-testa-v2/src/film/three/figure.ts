@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { clamp, ease, hash, lerp } from '../util';
 import { STONE, glowMat, glowSprite, mat } from './mats';
+import { kit, kitMesh } from './assets';
 
 export type PoseName =
   | 'stand' | 'talk' | 'kneel' | 'pray' | 'offer' | 'point' | 'raise' | 'bow' | 'sit' | 'lie' | 'hold'
@@ -119,6 +120,28 @@ function skirt(len: number): THREE.LatheGeometry {
   }
   return g;
 }
+/* The draped robe from the kit, stretched to this length below the waist. */
+const kitSkirts = new Map<number, THREE.BufferGeometry>();
+function kitSkirt(len: number): THREE.BufferGeometry | undefined {
+  const k = Math.round(len * 20) / 20;
+  const cached = kitSkirts.get(k);
+  if (cached) return cached;
+  const near = k < 0.62 ? 50 : k < 0.87 ? 75 : 100;
+  const src = kit(`skirt_${near}` as 'skirt_50');
+  if (!src) return undefined;
+  const g = src.clone();
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const f = k / (near / 100);
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    if (y < 0.02) p.setY(i, 0.02 + (y - 0.02) * f);
+  }
+  /* Normals stay as sculpted: recomputing them would open the UV seams. */
+  g.computeBoundingSphere();
+  kitSkirts.set(k, g);
+  return g;
+}
+
 const CAPE = new THREE.CylinderGeometry(0.2, 0.42, 1.25, 20, 6, true, Math.PI - 1.35, 2.7);
 CAPE.translate(0, -0.62, -0.02);
 
@@ -240,12 +263,18 @@ function makeHead(look: Look): Face {
   const head = new THREE.Group();
   const skin = skinMat(look.skin);
   const hairM = cloth(look.hair, 0.8);
-  head.add(mesh(G.sphere, skin, [0.108, 0.125, 0.112]));
-  /* Jaw and cheeks, so the face is not a ball. */
-  head.add(mesh(G.sphere, skin, [0.085, 0.07, 0.09], [0, -0.055, 0.02]));
-  head.add(mesh(G.sphere, skin, [0.016, 0.03, 0.02], [0.108, 0, -0.005]));
-  head.add(mesh(G.sphere, skin, [0.016, 0.03, 0.02], [-0.108, 0, -0.005]));
-  head.add(mesh(G.sphere, skin, [0.014, 0.026, 0.022], [0, -0.012, 0.11]));
+  const sculpted = kitMesh('head', skin);
+  if (sculpted) {
+    /* The head sculpted in Blender: brow, sockets, nose, cheekbones, lips, ears. */
+    head.add(sculpted);
+  } else {
+    head.add(mesh(G.sphere, skin, [0.108, 0.125, 0.112]));
+    /* Jaw and cheeks, so the face is not a ball. */
+    head.add(mesh(G.sphere, skin, [0.085, 0.07, 0.09], [0, -0.055, 0.02]));
+    head.add(mesh(G.sphere, skin, [0.016, 0.03, 0.02], [0.108, 0, -0.005]));
+    head.add(mesh(G.sphere, skin, [0.016, 0.03, 0.02], [-0.108, 0, -0.005]));
+    head.add(mesh(G.sphere, skin, [0.014, 0.026, 0.022], [0, -0.012, 0.11]));
+  }
 
   const eyes: THREE.Group[] = [];
   const brows: THREE.Mesh[] = [];
@@ -263,7 +292,7 @@ function makeHead(look: Look): Face {
     brows.push(brow);
   }
   const lip = mat({ color: new THREE.Color(look.skin).multiplyScalar(0.62).getStyle(), rough: 0.6 });
-  const mouth = mesh(G.sphere, mat({ color: '#3a1410', rough: 0.7 }), [0.024, 0.004, 0.01], [0, -0.058, 0.102]);
+  const mouth = mesh(G.sphere, mat({ color: '#4a1a16', rough: 0.7 }), [0.018, 0.0035, 0.008], [0, -0.06, 0.103]);
   head.add(mouth);
   const smile = mesh(G.smile, lip, [0.02, 0.012, 0.012], [0, -0.052, 0.104]);
   smile.rotation.z = Math.PI;
@@ -409,7 +438,8 @@ export class Figure {
     this.root.add(this.pelvis);
     this.pelvis.add(this.spine);
     /* Torso. */
-    const torso = mesh(TORSO, robe, [build, 1, build * 0.74]);
+    const torso = kitMesh('torso', robe) ?? mesh(TORSO, robe);
+    torso.scale.set(build, 1, build * 0.74);
     torso.position.y = 0.04;
     this.spine.add(torso);
     if (look.armor) {
@@ -437,14 +467,18 @@ export class Figure {
       this.spine.add(mesh(G.capsule, cloth(look.toga), [0.07, 0.2, 0.05], [0.14, 0.32, -0.08]));
     }
     if (look.cape) {
-      this.cape = mesh(CAPE, cloth(look.cape), [build, 1, build * 0.85]);
+      this.cape = kitMesh('cape', cloth(look.cape)) ?? mesh(CAPE, cloth(look.cape));
+      this.cape.scale.set(build, 1, build * 0.85);
       (this.cape.material as THREE.Material).side = THREE.DoubleSide;
       this.cape.position.y = 0.52;
       this.spine.add(this.cape);
       this.spine.add(mesh(G.lowSphere, metal('#e0b048', 0.5), [0.016, 0.016, 0.01], [0.12, 0.47, 0.12]));
     }
     /* Skirt of the robe, hanging from the waist. */
-    this.skirtMesh = mesh(skirt(look.robeLen), robe, [build, 1, build * 0.86]);
+    const draped = kitSkirt(look.robeLen);
+    this.skirtMesh = draped ? (kitMesh('skirt_100', robe) as THREE.Mesh) : mesh(skirt(look.robeLen), robe);
+    if (draped) this.skirtMesh.geometry = draped;
+    this.skirtMesh.scale.set(build, 1, build * 0.86);
     this.pelvis.add(this.skirtMesh);
     if (look.trim) {
       const h = 0.93 * look.robeLen;
@@ -479,16 +513,25 @@ export class Figure {
       const shoulder = new THREE.Group();
       shoulder.position.set(0.2 * side * build, 0.46, 0);
       this.spine.add(shoulder);
-      shoulder.add(mesh(G.sphere, sleeves, [0.062, 0.062, 0.062]));
-      shoulder.add(mesh(G.capsule, sleeves, [0.052, 0.2, 0.052], [0, -0.14, 0]));
+      const upper = kitMesh('sleeve', sleeves);
+      if (upper) shoulder.add(upper);
+      else {
+        shoulder.add(mesh(G.sphere, sleeves, [0.062, 0.062, 0.062]));
+        shoulder.add(mesh(G.capsule, sleeves, [0.052, 0.2, 0.052], [0, -0.14, 0]));
+      }
       const elbow = new THREE.Group();
       elbow.position.y = -0.29;
       shoulder.add(elbow);
-      elbow.add(mesh(G.capsule, look.armor ? skin : sleeves, [0.044, 0.18, 0.044], [0, -0.12, 0]));
+      elbow.add(kitMesh('forearm', look.armor ? skin : sleeves) ?? mesh(G.capsule, look.armor ? skin : sleeves, [0.044, 0.18, 0.044], [0, -0.12, 0]));
       const hand = new THREE.Group();
       hand.position.y = -0.27;
       elbow.add(hand);
-      hand.add(mesh(G.sphere, skin, [0.042, 0.05, 0.03], [0, -0.01, 0]));
+      const palm = kitMesh('hand', skin);
+      if (palm) {
+        /* Palm towards the body: the hand on the other side is mirrored. */
+        palm.scale.set(side, 1, 1);
+        hand.add(palm);
+      } else hand.add(mesh(G.sphere, skin, [0.042, 0.05, 0.03], [0, -0.01, 0]));
       this.arms.push({ shoulder, elbow, hand });
     }
     /* Legs (mostly under the robe; the feet always show). */
@@ -501,7 +544,11 @@ export class Figure {
       knee.position.y = -0.45;
       hip.add(knee);
       knee.add(mesh(G.capsule, legs, [0.055, 0.32, 0.055], [0, -0.21, 0]));
-      knee.add(mesh(G.box, shoes, [0.085, 0.06, 0.2], [0, -0.45, 0.045]));
+      const shoe = kitMesh('foot', shoes);
+      if (shoe) {
+        shoe.position.set(0, -0.45, 0.045);
+        knee.add(shoe);
+      } else knee.add(mesh(G.box, shoes, [0.085, 0.06, 0.2], [0, -0.45, 0.045]));
       this.legs.push({ hip, knee });
     }
 

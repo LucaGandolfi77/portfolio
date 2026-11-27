@@ -33,6 +33,8 @@ export const ACT2: Shots = {
   'vi-cellar': {
     set: 'cellar',
     cam: [C(-1, [0, 1.6, 3.2], [0, 1.0, -1.5], 40), C(0, [1.1, 1.2, 1.2], [0, 1.0, -1.8], 34, 8)],
+    /* Behind the presbyter is the back wall: answer him in close-up. */
+    frames: { 2: 'close' },
     actors: [
       { who: 'presbyter', voice: 'pres', at: [-0.7, -2.5], rot: 20, item: 'bread' },
       { who: 'faithfulA', at: [0.9, -2.4], rot: -30, pose: 'kneel' },

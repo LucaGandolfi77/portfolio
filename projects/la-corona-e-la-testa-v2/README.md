@@ -1,7 +1,7 @@
 # LA CORONA E LA TESTA · 3D
 
 La leggenda di San Donnino, patrono di Fidenza, in un film animato in 3D di
-circa 17 minuti, girato dal vivo nel browser con Three.js.
+circa 21 minuti, girato dal vivo nel browser con Three.js.
 
 **Guarda:** <https://lucagandolfi77.github.io/portfolio/projects/la-corona-e-la-testa-v2/>
 
@@ -14,7 +14,7 @@ a Borgo San Donnino, l'odierna Fidenza. Una bambina e sua madre, davanti al
 Duomo di oggi, aprono e chiudono la storia.
 
 - Prologo, otto atti con titoli latini, epilogo: 39 inquadrature e 135 battute
-  in italiano e inglese. Le parole latine compaiono come iscrizioni.
+  in italiano e inglese, scritte come confessioni: dubbi, colpa, libertà. Le parole latine compaiono come iscrizioni.
 - Scene in 3D con luce, ombre morbide, nebbia, bagliori, pioggia, neve e polvere
   nella luce: l'aula imperiale di porfido e mosaici d'oro, la prigione, la
   locanda, la pianura con i pioppi, il ponte romano sullo Stirone, il cantiere
@@ -46,7 +46,21 @@ npm run build
 | `src/film/three/kit.ts` | Colonne, archi, bracieri, case, pioppi, ponte romano, Duomo di Fidenza. |
 | `src/film/three/figure.ts` | Gli attori: corpo, volto, pose, costumi, oggetti. |
 | `src/film/three/fx.ts` | Pioggia, neve, nebbia, braci, lucciole, polvere nella luce. |
+| `src/film/three/assets.ts` | Carica il kit scolpito in Blender; senza kit ogni pezzo torna alle forme semplici. |
+| `blender/build_kit.py` | Il kit in Blender: teste, mani, calzari, vesti e mantelli con le pieghe, colonne, trono, anfore, bracieri. |
 | `src/film/stage.ts` | La regia: attori, inquadrature automatiche, render con bloom, transizioni, sottotitoli. |
+
+### Il kit di Blender
+
+Teste, mani, calzari, busti, vesti e mantelli degli attori, le colonne con
+base attica, fusto scanalato e capitello a ovoli, il trono intagliato, le anfore
+e i bracieri sono generati da uno script Python in Blender, con l'occlusione
+ambientale calcolata in Cycles e salvata nei colori dei vertici. Il risultato è
+compresso con meshopt in `public/models/kit.glb` (circa 320 kB).
+
+```bash
+BLENDER=/percorso/di/Blender npm run kit   # rigenera public/models/kit.glb
+```
 
 La versione 2D, disegnata a mano in Canvas, è in `projects/la-corona-e-la-testa`.
 

@@ -8,6 +8,7 @@ import { hash } from '../util';
 import { Figure } from './figure';
 import { CAST } from './cast';
 import { glowMat, glowSprite, mat, type MatOpts } from './mats';
+import { kitMesh } from './assets';
 
 export type M = THREE.Material;
 
@@ -99,6 +100,19 @@ export const STUFF = {
 export function column(h: number, r: number, shaft: M, trim: M = STUFF.marble()): THREE.Group {
   const g = new THREE.Group();
   add(g, box(r * 2.6, r * 0.5, r * 2.6, trim), [0, r * 0.25, 0]);
+  const base = kitMesh('col_base', trim);
+  const body = kitMesh('col_shaft', shaft);
+  const cap = kitMesh('col_cap', trim);
+  if (base && body && cap) {
+    /* Carved in Blender: attic base, fluted shaft with entasis, capital with eggs and darts. */
+    base.scale.setScalar(r);
+    add(g, base, [0, r * 0.5, 0]);
+    body.scale.set(r, h - r * 2.05, r);
+    add(g, body, [0, r * 0.95, 0]);
+    cap.scale.setScalar(r);
+    add(g, cap, [0, h, 0]);
+    return g;
+  }
   add(g, shade(new THREE.Mesh(new THREE.TorusGeometry(r * 1.08, r * 0.18, 8, 24), trim)), [0, r * 0.6, 0], [Math.PI / 2, 0, 0]);
   add(g, cyl(r * 0.88, r, h - r * 1.6, shaft, 24), [0, r * 0.5 + (h - r * 1.6) / 2, 0]);
   add(g, cyl(r * 1.3, r * 0.9, r * 0.6, trim, 20), [0, h - r * 0.8, 0]);
@@ -197,6 +211,15 @@ export function flicker(f: Flame, time: number): void {
 export function brazier(flames: Flame[], light = 6, seed = 1): THREE.Group {
   const g = new THREE.Group();
   const bronze = STUFF.bronze();
+  const cast = kitMesh('brazier', bronze);
+  if (cast) {
+    /* Cast in Blender: three curved legs on paws, a ring, a flared bowl. */
+    g.add(cast);
+    const f = flame(0.42, light, '#ffa040', seed);
+    add(g, f.group, [0, 1.2, 0]);
+    flames.push(f);
+    return g;
+  }
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2;
     const leg = add(g, cyl(0.025, 0.03, 1.1, bronze, 8), [Math.cos(a) * 0.2, 0.52, Math.sin(a) * 0.2]);
@@ -225,6 +248,13 @@ export function throne(): THREE.Group {
   const g = new THREE.Group();
   const gold = STUFF.gold();
   const red = STUFF.cloth('#7a1028');
+  const carved = kitMesh('throne_gold', gold);
+  const cushions = kitMesh('throne_cloth', red);
+  if (carved && cushions) {
+    /* Carved in Blender: lion paws, arms ending in lion heads, arched back, pine-cone finial. */
+    g.add(carved, cushions);
+    return g;
+  }
   add(g, box(1.1, 0.5, 0.8, gold), [0, 0.25, 0]);
   add(g, box(0.95, 0.12, 0.7, red), [0, 0.56, 0.02]);
   add(g, box(1.1, 1.6, 0.14, gold), [0, 1.0, -0.36]);
@@ -276,6 +306,8 @@ export function barrel(r = 0.4, h = 0.95): THREE.Group {
 }
 
 export function amphora(m: M = mat({ color: '#b0683a', rough: 0.8 })): THREE.Mesh {
+  const carved = kitMesh('amphora', m);
+  if (carved) return carved;
   return lathe([[0, 0], [0.05, 0.02], [0.17, 0.25], [0.2, 0.45], [0.16, 0.62], [0.06, 0.72], [0.05, 0.85], [0.07, 0.88], [0, 0.88]], m, 18);
 }
 

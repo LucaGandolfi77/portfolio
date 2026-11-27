@@ -11,6 +11,7 @@ import {
   ground, house, milestone, poplar, rocks, romanBridge, roof, scaffold, shade, skyDome, sphere, stairs, statue, streetLamp,
   table, tree, wallTorch, water, type Flame, type SkyColors, type Water,
 } from './kit';
+import { kitMesh } from './assets';
 import { glowMat, glowSprite, mat } from './mats';
 
 export type SetName =
@@ -280,6 +281,14 @@ function throneGroup(): THREE.Group {
   const g = new THREE.Group();
   const gold = STUFF.gold();
   const red = STUFF.cloth('#7a1028');
+  const carved = kitMesh('throne_gold', gold);
+  const cushions = kitMesh('throne_cloth', red);
+  if (carved && cushions) {
+    /* The carved throne from the Blender kit, a little grander than the treasury's. */
+    g.add(carved, cushions);
+    g.scale.setScalar(1.1);
+    return g;
+  }
   add(g, box(1.2, 0.55, 0.85, gold), [0, 0.27, 0]);
   add(g, box(1.05, 0.14, 0.75, red), [0, 0.6, 0.02]);
   add(g, box(1.2, 1.9, 0.16, gold), [0, 1.2, -0.38]);

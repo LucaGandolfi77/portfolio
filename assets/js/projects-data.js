@@ -5,7 +5,7 @@ const PROJECTS_DATA = [
   {
     "id": "la-corona-e-la-testa-v2",
     "title": "La Corona e la Testa 3D",
-    "description": "La leggenda di San Donnino rifatta in 3D con Three.js: 17 minuti girati dal vivo nel browser, con luci e ombre, nebbia e pioggia, cavalieri, il ponte romano sullo Stirone e il Duomo di Fidenza. La regia stacca da sola tra chi parla; dialoghi in italiano e inglese, musica originale.",
+    "description": "La leggenda di San Donnino rifatta in 3D con Three.js: 21 minuti girati dal vivo nel browser, con luci e ombre, nebbia e pioggia, cavalieri, il ponte romano sullo Stirone e il Duomo di Fidenza. La regia stacca da sola tra chi parla; dialoghi in italiano e inglese, musica originale.",
     "href": "projects/la-corona-e-la-testa-v2/",
     "emoji": "🏛️",
     "badge": "Creative",
