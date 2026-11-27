@@ -41,13 +41,14 @@ export const DEFAULT_LOOK = {
 
 const emptyStats = () => ({
   shots: 0, makes: 0, swishes: 0, bank: 0, rim: 0, airballs: 0, blocked: 0,
-  threes: 0, deep: 0, half: 0, bestStreak: 0, windMakes: 0, movingMakes: 0, overHand: 0, buzzers: 0, zones: {},
+  threes: 0, deep: 0, half: 0, bestStreak: 0, windMakes: 0, movingMakes: 0, overHand: 0, buzzers: 0,
+  bombs: 0, bombRound: 0, bombWrecked: 0, bombStanding: 0, bombSteady: 0, bombWater: 0, zones: {},
 });
 
 export function newState() {
   return {
     v: 1, xp: 0, matches: 0, stats: emptyStats(), stars: {},
-    best: { timed: 0, three: 0, zero: 0 }, daily: {},
+    best: { timed: 0, three: 0, zero: 0, bomb: 0 }, daily: {},
     zero: { won: 0, lost: 0, flawless: 0 },
     look: { ...DEFAULT_LOOK }, medals: [], seen: {},
   };
@@ -137,6 +138,12 @@ export const MEDALS = [
   medal('champion', (s) => chapterDone(s, 5)),
   medal('perfect', chapterPerfect),
   medal('stars60', (s) => totalStars(s.stars) >= 60),
+  medal('bomb1', (s) => s.stats.bombs >= 1),
+  medal('bomb6', (s) => s.stats.bombRound >= 6),
+  medal('bombWrecked', (s) => s.stats.bombWrecked >= 1),
+  medal('bombStanding', (s) => s.stats.bombStanding >= 1),
+  medal('bombSteady', (s) => s.stats.bombSteady >= 1),
+  medal('bombWater', (s) => s.stats.bombWater >= 1),
 ];
 
 /** Adds the medals earned since the last call and returns their ids. */
@@ -161,6 +168,7 @@ export function recordShot(state, { spot, env = {}, buzzer = false, out }) {
   const st = state.stats;
   if (out.who !== 'you' || out.result === 'late') return;
   st.shots++;
+  if (out.made && out.drunk >= 80) st.bombWrecked++;
   const z = zoneOf(spot);
   const zone = (st.zones[z] = st.zones[z] || [0, 0]);
   zone[0]++;
@@ -198,7 +206,16 @@ export function finishMatch(state, match, summary) {
   state.matches++;
   state.stats.bestStreak = Math.max(state.stats.bestStreak, summary.bestStreak);
   if (summary.attempts > 0 && match.id !== 'training') state.xp += 15;
-  if (match.id === 'timed' || match.id === 'three') {
+  if (match.id === 'bomb') {
+    state.stats.bombs += summary.bombs;
+    state.stats.bombRound = Math.max(state.stats.bombRound, summary.bombs);
+    if (match.over && !summary.crashed) {
+      if (summary.level >= 60) state.stats.bombStanding++;
+      if (summary.bombs === 0) state.stats.bombWater++;
+    }
+    if (match.over && summary.bombs >= 3 && summary.cleanBombs === summary.bombs) state.stats.bombSteady++;
+  }
+  if (match.id === 'timed' || match.id === 'three' || match.id === 'bomb') {
     if (summary.score > state.best[match.id]) { state.best[match.id] = summary.score; newBest = true; }
   } else if (match.id === 'daily' && match.over) {
     const key = String(match.seed);

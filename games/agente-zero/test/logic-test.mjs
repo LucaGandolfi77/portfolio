@@ -11,6 +11,9 @@ import { CHAPTERS, missionId, chapterUnlocked, missionUnlocked, totalStars } fro
 import { spotAt, isThree, zoneOf, ZONES, PRACTICE_SPOTS, CONTEST_SPOTS } from '../js/court-data.js';
 import { LINES, say, lineKey } from '../js/lines.js';
 import { STRINGS } from '../js/strings.js';
+import * as D from '../js/drunk.js';
+import * as B from '../js/bomb.js';
+import { tiltDelta, createTilt } from '../js/tilt.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const results = [];
@@ -343,6 +346,144 @@ t('lines follow the shot', () => {
   eq(lineKey({ made: false, result: 'miss' }), 'miss');
   const a = say('it', 'swish', () => 0);
   ok(a && say('it', 'swish', () => 0, a) !== a);
+});
+
+/* ---------- bomb mode ---------- */
+t('drunkenness stays in 0–100, rises with bombs and wears off', () => {
+  let l = 0;
+  for (let i = 0; i < 20; i++) l = D.addBomb(l, true);
+  eq(l, 100);
+  for (let i = 0; i < 1000; i++) l = D.sober(l, 1);
+  eq(l, 0);
+  eq(D.addBomb(0, true), D.PER_BOMB); eq(D.addBomb(0, false), D.PER_SPILL);
+  near(D.sober(50, 4), 48);
+  eq([0, 19, 20, 40, 60, 80, 100].map(D.stageOf).join(), '0,0,1,2,3,4,4');
+  eq(D.multiplierOf(0), 1); eq(D.multiplierOf(100), 3);
+});
+t('sober hands are today’s hands', () => {
+  for (let i = 0; i < 200; i++) {
+    const w = D.wobbleAt(i * 0.13, 0);
+    ok(w.aim === 0 && w.power === 0 && !w.hiccup && !w.flip, JSON.stringify(w));
+  }
+  eq(D.swerveAmp(30), 0);
+});
+t('the wobble grows with the level; hiccups and swapped controls come in turns', () => {
+  const peak = (lv, key) => Math.max(...Array.from({ length: 600 }, (_, i) => Math.abs(D.wobbleAt(i * 0.02, lv)[key])));
+  ok(peak(40, 'aim') > peak(25, 'aim') && peak(95, 'aim') > peak(40, 'aim'));
+  const some = (lv, key) => Array.from({ length: 800 }, (_, i) => D.wobbleAt(i * 0.025, lv)[key]);
+  ok(!some(39, 'hiccup').includes(true) && some(50, 'hiccup').includes(true) && some(50, 'hiccup').includes(false));
+  ok(!some(79, 'flip').includes(true) && some(85, 'flip').includes(true));
+  eq(D.applyWobble({ aim: 0.1, power: 1 }, { aim: 0, power: 0, flip: true }).aim, -0.1);
+});
+t('at every level below 100 a well-timed shot still scores', () => {
+  const spot = spotAt(0, 4.2), f = from(spot);
+  for (let level = 0; level < 100; level += 3) {
+    let found = false;
+    for (let time = 0; time < 12 && !found; time += 0.02) {
+      const w = D.wobbleAt(time, level);
+      if (w.hiccup || Math.abs(w.aim) > 0.012 || Math.abs(w.power) > 0.009) continue;
+      found = P.simulate(P.makeShot(f.p, f.ideal, D.applyWobble({}, w))).scored;
+    }
+    ok(found, 'level ' + level);
+  }
+});
+t('a badly timed drunk shot misses', () => {
+  const f = from(spotAt(0, 4.2));
+  let missed = 0, n = 0;
+  for (let time = 0; time < 6; time += 0.1) { n++; if (!P.simulate(P.makeShot(f.p, f.ideal, D.applyWobble({}, D.wobbleAt(time, 90)))).scored) missed++; }
+  ok(missed / n > 0.5, `${missed}/${n}`);
+});
+t('the ball swerves in the air but arrives where it was sent', () => {
+  const f = from(spotAt(0, 4.5)), state = P.makeShot(f.p, f.ideal, {});
+  const straight = P.simulate(state), bent = D.swerve(straight, state, 90, P.FRAME);
+  const side = bent.path.map((p, i) => p.p[0] - straight.path[i].p[0]);
+  ok(Math.max(...side) > 0.2 && Math.min(...side) < -0.2, 'no S');
+  for (let i = Math.floor(straight.scoreAt / P.FRAME) - 3; i < side.length; i++) near(side[i], 0, 1e-9, 'frame ' + i);
+  eq(bent.result, straight.result);
+  eq(JSON.stringify(D.swerve(straight, state, 90, P.FRAME).path), JSON.stringify(bent.path));
+  eq(D.swerve(straight, state, 10, P.FRAME), straight);
+});
+t('“reduce motion” stops the court from turning or doubling', () => {
+  for (let i = 0; i < 100; i++) {
+    const e = D.effects(i * 0.2, 99, true);
+    ok(e.rot === 0 && e.double === 0 && e.dy === 0 && Math.abs(e.dx) <= 3);
+  }
+  const wild = Array.from({ length: 100 }, (_, i) => D.effects(i * 0.2, 99));
+  ok(wild.some((e) => Math.abs(e.rot) > 0.04) && wild.every((e) => Math.abs(e.rot) < 0.15) && wild[0].double > 0);
+});
+t('the drink: drop, fall, drink, burp, done', () => {
+  const b = B.newBomb(0);
+  ok(!B.dropShot(b), 'too soon');
+  let time = 0;
+  while (!(b.t > B.GUARD && Math.abs(b.x) < 0.05) && time < 5) { B.stepBomb(b, 0.01); time += 0.01; }
+  ok(B.dropShot(b)); eq(b.clean, true);
+  B.stepBomb(b, 0.6); eq(b.step, 'drink');
+  for (let i = 0; i < 100; i++) B.stepBomb(b, 0.1, { tilt: 5 });
+  eq(b.progress, 0, 'an upright phone pours nothing');
+  let n = 0;
+  while (b.step === 'drink' && n++ < 100) B.stepBomb(b, 0.1, { tilt: 70 });
+  eq(b.step, 'burp'); ok(n >= 12 && n <= 15, 'tilt ' + n);
+  B.stepBomb(b, 2); eq(b.step, 'done'); eq(B.stepBomb(b, 1), null);
+});
+t('a drop off centre spills, and idle fingers let go', () => {
+  const b = B.newBomb(60);
+  while (!(b.t > B.GUARD && Math.abs(b.x) > 0.6)) B.stepBomb(b, 0.01);
+  B.dropShot(b); eq(b.clean, false);
+  const c = B.newBomb(0);
+  for (let i = 0; i < 80 && c.step === 'swing'; i++) B.stepBomb(c, 0.1);
+  eq(c.step, 'fall');
+  ok(B.tiltRate(NaN) === 0 && B.tiltRate(30) > 0 && B.tiltRate(65) > B.tiltRate(35) && B.tiltRate(170) === B.TILT_RATE);
+});
+t('the tilt angle ignores how the phone was held and survives wrap-around', () => {
+  near(tiltDelta({ beta: 70, gamma: 0 }, { beta: 70, gamma: 0 }), 0, 1e-4);
+  near(tiltDelta({ beta: 70, gamma: 0 }, { beta: 20, gamma: 0 }), 50, 1e-6);
+  near(tiltDelta({ beta: 80, gamma: 0 }, { beta: 130, gamma: 0 }), 50, 1e-6);
+  near(tiltDelta({ beta: 0, gamma: 89 }, { beta: 180, gamma: -89 }), 2, 1e-3);
+  const target = new EventTarget(), tilt = createTilt(target);
+  const send = (beta, gamma) => target.dispatchEvent(Object.assign(new Event('deviceorientation'), { beta, gamma }));
+  eq(tilt.angle(), 0); send(null, null); ok(!tilt.seen);
+  send(75, 0); send(30, 0); near(tilt.angle(), 45, 1e-6);
+  tilt.reset(); near(tilt.angle(), 0, 1e-4);
+});
+t('every basket must be drunk before the next shot, and the clock waits', () => {
+  const m = M.newMatch('bomb', { rng: rng(8) });
+  const out = shoot(m, true);
+  eq(out.points, 3); ok(m.pendingDrink); ok(!M.release(m), 'shot while holding a drink');
+  const left = m.timeLeft;
+  M.tick(m, 30); eq(m.timeLeft, left);
+  const r = M.applyBomb(m, true);
+  eq(r.level, D.PER_BOMB); eq(m.score, 3 + M.CLEAN_BONUS); eq(M.applyBomb(m, true), null);
+  shoot(m, false); ok(!m.pendingDrink, 'no drink for a miss');
+  M.tick(m, 2); near(m.level, D.PER_BOMB - 1);
+  m.level = 85;
+  eq(shoot(m, true).points, 9, 'wrecked baskets pay triple');
+});
+t('at 100 he passes out; on his feet at the siren pays a bonus', () => {
+  const m = M.newMatch('bomb', { rng: rng(8) });
+  let n = 0;
+  while (!m.over && n++ < 20) { shoot(m, true); M.applyBomb(m, true); }
+  eq(n, Math.ceil(100 / D.PER_BOMB)); ok(m.crashed);
+  const s = M.summaryOf(m);
+  ok(!s.won && s.crashed && s.bonus === 0);
+  const up = M.newMatch('bomb', { rng: rng(8) });
+  shoot(up, true); M.applyBomb(up, false);
+  const before = up.score;
+  M.tick(up, 100);
+  ok(up.over && !up.crashed); eq(up.score, before + M.STANDING_BONUS);
+  const late = M.newMatch('bomb', { rng: rng(8) });
+  M.release(late); M.tick(late, 100); M.applyShot(late, { scored: true, result: 'swish' });
+  ok(late.over && !late.pendingDrink, 'no drink after the siren');
+});
+t('bomb medals: counted when the night ends', () => {
+  const s = G.newState();
+  const m = G.beginMatch(s, M.newMatch('bomb', { rng: rng(8) }));
+  for (let i = 0; i < 6; i++) { const o = shoot(m, true); o.drunk = i === 5 ? 82 : o.drunk; G.recordShot(s, { spot: o.spot, out: o }); M.applyBomb(m, true); m.level = 62; }
+  m.timeLeft = 0.5; M.tick(m, 1);
+  const r = G.finishMatch(s, m, M.summaryOf(m));
+  for (const id of ['bomb1', 'bomb6', 'bombWrecked', 'bombStanding', 'bombSteady']) ok(r.medals.includes(id), id);
+  ok(!r.medals.includes('bombWater')); eq(s.best.bomb, m.score);
+  const dry = G.beginMatch(s, M.newMatch('bomb')); shoot(dry, false); M.tick(dry, 100);
+  ok(G.finishMatch(s, dry, M.summaryOf(dry)).medals.includes('bombWater'));
 });
 
 /* ---------- files ---------- */

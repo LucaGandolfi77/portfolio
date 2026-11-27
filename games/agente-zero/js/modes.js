@@ -8,12 +8,16 @@
 import { seededRandom, dailySeed } from '../../_kit/core.js';
 import { spotAt, isThree, CONTEST_SPOTS, PRACTICE_SPOTS } from './court-data.js';
 import { getMission, CHAPTERS } from './career.js';
+import { addBomb, sober, multiplierOf, MAX } from './drunk.js';
 
-export const MODES = ['training', 'career', 'timed', 'three', 'zero', 'daily'];
+export const MODES = ['training', 'career', 'timed', 'three', 'zero', 'daily', 'bomb'];
 export const FIRE_AT = 3;
 export const TIMED_SECONDS = 60;
 export const DAILY_SHOTS = 10;
 export const WORD = 'ZERO';
+export const BOMB_SECONDS = 90;
+export const STANDING_BONUS = 10;
+export const CLEAN_BONUS = 1;
 
 const base = (id) => ({
   id, score: 0, attempts: 0, makes: 0, swishes: 0, streak: 0, bestStreak: 0,
@@ -47,6 +51,12 @@ export function dailyShots(seed) {
   });
 }
 
+/** In the bomb mode he moves a little farther out with every drink. */
+function bombSpot(match) {
+  const dist = Math.min(5.8, 3.4 + match.bombs * 0.28) + (match.rng() - 0.5) * 0.4;
+  return spotAt(Math.round((match.rng() * 2 - 1) * 55), dist);
+}
+
 export function newMatch(id, opts = {}) {
   const match = base(id);
   match.rng = opts.rng || Math.random;
@@ -60,6 +70,11 @@ export function newMatch(id, opts = {}) {
     match.timeLeft = TIMED_SECONDS;
     match.place = opts.place || 'arena';
     match.spot = { ...CONTEST_SPOTS[0] };
+  } else if (id === 'bomb') {
+    match.timeLeft = BOMB_SECONDS;
+    match.place = opts.place || 'beach';
+    match.spot = spotAt(0, 3.6);
+    Object.assign(match, { level: 0, peak: 0, bombs: 0, cleanBombs: 0, pendingDrink: false, crashed: false });
   } else if (id === 'daily') {
     match.seed = opts.seed ?? dailySeed();
     match.shots = dailyShots(match.seed);
@@ -122,7 +137,7 @@ export function isMoneyBall(match) {
 }
 
 export function onFire(match) {
-  return match.id !== 'zero' && match.streak >= FIRE_AT;
+  return match.id !== 'zero' && match.id !== 'bomb' && match.streak >= FIRE_AT;
 }
 
 export function shotSpec(match) {
@@ -133,7 +148,7 @@ export function shotSpec(match) {
 }
 
 export function release(match) {
-  if (match.over || match.inFlight) return false;
+  if (match.over || match.inFlight || match.pendingDrink) return false;
   if (match.timeLeft !== null && match.timeLeft <= 0) return false;
   match.inFlight = true;
   return true;
@@ -212,6 +227,7 @@ export function applyShot(match, res) {
       match.streak++;
       match.bestStreak = Math.max(match.bestStreak, match.streak);
       if (match.id === 'three') points = money ? 2 : 1;
+      else if (match.id === 'bomb') points = Math.round(basketPoints(spot, res.result) * multiplierOf(match.level));
       else if (match.id !== 'zero') points = basketPoints(spot, res.result) * (wasFire ? 2 : 1);
     } else {
       match.streak = 0;
@@ -223,7 +239,14 @@ export function applyShot(match, res) {
   out.fire = onFire(match);
   out.ignited = !wasFire && out.fire;
 
-  if (match.id === 'timed') {
+  if (match.id === 'bomb') {
+    out.drunk = match.level;
+    // every basket must be drunk to, unless the siren has already gone
+    if (made) {
+      if (match.timeLeft > 0) match.pendingDrink = true;
+      match.spot = bombSpot(match);
+    }
+  } else if (match.id === 'timed') {
     if (made) match.spot = timedSpot(match);
   } else if (match.id === 'three') {
     if (match.attempts >= 25) match.over = true;
@@ -247,8 +270,30 @@ export function applyShot(match, res) {
     const n = spec.type === 'clock' ? match.makes : match.attempts;
     match.spot = { ...spec.spots[n % spec.spots.length] };
   }
-  if (match.timeLeft !== null && match.timeLeft <= 0) match.over = true;
+  if (match.timeLeft !== null && match.timeLeft <= 0) timeUp(match);
   return out;
+}
+
+/** The siren: in the bomb mode, still being on your feet pays. */
+function timeUp(match) {
+  if (match.over) return;
+  match.over = true;
+  if (match.id === 'bomb' && !match.crashed && match.bombs > 0) {
+    match.score += STANDING_BONUS;
+    match.bonus = STANDING_BONUS;
+  }
+}
+
+/** The drink is finished. `clean`: the shot landed in the glass. */
+export function applyBomb(match, clean) {
+  if (match.id !== 'bomb' || !match.pendingDrink || match.over) return null;
+  match.pendingDrink = false;
+  match.bombs++;
+  if (clean) { match.cleanBombs++; match.score += CLEAN_BONUS; }
+  match.level = addBomb(match.level, clean);
+  match.peak = Math.max(match.peak, match.level);
+  if (match.level >= MAX) { match.crashed = true; match.over = true; }
+  return { level: match.level, crashed: match.crashed, clean };
 }
 
 /**
@@ -256,12 +301,14 @@ export function applyShot(match, res) {
  * shot clock expires (counted as a miss), otherwise null.
  */
 export function tick(match, dt) {
-  if (match.over) return null;
+  // the clock waits while he drinks
+  if (match.over || match.pendingDrink) return null;
+  if (match.id === 'bomb') match.level = sober(match.level, dt);
   if (match.timeLeft !== null && match.timeLeft > 0) {
     match.timeLeft = Math.max(0, match.timeLeft - dt);
     if (match.timeLeft === 0) {
       // a ball already in the air still counts
-      if (!match.inFlight) match.over = true;
+      if (!match.inFlight) timeUp(match);
       return 'buzzer';
     }
   }
@@ -288,6 +335,11 @@ export function summaryOf(match) {
     s.chapter = match.chapter;
     s.mission = match.mission;
     if (match.spec.type === 'duel') s.rivalScore = match.rivalScore;
+  } else if (match.id === 'bomb') {
+    Object.assign(s, {
+      won: !match.crashed && match.score > 0, bombs: match.bombs, cleanBombs: match.cleanBombs,
+      level: match.level, peak: match.peak, crashed: match.crashed, bonus: match.bonus || 0,
+    });
   } else if (match.id === 'zero') {
     s.won = match.winner === 'you';
     s.letters = { ...match.letters };

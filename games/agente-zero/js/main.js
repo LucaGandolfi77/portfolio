@@ -16,6 +16,8 @@ import { createInput } from './input.js';
 import { createGame } from './game.js';
 import { drawPlayer, poseAt } from './render/player.js';
 import { greenZone } from './shot.js';
+import { createTilt } from './tilt.js';
+import { stageOf, multiplierOf } from './drunk.js';
 import * as UI from './ui.js';
 
 const $ = (s) => document.querySelector(s);
@@ -25,7 +27,7 @@ const t = i18n.t;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const settings = load(G.SETTINGS_KEY, {
   control: 'swipe', diff: 'normal', sound: true, music: true, vibrate: true, guide: true,
-  motion: reduced, contrast: false, bigtext: false,
+  motion: reduced, contrast: false, bigtext: false, tilt: true, adult: false,
 });
 let state = G.hydrate(load(G.SAVE_KEY, null));
 const save = () => store(G.SAVE_KEY, state);
@@ -35,6 +37,7 @@ const audio = createAudio();
 audio.setSound(settings.sound);
 audio.setMusic(settings.music);
 
+const tilt = createTilt();
 const canvas = $('#court');
 const panel = $('#screen');
 let screen = 'home';
@@ -43,8 +46,13 @@ let openChapter = 0;
 let askingReset = false;
 let bubbleTimer = 0, flashTimer = 0, lastLine = '';
 let hudKey = '';
+let declined = false;     // said "no" to the age question in this visit
 
-const game = createGame(canvas, { audio, settings: () => settings, look: () => state.look, emit: onGame });
+const game = createGame(canvas, {
+  audio, settings: () => settings, look: () => state.look, emit: onGame,
+  tilt: () => (settings.tilt ? tilt.angle() : 0),
+  words: () => ({ clean: t('bomb.clean'), spill: t('bomb.spill'), burp: t('bomb.burp'), can: t('bomb.can') }),
+});
 
 const input = createInput(canvas, {
   canShoot: () => screen === 'play' && game.canShoot(),
@@ -65,6 +73,7 @@ function show(name, html) {
   panel.dataset.kind = name;
   panel.scrollTop = 0;
   const playing = ['pause', 'result', 'paused-settings'].includes(name);
+  game.hold(false);
   $('#hud').hidden = !playing;
   $('#spots').hidden = true;
   $('#hint').hidden = true;
@@ -115,8 +124,14 @@ function startMatch(mode, opts = {}) {
   input.cancel();
   input.resetAim();
   game.start(match);
-  bubble(say(i18n.getLang(), mode === 'career' ? 'coach' : 'hello'));
-  if (mode === 'timed' || mode === 'three') audio.sfx.whistle();
+  bubble(say(i18n.getLang(), mode === 'career' ? 'coach' : mode === 'bomb' ? 'bombHello' : 'hello'));
+  if (mode === 'timed' || mode === 'three' || mode === 'bomb') audio.sfx.whistle();
+}
+
+/** iOS only grants the motion sensor from a tap, so ask before anything else. */
+async function startBomb() {
+  if (settings.tilt) await tilt.request();
+  startMatch('bomb');
 }
 
 /** The furthest chapter reached picks the court for the free modes. */
@@ -134,9 +149,13 @@ function endMatch(match, summary) {
   setTimeout(() => {
     if (screen !== 'play' || game.match !== match) return;
     if (summary.won) audio.sfx.win(); else audio.sfx.lose();
-    bubble(say(i18n.getLang(), summary.won ? 'win' : 'lose'));
+    if (match.id !== 'bomb') bubble(say(i18n.getLang(), summary.won ? 'win' : 'lose'));
     show('result', UI.result(t, match, summary, reward, hasNext));
-  }, 900);
+  }, summary.crashed ? 2600 : 900);
+  if (match.id === 'bomb') {
+    bubble(say(i18n.getLang(), summary.crashed ? 'crash' : 'standing'));
+    $('#hint').hidden = true;
+  }
 }
 
 function nextMission(c, m) {
@@ -169,7 +188,7 @@ function resume() {
   game.pause(false);
   $('#hud').hidden = false;
   hudKey = '';
-  updateTurn();
+  if (game.phase === 'drink') { tilt.reset(); drinkHint(); } else updateTurn();
 }
 
 /* ---------- game events ---------- */
@@ -180,6 +199,24 @@ function onGame(type, data) {
   else if (type === 'cancel') input.cancel();
   else if (type === 'shot') onShot(data);
   else if (type === 'over') endMatch(data.match, data.summary);
+  else if (type === 'drink') { input.cancel(); $('#flash').hidden = true; $('#bubble').hidden = true; drinkHint(); }
+  else if (type === 'bombstep') { if (data.bomb.step === 'drink') tilt.reset(); drinkHint(); }
+  else if (type === 'drunk') {
+    // he comments back on court: the drink scene has no room for a bubble
+    const stage = stageOf(data.match.level);
+    const key = stage ? `drunk${stage}` : data.res.clean ? 'bombClean' : 'bombSpill';
+    if (!data.match.over) bubble(say(i18n.getLang(), key, Math.random, lastLine));
+  } else if (type === 'hiccup') flash(t('bomb.hic'), '', false);
+}
+
+/** What to do now in the drink scene. */
+function drinkHint() {
+  const step = game.bomb?.step;
+  const hint = $('#hint');
+  $('#spots').hidden = true;
+  const key = step === 'swing' ? 'drop' : step === 'drink' ? (settings.tilt && tilt.seen ? 'both' : 'hold') : '';
+  hint.textContent = key ? t(`bomb.${key}`) : '';
+  hint.hidden = !key;
 }
 
 function onShot({ match, out, err, spot, env, beater }) {
@@ -229,7 +266,8 @@ function updateTurn() {
   let text = '';
   if (match.id === 'zero') {
     text = who === 'you' ? t(match.phase === 'lead' ? 'zeroLead' : 'zeroCopy') : t(match.phase === 'lead' ? 'zeroCpuLead' : 'zeroCpuCopy');
-  } else if (match.attempts < 3) text = t(`hint.${settings.control === 'hold' ? 'hold' : 'swipe'}`);
+  } else if (match.id === 'bomb' && match.level >= 20 && match.bombs < 3) text = t('bomb.arrow');
+  else if (match.attempts < 3) text = t(`hint.${settings.control === 'hold' ? 'hold' : 'swipe'}`);
   hint.textContent = text;
   hint.hidden = !text;
   const picker = $('#spots');
@@ -249,7 +287,8 @@ function updateHud() {
   if (!m) return;
   const time = m.timeLeft !== null ? Math.ceil(m.timeLeft) : m.shotClock !== undefined ? Math.ceil(m.shotClock) : null;
   const wind = m.env.wind;
-  const key = [m.score, m.attempts, m.makes, m.streak, time, m.letters?.you, m.letters?.cpu, m.rivalScore, wind?.[0], m.spot.x, M.isMoneyBall(m), i18n.getLang()].join('|');
+  const wob = game.wobble();
+  const key = [m.level === undefined ? '' : Math.round(m.level), m.bombs, wob?.flip, m.score, m.attempts, m.makes, m.streak, time, m.letters?.you, m.letters?.cpu, m.rivalScore, wind?.[0], m.spot.x, M.isMoneyBall(m), i18n.getLang()].join('|');
   if (key === hudKey) return;
   hudKey = key;
   $('#hud-mode').textContent = t(`modes.${m.id}`);
@@ -271,6 +310,7 @@ function updateHud() {
       item(t('hud.streak'), m.streak);
     } else {
       item(t('hud.score'), m.score);
+      if (m.id === 'bomb') item(t('bomb.bombs'), m.bombs);
       if (m.id === 'timed') item(t('hud.streak'), m.streak);
       if (m.id === 'three') item(t('hud.shots'), `${m.attempts}/25`);
       if (m.id === 'daily') item(t('hud.shots'), `${m.attempts}/${M.DAILY_SHOTS}`);
@@ -288,6 +328,11 @@ function updateHud() {
   }
   if (M.isMoneyBall(m)) chips.push(`<span class="money">×2 ${UI.esc(t('hud.money'))}</span>`);
   if (M.onFire(m)) chips.push(`<span class="hot">🔥 ${UI.esc(t('hud.fire'))}</span>`);
+  if (m.id === 'bomb') {
+    const stage = t('bomb.stages')[stageOf(m.level)];
+    chips.push(`<span class="meter" role="meter" aria-label="${UI.esc(t('bomb.meter'))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(m.level)}"><i><u style="width:${Math.round(m.level)}%"></u></i> ${UI.esc(stage)} ×${multiplierOf(m.level)}</span>`);
+    if (wob.flip) chips.push(`<span class="hot">↔ ${UI.esc(t('bomb.flip'))}</span>`);
+  }
   $('#hud-chips').innerHTML = chips.join('');
 }
 
@@ -312,8 +357,15 @@ const actions = {
   home: goHome,
   mode(el) {
     const id = el.dataset.id;
-    if (id === 'career') { openChapter = bestChapter(); showCareer(); } else startMatch(id);
+    if (id === 'career') { openChapter = bestChapter(); showCareer(); }
+    else if (id === 'bomb') {
+      if (declined) show('gate', UI.gate(t, true));
+      else if (!settings.adult) show('gate', UI.gate(t, false));
+      else startBomb();
+    } else startMatch(id);
   },
+  'adult-yes'() { settings.adult = true; saveSettings(); startBomb(); },
+  'adult-no'() { declined = true; show('gate', UI.gate(t, true)); },
   career: showCareer,
   chapter(el) {
     const c = +el.dataset.c;
@@ -356,7 +408,11 @@ const actions = {
   'reset-no'() { askingReset = false; showSettings(); },
   'reset-yes'() { askingReset = false; state = G.newState(); save(); goHome(); },
   resume,
-  retry() { if (current) startMatch(current.mode, current.opts); },
+  retry() {
+    if (!current) return;
+    if (current.mode === 'bomb') startBomb();
+    else startMatch(current.mode, current.opts);
+  },
   next() {
     const n = game.match && nextMission(game.match.chapter, game.match.mission);
     if (!n) return showCareer();
@@ -381,6 +437,22 @@ $('#spots').addEventListener('click', (e) => {
   if (game.setSpot(spot)) { audio.sfx.tap(); input.cancel(); updateTurn(); el.blur(); }
 });
 $('#btn-pause').addEventListener('click', pauseMatch);
+
+// in the drink scene a tap drops the shot, then holding drinks it
+function pour(down) {
+  if (screen !== 'play' || game.phase !== 'drink') return;
+  if (!down) game.hold(false);
+  else if (!game.drop()) game.hold(true);
+}
+canvas.addEventListener('pointerdown', (e) => { if (e.button <= 0) pour(true); });
+for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, () => game.hold(false));
+const POUR_KEYS = ['Space', 'Enter'];
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || !POUR_KEYS.includes(e.code) || e.target.closest?.('button') || game.phase !== 'drink') return;
+  e.preventDefault();
+  pour(true);
+});
+window.addEventListener('keyup', (e) => { if (POUR_KEYS.includes(e.code)) pour(false); });
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' && e.key.toLowerCase() !== 'p') return;
   if (screen === 'play') pauseMatch();

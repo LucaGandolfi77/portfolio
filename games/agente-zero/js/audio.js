@@ -5,6 +5,7 @@
 export function createAudio() {
   let ctx = null, master = null, fxBus = null, musicBus = null, crowdGain = null, noiseBuf = null;
   let soundOn = true, musicOn = true, timer = 0, step = 0, nextAt = 0, wantMusic = false, crowdLevel = 0;
+  let muffle = null, drunk = 0;
 
   function unlock() {
     if (!ctx) {
@@ -13,7 +14,9 @@ export function createAudio() {
       ctx = new AC();
       master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
       fxBus = ctx.createGain(); fxBus.gain.value = soundOn ? 1 : 0; fxBus.connect(master);
-      musicBus = ctx.createGain(); musicBus.gain.value = musicOn ? 0.32 : 0; musicBus.connect(master);
+      muffle = ctx.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 18000; muffle.connect(master);
+      musicBus = ctx.createGain(); musicBus.gain.value = musicOn ? 0.32 : 0; musicBus.connect(muffle);
+      setDrunk(drunk);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -75,6 +78,11 @@ export function createAudio() {
     cheer(k = 1) { noise(0.9 * k, { freq: 800, to: 1400, q: 0.5, vol: 0.13 * k }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, { type: 'triangle', vol: 0.14, at: i * 0.12 })); },
     lose() { [330, 277, 233].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.12, at: i * 0.18 })); },
+    plop() { tone(520, 0.16, { vol: 0.35, to: 130 }); noise(0.5, { freq: 6500, type: 'highpass', vol: 0.12, at: 0.08 }); },
+    spill() { noise(0.35, { freq: 1900, to: 500, vol: 0.28 }); tone(1250, 0.12, { type: 'triangle', vol: 0.1, at: 0.05 }); },
+    gulp() { tone(210, 0.11, { vol: 0.24, to: 95 }); tone(120, 0.07, { vol: 0.14, to: 260, at: 0.09 }); },
+    burp() { for (let i = 0; i < 6; i++) tone(95 - i * 6 + (i % 2) * 22, 0.1, { type: 'sawtooth', vol: 0.2, at: i * 0.065, to: 70 }); },
+    hiccup() { tone(260, 0.08, { type: 'square', vol: 0.1, to: 720 }); },
   };
 
   function crowd(level) {
@@ -96,6 +104,12 @@ export function createAudio() {
     if (s === 2 || s === 11) for (const f of CHORDS[bar]) tone(f * 2, 0.22, { type: 'triangle', vol: 0.055, at: delay, bus: musicBus });
   }
 
+  /** 0 sober … 1 wrecked: muffles and slows the music. */
+  function setDrunk(k) {
+    drunk = Math.max(0, Math.min(1, k));
+    if (muffle) muffle.frequency.setTargetAtTime(18000 * Math.pow(0.05, drunk), ctx.currentTime, 0.5);
+  }
+
   function startMusic() {
     wantMusic = true;
     if (!ctx || timer) return;
@@ -106,7 +120,8 @@ export function createAudio() {
       while (nextAt < ctx.currentTime + 0.18) {
         beat(step, nextAt);
         const swing = step % 2 ? 0.86 : 1.14;
-        nextAt += (60 / 92 / 4) * swing;
+        // the more he drinks, the slower and more uneven the beat
+        nextAt += (60 / (92 * (1 - 0.22 * drunk)) / 4) * swing * (1 + Math.sin(step * 0.4) * 0.12 * drunk);
         step++;
       }
     }, 60);
@@ -115,7 +130,7 @@ export function createAudio() {
   function stopMusic() { wantMusic = false; clearInterval(timer); timer = 0; }
 
   return {
-    unlock, sfx, crowd, startMusic, stopMusic,
+    unlock, sfx, crowd, startMusic, stopMusic, setDrunk,
     setSound(v) { soundOn = v; if (fxBus) fxBus.gain.value = v ? 1 : 0; },
     setMusic(v) { musicOn = v; if (musicBus) musicBus.gain.value = v ? 0.32 : 0; },
     pause() { ctx?.suspend().catch(() => {}); },

@@ -8,7 +8,7 @@ import { MODES, TIMED_SECONDS, WORD } from './modes.js';
 import { CHAPTERS, missionId, chapterStars, totalStars, chapterUnlocked, missionUnlocked, STARS_PER_CHAPTER } from './career.js';
 import { LOOKS, ITEMS, SLOTS, MEDALS, levelOf, xpForLevel, isUnlocked } from './state.js';
 
-const ICONS = { training: '🎯', career: '🏆', timed: '⏱️', three: '🛒', zero: '🔤', daily: '📅' };
+const ICONS = { training: '🎯', career: '🏆', timed: '⏱️', three: '🛒', zero: '🔤', daily: '📅', bomb: '🥤' };
 
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const btn = (act, label, cls = '', extra = '') => `<button type="button" class="btn ${cls}" data-act="${act}" ${extra}>${label}</button>`;
@@ -25,7 +25,7 @@ export function home(t, state, seed) {
   const lv = levelOf(state.xp);
   const a = xpForLevel(lv), b = xpForLevel(lv + 1);
   const best = {
-    timed: state.best.timed, three: state.best.three, daily: state.daily[seed] ?? 0,
+    timed: state.best.timed, three: state.best.three, daily: state.daily[seed] ?? 0, bomb: state.best.bomb,
   };
   const note = (id) => {
     if (id === 'career') return `★ ${totalStars(state.stars)}/108`;
@@ -37,8 +37,8 @@ export function home(t, state, seed) {
     <h1><span>AGENTE</span><b>ZERO</b></h1>
     <p class="tagline">${esc(t('tagline'))}</p>
     <div class="levelbar" title="XP ${state.xp}"><span>${esc(t('levelN', { n: lv }))}</span><i><u style="width:${Math.round(((state.xp - a) / (b - a)) * 100)}%"></u></i></div>
-    <div class="modes">${MODES.map((id) => `<button type="button" class="mode" data-act="mode" data-id="${id}">
-      <span class="mi" aria-hidden="true">${ICONS[id]}</span><strong>${esc(t(`modes.${id}`))}</strong><small>${esc(t(`modeDesc.${id}`))}</small><em>${note(id)}</em></button>`).join('')}</div>
+    <div class="modes">${MODES.map((id) => `<button type="button" class="mode ${id === 'bomb' ? 'adult' : ''}" data-act="mode" data-id="${id}">
+      <span class="mi" aria-hidden="true">${ICONS[id]}</span><strong>${esc(t(`modes.${id}`))}${id === 'bomb' ? ' <span class="age">18+</span>' : ''}</strong><small>${esc(t(`modeDesc.${id}`))}</small><em>${note(id)}</em></button>`).join('')}</div>
     <nav class="tools">
       ${btn('wardrobe', `👕<span>${esc(t('wardrobe'))}</span>`)}
       ${btn('stats', `📊<span>${esc(t('stats'))}</span>`)}
@@ -79,11 +79,18 @@ export function brief(t, lang, ci, mi) {
     <div class="row">${btn('career', esc(t('back')))}${btn('mission', esc(t('start')), 'primary', `data-c="${ci}" data-m="${mi}"`)}</div></div>`;
 }
 
+export function gate(t, closed) {
+  return `<div class="card"><p class="age big-age">18+</p><h2>${esc(t('bomb.gateTitle'))}</h2>
+    <p>${esc(t(closed ? 'bomb.closed' : 'bomb.gate'))}</p>
+    <div class="col">${closed ? btn('home', esc(t('menu')), 'primary') : `${btn('adult-yes', esc(t('bomb.yes')), 'primary')}${btn('adult-no', esc(t('bomb.no')))}`}</div></div>`;
+}
+
 export function result(t, match, summary, reward, hasNext) {
   const id = summary.id;
   let title = t('result.over');
   if (id === 'career') title = t(summary.won ? 'result.win' : 'result.lose');
   if (id === 'zero') title = t(summary.won ? 'result.zeroWin' : 'result.zeroLose');
+  if (id === 'bomb') title = t(summary.crashed ? 'bomb.crashed' : 'bomb.standing');
   const letters = (n) => [...WORD].map((l, i) => `<i class="${i < n ? 'on' : ''}">${l}</i>`).join('');
   const big = id === 'zero' ? '' : id === 'career'
     ? starRow(summary.stars)
@@ -93,6 +100,7 @@ export function result(t, match, summary, reward, hasNext) {
     ${id === 'zero' ? `<div class="letters"><p><b>${esc(t('hud.you'))}</b>${letters(summary.letters.you)}</p><p><b>${esc(t('hud.cpu'))}</b>${letters(summary.letters.cpu)}</p></div>` : ''}
     ${id === 'career' && match.spec.type === 'duel' ? `<p>${esc(t('hud.you'))} ${summary.makes} – ${summary.rivalScore} ${esc(t('hud.rival'))}</p>` : ''}
     <p class="muted">${esc(t('line.makes', { m: summary.makes, a: summary.attempts }))} · ${esc(t('line.swishes', { n: summary.swishes }))} · ${esc(t('line.streak', { n: summary.bestStreak }))}</p>
+    ${id === 'bomb' ? `<p>🥤 ${esc(t('bomb.line', { n: summary.bombs, c: summary.cleanBombs }))}${summary.bonus ? `<br>${esc(t('bomb.bonus', { n: summary.bonus }))}` : ''}</p>` : ''}
     <ul class="news">
       ${reward.newBest ? `<li class="hot">🎉 ${esc(t('result.newBest'))}</li>` : ''}
       ${reward.xp ? `<li>+${reward.xp} ${esc(t('xp'))}</li>` : ''}
@@ -128,7 +136,7 @@ export function stats(t, state) {
   const pct = (m, a) => (a ? `${Math.round((m / a) * 100)}%` : '–');
   const rows = [
     ['shots', s.shots], ['pct', pct(s.makes, s.shots)], ['swishes', s.swishes], ['bank', s.bank], ['rim', s.rim], ['airballs', s.airballs], ['threes', s.threes], ['bestStreak', s.bestStreak],
-    ['timed', state.best.timed], ['three', state.best.three], ['zero', `${state.zero.won} / ${state.zero.lost}`],
+    ['timed', state.best.timed], ['three', state.best.three], ['bomb', state.best.bomb], ['bombs', s.bombs], ['zero', `${state.zero.won} / ${state.zero.lost}`],
   ];
   const map = ['deep', 'three', 'mid', 'near'].map((r) => `<tr><th scope="row">${esc(t(`zones.${r}`))}</th>${['l', 'c', 'r'].map((side) => {
     const [a, m] = s.zones[`${r}-${side}`] || [0, 0];
@@ -153,7 +161,7 @@ export function settingsScreen(t, lang, s, inMatch, asking) {
     ${seg('lang', [['it', 'Italiano'], ['en', 'English']], lang)}
     ${seg('control', [['swipe', t('set.swipe')], ['hold', t('set.hold')]], s.control)}
     ${seg('diff', [['easy', t('set.easy')], ['normal', t('set.normal')], ['hard', t('set.hard')]], s.diff)}
-    ${onoff('sound')}${onoff('music')}${onoff('vibrate')}${onoff('guide')}${onoff('motion')}${onoff('contrast')}${onoff('bigtext')}
+    ${onoff('tilt')}${onoff('sound')}${onoff('music')}${onoff('vibrate')}${onoff('guide')}${onoff('motion')}${onoff('contrast')}${onoff('bigtext')}
     ${inMatch ? '' : asking
       ? `<div class="card danger"><p>${esc(t('set.resetAsk'))}</p><div class="row">${btn('reset-no', esc(t('back')))}${btn('reset-yes', esc(t('set.resetYes')), 'primary')}</div></div>`
       : btn('reset-ask', esc(t('set.reset')), 'quiet')}`;

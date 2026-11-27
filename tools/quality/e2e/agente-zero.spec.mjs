@@ -51,10 +51,10 @@ async function swipe(page, ratio = 1) {
 }
 
 test.describe('Agente Zero', () => {
-  test('home shows six modes and a swipe scores in training', async ({ page }) => {
+  test('home shows seven modes and a swipe scores in training', async ({ page }) => {
     const errors = collectErrors(page);
     await open(page);
-    await expect(page.locator('.mode')).toHaveCount(6);
+    await expect(page.locator('.mode')).toHaveCount(7);
     await page.locator('[data-id="training"]').click();
     await expect(page.locator('#hud')).toBeVisible();
     await swipe(page);
@@ -198,7 +198,133 @@ test.describe('Agente Zero', () => {
     await context.setOffline(true);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-ready', '1');
-    await expect(page.locator('.mode')).toHaveCount(6);
+    await expect(page.locator('.mode')).toHaveCount(7);
     await context.setOffline(false);
+  });
+});
+
+test.describe('Agente Zero — Bomba', () => {
+  const info = (page) => page.evaluate(() => {
+    const g = window.__zero.game, m = g.match;
+    return { phase: g.phase, step: g.bomb?.step ?? null, level: m.level, bombs: m.bombs, score: m.score, left: m.timeLeft };
+  });
+  const advance = (page, ms) => page.evaluate((t) => window.__zero.advance(t), ms);
+  async function enter(page) {
+    await open(page);
+    await page.locator('[data-id="bomb"]').click();
+    await page.locator('[data-act="adult-yes"]').click();
+    await expect(page.locator('#hud')).toBeVisible();
+  }
+  /** Scores one sober basket and waits for the drink to appear. */
+  async function basket(page) {
+    await page.evaluate(() => {
+      const z = window.__zero;
+      for (let i = 0; i < 40 && !z.game.canShoot(); i++) z.advance(200);
+      z.game.match.level = 0;
+      z.shoot({});
+      for (let i = 0; i < 40 && z.game.phase !== 'drink'; i++) z.advance(200);
+    });
+    await expect.poll(async () => (await info(page)).phase).toBe('drink');
+  }
+
+  test('asks the age first; “no” keeps only this mode closed', async ({ page }) => {
+    await open(page);
+    await page.locator('[data-id="bomb"]').click();
+    await expect(page.locator('[data-act="adult-yes"]')).toBeVisible();
+    await page.locator('[data-act="adult-no"]').click();
+    await expect(page.locator('[data-act="adult-yes"]')).toHaveCount(0);
+    await page.locator('#screen [data-act="home"]').click();
+    await page.locator('[data-id="bomb"]').click();
+    await expect(page.locator('[data-act="adult-yes"]')).toHaveCount(0);
+    await page.locator('#screen [data-act="home"]').click();
+    await page.locator('[data-id="training"]').click();
+    expect(await screen(page)).toBe('play');
+  });
+
+  test('basket, drop the shot with a tap, drink by holding, back on court drunker', async ({ page }) => {
+    const errors = collectErrors(page);
+    await enter(page);
+    await basket(page);
+    await expect(page.locator('#hint')).toContainText('Tocca');
+    const left = (await info(page)).left;
+    await advance(page, 500);
+    const box = await page.locator('#court').boundingBox();
+    await page.mouse.click(box.width / 2, box.height / 2);
+    expect((await info(page)).step).toBe('fall');
+    await advance(page, 700);
+    await expect(page.locator('#hint')).toContainText('Tieni premuto');
+    await page.mouse.move(box.width / 2, box.height / 2);
+    await page.mouse.down();
+    await advance(page, 1800);
+    await page.mouse.up();
+    await advance(page, 1500);
+    const after = await info(page);
+    expect(after.phase).toBe('aim');
+    expect(after.bombs).toBe(1);
+    expect(after.level).toBeGreaterThan(10);
+    // over five seconds of drinking; only the moment back on court counts
+    expect(left - after.left).toBeLessThan(1.5);
+    await expect(page.locator('#hud-chips .meter')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('tipping the phone empties the glass', async ({ page }) => {
+    await enter(page);
+    const tip = (beta) => page.evaluate((b) => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: 0 })), beta);
+    await tip(75);
+    await basket(page);
+    await advance(page, 500);
+    await page.evaluate(() => window.__zero.game.drop());
+    await advance(page, 700);
+    await expect(page.locator('#hint')).toContainText('Inclina');
+    await advance(page, 1000);
+    expect(await page.evaluate(() => window.__zero.game.bomb.progress)).toBe(0);
+    await tip(5);
+    await advance(page, 1600);
+    await advance(page, 1500);
+    expect((await info(page)).bombs).toBe(1);
+  });
+
+  test('one drink too many: he falls asleep and the night is saved', async ({ page }) => {
+    const errors = collectErrors(page);
+    await enter(page);
+    await basket(page);
+    await page.evaluate(() => {
+      const z = window.__zero;
+      z.game.match.level = 95;
+      z.advance(500);
+      z.game.drop();
+      z.advance(700);
+      z.game.hold(true);
+      z.advance(1800);
+      z.advance(1500);
+    });
+    await expect(page.locator('.result h2')).toHaveText('Crollato!', { timeout: 8000 });
+    const saved = await page.evaluate(() => window.__zero.state);
+    expect(saved.stats.bombs).toBe(1);
+    expect(saved.medals).toContain('bomb1');
+    await page.locator('[data-act="retry"]').click();
+    await expect.poll(async () => (await info(page)).level).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('drunk shots are bent by the wobble and sober modes are untouched', async ({ page }) => {
+    await enter(page);
+    const aimed = await page.evaluate(() => {
+      const z = window.__zero;
+      z.advance(900);
+      z.game.match.level = 90;
+      z.shoot({});
+      return z.game.flight.err;
+    });
+    expect(Math.abs(aimed.aim) + Math.abs(aimed.power - 1)).toBeGreaterThan(0.004);
+    const sober = await page.evaluate(() => {
+      const z = window.__zero;
+      z.start('training');
+      z.advance(900);
+      z.shoot({});
+      return { err: z.game.flight.err, wobble: z.game.wobble() };
+    });
+    expect(sober).toEqual({ err: {}, wobble: null });
   });
 });

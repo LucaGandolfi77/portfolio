@@ -3,11 +3,14 @@
    ------------------------------------------------------------
    Owns the canvas: camera, player, ball, net and effects. Rules
    stay in modes.js; this file plays them out in real time.
-   Phases: demo → aim → gather → flight → react → … → over
-   (cpu: the rival's turn in Z-E-R-O).
+   Phases: demo → aim → gather → flight → … → over
+   (cpu: the rival's turn in Z-E-R-O; drink: the bomb mode).
    ============================================================ */
 import * as M from './modes.js';
-import { releasePoint, idealShot, makeShot, simulate, sampleAt, hoopX, handAt, BALL_R, RIM, BOARD_Y } from './physics.js';
+import { releasePoint, idealShot, makeShot, simulate, sampleAt, hoopX, handAt, BALL_R, RIM, BOARD_Y, FRAME } from './physics.js';
+import { wobbleAt, applyWobble, swerve, effects, strength } from './drunk.js';
+import { newBomb, stepBomb, dropShot } from './bomb.js';
+import { drawBombScene } from './render/bomb.js';
 import { aiError, judgeError } from './shot.js';
 import { makeCamera, project, toView } from './render/camera.js';
 import { drawScene } from './render/court.js';
@@ -17,7 +20,7 @@ import { distanceOf, angleOf, spotAt, PRACTICE_SPOTS } from './court-data.js';
 
 const RIVAL_LOOK = { skin: 's3', hair: 'buzz', hairColor: 'black', jersey: 'rival', shoes: 'black', band: 'none', ball: 'classic' };
 
-export function createGame(canvas, { audio, settings, look, emit }) {
+export function createGame(canvas, { audio, settings, look, emit, tilt = () => 0, words = () => ({}) }) {
   const ctx = canvas.getContext('2d');
   const still = document.createElement('canvas');
   const stillCtx = still.getContext('2d');
@@ -28,6 +31,7 @@ export function createGame(canvas, { audio, settings, look, emit }) {
   let pose = null, poseName = 'idle', poseStart = 0;
   let flight = null, gather = 0, preview = null, decidedAt = 0;
   let particles = [], shake = 0, lastBeep = 0;
+  let bomb = null, holding = false, wasHic = false, idealCache = null;
   const net = makeNet();
 
   function resize() {
@@ -60,9 +64,14 @@ export function createGame(canvas, { audio, settings, look, emit }) {
     return spotAt(a, d);
   }
 
+  const isBomb = () => match?.id === 'bomb';
+  /** What the drink is doing to his hands right now. */
+  const wobble = () => (isBomb() ? wobbleAt(clock, match.level) : null);
+
   /** The court with nobody playing: behind the menus. */
   function demo(place = 'bunker') {
-    match = null; flight = null; phase = 'demo'; paused = false; particles = [];
+    match = null; flight = null; bomb = null; holding = false; phase = 'demo'; paused = false; particles = [];
+    audio.setDrunk(0);
     demo.place = place;
     moveTo(spotAt(0, 4.2), true);
     setPose('idle');
@@ -73,6 +82,8 @@ export function createGame(canvas, { audio, settings, look, emit }) {
   function start(next) {
     match = next;
     clock = 0; flight = null; particles = []; paused = false; lastBeep = 0;
+    bomb = null; holding = false; wasHic = false;
+    audio.setDrunk(0);
     moveTo(match.spot, true);
     audio.crowd(['hall', 'arena'].includes(match.place) ? 0.5 : 0);
     nextShot();
@@ -81,6 +92,14 @@ export function createGame(canvas, { audio, settings, look, emit }) {
   function nextShot() {
     flight = null; preview = null; gather = 0;
     if (match.over) return finish();
+    if (match.pendingDrink) {
+      bomb = newBomb(match.level);
+      holding = false;
+      phase = 'drink';
+      setPose('idle');
+      emit('drink', { match, bomb });
+      return;
+    }
     moveTo(match.spot);
     phaseT = 0;
     if (M.turnOf(match) === 'cpu') { phase = 'cpu'; setPose('ready'); }
@@ -93,6 +112,7 @@ export function createGame(canvas, { audio, settings, look, emit }) {
     phase = 'over';
     audio.crowd(0);
     const s = M.summaryOf(match);
+    bomb = null;
     setPose(s.won ? look().celebration : 'sad');
     emit('over', { match, summary: s });
   }
@@ -107,11 +127,15 @@ export function createGame(canvas, { audio, settings, look, emit }) {
     return makeShot(p, idealShot(p), err, clock);
   }
 
-  function launch(err, who) {
+  function launch(input, who) {
     const s = shooterSpot();
     const spot = { x: s.x, y: s.y };
     const env = match.env;
-    const sim = simulate(stateFor(err), env);
+    const w = who === 'you' ? wobble() : null;
+    const err = w ? applyWobble(input, w) : input;
+    const state = stateFor(err);
+    let sim = simulate(state, env);
+    if (w) sim = swerve(sim, state, match.level, FRAME, match.attempts % 2 ? -1 : 1);
     if (!M.release(match)) return false;
     flight = {
       sim, t: 0, who, err, spot, env, event: 0, decided: false, trail: [],
@@ -157,6 +181,25 @@ export function createGame(canvas, { audio, settings, look, emit }) {
   function cancel() {
     if (phase === 'gather') { phase = 'aim'; setPose('idle'); }
     preview = null;
+  }
+
+  /** One step of the drink scene. */
+  function stepDrink(dt) {
+    const before = bomb.step;
+    const entered = stepBomb(bomb, dt, { tilt: tilt(), hold: holding });
+    if (bomb.step === 'fall' && before === 'fall' && bomb.t >= 0.35 && bomb.t - dt < 0.35) {
+      if (bomb.clean) { audio.sfx.plop(); buzz(25); } else audio.sfx.spill();
+    }
+    if (bomb.step === 'drink' && bomb.rate && Math.floor(bomb.t * 4) !== Math.floor((bomb.t - dt) * 4)) audio.sfx.gulp();
+    if (!entered) return;
+    if (entered === 'burp') { audio.sfx.burp(); buzz(60); }
+    if (entered === 'done') {
+      const res = M.applyBomb(match, bomb.clean);
+      bomb = null; holding = false;
+      audio.setDrunk(strength(match.level));
+      emit('drunk', { match, res });
+      nextShot();
+    } else emit('bombstep', { match, bomb });
   }
 
   function burst(x, y, n, colors, speed = 220, life = 0.9) {
@@ -208,6 +251,7 @@ export function createGame(canvas, { audio, settings, look, emit }) {
       else if (!made && poseName === 'land' && f.sim.result === 'airball') setPose('sad');
       const quick = match.timeLeft !== null;
       let wait = quick ? 0.4 : made ? 1.15 : 0.7;
+      if (isBomb() && made) wait = 0.9;
       if (match.id === 'zero') wait = 1.5;
       if (f.t - decidedAt > wait) nextShot();
     }
@@ -224,6 +268,7 @@ export function createGame(canvas, { audio, settings, look, emit }) {
     anim += dt;
     if (paused) return;
     phaseT += dt;
+    if (phase === 'drink') { stepDrink(dt); return; }
     const ts = phase === 'flight' ? timeScale() : 1;
     clock += dt * ts;
     if (moveT < 1) moveT = Math.min(1, moveT + dt / 0.5);
@@ -251,6 +296,11 @@ export function createGame(canvas, { audio, settings, look, emit }) {
         launch(aiError(match.rng, match.skill, d), 'cpu');
       }
     } else if (phase === 'flight') stepFlight(dt * ts);
+    if (isBomb() && (phase === 'aim' || phase === 'gather')) {
+      const hic = wobble().hiccup;
+      if (hic && !wasHic) { audio.sfx.hiccup(); emit('hiccup', { match }); }
+      wasHic = hic;
+    }
 
     // pose blending
     const t = anim - poseStart;
@@ -282,17 +332,77 @@ export function createGame(canvas, { audio, settings, look, emit }) {
       stillCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawScene(stillCtx, cam, place);
     }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(still, 0, 0);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /** The aim trail that circles while he is drunk: green when it is true. */
+  function drawSway() {
+    const w = wobble();
+    if (!w || match.level < 20 || !canShoot()) return;
+    const key = `${view.x}|${view.y}`;
+    if (idealCache?.key !== key) {
+      const p = releasePoint(view.x, view.y);
+      const ideal = idealShot(p);
+      idealCache = { key, p, ideal, true: simulate(makeShot(p, ideal, {}), {}, { maxT: 0.45 }).path };
+    }
+    const { p, ideal } = idealCache;
+    const live = simulate(makeShot(p, ideal, { power: 1 + w.power, aim: w.aim }), {}, { maxT: 0.45 }).path;
+    const good = Math.abs(w.aim) < 0.012 && Math.abs(w.power) < 0.009;
+    const dots = (path, r, color) => path.forEach((f, i) => {
+      if (i % 3 !== 2) return;
+      const s = project(cam, f.p);
+      if (!s) return;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 7); ctx.fill();
+    });
+    dots(idealCache.true, 2.4, 'rgba(255,255,255,.4)');
+    // the swing is drawn three times larger than it is, to be readable
+    const shown = live.map((f, i) => {
+      const t = idealCache.true[i] || f;
+      return { p: f.p.map((v, k) => t.p[k] + (v - t.p[k]) * 3) };
+    });
+    dots(shown, 4.6, good ? '#4ade80' : '#ffd24a');
+  }
+
+  /** Zero asleep under the hoop, the ball for a pillow. */
+  function drawAsleep() {
+    const at = project(cam, [0.95, -0.7, 0.1]);
+    if (!at) return;
+    ctx.save();
+    ctx.translate(at.x, at.y);
+    ctx.rotate(-Math.PI / 2);
+    drawPlayer(ctx, 0, 0, at.s, poseAt('idle', 0), look(), { ball: false, shadow: false });
+    ctx.restore();
+    drawBallAt(ctx, at.x - 1.92 * at.s, at.y + 0.08 * at.s, BALL_R * 1.5 * at.s, 0, look().ball);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14101c'; ctx.lineWidth = 4; ctx.textAlign = 'center';
+    for (let i = 0; i < 3; i++) {
+      const k = (anim * 0.45 + i / 3) % 1;
+      ctx.font = `900 ${14 + k * 22}px system-ui, sans-serif`;
+      ctx.globalAlpha = 1 - k;
+      const x = at.x - 1.7 * at.s + k * 40, y = at.y - 0.4 * at.s - k * 90;
+      ctx.strokeText('Z', x, y); ctx.fillText('Z', x, y);
+    }
+    ctx.globalAlpha = 1;
   }
 
   function draw() {
     if (!w) return;
     const place = match?.place || demo.place;
     drawStill(place);
+    const fx = isBomb() ? effects(anim, match.level, settings().motion) : null;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#0c0814';
+    ctx.fillRect(0, 0, w, h);
     ctx.save();
+    if (fx) {
+      // the whole court sways; a little zoom hides most of the corners
+      const zoom = 1 + Math.abs(fx.rot) * 1.1 + strength(match.level) * 0.05;
+      ctx.translate(w / 2 + fx.dx, h / 2 + fx.dy);
+      ctx.rotate(fx.rot);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-w / 2, -h / 2);
+    }
     if (shake > 0.2) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    ctx.drawImage(still, 0, 0, w, h);
     const env = match?.env || {};
     const sample = flight ? sampleAt(flight.sim.path, flight.t) : null;
     const hx = sample ? sample.hx : hoopX(env, clock);
@@ -356,13 +466,23 @@ export function createGame(canvas, { audio, settings, look, emit }) {
       ctx.globalAlpha = 1;
     }
 
-    if (feet && pose) {
+    drawSway();
+    const asleep = isBomb() && match.crashed && phase === 'over';
+    if (asleep) drawAsleep();
+    else if (feet && pose) {
       const cpu = match && (flight ? flight.who : M.turnOf(match)) === 'cpu' && phase !== 'over';
       const mine = look();
+      ctx.save();
+      if (isBomb()) {
+        ctx.translate(feet.x, feet.y);
+        ctx.rotate(Math.sin(anim * 1.9) * 0.13 * strength(match.level));
+        ctx.translate(-feet.x, -feet.y);
+      }
       drawPlayer(ctx, feet.x, feet.y, feet.s, pose, cpu ? RIVAL_LOOK : mine, {
         ball: phase !== 'flight' && phase !== 'over',
         spin: anim * 3, fire: !cpu && !!match && M.onFire(match),
       });
+      ctx.restore();
     }
     if (layer === 'near') drawFlying();
 
@@ -373,13 +493,36 @@ export function createGame(canvas, { audio, settings, look, emit }) {
     }
     ctx.globalAlpha = 1;
     ctx.restore();
+
+    if (fx?.double && phase !== 'drink') {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = fx.double;
+      ctx.drawImage(canvas, fx.offset * dpr, Math.abs(fx.offset) * 0.2 * dpr);
+      ctx.globalAlpha = 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    if (fx?.vignette > 0.05 && phase !== 'drink') {
+      const v = ctx.createRadialGradient(w / 2, h * 0.45, h * (0.42 - 0.2 * fx.vignette), w / 2, h * 0.45, h * 0.75);
+      v.addColorStop(0, 'rgba(30,0,40,0)');
+      v.addColorStop(1, `rgba(30,0,40,${(0.7 * fx.vignette).toFixed(3)})`);
+      ctx.fillStyle = v;
+      ctx.fillRect(0, 0, w, h);
+    }
+    if (phase === 'drink' && bomb) drawBombScene(ctx, w, h, bomb, look(), words(), anim);
   }
 
   resize();
 
   return {
     resize, update, draw, demo, start, shoot, onGather, onPreview, cancel, canShoot, distance,
-    nextShot,
+    nextShot, wobble,
+    drop() {
+      if (paused || phase !== 'drink' || !bomb || !dropShot(bomb)) return false;
+      emit('bombstep', { match, bomb });
+      return true;
+    },
+    hold(v) { holding = !!v && phase === 'drink' && !paused; },
+    get bomb() { return bomb; },
     setSpot(spot) {
       if (!match || !M.setSpot(match, spot)) return false;
       moveTo(match.spot);

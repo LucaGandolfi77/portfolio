@@ -7,7 +7,7 @@ export const STRINGS = {
     menu: 'Menu', back: 'Indietro', retry: 'Riprova', next: 'Avanti', resume: 'Riprendi', quit: 'Esci', close: 'Chiudi', start: 'Via!',
     pause: 'Pausa', level: 'Livello', levelN: 'Liv. {n}', xp: 'XP',
     modes: {
-      training: 'Allenamento', career: 'Carriera', timed: '60 secondi', three: 'Gara da tre', zero: 'Z-E-R-O', daily: 'Sfida del giorno',
+      training: 'Allenamento', career: 'Carriera', timed: '60 secondi', three: 'Gara da tre', zero: 'Z-E-R-O', daily: 'Sfida del giorno', bomb: 'Bomba Zero',
     },
     modeDesc: {
       training: 'Scegli il punto, tira quanto vuoi.',
@@ -16,6 +16,14 @@ export const STRINGS = {
       three: '5 carrelli, 25 palloni. L’ultimo vale doppio.',
       zero: 'Chi sbaglia il tiro dell’altro prende una lettera.',
       daily: '10 tiri uguali per tutti, oggi.',
+      bomb: 'Ogni canestro, un drink. Poi prova a mirare. Solo 18+.',
+    },
+    bomb: {
+      gateTitle: 'Solo maggiorenni', gate: 'In questa modalità Zero beve dopo ogni canestro e tira ubriaco. È un gioco satirico: i drink sono inventati e rendono tutto più difficile. Hai almeno 18 anni?', yes: 'Sì, ho 18 anni', no: 'No', closed: 'La modalità Bomba resta chiusa. Le altre sono tutte tue.',
+      drop: 'Tocca per far cadere il bicchierino', tilt: 'Inclina il telefono verso di te per bere', hold: 'Tieni premuto per bere', both: 'Inclina il telefono per bere, oppure tieni premuto',
+      clean: 'Plof!', spill: 'Sul bordo!', burp: 'Burp!', hic: 'Hic!', flip: 'Comandi al contrario', arrow: 'Tira quando la scia passa al centro',
+      drink: 'Amaro Nebbia', can: 'FULMINE', meter: 'Ebbrezza', stages: ['Lucido', 'Allegro', 'Brillo', 'Sbronzo', 'Distrutto'],
+      crashed: 'Crollato!', standing: 'In piedi!', bonus: '+{n} per essere rimasto in piedi', line: 'Bombe: {n} · centrate: {c}', bombs: 'Bombe',
     },
     wardrobe: 'Spogliatoio', stats: 'Statistiche', medals: 'Medaglie', settings: 'Impostazioni', howto: 'Come si tira',
     hint: {
@@ -31,6 +39,7 @@ export const STRINGS = {
       'Da tastiera: frecce per mirare, spazio premuto per la forza.',
       'Con 3 canestri di fila sei in fiamme: i punti raddoppiano.',
       'Vento: guarda la bandierina. Mani: tira quando scendono.',
+      'Bomba Zero (18+): dopo un canestro tocca per far cadere il bicchierino, poi inclina il telefono o tieni premuto. Da ubriaco, tira quando la scia diventa verde.',
     ],
     hud: { baskets: 'Canestri', score: 'Punti', streak: 'Serie', time: 'Tempo', shots: 'Tiri', goal: 'Obiettivo', rival: 'Kappa', best: 'Record', you: 'Zero', cpu: 'Kappa', spot: 'Posizione', wind: 'Vento', money: 'Palla doppia', fire: 'In fiamme!' },
     spots: {
@@ -49,9 +58,9 @@ export const STRINGS = {
     },
     mission: 'Missione {n}', chapter: 'Capitolo {n}', locked: 'Bloccato', needStars: 'Finisci il capitolo precedente e raccogli {n} stelle.', stars: 'Stelle',
     result: { win: 'Missione compiuta', lose: 'Missione fallita', over: 'Fine', zeroWin: 'Hai vinto!', zeroLose: 'Ha vinto Kappa', newBest: 'Nuovo record!', levelUp: 'Livello {n}!', unlocked: 'Sbloccato', medal: 'Medaglia' },
-    line: { makes: '{m} canestri su {a}', swishes: '{n} puliti', streak: 'serie migliore {n}', points: '{n} punti' },
+    line: { makes: 'Canestri: {m} su {a}', swishes: 'puliti: {n}', streak: 'serie migliore {n}', points: '{n} punti' },
     set: {
-      lang: 'Lingua', sound: 'Effetti', music: 'Musica', vibrate: 'Vibrazione', control: 'Controllo', swipe: 'Scorri', hold: 'Tieni e rilascia',
+      lang: 'Lingua', sound: 'Effetti', music: 'Musica', vibrate: 'Vibrazione', control: 'Controllo', tilt: 'Inclina per bere', swipe: 'Scorri', hold: 'Tieni e rilascia',
       diff: 'Difficoltà', easy: 'Facile', normal: 'Normale', hard: 'Difficile', guide: 'Traiettoria in allenamento', motion: 'Meno movimento', contrast: 'Contrasto alto', bigtext: 'Testo grande', on: 'Sì', off: 'No', reset: 'Azzera i progressi', resetAsk: 'Cancellare tutti i progressi? Non si può annullare.', resetYes: 'Sì, cancella',
     },
     look: { skin: 'Pelle', hair: 'Capelli', hairColor: 'Colore', jersey: 'Maglia', ball: 'Pallone', shoes: 'Scarpe', band: 'Fascia', celebration: 'Esultanza', needLevel: 'Livello {n}', needMedal: 'Medaglia: {m}' },
@@ -66,13 +75,14 @@ export const STRINGS = {
       celebration: { fist: 'Pugno', zero: 'Lo zero', flex: 'Muscoli', dance: 'Balletto', bow: 'Inchino' },
     },
     zones: { near: 'Vicino', mid: 'Media', three: 'Da tre', deep: 'Oltre', l: 'sx', c: 'centro', r: 'dx' },
-    stat: { shots: 'Tiri', pct: 'Percentuale', swishes: 'Puliti', bank: 'Di tabella', rim: 'Di ferro', airballs: 'Air ball', threes: 'Da tre', bestStreak: 'Serie migliore', timed: 'Record 60 secondi', three: 'Record gara da tre', zero: 'Z-E-R-O vinte / perse', empty: 'Ancora nessun tiro.' },
+    stat: { shots: 'Tiri', pct: 'Percentuale', swishes: 'Puliti', bank: 'Di tabella', rim: 'Di ferro', airballs: 'Air ball', threes: 'Da tre', bestStreak: 'Serie migliore', timed: 'Record 60 secondi', three: 'Record gara da tre', zero: 'Z-E-R-O vinte / perse', empty: 'Ancora nessun tiro.', bomb: 'Record Bomba Zero', bombs: 'Bombe bevute' },
     medal: {
       first: 'Primo canestro', swish1: 'Solo cotone', swish50: '50 puliti', make100: '100 canestri', make500: '500 canestri', shots1000: '1000 tiri',
       streak3: 'In fiamme', streak5: 'Cinque di fila', streak10: 'Dieci di fila', bank10: 'Amico del vetro', three10: '10 triple', three100: '100 triple',
       deep: 'Da casa tua', half: 'Da metà campo', wind10: 'Controvento', moving10: 'Bersaglio mobile', hands10: 'Sopra le mani', buzzer: 'Sulla sirena', airball: 'Aria pura',
       timed20: '20 al minuto', timed40: '40 al minuto', three12: 'Tiratore', three20: 'Re del carrello', daily: 'Puntuale', daily7: 'Sette giorni',
       zeroWin: 'Kappa battuto', zeroClean: 'Zero lettere', chapter1: 'Fuori dal Bunker', chapter3: 'Sopra i tetti', champion: 'Campione', perfect: 'Capitolo perfetto', stars60: '60 stelle',
+      bomb1: 'Prima bomba', bomb6: 'Sei bombe in una sera', bombWrecked: 'Canestro da distrutto', bombStanding: 'Ancora in piedi', bombSteady: 'Mano ferma', bombWater: 'Acqua minerale',
     },
     credits: 'Gioco originale. Personaggi, nomi e posti sono inventati. Audio sintetizzato, nessun dato inviato.',
   },
@@ -82,7 +92,7 @@ export const STRINGS = {
     menu: 'Menu', back: 'Back', retry: 'Retry', next: 'Next', resume: 'Resume', quit: 'Quit', close: 'Close', start: 'Go!',
     pause: 'Paused', level: 'Level', levelN: 'Lv. {n}', xp: 'XP',
     modes: {
-      training: 'Training', career: 'Career', timed: '60 seconds', three: 'Three-point contest', zero: 'Z-E-R-O', daily: 'Daily challenge',
+      training: 'Training', career: 'Career', timed: '60 seconds', three: 'Three-point contest', zero: 'Z-E-R-O', daily: 'Daily challenge', bomb: 'Zero Bomb',
     },
     modeDesc: {
       training: 'Pick a spot, shoot as long as you like.',
@@ -91,6 +101,14 @@ export const STRINGS = {
       three: '5 racks, 25 balls. The last one counts double.',
       zero: 'Miss the other player’s shot and take a letter.',
       daily: '10 shots, the same for everyone today.',
+      bomb: 'Every basket, a drink. Then try to aim. 18+ only.',
+    },
+    bomb: {
+      gateTitle: 'Adults only', gate: 'In this mode Zero drinks after every basket and shoots drunk. It is satire: the drinks are invented and make everything harder. Are you at least 18?', yes: 'Yes, I am 18', no: 'No', closed: 'Bomb mode stays closed. All the others are yours.',
+      drop: 'Tap to drop the shot', tilt: 'Tip the phone toward you to drink', hold: 'Hold to drink', both: 'Tip the phone to drink, or hold your finger down',
+      clean: 'Plop!', spill: 'On the rim!', burp: 'Burp!', hic: 'Hic!', flip: 'Controls reversed', arrow: 'Shoot when the trail crosses the middle',
+      drink: 'Fog Bitter', can: 'FULMINE', meter: 'Drunkenness', stages: ['Sober', 'Merry', 'Tipsy', 'Drunk', 'Wrecked'],
+      crashed: 'Passed out!', standing: 'Still standing!', bonus: '+{n} for staying on your feet', line: 'Bombs: {n} · on target: {c}', bombs: 'Bombs',
     },
     wardrobe: 'Locker room', stats: 'Statistics', medals: 'Medals', settings: 'Settings', howto: 'How to shoot',
     hint: {
@@ -106,6 +124,7 @@ export const STRINGS = {
       'Keyboard: arrows to aim, hold space for power.',
       'Three baskets in a row and you are on fire: double points.',
       'Wind: watch the flag. Hands: shoot when they drop.',
+      'Zero Bomb (18+): after a basket tap to drop the shot, then tip the phone or hold. When drunk, shoot as the trail turns green.',
     ],
     hud: { baskets: 'Baskets', score: 'Score', streak: 'Streak', time: 'Time', shots: 'Shots', goal: 'Goal', rival: 'Kappa', best: 'Best', you: 'Zero', cpu: 'Kappa', spot: 'Spot', wind: 'Wind', money: 'Money ball', fire: 'On fire!' },
     spots: {
@@ -126,7 +145,7 @@ export const STRINGS = {
     result: { win: 'Mission complete', lose: 'Mission failed', over: 'Time!', zeroWin: 'You win!', zeroLose: 'Kappa wins', newBest: 'New best!', levelUp: 'Level {n}!', unlocked: 'Unlocked', medal: 'Medal' },
     line: { makes: '{m} of {a} made', swishes: '{n} clean', streak: 'best streak {n}', points: '{n} points' },
     set: {
-      lang: 'Language', sound: 'Effects', music: 'Music', vibrate: 'Vibration', control: 'Control', swipe: 'Swipe', hold: 'Hold and release',
+      lang: 'Language', sound: 'Effects', music: 'Music', vibrate: 'Vibration', control: 'Control', tilt: 'Tip to drink', swipe: 'Swipe', hold: 'Hold and release',
       diff: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', guide: 'Trajectory in training', motion: 'Reduce motion', contrast: 'High contrast', bigtext: 'Large text', on: 'On', off: 'Off', reset: 'Erase progress', resetAsk: 'Erase all progress? This cannot be undone.', resetYes: 'Yes, erase',
     },
     look: { skin: 'Skin', hair: 'Hair', hairColor: 'Colour', jersey: 'Jersey', ball: 'Ball', shoes: 'Shoes', band: 'Headband', celebration: 'Celebration', needLevel: 'Level {n}', needMedal: 'Medal: {m}' },
@@ -141,13 +160,14 @@ export const STRINGS = {
       celebration: { fist: 'Fist pump', zero: 'The zero', flex: 'Flex', dance: 'Dance', bow: 'Bow' },
     },
     zones: { near: 'Close', mid: 'Mid', three: 'Three', deep: 'Deep', l: 'L', c: 'centre', r: 'R' },
-    stat: { shots: 'Shots', pct: 'Percentage', swishes: 'Clean', bank: 'Off glass', rim: 'Off rim', airballs: 'Airballs', threes: 'Threes', bestStreak: 'Best streak', timed: '60-second best', three: 'Contest best', zero: 'Z-E-R-O won / lost', empty: 'No shots yet.' },
+    stat: { shots: 'Shots', pct: 'Percentage', swishes: 'Clean', bank: 'Off glass', rim: 'Off rim', airballs: 'Airballs', threes: 'Threes', bestStreak: 'Best streak', timed: '60-second best', three: 'Contest best', zero: 'Z-E-R-O won / lost', empty: 'No shots yet.', bomb: 'Zero Bomb best', bombs: 'Bombs drunk' },
     medal: {
       first: 'First basket', swish1: 'Nothing but net', swish50: '50 swishes', make100: '100 baskets', make500: '500 baskets', shots1000: '1000 shots',
       streak3: 'On fire', streak5: 'Five straight', streak10: 'Ten straight', bank10: 'Friend of the glass', three10: '10 threes', three100: '100 threes',
       deep: 'From your house', half: 'From half court', wind10: 'Against the wind', moving10: 'Moving target', hands10: 'Over the hands', buzzer: 'Buzzer beater', airball: 'Fresh air',
       timed20: '20 a minute', timed40: '40 a minute', three12: 'Shooter', three20: 'Rack royalty', daily: 'On time', daily7: 'Seven days',
       zeroWin: 'Kappa beaten', zeroClean: 'Zero letters', chapter1: 'Out of the Bunker', chapter3: 'Above the roofs', champion: 'Champion', perfect: 'Perfect chapter', stars60: '60 stars',
+      bomb1: 'First bomb', bomb6: 'Six in one night', bombWrecked: 'Scored while wrecked', bombStanding: 'Still standing', bombSteady: 'Steady hand', bombWater: 'Mineral water',
     },
     credits: 'An original game. Characters, names and places are invented. Synthesised audio, no data sent.',
   },
