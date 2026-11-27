@@ -135,11 +135,11 @@ class Part:
                 if v < 0.15:
                     t = 0.0
                     k = math.sin(v / 0.15 * math.pi / 2)
-                    back = (1 - math.cos((0.15 - v) / 0.15 * math.pi / 2))
+                    back = math.cos(v / 0.15 * math.pi / 2)
                 elif v > 0.85:
                     t = 1.0
                     k = math.sin((1 - v) / 0.15 * math.pi / 2)
-                    back = -(1 - math.cos((v - 0.85) / 0.15 * math.pi / 2))
+                    back = -math.cos((1 - v) / 0.15 * math.pi / 2)
                 else:
                     t = (v - 0.15) / 0.7
                     k = 1.0
@@ -158,7 +158,7 @@ class Part:
             return tuple(c[i] + r * k * (math.cos(ph) * n1[i] * flat + math.sin(ph) * n2[i]) - d[i] * back * r for i in range(3))
         return self.grid(nu, nv, fn, wrap_u=True)
 
-    def build(self, name, smooth_shade=True, weld=True):
+    def build(self, name, smooth_shade=True, weld=True, outward=None):
         me = bpy.data.meshes.new(name)
         bm = bmesh.new()
         verts = [bm.verts.new((x, -z, y)) for (x, y, z) in self.v]  # film -> Blender Z-up
@@ -194,6 +194,13 @@ class Part:
         if smooth_shade:
             for p in me.polygons:
                 p.use_smooth = True
+        if outward is not None:
+            # Open shells (hair, beards): face away from a known centre.
+            o = __import__('mathutils').Vector((outward[0], -outward[2], outward[1]))
+            inward = sum(1 for p in me.polygons if p.normal.dot(p.center - o) < 0)
+            if inward > len(me.polygons) / 2:
+                me.flip_normals()
+            return ob
         # Faces were wound for a right-handed film frame; make them face out.
         bpy.context.view_layer.objects.active = ob
         ob.select_set(True)
@@ -215,10 +222,9 @@ def subsurf(ob, levels=1):
 
 # ---------------------------------------------------------------- actors
 
-def head():
+def face_deform(p, u=0.0, v=0.0):
     a, b, c = 0.108, 0.125, 0.112
-
-    def deform(p, u, v):
+    if True:
         x, y, z = p
         front = max(0.0, z / c)
         # Jaw narrows towards the chin; the skull is longer at the back.
@@ -248,7 +254,10 @@ def head():
         z += front * gauss(x, 0.022) * (0.003 * gauss(y + 0.05, 0.005) + 0.0035 * gauss(y + 0.066, 0.006))
         return [x, y, z]
 
-    p = Part().ellipsoid((0, 0, 0), (a, b, c), nu=64, nv=48, deform=deform)
+
+def head():
+    a, b, c = 0.108, 0.125, 0.112
+    p = Part().ellipsoid((0, 0, 0), (a, b, c), nu=64, nv=48, deform=face_deform)
     # Ears: shells with a rim, slightly behind the middle of the head.
     for s in (1, -1):
         def ear(q, u, v, s=s):
@@ -259,6 +268,37 @@ def head():
             return [x - inner * s, y, z]
         p.ellipsoid((0.104 * s, -0.004, -0.012), (0.014, 0.031, 0.02), nu=20, nv=14, deform=ear)
     return p.build('head')
+
+
+
+def beard(name, full):
+    """Beard and moustache grown on the sculpted face: thick on the jaw and
+    chin, thinning up the cheeks to the sideburns, the mouth left clear.
+    Outside the beard the shell sinks under the skin, so the edge is clean."""
+    a, b, c = 0.108, 0.125, 0.112
+    T = 0.016 if full else 0.007
+
+    def fn(u, v):
+        th = (u - 0.5) * 1.25 * math.pi
+        ph = math.pi * (0.42 + 0.58 * v)
+        base = [a * math.sin(ph) * math.sin(th), b * math.cos(ph), c * math.sin(ph) * math.cos(th)]
+        q = face_deform(base)
+        x, y, z = q
+        side = abs(math.sin(th))
+        # Upper edge of the beard: low on the cheeks in front, up to the ears.
+        top = -0.05 + 0.03 * smooth(0.6, 0.98, side)
+        m = smooth(top + 0.004, top - 0.012, y) * smooth(0.55 * math.pi, 0.45 * math.pi, abs(th))
+        # Keep the mouth and lower lip clear...
+        m *= 1 - gauss(x, 0.02) * smooth(-0.082, -0.07, y) * smooth(-0.04, -0.05, y)
+        # ...and add the moustache above the upper lip.
+        mo = gauss(x, 0.02) * gauss(y + 0.044, 0.0045) * smooth(0.8, 0.95, math.cos(th))
+        m = max(m, mo * 0.9)
+        k = T * m * (1 + (0.15 * math.sin(th * 30 + y * 120) if full else 0.1 * math.sin(th * 50)))
+        k -= 0.004 * (1 - m)
+        r = math.sqrt(x * x + y * y + z * z) or 1.0
+        return (x + x / r * k, y + y / r * k, z + z / r * k)
+
+    return Part().grid(110, 56, fn).build(name, outward=(0, 0, 0))
 
 
 def hand():
@@ -501,6 +541,192 @@ def brazier():
     return p.build('brazier')
 
 
+
+# ---------------------------------------------------------------- hair
+
+HA, HB, HC = 0.108, 0.125, 0.112
+
+
+def skull(th, ph, k):
+    """A point on the skull (head() before its face details), pushed out by k."""
+    x = HA * math.sin(ph) * math.sin(th)
+    y = HB * math.cos(ph)
+    z = HC * math.sin(ph) * math.cos(th)
+    if z < 0:
+        z *= 1.06 - 0.06 * smooth(0.0, -0.1, y)
+    return [x * k, y * k, z * k]
+
+
+def hair(name, style):
+    """Hair as a shell over the skull, thick on the crown and thinning to
+    nothing at the hairline, combed into strands or rolled into curls."""
+    p = Part()
+
+    def limit(th):
+        f = math.cos(th)
+        lim = 0.5 * math.pi - 0.15 * math.pi * f - 0.05 * math.pi * f * f
+        if style == 'short':
+            lim += 0.03 * math.pi * max(0.0, f) * (0.5 + 0.5 * math.sin(th * 16))   # a ragged Roman fringe
+        if style == 'long':
+            lim += 0.08 * math.pi * (1 - max(0.0, f))
+        return lim
+
+    def fn(u, v):
+        th = u * TAU
+        ph = v * limit(th)
+        edge = smooth(1.0, 0.8, v)
+        if style == 'curly':
+            k = 1.0 + 0.1 * edge
+            curl = abs(math.sin(th * 9 + 3 * v)) * abs(math.sin(v * math.pi * 7 + th * 2))
+            k += 0.035 * edge * curl
+        elif style == 'bun':
+            k = 1.0 + 0.045 * edge + 0.006 * edge * math.sin(th * 46)
+        else:
+            k = 1.0 + 0.07 * edge
+            # strands combed from the crown: grooves along the meridians
+            k += 0.012 * edge * smooth(0.08, 0.3, v) * math.sin(th * 38 + 2.5 * math.sin(v * 6))
+        return tuple(skull(th, max(1e-4, ph), k))
+
+    p.grid(96, 30, fn, wrap_u=True)
+    if style == 'long':
+        # Hair falling behind the neck to the shoulders.
+        def fall(u, v):
+            th = math.pi + (u - 0.5) * 1.9
+            y = 0.01 - v * 0.23
+            r = 1.0 + 0.1 * math.sin(v * math.pi) * 0.6
+            wav = 0.0025 * math.sin(th * 30 + v * 4)
+            x = math.sin(th) * (HA * 0.98 * r) * (1 - 0.25 * v)
+            z = math.cos(th) * (HC * 1.08 * r) - 0.01 * v
+            return (x * (1 + wav * 4), y, z * (1 + wav * 4))
+        p.grid(40, 16, fall)
+        p.grid(40, 16, lambda u, v: (lambda q: (q[0] * 0.92, q[1], q[2] * 0.9))(fall(1 - u, v)))
+    if style == 'bun':
+        def bun(q, u, v):
+            x, y, z = q
+            g = 1 + 0.08 * math.sin(u * TAU * 3 + v * 9)
+            return [x * g, y, z * g]
+        p.ellipsoid((0, 0.05, -0.125), (0.05, 0.045, 0.045), nu=24, nv=14, deform=lambda q, u, v: bun([q[0], q[1], q[2] + 0.125], u, v)[:2] + [bun([q[0], q[1], q[2] + 0.125], u, v)[2] - 0.125])
+    return p.build(name)
+
+
+def hair_fringe():
+    """The band of hair of a bald man, from ear to ear around the back."""
+    def fn(u, v):
+        th = math.pi * 0.42 + u * math.pi * 1.16
+        ph = math.pi * (0.36 + 0.24 * v)
+        ends = math.sin(math.pi * u) ** 0.4
+        mid = math.sin(math.pi * v)
+        k = 1.0 + 0.05 * ends * mid + 0.008 * mid * math.sin(th * 30)
+        return tuple(skull(th, ph, k))
+    return Part().grid(64, 12, fn).build('hair_fringe', outward=(0, 0, 0))
+
+
+# ---------------------------------------------------------------- horse
+# Same frames as horse.ts: the horse faces +z; body in root space, neck in
+# the neck group (at 0, 1.38, 0.6), head in the head group (0, 0.58, 0.32 in
+# the neck), legs from the hip (knee at y=-0.48, hoof bottom at about -1.04).
+
+def horse_body_point(u, v):
+    if True:
+        # v along the body from the tail (-0.9) to the chest (0.78); u around.
+        z = -0.9 + v * 1.68
+        th = u * TAU
+        # Radii of the cross-section: deep chest, round croup, tucked belly.
+        ry = 0.3 + 0.06 * gauss(z + 0.5, 0.25) + 0.05 * gauss(z - 0.4, 0.25)
+        rx = 0.27 + 0.06 * gauss(z + 0.55, 0.22) + 0.04 * gauss(z - 0.42, 0.2)
+        cap_ = math.sin(math.pi * v) ** 0.35
+        x = math.sin(th) * rx * cap_
+        yy = math.cos(th)
+        y = 1.2 + yy * ry * cap_
+        # Back line: withers high, a dip behind them, croup rounded.
+        if yy > 0:
+            y += yy * (0.07 * gauss(z - 0.5, 0.12) + 0.03 * gauss(z + 0.55, 0.18) - 0.03 * gauss(z - 0.05, 0.2))
+        else:
+            y += yy * 0.04 * gauss(z - 0.35, 0.2)   # girth
+        # Shoulder and haunch muscles where the legs join.
+        side = abs(math.sin(th))
+        bulge = 0.05 * side * (gauss(z - 0.45, 0.13) * gauss(yy + 0.2, 0.5) + gauss(z + 0.55, 0.16) * gauss(yy + 0.1, 0.5))
+        x += math.copysign(bulge, x)
+        return (x, y, z)
+
+
+def horse_body():
+    p = Part().grid(48, 40, horse_body_point, wrap_u=True)
+    return p.build('horse_body')
+
+
+def horse_saddle():
+    """A saddle blanket lying on the back, following the body, with a
+    fringed lower edge."""
+    def fn(u, v):
+        th = (u - 0.5) * 2.3
+        z = 0.22 - v * 0.6
+        q = horse_body_point((th / TAU) % 1.0, (z + 0.9) / 1.68)
+        x, y, zz = q
+        dx, dy = x, y - 1.2
+        r = math.sqrt(dx * dx + dy * dy) or 1.0
+        k = 0.018 + 0.006 * math.sin(math.pi * v) * gauss(th, 0.5)
+        k += 0.004 * math.sin(u * 60) * smooth(0.25, 0.05, min(u, 1 - u))
+        return (x + dx / r * k, y + dy / r * k, zz)
+    return Part().grid(48, 20, fn).build('horse_saddle', outward=(0, 1.2, -0.04))
+
+
+def horse_neck():
+    def path(t):
+        # From inside the shoulders up to the poll, with an arched crest.
+        return (0.0, -0.12 + 0.68 * t - 0.06 * t * t, -0.08 + 0.42 * t + 0.08 * math.sin(math.pi * t))
+    p = Part().tube(path, lambda t: 0.2 - 0.1 * t, nu=24, nv=24, flat=0.62)
+    return p.build('horse_neck')
+
+
+def horse_head():
+    def path(t):
+        return (0.0, 0.06 - 0.44 * t, 0.02 + 0.3 * t)
+    def rad(t):
+        return 0.12 - 0.05 * t + 0.05 * gauss(t - 0.25, 0.15)  # broad jaw, slim face
+    p = Part().tube(path, rad, nu=24, nv=24, flat=0.58,
+                    ripple=lambda t, ph: 1 + 0.12 * gauss(t - 0.95, 0.08) * (0.5 + 0.5 * math.cos(ph)))
+    for s in (1, -1):
+        # ears
+        p.ellipsoid((0.045 * s, 0.14, 0.0), (0.024, 0.065, 0.02), nu=12, nv=10,
+                    deform=lambda q, u, v, s=s: [q[0] + 0.02 * s * (q[1] - 0.11) / 0.07, q[1], q[2]])
+    return p.build('horse_head')
+
+
+def horse_mane():
+    p = Part()
+    for i in range(14):
+        t = i / 13
+        y = -0.05 + 0.6 * t - 0.05 * t * t
+        z = -0.14 + 0.38 * t + 0.08 * math.sin(math.pi * t)
+        p.ellipsoid((0.02 * (1 if i % 2 else -1), y + 0.02, z - 0.06), (0.03, 0.07, 0.045), nu=10, nv=8)
+    return p.build('horse_mane')
+
+
+def horse_leg_upper(name, hind):
+    def path(t):
+        return (0.0, 0.08 - 0.56 * t, (0.04 if hind else 0.0) * math.sin(math.pi * t) - (0.04 if hind else 0.0) * t)
+    def rad(t):
+        top = 0.15 if hind else 0.125
+        return top - (top - 0.055) * smooth(0.0, 0.9, t) + 0.012 * gauss(t - 0.95, 0.06)
+    return Part().tube(path, rad, nu=20, nv=20, flat=0.8).build(name)
+
+
+def horse_leg_lower():
+    def path(t):
+        return (0.0, 0.02 - 0.5 * t, 0.012 * gauss(t - 0.82, 0.12))
+    def rad(t):
+        return 0.042 + 0.014 * gauss(t - 0.82, 0.07) + 0.008 * gauss(t, 0.06)  # fetlock and knee
+    return Part().tube(path, rad, nu=16, nv=20, flat=0.85).build('horse_shin')
+
+
+def horse_tail():
+    def path(t):
+        return (0.0, 0.02 - 0.6 * t, -0.06 - 0.12 * t + 0.08 * t * t)
+    p = Part().tube(path, lambda t: 0.05 + 0.06 * smooth(0.1, 0.8, t) - 0.05 * smooth(0.85, 1.0, t), nu=16, nv=18,
+                    ripple=lambda t, ph: 1 + 0.18 * smooth(0.2, 1.0, t) * math.sin(ph * 7 + t * 5))
+    return p.build('horse_tail')
+
 # ---------------------------------------------------------------- bake + export
 
 def bake_ao(ob, distance):
@@ -517,6 +743,12 @@ def bake_ao(ob, distance):
     bpy.context.view_layer.objects.active = ob
     sc.world.light_settings.distance = distance
     bpy.ops.object.bake(type='AO', target='VERTEX_COLORS')
+    # Soften it: crevices darken, but no part of the surface goes black
+    # (faces hidden inside overlapping shapes bake to zero).
+    for d in attr.data:
+        c = d.color
+        k = 0.35 + 0.65 * c[0]
+        d.color = (k, k, k, 1.0)
 
 
 def main():
@@ -530,7 +762,9 @@ def main():
 
     obs = []
     obs.append((head(), 0.05))
-    obs.append((hand(), 0.03))
+    obs.append((hand(), 0.012))
+    obs.append((beard('beard_short', False), 0.03))
+    obs.append((beard('beard_full', True), 0.03))
     obs.append((foot(), 0.04))
     obs.append((torso(), 0.08))
     obs.append((sleeve(), 0.05))
@@ -546,6 +780,18 @@ def main():
     obs.append((bpy.data.objects['throne_cloth'], 0.2))
     obs.append((amphora(), 0.08))
     obs.append((brazier(), 0.15))
+    for style in ('short', 'curly', 'long', 'bun'):
+        obs.append((hair('hair_' + style, style), 0.04))
+    obs.append((hair_fringe(), 0.03))
+    obs.append((horse_body(), 0.3))
+    obs.append((horse_saddle(), 0.1))
+    obs.append((horse_neck(), 0.15))
+    obs.append((horse_head(), 0.1))
+    obs.append((horse_mane(), 0.06))
+    obs.append((horse_leg_upper('horse_fore', False), 0.08))
+    obs.append((horse_leg_upper('horse_hind', True), 0.08))
+    obs.append((horse_leg_lower(), 0.05))
+    obs.append((horse_tail(), 0.08))
 
     for ob, dist in obs:
         bake_ao(ob, dist)

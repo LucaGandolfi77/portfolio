@@ -13,6 +13,8 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 export type KitPart =
   | 'head' | 'hand' | 'foot' | 'torso' | 'sleeve' | 'forearm' | 'skirt_50' | 'skirt_75' | 'skirt_100' | 'cape'
+  | 'beard_short' | 'beard_full' | 'hair_short' | 'hair_curly' | 'hair_long' | 'hair_bun' | 'hair_fringe'
+  | 'horse_body' | 'horse_saddle' | 'horse_neck' | 'horse_head' | 'horse_mane' | 'horse_fore' | 'horse_hind' | 'horse_shin' | 'horse_tail'
   | 'col_base' | 'col_shaft' | 'col_cap' | 'throne_gold' | 'throne_cloth' | 'amphora' | 'brazier';
 
 const parts = new Map<string, THREE.BufferGeometry>();
@@ -56,8 +58,12 @@ export function loadKit(url = new URL('models/kit.glb', document.baseURI).href):
             geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
           }
           geo.computeBoundingSphere();
-          parts.set(mesh.name, geo);
+          /* gltfpack keeps the names on the nodes and calls the meshes mesh_N. */
+          const name = !mesh.name || /^mesh_\d+$/.test(mesh.name) ? mesh.parent?.name ?? '' : mesh.name;
+          parts.set(name, geo);
         });
+        /* Exposed for the end-to-end test: how many parts the film can use. */
+        document.documentElement.dataset.kit = String(parts.size);
         return parts.size > 0;
       })
       .catch(() => false);
@@ -85,7 +91,8 @@ export function withAO<M extends THREE.Material>(m: M): M {
 export function kitMesh(name: KitPart, m: THREE.Material): THREE.Mesh | undefined {
   const g = kit(name);
   if (!g) return undefined;
-  const o = new THREE.Mesh(g, withAO(m));
+  /* Without baked colours the AO material would render black. */
+  const o = new THREE.Mesh(g, g.getAttribute('color') ? withAO(m) : m);
   o.castShadow = true;
   o.receiveShadow = true;
   return o;

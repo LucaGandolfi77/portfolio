@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { clamp, ease, hash, lerp } from '../util';
 import { STONE, glowMat, glowSprite, mat } from './mats';
-import { kit, kitMesh } from './assets';
+import { kit, kitMesh, type KitPart } from './assets';
 
 export type PoseName =
   | 'stand' | 'talk' | 'kneel' | 'pray' | 'offer' | 'point' | 'raise' | 'bow' | 'sit' | 'lie' | 'hold'
@@ -298,7 +298,9 @@ function makeHead(look: Look): Face {
   smile.rotation.z = Math.PI;
   head.add(smile);
 
-  if (look.beard) {
+  const grown = look.beard ? kitMesh(look.beard === 'full' ? 'beard_full' : 'beard_short', cloth(new THREE.Color(look.hair).lerp(new THREE.Color(look.skin), 0.18).getStyle(), 0.95)) : undefined;
+  if (grown) head.add(grown);
+  else if (look.beard) {
     /* Beard on the jaw below the mouth, and a moustache above it: the mouth stays visible. */
     const tone = new THREE.Color(look.hair).lerp(new THREE.Color(look.skin), 0.18).getStyle();
     const bm = cloth(tone, 0.95);
@@ -309,7 +311,11 @@ function makeHead(look: Look): Face {
       head.add(m);
     }
   }
-  switch (look.hairStyle) {
+  const hairPart = { short: 'hair_short', long: 'hair_long', curly: 'hair_curly', bun: 'hair_bun', bald: 'hair_fringe', none: null }[look.hairStyle] as KitPart | null;
+  const sculptedHair = hairPart ? kitMesh(hairPart, hairM) : undefined;
+  /* Hair sculpted in Blender, combed into strands or rolled into curls. */
+  if (sculptedHair) head.add(sculptedHair);
+  else switch (look.hairStyle) {
     case 'short':
       head.add(mesh(G.cap, hairM, [0.116, 0.13, 0.12], [0, 0.014, -0.016])).rotation.x = -0.38;
       break;

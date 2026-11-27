@@ -47,16 +47,17 @@ npm run build
 | `src/film/three/figure.ts` | Gli attori: corpo, volto, pose, costumi, oggetti. |
 | `src/film/three/fx.ts` | Pioggia, neve, nebbia, braci, lucciole, polvere nella luce. |
 | `src/film/three/assets.ts` | Carica il kit scolpito in Blender; senza kit ogni pezzo torna alle forme semplici. |
-| `blender/build_kit.py` | Il kit in Blender: teste, mani, calzari, vesti e mantelli con le pieghe, colonne, trono, anfore, bracieri. |
+| `blender/build_kit.py` | Il kit in Blender: teste, capelli, barbe, mani, calzari, vesti e mantelli con le pieghe, cavallo, colonne, trono, anfore, bracieri. |
 | `src/film/stage.ts` | La regia: attori, inquadrature automatiche, render con bloom, transizioni, sottotitoli. |
 
 ### Il kit di Blender
 
-Teste, mani, calzari, busti, vesti e mantelli degli attori, le colonne con
+Teste, capelli, barbe, mani, calzari, busti, vesti e mantelli degli attori, il
+cavallo con la gualdrappa, le colonne con
 base attica, fusto scanalato e capitello a ovoli, il trono intagliato, le anfore
 e i bracieri sono generati da uno script Python in Blender, con l'occlusione
 ambientale calcolata in Cycles e salvata nei colori dei vertici. Il risultato è
-compresso con meshopt in `public/models/kit.glb` (circa 320 kB).
+compresso con meshopt in `public/models/kit.glb` (circa 800 kB).
 
 ```bash
 BLENDER=/percorso/di/Blender npm run kit   # rigenera public/models/kit.glb

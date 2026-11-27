@@ -12,7 +12,7 @@ const APP = '/projects/la-corona-e-la-testa-v2/dist/';
 test.skip(!existsSync(DIST), 'build the film first: cd projects/la-corona-e-la-testa-v2 && npm run build');
 test.use({ video: 'off' });
 /* Every set is built and rendered in software (SwiftShader) here: slow, so generous. */
-test.setTimeout(240_000);
+test.setTimeout(360_000);
 
 function watchErrors(page) {
   const errors = [];
@@ -50,12 +50,15 @@ test.describe('La Corona e la Testa 3D', () => {
   test('draws every part of the film without errors, up to the end screen', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto(`${APP}?lang=en&t=5`);
+    /* Every sculpted part of the Blender kit is loaded, none falls back. */
+    await expect(page.locator('html')).toHaveAttribute('data-kit', /^(3[0-9]|[4-9][0-9])$/, { timeout: 30_000 });
     await page.locator('#btn-resume').click();
-    /* Scrub through the whole film: every shot is drawn at least once. */
+    /* Scrub through the whole film: every shot is drawn at least once (the
+       shortest shot lasts 12 s, so a 10 s step cannot skip one). */
     const length = await page.evaluate(async () => {
       const seek = document.querySelector('#seek');
       const max = Number(seek.max);
-      for (let t = 1; t < max - 8; t += 7) {
+      for (let t = 1; t < max - 8; t += 10) {
         seek.value = String(t);
         seek.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 16));
