@@ -1009,14 +1009,6 @@ async function boot(): Promise<void> {
     // A direct link to a moment: keep the poster, but show the moment behind it.
     lastDraw = 0;
   }
-
-  if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    const register = (): void => {
-      navigator.serviceWorker.register(new URL('sw.js', document.baseURI).href).catch(() => undefined);
-    };
-    if (document.readyState === 'complete') register();
-    else window.addEventListener('load', register, { once: true });
-  }
 }
 
 void boot();

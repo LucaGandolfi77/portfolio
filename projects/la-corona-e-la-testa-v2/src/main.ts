@@ -22,3 +22,12 @@ if (webgl()) {
       ? 'Questo film è disegnato in 3D con WebGL, che questo browser non mette a disposizione. Prova con un browser aggiornato o attiva l’accelerazione grafica.'
       : 'This film is drawn in 3D with WebGL, which this browser does not provide. Try an up-to-date browser or turn on hardware acceleration.';
 }
+
+/* Offline: register the service worker once the page has loaded. */
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  const register = (): void => {
+    navigator.serviceWorker.register(new URL('sw.js', document.baseURI).href).catch(() => undefined);
+  };
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
+}
