@@ -60,6 +60,34 @@ ok(
 ok(span > MAP.half * 0.7, `gli oggetti arrivano fino a x=${span.toFixed(0)} (mappa ±${MAP.half})`);
 ok(world.byDef.size > 10, `${world.byDef.size} tipi di oggetto distinti`);
 
+/* ---------------------------------------------- 2b. ogni ambientazione */
+console.log('\n— ambientazioni —');
+{
+  const { THEME_IDS } = await import('../src/world/themes.js');
+  const { readFileSync, existsSync } = await import('node:fs');
+  const py = ['blender/build_kit.py', 'blender/props_themes.py', 'blender/props_new.py']
+    .map((f) => new URL(`../${f}`, import.meta.url))
+    .filter((u) => existsSync(u))
+    .map((u) => readFileSync(u, 'utf8'))
+    .join('\n');
+  // gli id dei modelli Blender: def palazzo_alto() → palazzo-alto
+  const modelled = new Set([...py.matchAll(/@kit\s*\ndef (\w+)\(/g)].map((m) => m[1].replace(/_/g, '-')));
+  for (const id of THEME_IDS) {
+    setTheme(id);
+    setScale(1);
+    applyLayout(id);
+    const w = new PropWorld(scene, { density: 1 });
+    const alive = w.items.filter((i) => i.alive);
+    const south = alive.filter((i) => i.z > MAP.half * 0.25).length;
+    const defs = PropWorld.defsFor(id);
+    const missing = defs.filter((d) => !modelled.has(d.id)).map((d) => d.id);
+    ok(alive.length > 500 && w.golds.length > 0, `${id}: ${alive.length} oggetti vivi, ${w.golds.length} ori`);
+    if (!MAP.water) ok(south > alive.length * 0.12, `${id}: ${south} oggetti nella fascia sud (la mappa non è vuota a metà)`);
+    ok(missing.length === 0, `${id}: ${defs.length} oggetti, tutti con un modello Blender${missing.length ? ` (mancano: ${missing})` : ''}`);
+  }
+  setTheme('portomarina');
+}
+
 /* ------------------------------------------------- 3. regole del knockout */
 console.log('\n— knockout —');
 const fx = { ring() {}, pop() {}, text() {}, trail() {} };

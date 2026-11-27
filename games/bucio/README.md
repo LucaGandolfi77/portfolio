@@ -5,9 +5,9 @@ cittadina italiana schiacciata tra la collina e il mare. Hai 120 secondi per
 divorarla: gelati, vespette, ombrelloni, barche, turisti, palazzi… e i tuoi
 quattro rivali.
 
-Installabile, offline, su desktop e telefono. Portomarina è modellata in
-**Blender** (35 oggetti, un solo file `models/kit.glb` da ~400 kB); le altre
-ambientazioni restano procedurali e tutto l'audio è sintetizzato.
+Installabile, offline, su desktop e telefono. **Sette ambientazioni**, tutte
+modellate in **Blender** (114 modelli, un kit per scenario da 100–400 kB),
+ognuna con il suo backup procedurale; tutto l'audio è sintetizzato.
 
 Gioca online: <https://lucagandolfi77.github.io/portfolio/games/bucio/>
 
@@ -61,27 +61,54 @@ aspettarti, e con un po' di vantaggio in meno (il 15% di massa invece del 30%)
 puoi divorarli — perché in un continente inseguire un rivale deve valere la
 corsa. Se ti prendono, la partita finisce lì.
 
+## Le ambientazioni
+
+| | Scenario | Oggetti |
+|---|---|---|
+| 🏖️ | **Portomarina**, città di mare | palazzi con persiane, chiesa, faro, barche, ombrelloni, motorini |
+| 🌵 | **Polvere Rossa**, canyon del Far West | saloon, mesas, carovane, cactus, torre dell'acqua |
+| 🎿 | **Nevegal**, paese d'alta quota | chalet, igloo, sciovia, pini innevati, pupazzi di neve |
+| 🌸 | **Giardino delle Nuvole**, isola sospesa | ciliegi, torii, mulino, serra, mongolfiere |
+| 🌃 | **Notte Neon**, metropoli alle 3 | grattacieli con finestre accese, taxi, insegne al neon |
+| 🍇 | **Colline del Vino**, borgo tra i filari *(nuovo)* | casali, torre con orologio, filari, cipressi, ulivi, trattori, pecore, botti |
+| 🌙 | **Base Lunare**, colonia nel cratere *(nuovo)* | cupole, moduli, razzo con torre, rover, lander, astronauti; la Terra in cielo |
+
 ## Il kit di Blender
 
-`blender/build_kit.py` rimodella da codice tutti gli oggetti di Portomarina:
-palazzi con persiane verdi, balconi e tetti a padiglione a file di coppi, la
-chiesa con cupola, tamburo e campanile, il faro a fasce, barche con scafo
-vero, il veliero con randa e fiocco, l'utilitaria e il bus scoperto con i
-finestrini, motorini, biciclette, palme, pini marittimi, turisti col
-cappello di paglia, ombrelloni a spicchi e il Nettuno d'oro. Ogni oggetto ha
-spigoli smussati, normali morbide fino a 38° e **occlusione ambientale cotta
-in Cycles** (con il terreno sotto, così ogni cosa poggia a terra),
-moltiplicata nei colori della palette: il gioco non usa texture.
+Ogni ambientazione ha il suo file `public/models/kit-<tema>.glb`, scaricato
+solo quando serve (gli altri arrivano dopo, in sottofondo, e il service worker
+li tiene offline). I modelli sono scritti da codice:
+
+- `blender/build_kit.py` — primitive, assemblaggio, cottura ed export; i 36
+  oggetti di Portomarina;
+- `blender/props_themes.py` — Polvere Rossa, Nevegal, Giardino, Notte Neon;
+- `blender/props_new.py` — Colline del Vino e Base Lunare.
+
+Ogni oggetto ha spigoli smussati, normali morbide fino a 38° e **occlusione
+ambientale cotta in Cycles** (con il terreno sotto, così poggia a terra),
+moltiplicata nei colori della palette **di quel tema**: gli oggetti comuni a
+più scenari (turisti, lampioni, panchine…) vengono cotti una volta per tema.
+Lampade, neon e finestre accese portano una maschera di luce propria nel
+canale alfa del colore, che il materiale del gioco trasforma in emissione.
 
 ```bash
 npm run kit   # Blender 4.2+ (variabile BLENDER se non è nel PATH) + gltfpack
+KIT_THEMES=luna,vigneto npm run kit   # solo alcuni scenari
 ```
 
-Lo script esporta `blender/kit.raw.glb` (ignorato da git); gltfpack lo
-comprime con meshopt in `public/models/kit.glb`. Il gioco aspetta il kit al
-massimo 4 secondi: se manca o non si carica, ogni oggetto torna alla sua
-geometria procedurale di `props.js`. Ogni modello tiene l'ingombro (`r`),
-l'origine a terra e il fronte (+x per i veicoli) del prop che sostituisce.
+`npm run kit` scrive prima `blender/manifest.json` (palette e oggetti di ogni
+tema, letti dal codice del gioco), poi lancia Blender e infine comprime ogni
+`blender/kit-<tema>.raw.glb` con gltfpack (meshopt).
+
+### Il backup
+
+Ogni modello Blender ha una gemella procedurale (`props.js`,
+`props-extra.js`, `props-new.js`) con lo stesso ingombro `r`, la stessa
+origine e lo stesso fronte. Se un kit non arriva entro 4 secondi o non si
+carica, quello scenario parte con le geometrie procedurali; se il kit arriva
+dopo, nel menu il mondo si rifà con i modelli scolpiti. Il test E2E blocca
+apposta i kit e verifica che si giochi lo stesso, e `npm test` controlla che
+ogni oggetto di ogni scenario abbia il suo modello Blender.
 
 ## Come funziona
 
@@ -130,7 +157,8 @@ src/
 │  ├─ palette.js      colori e materiali condivisi
 │  ├─ geometry.js     primitive low-poly e fusione delle geometrie
 │  ├─ props.js        catalogo di 35 oggetti (motorini, palazzi, barche…)
-│  ├─ kit.js          carica il kit di Blender, con ripiego procedurale
+│  ├─ props-new.js    Colline del Vino e Base Lunare (backup procedurale)
+│  ├─ kit.js          carica il kit di Blender di ogni tema, con backup
 │  └─ propworld.js    InstancedMesh, griglia spaziale, divoramento, respawn
 ├─ game/
 │  ├─ modes.js        modalità: dimensione mondo, durata, regole del morso
@@ -140,7 +168,8 @@ src/
 │  ├─ camera.js       inseguimento e zoom
 │  └─ effects.js      particelle, onde d'urto, numeri che salgono
 └─ ui/                hud.js · screens.js · joystick.js · minimap.js
-blender/build_kit.py  il kit di Portomarina (→ public/models/kit.glb)
+blender/              build_kit.py · props_themes.py · props_new.py
+scripts/              kit-manifest.mjs · pack-kit.mjs · smoke-modes.mjs
 ```
 
 ## Test

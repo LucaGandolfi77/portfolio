@@ -20,7 +20,7 @@ import {
 } from './world/terrain.js';
 import { buildSky, buildClouds, buildLights, animateSky } from './world/sky.js';
 import { PropWorld } from './world/propworld.js';
-import { loadKit } from './world/kit.js';
+import { loadKit, kitReady, kitSize } from './world/kit.js';
 import { SPAWNS } from './world/layout.js';
 
 import { createHoles, R0, TIERS } from './game/hole.js';
@@ -204,6 +204,8 @@ window.__bucio = debug;
 
 function buildWorld(density) {
   world = new PropWorld(scene, { density });
+  // per il test E2E: quanti oggetti di questo mondo vengono dal kit di Blender
+  document.documentElement.dataset.kit = String(kitSize(themeId));
   const brains = [];
   for (const s of [0.95, 0.82, 0.9, 0.72]) brains.push(createBrain(rng, s));
 
@@ -287,6 +289,14 @@ function chooseTheme(id, { silent = false } = {}) {
   applyPalette(currentTheme().palette);
   buildVisuals();
   rebuildAll();
+  // Se il kit di Blender di questo tema non è ancora arrivato si parte col
+  // backup procedurale; appena arriva, nel menu, il mondo si rifà scolpito.
+  if (!kitSize(themeId)) {
+    const wanted = themeId;
+    loadKit(wanted).then((ok) => {
+      if (ok && themeId === wanted && state === 'menu') rebuildAll();
+    });
+  }
   if (!silent) {
     const t = currentTheme();
     hud.toast(`${t.emoji} ${t.name} — ${t.subtitle}`);
@@ -545,11 +555,17 @@ function boot() {
 
 // Il kit di Blender arriva prima del mondo: se tarda o manca, si parte con i
 // modelli procedurali (oltre 4 s non vale la pena di aspettare).
-Promise.race([loadKit(), new Promise((ok) => setTimeout(ok, 4000))]).then(() => {
+const loaderText = document.querySelector('.loader-text');
+if (loaderText) loaderText.textContent = `Costruisco ${currentTheme().name}…`;
+kitReady(themeId).then(() => {
   buildVisuals();
   buildWorld(propDensity(QUALITY[engine.quality].density, modeId));
   resetHoles();
   cam.orbit(0, { x: 0, y: 0, z: 0 }, orbitRadius());
   engine.start(step);
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(boot, 40)));
+  // gli altri kit si scaricano dopo, uno alla volta, per i cambi di scena
+  setTimeout(async () => {
+    for (const id of THEME_IDS) await loadKit(id);
+  }, 3000);
 });

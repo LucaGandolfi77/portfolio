@@ -469,6 +469,202 @@ const notteneon = {
   },
 };
 
+/* ======================================================== COLLINE DEL VINO */
+
+const VG_ROADS = [
+  { axis: 'x', at: -24, w: 6 },
+  { axis: 'z', at: 12, w: 6 },
+  { axis: 'x', at: 38, w: 5 },
+];
+const VG_PLAZZA = { x: 10, z: -22, r: 12 };
+const VG_TOWN = circle(8, -20, 44);
+// i filari: lunghe righe parallele che seguono le colline
+const vgRows = (x, z) => Math.sin(z * 1.7 + Math.sin(x * 0.05) * 2.2) > 0.15;
+const vgVineyard = (x, z) => !VG_TOWN(x, z) && Math.sin(x * 0.045 + 0.6) * Math.cos(z * 0.05 - 0.3) > 0.1;
+
+const vigneto = {
+  id: 'vigneto',
+  name: 'Colline del Vino',
+  subtitle: 'borgo tra i filari',
+  emoji: '🍇',
+  map: { half: 110, water: false, seaLevel: -8, shoreBase: 0, shoreWave: 0, beachDepth: 0 },
+  shore: () => 9999,
+  roads: VG_ROADS,
+  plaza: VG_PLAZZA,
+  spawns: [
+    { x: 8, z: -6 },
+    { x: -44, z: -46 },
+    { x: 56, z: 22 },
+    { x: -40, z: 40 },
+    { x: 64, z: -40 },
+  ],
+  solid: () => true,
+  relief(x, z) {
+    // colline dolci; il borgo sta su un poggio
+    const hills = Math.sin(x * 0.028 + 0.4) * 2.6 + Math.cos(z * 0.024 - 0.8) * 2.2 + Math.sin((x - z) * 0.015) * 1.6;
+    const poggio = 3.2 * (1 - clamp(Math.hypot(x - 8, z + 20) / 60, 0, 1));
+    return hills * 0.7 + poggio;
+  },
+  ponds: [],
+  // gli oggetti universali che qui stonano
+  skipProps: ['palma', 'gabbiano', 'secchio'],
+  palette: {
+    sand: 0xe9d9a8,
+    sandDark: 0xcdb57a,
+    wetSand: 0xb89a62,
+    asphalt: 0xd8cbb0,
+    stone: 0xd9c7a2,
+    stoneDark: 0xa8926c,
+    olive: 0x7f9a4a,
+    mint: 0xb5c98a,
+    palm: 0x5d7f3a,
+    palmDark: 0x3f5f2e,
+    terra: 0xc8643e,
+    terraDark: 0x9a4a2e,
+    sea: 0x6f9fc0,
+    seaDeep: 0x4a7a9a,
+  },
+  exposure: 1.05,
+  sky: {
+    top: 0x3b6fb5,
+    mid: 0x86b5e0,
+    horizon: 0xffd9a8,
+    cloud: 0xfff4e4,
+    hemiSky: 0xffe3b8,
+    hemiGround: 0x7f8a4a,
+    hemiInt: 1.2,
+    sun: 0xfff0c8,
+    sunInt: 2.4,
+    sunPos: [-80, 70, 60],
+    fog: 0xe8d6b0,
+    fogNear: 130,
+    fogFar: 460,
+    stars: false,
+  },
+  ground(x, z, rng, out) {
+    if (onRoad(VG_ROADS, x, z)) return mix(out, 0xe6dcc4, 0xcfc2a4, rng() * 0.3); // strade bianche
+    if ((x - 10) ** 2 + (z + 22) ** 2 < 12 * 12) return mix(out, 0xd9c7a2, 0xbfa982, rng() * 0.3);
+    if (VG_TOWN(x, z)) return mix(out, 0x9fb06a, 0xb8c27e, rng() * 0.35);
+    if (vgVineyard(x, z)) return vgRows(x, z) ? mix(out, 0x4f7a34, 0x628a3c, rng() * 0.4) : mix(out, 0xa8825a, 0x94714c, rng() * 0.3);
+    const patch = Math.sin(x * 0.07 - 1) * Math.cos(z * 0.06 + 0.4);
+    if (patch > 0.55) return mix(out, 0xe8c64a, 0xd9b33a, rng() * 0.3); // girasoli
+    if (patch < -0.6) return mix(out, 0xd9c48a, 0xc8b070, rng() * 0.3); // grano mietuto
+    return mix(out, 0x8fa856, 0xa3b862, rng() * 0.35);
+  },
+  zones: {
+    town: VG_TOWN,
+    field: (x, z) => !VG_TOWN(x, z),
+    water: () => false,
+  },
+};
+
+/* ============================================================== BASE LUNARE */
+
+const LN_CRATERS = [
+  // profondità basse: la buca è un disco piatto e sui pendii ripidi sparirebbe
+  { x: 58, z: -50, r: 22, d: 1.5 },
+  { x: -62, z: 36, r: 18, d: 1.3 },
+  { x: 40, z: 52, r: 14, d: 1.0 },
+  { x: -70, z: -60, r: 16, d: 1.1 },
+  { x: 80, z: 8, r: 10, d: 0.7 },
+  { x: -18, z: 70, r: 11, d: 0.8 },
+  { x: 8, z: -84, r: 13, d: 0.9 },
+];
+const LN_ROADS = [
+  { axis: 'x', at: -8, w: 7 },
+  { axis: 'z', at: -30, w: 6 },
+];
+const LN_PAD = { x: -20, z: -12, r: 13 };
+const LN_TOWN = circle(-16, -12, 48);
+// quanto si è dentro un cratere (0 fuori, 1 al centro) e sul suo orlo
+function lnCrater(x, z) {
+  let bowl = 0;
+  let rim = 0;
+  for (const c0 of LN_CRATERS) {
+    const d = Math.hypot(x - c0.x, z - c0.z) / c0.r;
+    if (d < 1) bowl = Math.max(bowl, (1 - d * d) * c0.d);
+    if (d > 0.8 && d < 1.35) rim = Math.max(rim, (1 - Math.abs(d - 1.05) / 0.3) * c0.d * 0.3);
+  }
+  return { bowl, rim };
+}
+
+const luna = {
+  id: 'luna',
+  name: 'Base Lunare',
+  subtitle: 'colonia nel cratere',
+  emoji: '🌙',
+  map: { half: 110, water: false, seaLevel: -8, shoreBase: 0, shoreWave: 0, beachDepth: 0 },
+  shore: () => 9999,
+  roads: LN_ROADS,
+  plaza: LN_PAD,
+  spawns: [
+    { x: -16, z: 6 },
+    { x: 40, z: -24 },
+    { x: -56, z: -20 },
+    { x: 24, z: 30 },
+    { x: -30, z: 52 },
+  ],
+  solid: () => true,
+  relief(x, z) {
+    const { bowl, rim } = lnCrater(x, z);
+    return -bowl + rim + Math.sin(x * 0.09) * Math.cos(z * 0.08) * 0.2;
+  },
+  ponds: [],
+  // sulla Luna niente turisti, palme o panchine: solo i lampioni della base
+  onlyUniversal: ['lampione'],
+  palette: {
+    sand: 0xb9b6b0,
+    sandDark: 0x8f8c88,
+    wetSand: 0x77757a,
+    asphalt: 0x4f525a,
+    stone: 0xc9c6bf,
+    stoneDark: 0x77757a,
+    olive: 0x9a978f,
+    mint: 0xd5d2cb,
+    palm: 0xa3a09a,
+    sea: 0x4a6a9a,
+    seaDeep: 0x2a3a5a,
+  },
+  exposure: 1.0,
+  sky: {
+    top: 0x010208,
+    mid: 0x05070f,
+    horizon: 0x161b30,
+    cloud: 0x222222,
+    hemiSky: 0x9aa6c8,
+    hemiGround: 0x3a3a40,
+    hemiInt: 0.95,
+    sun: 0xfffaf0,
+    sunInt: 2.9,
+    sunPos: [90, 60, 40],
+    fog: 0x070914,
+    fogNear: 170,
+    fogFar: 540,
+    stars: true,
+    noClouds: true,
+    planet: { dir: [-0.55, 0.42, -0.72], r: 34 },
+  },
+  ground(x, z, rng, out) {
+    if (onRoad(LN_ROADS, x, z)) return mix(out, 0x4f525a, 0x5f626a, rng() * 0.3);
+    const dp = Math.hypot(x - LN_PAD.x, z - LN_PAD.z);
+    if (dp < LN_PAD.r) {
+      if (Math.abs(dp - LN_PAD.r * 0.62) < 0.9) return c(0xffc93c); // anello giallo della piazzola
+      return mix(out, 0x8a8d94, 0x9a9da4, rng() * 0.3);
+    }
+    const { bowl, rim } = lnCrater(x, z);
+    if (rim > 0.12) return mix(out, 0xd6d3cc, 0xc4c1ba, rng() * 0.3);
+    if (bowl > 0.08) return mix(out, 0x7d7b78, 0x8c8a86, rng() * 0.3);
+    const dust = Math.sin(x * 0.13 + 1) * Math.cos(z * 0.11) + Math.sin((x + z) * 0.05) * 0.5;
+    if (dust > 0.8) return mix(out, 0x9c9994, 0xa8a5a0, rng() * 0.3);
+    return mix(out, 0xb4b1ab, 0xc2bfb9, rng() * 0.35);
+  },
+  zones: {
+    town: LN_TOWN,
+    field: (x, z) => !LN_TOWN(x, z),
+    water: () => false,
+  },
+};
+
 /* =============================================================== REGISTRO */
 
 export const THEMES = {
@@ -477,6 +673,8 @@ export const THEMES = {
   nevegal,
   giardino,
   notteneon,
+  vigneto,
+  luna,
 };
 
 export const THEME_IDS = Object.keys(THEMES);

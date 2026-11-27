@@ -1,13 +1,21 @@
 """
-Builds blender/kit.raw.glb (packed by `npm run kit` into public/models/kit.glb):
-the 35 props of Portomarina modelled again in Blender, with bevelled edges,
-smooth-by-angle normals and ambient occlusion baked in Cycles. The baked
-occlusion is multiplied into the palette colours, so every vertex carries its
-final colour and the game needs no textures.
+Builds one blender/kit-<theme>.raw.glb per setting (packed by `npm run kit`
+into public/models/kit-<theme>.glb): the props of every setting modelled again
+in Blender, with bevelled edges, smooth-by-angle normals and ambient occlusion
+baked in Cycles. The baked occlusion is multiplied into the palette colours
+of that setting (blender/manifest.json, written by scripts/kit-manifest.mjs),
+so every vertex carries its final colour and the game needs no textures.
 
-Run it headless from the game folder:
+Builders live here (Portomarina), in props_themes.py (the other four
+settings) and in props_new.py (Colline del Vino, Base Lunare).
 
+Run it headless from the game folder (npm run kit does all three steps):
+
+    node scripts/kit-manifest.mjs
     blender -b --factory-startup --python blender/build_kit.py
+    node scripts/pack-kit.mjs
+
+KIT_THEMES=luna,vigneto limits the run to some settings.
 
 Everything is generated from code, so every run gives the same result.
 Shapes are written in the game's frame (x right, y up, z towards the sea) and
@@ -20,21 +28,26 @@ import math
 import os
 from mathutils import Matrix, Vector
 
-OUT = os.path.join(os.getcwd(), 'blender', 'kit.raw.glb')
+HERE = os.path.join(os.getcwd(), 'blender')
+import json
 TAU = math.pi * 2
 
-# The palette of src/world/palette.js (Portomarina has no overrides).
-P = dict(
-    sand=0xf0dcb0, sandDark=0xdcbf8d, wetSand=0xc9a878, sea=0x2fa8c9, seaDeep=0x1b7fa4,
-    foam=0xdff4f8, cream=0xf7f1e3, white=0xfffdf6, bone=0xe6dcc6, terra=0xd4784f,
-    terraDark=0xa9563a, rose=0xef9a8c, pink=0xf6b7c3, lemon=0xffd15c, coral=0xef7d6b,
-    palm=0x5fa860, palmDark=0x3f7f4a, olive=0x8aab5b, mint=0x9fd6b5, asphalt=0x5b5f68,
-    stone=0xa9a396, stoneDark=0x7d776c, glass=0x8fc7d8, ink=0x0a0f18, night=0x0d1b2a,
-    navy=0x16304d, sun=0xffe6a8, chocolate=0x7a4a2e, gold=0xffc93c,
-    # a few extra tones that only the kit uses
+# The palette of the setting being built: src/world/palette.js plus the
+# overrides of the theme, read from blender/manifest.json in main(). P is
+# filled before each setting, the builders read it while they run.
+P = {}
+# a few extra tones that only the kit uses (no theme overrides them)
+EXTRA = dict(
     shutter=0x3d7a5a, wood=0x9b6a43, glassDark=0x4f7f95, chrome=0xd9dde0, leaf=0x4e9a4f,
-    goldDark=0xd99a1c, skin=0xe9b48c, hair=0x4a2f22,
+    goldDark=0xd99a1c, skin=0xe9b48c, hair=0x4a2f22, snow=0xf4f9ff, ice=0xbfe8ff,
+    neonPink=0xff6fa8, neonBlue=0x6fd8ff, neonYellow=0xffe98a,
 )
+
+
+# Colours that shine by themselves (lamps, neon, lit windows): the alpha of
+# their vertex colour is 0.5 and the game turns that into emission.
+GLOW_KEYS = {'sun', 'neonPink', 'neonBlue', 'neonYellow'}
+GLOW_HEX = {0xfff0c4, 0xff4d6a, 0x4d8bff}
 
 
 def lin(hexv):
@@ -304,7 +317,9 @@ class Prop:
                 key = color(c)
             else:
                 key = color
-            rgba = lin(P[key])
+            rgba = lin(P[key] if isinstance(key, str) else key)
+            if key in GLOW_KEYS or key in GLOW_HEX:
+                rgba = (rgba[0], rgba[1], rgba[2], 0.5)
             vs = []
             for v in f.verts:
                 k = (v.index, key)
@@ -352,11 +367,12 @@ def pane(p, w, h, d=0.02, col='glassDark', **o):
 
 
 # ------------------------------------------------------------ the props
-KIT = []
+KIT = {}
 
 
 def kit(fn):
-    KIT.append(fn)
+    """Registers a builder under the prop id: palazzo_alto -> palazzo-alto."""
+    KIT[fn.__name__.replace('_', '-')] = fn
     return fn
 
 
@@ -1151,13 +1167,33 @@ def bake_ao(ob, distance, ground):
     out = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
     for i in range(len(me.vertices)):
         a = albedo.data[i].color
-        k = 0.4 + 0.6 * attr.data[i].color[0]
-        out.data[i].color = (a[0] * k, a[1] * k, a[2] * k, 1.0)
+        glow = a[3] < 0.75
+        k = 1.0 if glow else 0.4 + 0.6 * attr.data[i].color[0]
+        out.data[i].color = (a[0] * k, a[1] * k, a[2] * k, 0.5 if glow else 1.0)
     me.color_attributes.remove(me.color_attributes['AO'])
     me.color_attributes.remove(me.color_attributes['Albedo'])
     me.color_attributes.active_color = me.color_attributes['Col']
     me.color_attributes.render_color_index = me.color_attributes.active_color_index
     me.materials.clear()
+
+
+def export(theme, obs):
+    sc = bpy.context.scene
+    for o in sc.objects:
+        o.hide_render = False
+        o.select_set(o in obs)
+    path = os.path.join(HERE, f'kit-{theme}.raw.glb')
+    bpy.ops.export_scene.gltf(
+        filepath=path, export_format='GLB', use_selection=True, export_apply=True,
+        export_normals=True, export_texcoords=False, export_materials='NONE',
+        export_vertex_color='NAME', export_vertex_color_name='Col', export_all_vertex_colors=False,
+        export_active_vertex_color_when_no_material=True,
+    )
+    print('wrote', path, os.path.getsize(path), flush=True)
+    for o in obs:
+        me = o.data
+        bpy.data.objects.remove(o)
+        bpy.data.meshes.remove(me)
 
 
 def main():
@@ -1178,32 +1214,36 @@ def main():
     sc.collection.objects.link(ground)
     gm.materials.append(bpy.data.materials.new('g'))
 
-    only = os.environ.get('KIT_ONLY')
-    obs = []
-    for fn in KIT:
-        prop = fn()
-        if only and prop.name not in only.split(','):
-            prop.bm.free()
+    with open(os.path.join(HERE, 'manifest.json')) as f:
+        manifest = json.load(f)
+    only = os.environ.get('KIT_THEMES')
+    for theme, info in manifest.items():
+        if only and theme not in only.split(','):
             continue
-        ob = prop.build()
-        obs.append((ob, prop))
-    for ob, prop in obs:
-        bake_ao(ob, prop.ao, prop.ground)
-        print('baked', ob.name, len(ob.data.vertices), len(ob.data.polygons), flush=True)
+        P.clear()
+        P.update(EXTRA)
+        P.update(info['palette'])
+        obs = []
+        missing = []
+        for pid in info['props']:
+            fn = KIT.get(pid)
+            if not fn:
+                missing.append(pid)
+                continue
+            prop = fn()
+            prop.name = pid
+            ob = prop.build()
+            bake_ao(ob, prop.ao, prop.ground)
+            obs.append(ob)
+        print(theme, 'baked', len(obs), 'missing', missing, flush=True)
+        export(theme, obs)
 
     bpy.data.objects.remove(ground)
-    for o in sc.objects:
-        o.hide_render = False
-        o.select_set(True)
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    bpy.ops.export_scene.gltf(
-        filepath=OUT, export_format='GLB', use_selection=False, export_apply=True,
-        export_normals=True, export_texcoords=False, export_materials='NONE',
-        export_vertex_color='NAME', export_vertex_color_name='Col', export_all_vertex_colors=False,
-        export_active_vertex_color_when_no_material=True,
-    )
-    print('wrote', OUT, os.path.getsize(OUT))
 
+for extra in ('props_themes.py', 'props_new.py'):
+    path = os.path.join(HERE, extra)
+    if os.path.exists(path):
+        exec(compile(open(path).read(), path, 'exec'), globals())
 
 main()

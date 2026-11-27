@@ -32,7 +32,38 @@ export function buildSky() {
   );
   mesh.name = 'cielo';
   mesh.frustumCulled = false;
+  if (sky.planet) mesh.add(buildPlanet(sky.planet));
   return mesh;
+}
+
+/** Un pianeta azzurro nel cielo nero (Base Lunare): oceani, terre e nubi. */
+function buildPlanet({ dir, r }) {
+  const geo = new THREE.IcosahedronGeometry(r, 4);
+  const pos = geo.attributes.position;
+  const cols = new Float32Array(pos.count * 3);
+  const ocean = c(0x2f6fd0);
+  const land = c(0x5f9a4a);
+  const desert = c(0xc9a86a);
+  const cloud = c(0xf4f8ff);
+  const col = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) / r;
+    const y = pos.getY(i) / r;
+    const z = pos.getZ(i) / r;
+    const n = Math.sin(x * 4.1 + 1) * Math.cos(y * 3.3) + Math.sin(z * 5.2 - y * 2) * 0.6;
+    const nb = Math.sin(x * 9 + z * 7) * Math.cos(y * 8 + x * 3);
+    col.copy(n > 0.45 ? (Math.abs(y) < 0.35 ? desert : land) : ocean);
+    if (nb > 0.55 || Math.abs(y) > 0.86) col.copy(cloud);
+    cols[i * 3] = col.r;
+    cols[i * 3 + 1] = col.g;
+    cols[i * 3 + 2] = col.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  const d = new THREE.Vector3(...dir).normalize().multiplyScalar(360);
+  m.position.copy(d);
+  m.name = 'pianeta';
+  return m;
 }
 
 /** Nuvole a ciambella: un cluster di ico-sfere schiacciate. */
@@ -64,7 +95,7 @@ export function buildClouds() {
     flatShading: true,
     fog: false,
   });
-  const n = sky.cloudsBelow ? 22 : 15;
+  const n = sky.noClouds ? 0 : sky.cloudsBelow ? 22 : 15;
   for (let i = 0; i < n; i++) {
     const mesh = new THREE.Mesh(cloudGeometry(rng, sky.cloud, P.white), mat);
     const a = rng() * Math.PI * 2;

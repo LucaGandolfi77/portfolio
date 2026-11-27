@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { PROP_DEFS, pointsFor } from './props.js';
 import { PROP_DEFS_EXTRA } from './props-extra.js';
-import { currentTheme } from './themes.js';
+import { PROP_DEFS_NEW } from './props-new.js';
+import { currentTheme, THEMES } from './themes.js';
 import { propMaterial } from './palette.js';
 import { kitGeometry, kitMaterial } from './kit.js';
 import {
@@ -64,9 +65,13 @@ export class PropWorld {
 
   /** Tutti i prop disponibili nel tema corrente (quelli senza etichetta sono universali). */
   static defsFor(themeId) {
-    return [...PROP_DEFS, ...PROP_DEFS_EXTRA].filter(
-      (d) => !d.themes || d.themes.includes(themeId)
-    );
+    const t = THEMES[themeId] ?? {};
+    return [...PROP_DEFS, ...PROP_DEFS_EXTRA, ...PROP_DEFS_NEW].filter((d) => {
+      if (d.themes) return d.themes.includes(themeId);
+      // gli oggetti universali: alcuni temi ne escludono qualcuno, o quasi tutti
+      if (t.onlyUniversal) return t.onlyUniversal.includes(d.id);
+      return !(t.skipProps ?? []).includes(d.id);
+    });
   }
 
   _build() {
@@ -226,9 +231,10 @@ export class PropWorld {
       const off = rng.range(-r.w * 0.34, r.w * 0.34);
       return r.axis === 'x' ? { x: along, z: r.at + off } : { x: r.at + off, z: along };
     }
-    // town
+    // town: con il mare la città finisce alla spiaggia; senza mare la mappa
+    // è tutta terra, altrimenti la metà sud resterebbe vuota
     const x = rng.range(-HALF + 8, HALF - 8);
-    const z = rng.range(-HALF + 8, 8);
+    const z = rng.range(-HALF + 8, MAP.water ? 8 : HALF - 8);
     return { x, z };
   }
 
@@ -242,7 +248,9 @@ export class PropWorld {
     // town: niente sull'asfalto per i grossi, niente in mezzo alla piazza
     if (big && isRoad(x, z)) return false;
     if (big && isPiazza(x, z)) return false;
-    if (isBeach(x, z) && !d.id.startsWith('palma') && !d.id.startsWith('pino')) return false;
+    // la spiaggia è riservata solo dove c'è il mare: senza mare la zona
+    // "aperta" è tutta la campagna fuori dal paese, e va riempita
+    if (MAP.water && isBeach(x, z) && !d.id.startsWith('palma') && !d.id.startsWith('pino')) return false;
     return true;
   }
 

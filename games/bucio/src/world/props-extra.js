@@ -1010,7 +1010,7 @@ def({
   count: 1,
   gold: true,
   rarity: 4,
-  themes: ['notteneon', 'nevegal', 'giardino', 'polvererosa'],
+  themes: ['notteneon', 'nevegal', 'giardino', 'polvererosa', 'luna'],
   build: () =>
     merge([
       part(ico(0.7, 1), P.gold, { y: 1.2 }),
