@@ -15,7 +15,7 @@ globalThis.localStorage = {
 
 import { TILES, POWERS, REGIONS } from '../src/data/config.js';
 import { ITEMS, CROPS, RECIPES } from '../src/data/items.js';
-import { BIOMINI, BIOMINI_BY_ID } from '../src/data/biomini.js';
+import { BIOMINI, BIOMINI_BY_ID, RARITIES } from '../src/data/biomini.js';
 import { HABITATS } from '../src/data/habitats.js';
 import { CHAPTERS, QUESTS, LORE_LOGS } from '../src/data/story.js';
 import { createInitialState, GameSimulation } from '../src/engine/simulation.js';
@@ -62,6 +62,12 @@ assert.equal(BIOMINI.length, 56, 'Should have 56 original Biomini');
 assert.equal(HABITATS.length, 50, 'Should have 50 habitats');
 assert.equal(CHAPTERS.length, 6, 'Should have 6 chapters');
 assert.equal(LORE_LOGS.length, 10, 'Should have 10 lore logs');
+
+for (const bio of BIOMINI) {
+  assert.ok(bio.num >= 1 && bio.num <= 56, `Invalid Biopedex num for ${bio.id}`);
+  assert.ok(RARITIES[bio.rarity], `Missing rarity for ${bio.id}`);
+  assert.ok(bio.trait && bio.curiosity, `Missing Biopedex lore for ${bio.id}`);
+}
 
 for (const rec of RECIPES) {
   assert.ok(ITEMS[rec.out], `Recipe output missing item: ${rec.out}`);

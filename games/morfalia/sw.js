@@ -1,6 +1,6 @@
 /* ===== MORFALIA · Offline Service Worker ===== */
 const CACHE_PREFIX = 'morfalia-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v2.2.0-3d-grand`;
+const CACHE_NAME = `${CACHE_PREFIX}v2.3.0-biopedex`;
 
 const ASSETS = [
   './',

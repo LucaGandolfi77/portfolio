@@ -568,4 +568,79 @@ export const BIOMINI = [
   }
 ];
 
+export const RARITIES = {
+  comune: { id: 'comune', label: 'Comune', stars: '★', order: 1, color: '#a8eab7', bg: 'rgba(126, 227, 155, 0.16)' },
+  non_comune: { id: 'non_comune', label: 'Non Comune', stars: '★★', order: 2, color: '#7ad8ff', bg: 'rgba(122, 216, 255, 0.18)' },
+  raro: { id: 'raro', label: 'Raro', stars: '★★★', order: 3, color: '#d7a8ff', bg: 'rgba(215, 168, 255, 0.2)' },
+  epico: { id: 'epico', label: 'Epico', stars: '★★★★', order: 4, color: '#ffd066', bg: 'rgba(255, 208, 102, 0.22)' },
+  leggendario: { id: 'leggendario', label: 'Leggendario', stars: '★★★★★', order: 5, color: '#ff8ec7', bg: 'rgba(255, 142, 199, 0.24)' }
+};
+
+const BIOMINO_DEX_META = {
+  fogliolo: ['raro', 'Ottimista solare', 'Le sue foglioline ruotano lentamente seguendo il sole e vibrano quando il terreno torna fertile.'],
+  gocciolino: ['raro', 'Giocherellone acquatico', 'È composto da rugiada purissima: lascia scie di trifogli ovunque rimbalzi.'],
+  bracino: ['raro', 'Cuore caldo', 'Non brucia mai chi gli vuole bene; usa la sua fiammella per arrostire bacche la sera.'],
+  muschietto: ['comune', 'Pigro tenero', 'Dorme fino a 14 ore al giorno sotto le panchine di legno, mimetizzato come un cuscino di muschio.'],
+  pollinello: ['non_comune', 'Operoso instancabile', 'Il suo ronzio armonico accelera la fioritura dei vasi di fiori nelle vicinanze.'],
+  ramosauro: ['raro', 'Artigiano preciso', 'Affila le sue foglie sui tronchi secchi per poter scolpire ponti e assi perfette.'],
+  sabbietta: ['comune', 'Architetto timido', 'Costruisce minuscole torri di sabbia dorata ogni volta che la marea si ritira.'],
+  corallina: ['raro', 'Collezionista musicale', 'Conserva l\'eco delle antiche canzoni marine dentro le conchiglie madreperla.'],
+  ondolina: ['non_comune', 'Acrobata spumosa', 'Fa capriole nell\'acqua ogni volta che sente il suono di una fontana.'],
+  rugiadina: ['non_comune', 'Meteo-sensibile', 'La sua foglia di ninfea cambia sfumatura qualche minuto prima che inizi a piovere.'],
+  ciotolino: ['raro', 'Gigante gentile', 'Nonostante la forza capace di spaccare il basalto, sposta con cura anche le coccinelle.'],
+  voltacchio: ['raro', 'Scattante elettrico', 'Accumula elettricità statica correndo in cerchio attorno ai generatori solari.'],
+  ferrotto: ['non_comune', 'Meccanico meticoloso', 'Lucidando gli ingranaggi con la propria corazza riesce a far ripartire vecchie turbine.'],
+  fornacino: ['raro', 'Cuoco paziente', 'Il suo guscio mantiene una temperatura costante ideale per cuocere pane dorato.'],
+  piumavento: ['non_comune', 'Esploratore libero', 'Conosce ogni corrente d\'aria tra le Creste e le Isole Sospese.'],
+  zefirino: ['raro', 'Spirito puro', 'Il suo soffio profuma di menta selvatica ed è in grado di dissolvere le spore sopite.'],
+  lumifungo: ['non_comune', 'Lanterna vivente', 'La sua cupola verde smeraldo guida i Biomini notturni lungo i sentieri della Foresta.'],
+  ombraluce: ['epico', 'Custode della memoria', 'Ricorda i nomi di tutti gli antichi Custodi che passeggiavano sotto l\'Albero Madre.'],
+  solaris: ['non_comune', 'Raggio boschivo', 'Immagazzina luce diurna nei petali per illuminare le radure più ombrose.'],
+  cristallino: ['non_comune', 'Rifrangente elegante', 'La sua pelliccia di quarzo proietta piccoli arcobaleni sul pavimento celeste.'],
+  gemmoro: ['epico', 'Sentinella d\'ametista', 'I suoi passi emettono un tintinnio cristallino che calma le tempeste ad alta quota.'],
+  nubolino: ['comune', 'Sognatore soffice', 'La sua lana è vapore condensato leggero come una piuma.'],
+  luminella: ['leggendario', 'Messaggera d\'Armonia', 'Appare solo dove natura e costruzioni convivono in equilibrio perfetto, donando l\'Eco Armonico.'],
+  astralio: ['leggendario', 'Sovrano Stellare', 'Leggendario cervo celeste: scende dal firmamento solo per celebrare la rinascita di Morfalia.'],
+  trifoglino: ['comune', 'Portafortuna allegro', 'Si dice che incrociare il suo sguardo porti raccolti doppi nell\'orto.'],
+  talpino: ['comune', 'Scavatore curioso', 'Ha un olfatto finissimo per individuare argilla morbida e radici dolci.'],
+  lucciolina: ['raro', 'Danzatrice del crepuscolo', 'Si raduna a sciami vicino alle lanterne di giardino formando coreografie luminose.'],
+  medusella: ['raro', 'Viaggiatrice eterea', 'Fluttua tanto nella laguna quanto nell\'aria umida dopo la pioggia.'],
+  tartamar: ['comune', 'Saggia della baia', 'Sul suo guscio sono incise mappe naturali delle antiche correnti costiere.'],
+  perletta: ['raro', 'Custode di gemme', 'Si apre solo a chi tratta con cura la spiaggia dorata e le conchiglie.'],
+  scintillino: ['comune', 'Energia pura', 'Fa le fusa come un piccolo trasformatore ogni volta che viene accarezzato.'],
+  magmino: ['non_comune', 'Fiamma operosa', 'Adora sonnecchiare tra le braci delle fornaci d\'argilla.'],
+  quarzo: ['comune', 'Mimetico silenzioso', 'Da fermo è indistinguibile da un comune masso di basalto lucido.'],
+  falchetto: ['non_comune', 'Vedetta dei cieli', 'Sorvola i mulini a vento segnalando nuovi visitatori alle porte della valle.'],
+  volpombra: ['raro', 'Ombra amica', 'La punta della sua coda funge da torcia verde nelle notti senza luna.'],
+  lichenino: ['non_comune', 'Abbraccia-statue', 'Decora le antiche sculture di muschio con germogli freschi ogni mattina.'],
+  falena: ['non_comune', 'Tessitrice di polline', 'Le sue ali vellutate spargono polvere dorata sui fiori notturni.'],
+  cometa: ['epico', 'Scheggia celeste', 'Ogni suo salto lascia dietro di sé una scia di scintille dorate.'],
+  prisma: ['raro', 'Alchimista di luce', 'Scompone la luce dell\'aurora in sette colori che nutrono i cristalli armonici.'],
+  aurorina: ['epico', 'Tessitrice d\'aurora', 'Le sue ali a nastro dipingono il cielo notturno delle Isole Sospese.'],
+  ghirino: ['comune', 'Collezionista previdente', 'Nasconde bacche e semi sotto le panchine per condividerli con i nuovi arrivati.'],
+  castorino: ['non_comune', 'Ingegnere fluviale', 'Controlla la solidità di ogni ponte di legno costruito da Mimo.'],
+  papavero: ['non_comune', 'Poeta scarlatto', 'Apre i petali solo davanti a giardini ricchi di colori e profumi.'],
+  stellamar: ['non_comune', 'Bussola della riva', 'Indica sempre la direzione del Faro delle Maree con la sua punta più luminosa.'],
+  gabbianello: ['comune', 'Postino costiero', 'Trasporta notizie leggere tra la Costa di Cenere e le Isole Sospese.'],
+  delfinello: ['epico', 'Campione di tuffi', 'Salta fuori dall\'acqua ogni volta che una fontana viene attivata vicino alla riva.'],
+  tuonino: ['non_comune', 'Batteria vivente', 'Le sue spine dorate si rizzano quando si avvicina un temporale o un lampione acceso.'],
+  capriolo: ['comune', 'Alpinista nato', 'Scala con agilità le terrazze di basalto più alte senza mai perdere l\'equilibrio.'],
+  lingottino: ['raro', 'Fabbro lucente', 'La sua corazza è forgiata in lega naturale di ferro e bronzo dei Custodi.'],
+  cerbiatto: ['raro', 'Guida del bosco', 'Conduce chi si perde nella nebbia verso le radure sicure dell\'Albero Madre.'],
+  riccioforo: ['non_comune', 'Torcia spinosa', 'I suoi aculei bioluminescenti brillano più forte quando mangia brodo di funghi.'],
+  linfino: ['non_comune', 'Linfa vitale', 'Porta gocce nutrienti direttamente alle radici dei germogli appena piantati.'],
+  celestino: ['non_comune', 'Cantore dell\'alba', 'Il suo fischio cristallino annuncia il sorgere del sole sulle Isole Sospese.'],
+  siderio: ['epico', 'Automa antico', 'Costruito dai Custodi secoli fa per custodire l\'armonia del Faro di Risonanza.'],
+  nebulina: ['epico', 'Sognatrice lunare', 'Culla le isole tra le nuvole rendendo le notti serene e luminose.'],
+  solstizio: ['leggendario', 'Spirito del Sole', 'Incarnazione della luce di Morfalia: dove risplende, nessun inverno può spegnere la vita.']
+};
+
+BIOMINI.forEach((b, idx) => {
+  const meta = BIOMINO_DEX_META[b.id] || ['comune', 'Amico della valle', 'Una creatura pacifica che ama gli habitat accoglienti.'];
+  b.num = idx + 1;
+  b.rarity = meta[0];
+  b.trait = meta[1];
+  b.curiosity = meta[2];
+});
+
 export const BIOMINI_BY_ID = Object.fromEntries(BIOMINI.map((b) => [b.id, b]));

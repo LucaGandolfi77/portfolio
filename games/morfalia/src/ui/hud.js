@@ -1,7 +1,7 @@
 /* ===== MORFALIA · Cozy Mobile HUD, Dialogs & Modal Sheets ===== */
 import { POWERS, REGIONS, getHarmonyLevel } from '../data/config.js';
 import { ITEMS, RECIPES } from '../data/items.js';
-import { BIOMINI } from '../data/biomini.js';
+import { BIOMINI, BIOMINI_BY_ID, RARITIES } from '../data/biomini.js';
 import { HABITATS } from '../data/habitats.js';
 import { CHAPTERS, QUESTS, LORE_LOGS } from '../data/story.js';
 import { sound } from '../engine/audio.js';
@@ -15,6 +15,7 @@ export class HudController {
     this.dialogOnDone = null;
     this.activePanel = null;
     this.activeTab = null;
+    this.selectedDexId = null;
     this._lastPowerSig = '';
 
     this.els = {
@@ -241,6 +242,7 @@ export class HudController {
   openPanel(panel, defaultTab = null) {
     this.activePanel = panel;
     this.activeTab = defaultTab;
+    this.selectedDexId = null;
     this.els.sheetBackdrop.classList.remove('hidden');
     this.renderSheetBody();
   }
@@ -470,36 +472,167 @@ export class HudController {
   renderDexSheet(c) {
     const s = this.sim.state;
     this.els.sheetIcon.textContent = '🐾';
-    this.els.sheetTitle.textContent = 'Enciclopedia dei Biomini';
-    this.els.sheetSubtitle.textContent = `Amici scoperti: ${s.befriended.length} / ${BIOMINI.length}`;
-    this.renderTabs([]);
+    this.els.sheetTitle.textContent = 'Biopedex di Morfalia';
+    const pct = Math.round((s.befriended.length / BIOMINI.length) * 100);
+    this.els.sheetSubtitle.textContent = `Biomini scoperti: ${s.befriended.length} / ${BIOMINI.length} (${pct}%)`;
 
-    for (const bio of BIOMINI) {
+    // Detailed View for a selected Biomino
+    if (this.selectedDexId && BIOMINI_BY_ID[this.selectedDexId]) {
+      this.renderTabs([]);
+      const bio = BIOMINI_BY_ID[this.selectedDexId];
       const met = s.befriended.includes(bio.id);
+      const rar = RARITIES[bio.rarity] || RARITIES.comune;
       const reg = REGIONS.find((r) => r.id === bio.region);
       const power = bio.teaches ? POWERS.find((p) => p.id === bio.teaches) : null;
       const fav = ITEMS[bio.favFood];
       const gift = ITEMS[bio.gift];
+      const attractingHabs = HABITATS.filter((h) => h.attracts === bio.id);
+      // Find friendship hearts across regions
+      let hearts = 0;
+      for (const r of Object.values(s.regions)) {
+        const found = (r.residents || []).find((x) => x.id === bio.id);
+        if (found) hearts = Math.max(hearts, found.hearts || 1);
+      }
 
+      const backBtn = document.createElement('button');
+      backBtn.type = 'button';
+      backBtn.className = 'btn-small secondary';
+      backBtn.style.alignSelf = 'flex-start';
+      backBtn.textContent = '← Torna al Biopedex';
+      backBtn.addEventListener('click', () => {
+        this.selectedDexId = null;
+        this.renderSheetBody();
+      });
+      c.appendChild(backBtn);
+
+      const numStr = `#${String(bio.num).padStart(3, '0')}`;
       c.insertAdjacentHTML('beforeend', `
-        <div class="card${met ? ' completed' : ''}">
-          <div class="card-row">
-            <div class="card-main">
-              <div class="card-emoji">${met ? bio.icon : '❓'}</div>
-              <div>
-                <p class="card-title">${met ? bio.name : 'Biomino Sconosciuto'} <span class="mini-pill">${bio.element}</span></p>
-                <p class="card-desc">${met ? bio.bio : `Costruisci Habitat in ${reg ? reg.name : 'Morfalia'} per attirare questa creatura.`}</p>
-              </div>
+        <div class="dex-hero">
+          <div class="dex-hero-icon">${met ? bio.icon : '❓'}</div>
+          <div style="min-width:0;flex:1">
+            <div class="pill-list" style="margin-bottom:4px">
+              <span class="mini-pill">${numStr}</span>
+              <span class="rarity-pill" style="color:${rar.color};background:${rar.bg}">${rar.stars} ${rar.label}</span>
             </div>
-          </div>
-          <div class="pill-list">
-            <span class="mini-pill">${reg ? reg.icon + ' ' + reg.name : ''}</span>
-            ${power ? `<span class="mini-pill gold">Insegna: ${power.icon} ${power.name}</span>` : ''}
-            ${met && fav ? `<span class="mini-pill">Ama: ${fav.icon} ${fav.name}</span>` : ''}
-            ${met && gift ? `<span class="mini-pill ok">Dono: ${gift.icon} ${gift.name}</span>` : ''}
+            <p class="card-title" style="font-size:18px">${met ? bio.name : 'Biomino Sconosciuto'}</p>
+            <p class="card-desc">${met ? `Tratto: <strong>${bio.trait}</strong>` : `Avvistato nella regione ${reg ? reg.name : 'Morfalia'}.`}</p>
           </div>
         </div>
+
+        <div class="card">
+          <p class="card-title">📖 Scheda Naturalistica</p>
+          <p class="card-desc">${met ? bio.bio : 'Incontra questo Biomino esplorando la regione o costruendo il suo Habitat preferito per sbloccare tutte le sue informazioni!'}</p>
+          ${met ? `<p class="lore-quote">${bio.curiosity}</p>` : ''}
+        </div>
+
+        <div class="dex-stat-grid">
+          <div class="dex-stat-box">
+            <small>Elemento</small>
+            <strong>${bio.element}</strong>
+          </div>
+          <div class="dex-stat-box">
+            <small>Regione Nativa</small>
+            <strong>${reg ? `${reg.icon} ${reg.name}` : 'Ovunque'}</strong>
+          </div>
+          <div class="dex-stat-box">
+            <small>Amicizia</small>
+            <strong>${met ? (hearts > 0 ? '♥'.repeat(hearts) + ` (${hearts}/5)` : '✅ Incontrato') : '🔒 Non scoperto'}</strong>
+          </div>
+          <div class="dex-stat-box">
+            <small>Cibo Preferito</small>
+            <strong>${met && fav ? `${fav.icon} ${fav.name}` : '❓ ???'}</strong>
+          </div>
+          <div class="dex-stat-box">
+            <small>Dono Passivo</small>
+            <strong>${met && gift ? `${gift.icon} ${gift.name}` : '❓ ???'}</strong>
+          </div>
+          <div class="dex-stat-box">
+            <small>Morfomimosi</small>
+            <strong>${power ? `${power.icon} ${power.name}` : 'Nessuna'}</strong>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="card-title">🏡 Come Attirarlo</p>
+          ${attractingHabs.length > 0
+            ? attractingHabs.map((h) => `<p class="card-desc">${s.discoveredHabitats.includes(h.id) ? '✅' : '○'} <strong>${h.icon} ${h.name}</strong> — ${h.hint}</p>`).join('')
+            : `<p class="card-desc">Questo Biomino si incontra esplorando liberamente <strong>${reg ? reg.name : 'Morfalia'}</strong>!</p>`}
+        </div>
       `);
+      return;
+    }
+
+    // List View with Filter Tabs
+    this.renderTabs([
+      { id: 'all', label: `Tutti (${BIOMINI.length})` },
+      { id: 'found', label: `Scoperti (${s.befriended.length})` },
+      { id: 'missing', label: 'Da Scoprire' },
+      { id: 'rare', label: 'Rari+' }
+    ]);
+
+    // Progress & Rarity Counter Summary Card
+    const rarityCounts = {};
+    for (const rKey of Object.keys(RARITIES)) rarityCounts[rKey] = { have: 0, total: 0 };
+    for (const b of BIOMINI) {
+      rarityCounts[b.rarity].total++;
+      if (s.befriended.includes(b.id)) rarityCounts[b.rarity].have++;
+    }
+    c.insertAdjacentHTML('beforeend', `
+      <div class="card">
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="pill-list">
+          ${Object.values(RARITIES).map((r) =>
+            `<span class="rarity-pill" style="color:${r.color};background:${r.bg}">${r.stars} ${r.label}: ${rarityCounts[r.id].have}/${rarityCounts[r.id].total}</span>`
+          ).join('')}
+        </div>
+      </div>
+    `);
+
+    const filtered = BIOMINI.filter((b) => {
+      const met = s.befriended.includes(b.id);
+      if (this.activeTab === 'found') return met;
+      if (this.activeTab === 'missing') return !met;
+      if (this.activeTab === 'rare') return RARITIES[b.rarity].order >= 3;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      c.insertAdjacentHTML('beforeend', `<div class="card"><p class="card-desc">Nessun Biomino corrisponde a questo filtro.</p></div>`);
+      return;
+    }
+
+    for (const bio of filtered) {
+      const met = s.befriended.includes(bio.id);
+      const reg = REGIONS.find((r) => r.id === bio.region);
+      const rar = RARITIES[bio.rarity] || RARITIES.comune;
+      const power = bio.teaches ? POWERS.find((p) => p.id === bio.teaches) : null;
+      const numStr = `#${String(bio.num).padStart(3, '0')}`;
+
+      const card = document.createElement('div');
+      card.className = `card dex-card${met ? ' completed' : ''}`;
+      card.innerHTML = `
+        <div class="card-row">
+          <div class="card-main">
+            <div class="card-emoji">${met ? bio.icon : '❓'}</div>
+            <div>
+              <p class="card-title"><small style="opacity:.6">${numStr}</small> ${met ? bio.name : 'Biomino Sconosciuto'}</p>
+              <p class="card-desc">${met ? bio.bio : `Esplora ${reg ? reg.name : 'Morfalia'} o costruisci il suo Habitat.`}</p>
+            </div>
+          </div>
+          <span style="opacity:.6;font-size:16px">›</span>
+        </div>
+        <div class="pill-list">
+          <span class="rarity-pill" style="color:${rar.color};background:${rar.bg}">${rar.stars} ${rar.label}</span>
+          <span class="mini-pill">${bio.element}</span>
+          <span class="mini-pill">${reg ? reg.icon + ' ' + reg.name : ''}</span>
+          ${power ? `<span class="mini-pill gold">Insegna: ${power.icon} ${power.name}</span>` : ''}
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        this.selectedDexId = bio.id;
+        this.renderSheetBody();
+      });
+      c.appendChild(card);
     }
   }
 
