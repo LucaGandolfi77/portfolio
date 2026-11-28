@@ -243,6 +243,167 @@ export const BIOMINI = [
       'Ho atteso secoli un cuore paziente quanto il tuo, piccolo Mimo.',
       'Quando la Serra del Professore sorgerà, Morfalia canterà di nuovo all\'unisono.'
     ]
+  },
+  // --- 16 NUOVI BIOMINI ORIGINALI (Totale 40) ---
+  {
+    id: 'trifoglino', name: 'Trifoglino', element: 'Erba', icon: '🍀',
+    bodyColor: '#58c964', accentColor: '#b7ff9e', shape: 'round_leaf',
+    region: 'landa', teaches: null, gift: 'herb', favFood: 'turnip',
+    bio: 'Un folletto portafortuna a quattro foglie che spunta nei prati più curati.',
+    quotes: [
+      'Chi trova un prato fiorito trova un tesoro!',
+      'Porto fortuna a chi coltiva la terra con gentilezza.'
+    ]
+  },
+  {
+    id: 'talpino', name: 'Talpino', element: 'Terra', icon: '🐾',
+    bodyColor: '#9c785c', accentColor: '#f2c1b0', shape: 'spiky',
+    region: 'landa', teaches: null, gift: 'clay', favFood: 'turnip',
+    bio: 'Una talpina morbida con un nasino rosa che scova argilla fresca sottoterra.',
+    quotes: [
+      'Sgrunt-snif! Sento profumo di argilla morbida e rape croccanti!',
+      'Gli orti ben innaffiati sono il mio posto preferito per scavare.'
+    ]
+  },
+  {
+    id: 'lucciolina', name: 'Lucciolina', element: 'Armonia', icon: '✨',
+    bodyColor: '#fff082', accentColor: '#8cf7b8', shape: 'winged',
+    region: 'landa', teaches: null, gift: 'pollen', favFood: 'berry_soup',
+    bio: 'Una minuscola lanterna alata che danza intorno ai falò al tramonto.',
+    quotes: [
+      'Bzzz-tlin! Di sera illuminiamo la valle insieme alle tue lanterne!',
+      'Ogni fiore che pianti accende una nuova scintilla.'
+    ]
+  },
+  {
+    id: 'medusella', name: 'Medusella', element: 'Acqua', icon: '🪼',
+    bodyColor: '#8ad8ff', accentColor: '#e8b5ff', shape: 'drop',
+    region: 'costa', teaches: null, gift: 'shell', favFood: 'strawberry',
+    bio: 'Una medusa di rugiada trasparente che galleggia leggera lungo la baia.',
+    quotes: [
+      'Bloop... Le onde cantano quando l\'acqua torna limpida.',
+      'Le mie campanelle brillano sotto la luce della luna.'
+    ]
+  },
+  {
+    id: 'tartamar', name: 'Tartamar', element: 'Acqua', icon: '🐢',
+    bodyColor: '#4fa88f', accentColor: '#ffe099', shape: 'golem',
+    region: 'costa', teaches: null, gift: 'sand_ore', favFood: 'berry',
+    bio: 'Una tartaruga marina dal guscio levigato dalle maree e coperto di sabbia d\'oro.',
+    quotes: [
+      'Piano piano si ricostruisce tutta la baia!',
+      'Adoro sonnecchiare vicino ai pontili di legno.'
+    ]
+  },
+  {
+    id: 'perletta', name: 'Perletta', element: 'Acqua', icon: '🦪',
+    bodyColor: '#ffd9e8', accentColor: '#fff8d6', shape: 'round_ear',
+    region: 'costa', teaches: null, gift: 'shell', favFood: 'strawberry_cake',
+    bio: 'Uno spirito di madreperla che custodisce sassolini lucenti e melodie marine.',
+    quotes: [
+      'Tlin! Ogni conchiglia racconta una storia dei vecchi marinai.',
+      'La fontana della piazzetta suona come una cascata di perle!'
+    ]
+  },
+  {
+    id: 'scintillino', name: 'Scintillino', element: 'Elettro', icon: '⚡',
+    bodyColor: '#ffd447', accentColor: '#ff9642', shape: 'round_ear',
+    region: 'creste', teaches: null, gift: 'spark_core', favFood: 'honey_cookies',
+    bio: 'Un cucciolo elettrico dalle orecchie a spina che fa le fusa come una dinamo.',
+    quotes: [
+      'Bzz-purr! Quando accendi i lampioni elettrici corro subito a giocare!',
+      'Ho sempre qualche nucleo carico da condividere.'
+    ]
+  },
+  {
+    id: 'magmino', name: 'Magmino', element: 'Fuoco', icon: '🌋',
+    bodyColor: '#e65a3e', accentColor: '#ffcf54', shape: 'flame',
+    region: 'creste', teaches: null, gift: 'brick', favFood: 'golden_bread',
+    bio: 'Una piccola salamandra di brace che riscalda i mattoni nelle fornaci.',
+    quotes: [
+      'Fwoosh! Senza un buon fuoco non si fonde né vetro né ferro!',
+      'Il calore gentile tiene lontana la nebbia.'
+    ]
+  },
+  {
+    id: 'quarzo', name: 'Quarzo', element: 'Roccia', icon: '🪨',
+    bodyColor: '#b8b0bd', accentColor: '#98e2ff', shape: 'golem',
+    region: 'creste', teaches: null, gift: 'iron_ore', favFood: 'turnip',
+    bio: 'Un piccolo cristallo-roccia timido che si mimetizza tra i massi di basalto.',
+    quotes: [
+      'Clack... Sembravo solo un sasso, vero?',
+      'Sotto il basalto delle Creste si nascondono vene di ferro purissimo.'
+    ]
+  },
+  {
+    id: 'falchetto', name: 'Falchetto', element: 'Vento', icon: '🦅',
+    bodyColor: '#8cb3d9', accentColor: '#fff2cc', shape: 'winged',
+    region: 'creste', teaches: null, gift: 'pollen', favFood: 'honey_cookies',
+    bio: 'Un falco delle correnti ascensionali che sorvola i mulini a vento.',
+    quotes: [
+      'Kreee! Dall\'alto vedo tutte le strade che stai tracciando!',
+      'I mulini a vento creano correnti perfette per planare.'
+    ]
+  },
+  {
+    id: 'volpombra', name: 'Volpombra', element: 'Spore', icon: '🦊',
+    bodyColor: '#6d5b9e', accentColor: '#b4f5d6', shape: 'round_ear',
+    region: 'foresta', teaches: null, gift: 'glow_mushroom', favFood: 'moon_carrot',
+    bio: 'Una volpe del crepuscolo con la coda che brilla di verde bosco.',
+    quotes: [
+      'Shhh... Segui le lanterne nel bosco e non ti perderai mai.',
+      'Le carote lunari sono il mio spuntino preferito!'
+    ]
+  },
+  {
+    id: 'lichenino', name: 'Lichenino', element: 'Erba', icon: '🌿',
+    bodyColor: '#66b583', accentColor: '#d9f799', shape: 'spiky',
+    region: 'foresta', teaches: null, gift: 'wood', favFood: 'mushroom_broth',
+    bio: 'Un piccolo spirito di corteccia e lichene che abbraccia le statue di muschio.',
+    quotes: [
+      'L\'Albero Madre ricorda il nome di ogni creatura della foresta.',
+      'Un buon brodo di funghi scalda anche le radici più antiche!'
+    ]
+  },
+  {
+    id: 'falena', name: 'Falena', element: 'Spore', icon: '🦋',
+    bodyColor: '#c9a6f5', accentColor: '#8ef5c8', shape: 'winged',
+    region: 'foresta', teaches: null, gift: 'pollen', favFood: 'honey_cookies',
+    bio: 'Una falena vellutata attirata dal bagliore delle lampade fungo.',
+    quotes: [
+      'Flut-flut... La tua luce verde è così riposante!',
+      'Spargo polline dorato su ogni sentiero illuminato.'
+    ]
+  },
+  {
+    id: 'cometa', name: 'Cometa', element: 'Armonia', icon: '🌟',
+    bodyColor: '#ffe77a', accentColor: '#fff9d6', shape: 'star',
+    region: 'isole', teaches: null, gift: 'crystal', favFood: 'harmony_elixir',
+    bio: 'Una stella caduta tra le nuvole che tintinna come un carillon.',
+    quotes: [
+      'Ting-aling! Brillo più forte quando tutti gli abitanti sorridono!',
+      'Le Isole Sospese sono più vicine alle stelle che alla terra.'
+    ]
+  },
+  {
+    id: 'prisma', name: 'Prisma', element: 'Cristallo', icon: '🔷',
+    bodyColor: '#7ce2ff', accentColor: '#ffadf0', shape: 'drop',
+    region: 'isole', teaches: null, gift: 'crystal', favFood: 'moon_carrot',
+    bio: 'Un prisma vivente che trasforma i raggi del sole in piccoli arcobaleni.',
+    quotes: [
+      'Vedi quanti colori ci sono in una sola goccia di rugiada?',
+      'La pietra celeste risuona benissimo con i pilastri di cristallo.'
+    ]
+  },
+  {
+    id: 'aurorina', name: 'Aurorina', element: 'Vento', icon: '🌈',
+    bodyColor: '#ffa8d8', accentColor: '#8ef7e4', shape: 'winged',
+    region: 'isole', teaches: null, gift: 'spark_core', favFood: 'strawberry_cake',
+    bio: 'Una creatura eterea delle alte quote che tesse nastri d\'aurora nel cielo.',
+    quotes: [
+      'Quando l\'aurora scende sulle isole, tutta Morfalia sogna in pace.',
+      'Che gioia vedere questo cielo ripopolarsi!'
+    ]
   }
 ];
 

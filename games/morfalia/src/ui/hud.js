@@ -509,7 +509,7 @@ export class HudController {
     this.els.sheetTitle.textContent = 'Diario degli Habitat';
     this.els.sheetSubtitle.textContent = `Scoperti: ${s.discoveredHabitats.length} / ${HABITATS.length} · Avvicina gli elementi in un'area 7×7!`;
     this.renderTabs([
-      { id: 'all', label: 'Tutti (30)' },
+      { id: 'all', label: `Tutti (${HABITATS.length})` },
       { id: 'todo', label: 'Da Scoprire' },
       { id: 'done', label: 'Scoperti' }
     ]);

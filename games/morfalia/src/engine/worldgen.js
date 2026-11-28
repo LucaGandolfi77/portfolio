@@ -1,4 +1,4 @@
-/* ===== MORFALIA · Deterministic 5-Region World Generator ===== */
+/* ===== MORFALIA · Deterministic 5-Region World Generator (42×32 Expanded World) ===== */
 import { MAP_W, MAP_H, REGIONS } from '../data/config.js';
 import { LORE_LOGS } from '../data/story.js';
 
@@ -20,7 +20,7 @@ function makeGrid(fill) {
 function paintCircle(grid, cx, cy, r, tile) {
   for (let y = Math.max(1, cy - r); y <= Math.min(MAP_H - 2, cy + r); y++) {
     for (let x = Math.max(1, cx - r); x <= Math.min(MAP_W - 2, cx + r); x++) {
-      if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + 0.3) {
+      if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + 0.35) {
         grid[y][x] = tile;
       }
     }
@@ -43,7 +43,7 @@ export function generateRegionWorld(regionId) {
   if (regionId === 'isole') baseTile = 'crystal_floor';
 
   const tiles = makeGrid(baseTile);
-  const objects = {}; // key "x,y" -> { type, solid, item, lit, powered, logId, crop, watered, stage }
+  const objects = {};
 
   const setObj = (x, y, obj) => {
     if (x < 1 || x >= MAP_W - 1 || y < 1 || y >= MAP_H - 1) return;
@@ -53,60 +53,76 @@ export function generateRegionWorld(regionId) {
     objects[k] = { x, y, ...obj };
   };
 
-  // --- Region-specific geography ---
+  // --- Expanded Region-specific Geography (42×32) ---
   if (regionId === 'landa') {
-    // Small natural pond east-south
-    paintCircle(tiles, 18, 12, 2, 'water');
-    // A couple starter grass patches near spawn & sanctuary
-    paintCircle(tiles, 12, 11, 1, 'grass');
-    tiles[12][16] = 'grass';
-    tiles[11][16] = 'grass';
-    // Ancient dirt path from spawn to sanctuary
-    for (let y = 8; y <= 13; y++) tiles[y][13] = 'path';
-    // Cracked Glass Terrarium where Mimo woke up!
-    setObj(11, 11, { type: 'terrarium', solid: true });
-    // Broken starter bench near sanctuary
-    setObj(15, 9, { type: 'workbench', solid: true });
+    // East-south pond & western brook
+    paintCircle(tiles, 28, 19, 3, 'water');
+    paintCircle(tiles, 10, 23, 2, 'water');
+    // Starter grass groves
+    paintCircle(tiles, 20, 18, 2, 'grass');
+    paintCircle(tiles, 26, 17, 1, 'grass');
+    paintCircle(tiles, 11, 10, 2, 'grass');
+    // Ancient stone road from southern meadow to Santuario del Seme
+    for (let y = 10; y <= 24; y++) tiles[y][21] = 'path';
+    for (let x = 14; x <= 28; x++) tiles[15][x] = 'path';
+    // Cracked Glass Terrarium where Mimo woke up
+    setObj(19, 18, { type: 'terrarium', solid: true });
+    // Starter workbench near sanctuary
+    setObj(23, 12, { type: 'workbench', solid: true });
   } else if (regionId === 'costa') {
-    // Ocean along bottom & right edge
+    // Wide ocean along bottom & right edge + lagoon
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        if (y >= MAP_H - 4 || x >= MAP_W - 3) tiles[y][x] = 'water';
+        if (y >= MAP_H - 5 || x >= MAP_W - 4) tiles[y][x] = 'water';
       }
     }
-    paintCircle(tiles, 15, 15, 3, 'water');
-    // Small patch of golden sand near entrance
-    paintCircle(tiles, 7, 10, 2, 'sand');
-    // Wooden pier
-    for (let x = 13; x <= 18; x++) tiles[14][x] = 'bridge';
+    paintCircle(tiles, 24, 24, 4, 'water');
+    paintCircle(tiles, 14, 8, 2, 'water');
+    // Golden sand coves near entrance & northern cape
+    paintCircle(tiles, 9, 15, 3, 'sand');
+    paintCircle(tiles, 22, 13, 2, 'sand');
+    // Wooden piers
+    for (let x = 20; x <= 28; x++) tiles[22][x] = 'bridge';
+    for (let x = 26; x <= 32; x++) tiles[10][x] = 'path';
   } else if (regionId === 'creste') {
-    // Elevated mountain brook
-    for (let y = 3; y <= 14; y++) tiles[y][8] = 'water';
-    tiles[9][8] = 'bridge';
-    tiles[10][8] = 'bridge';
-    // Old stone road
-    for (let y = 6; y <= 16; y++) tiles[y][13] = 'path';
-    paintCircle(tiles, 18, 10, 2, 'withered');
+    // Winding mountain river with twin wooden bridges
+    for (let y = 3; y <= 26; y++) tiles[y][13] = 'water';
+    for (let y = 14; y <= 28; y++) tiles[y][30] = 'water';
+    tiles[14][13] = 'bridge';
+    tiles[15][13] = 'bridge';
+    tiles[21][30] = 'bridge';
+    tiles[22][30] = 'bridge';
+    // Old stone road to Centrale Eolica
+    for (let y = 8; y <= 26; y++) tiles[y][21] = 'path';
+    paintCircle(tiles, 29, 15, 3, 'withered');
+    paintCircle(tiles, 8, 12, 2, 'withered');
   } else if (regionId === 'foresta') {
-    // Misty patches around Mother Tree
-    paintCircle(tiles, 13, 8, 5, 'grass');
-    paintCircle(tiles, 9, 6, 2, 'mist');
-    paintCircle(tiles, 17, 7, 2, 'mist');
-    paintCircle(tiles, 16, 13, 2, 'mist');
-    paintCircle(tiles, 10, 14, 2, 'water');
-    for (let x = 4; x <= 11; x++) tiles[10][x] = 'path';
+    // Lush clearing around Mother Tree + mystic mist rings + forest ponds
+    paintCircle(tiles, 21, 13, 6, 'grass');
+    paintCircle(tiles, 14, 9, 3, 'mist');
+    paintCircle(tiles, 28, 10, 3, 'mist');
+    paintCircle(tiles, 27, 21, 3, 'mist');
+    paintCircle(tiles, 12, 22, 3, 'mist');
+    paintCircle(tiles, 16, 23, 2, 'water');
+    paintCircle(tiles, 31, 16, 2, 'water');
+    for (let x = 6; x <= 18; x++) tiles[16][x] = 'path';
   } else if (regionId === 'isole') {
-    // Cloud water border (sky sea)
+    // Sky-cloud sea border + 2 floating island channels
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        if (x <= 2 || x >= MAP_W - 3 || y <= 1 || y >= MAP_H - 2) {
+        if (x <= 3 || x >= MAP_W - 4 || y <= 2 || y >= MAP_H - 3) {
           tiles[y][x] = 'water';
         }
       }
     }
-    // Central garden ring
-    paintCircle(tiles, 13, 11, 3, 'grass');
-    for (let y = 7; y <= 16; y++) tiles[y][13] = 'path';
+    paintCircle(tiles, 12, 16, 3, 'water');
+    paintCircle(tiles, 30, 16, 3, 'water');
+    // Central garden ring & crystal bridges
+    paintCircle(tiles, 21, 17, 4, 'grass');
+    for (let y = 9; y <= 26; y++) tiles[y][21] = 'path';
+    for (let x = 10; x <= 32; x++) tiles[17][x] = 'path';
+    tiles[17][12] = 'bridge';
+    tiles[17][30] = 'bridge';
   }
 
   // --- Place Sanctuary Station (ruined initially) ---
@@ -120,7 +136,7 @@ export function generateRegionWorld(regionId) {
     repaired: false,
     name: meta.sanctuaryName
   };
-  // Clear 1-tile ring around sanctuary & spawn
+
   const keepClear = new Set([
     key(sp.x, sp.y),
     key(sp.x, sp.y + 1),
@@ -149,54 +165,54 @@ export function generateRegionWorld(regionId) {
     keepClear.add(key(log.pos.x, log.pos.y));
   }
 
-  // --- Scatter Natural Resources & Obstacles ---
+  // --- Scatter Abundant Natural Resources & Obstacles ---
   const nodeTable = {
     landa: [
-      { type: 'node_wood', count: 10 },
-      { type: 'node_stone', count: 9 },
-      { type: 'node_clay', count: 7 },
-      { type: 'node_berry', count: 6 },
-      { type: 'node_herb', count: 6 },
-      { type: 'bramble', count: 5 },
-      { type: 'dead_tree', count: 5 }
+      { type: 'node_wood', count: 22 },
+      { type: 'node_stone', count: 18 },
+      { type: 'node_clay', count: 15 },
+      { type: 'node_berry', count: 14 },
+      { type: 'node_herb', count: 14 },
+      { type: 'bramble', count: 10 },
+      { type: 'dead_tree', count: 11 }
     ],
     costa: [
-      { type: 'node_sand', count: 11 },
-      { type: 'node_shell', count: 8 },
-      { type: 'node_wood', count: 8 },
-      { type: 'node_stone', count: 7 },
-      { type: 'bramble', count: 5 },
-      { type: 'dead_tree', count: 6 }
+      { type: 'node_sand', count: 24 },
+      { type: 'node_shell', count: 18 },
+      { type: 'node_wood', count: 16 },
+      { type: 'node_stone', count: 14 },
+      { type: 'bramble', count: 10 },
+      { type: 'dead_tree', count: 11 }
     ],
     creste: [
-      { type: 'node_iron', count: 10 },
-      { type: 'node_stone', count: 9 },
-      { type: 'node_spark', count: 8 },
-      { type: 'boulder', count: 7 },
-      { type: 'node_clay', count: 5 },
-      { type: 'node_wood', count: 5 }
+      { type: 'node_iron', count: 22 },
+      { type: 'node_stone', count: 20 },
+      { type: 'node_spark', count: 16 },
+      { type: 'boulder', count: 14 },
+      { type: 'node_clay', count: 11 },
+      { type: 'node_wood', count: 11 }
     ],
     foresta: [
-      { type: 'node_mushroom', count: 11 },
-      { type: 'node_pollen', count: 9 },
-      { type: 'node_wood', count: 8 },
-      { type: 'node_berry', count: 6 },
-      { type: 'dead_tree', count: 6 },
-      { type: 'bramble', count: 5 }
+      { type: 'node_mushroom', count: 24 },
+      { type: 'node_pollen', count: 19 },
+      { type: 'node_wood', count: 16 },
+      { type: 'node_berry', count: 14 },
+      { type: 'dead_tree', count: 12 },
+      { type: 'bramble', count: 11 }
     ],
     isole: [
-      { type: 'node_crystal', count: 12 },
-      { type: 'node_spark', count: 7 },
-      { type: 'node_iron', count: 6 },
-      { type: 'node_pollen', count: 6 },
-      { type: 'boulder', count: 6 }
+      { type: 'node_crystal', count: 24 },
+      { type: 'node_spark', count: 15 },
+      { type: 'node_iron', count: 14 },
+      { type: 'node_pollen', count: 14 },
+      { type: 'boulder', count: 12 }
     ]
   };
 
   for (const entry of nodeTable[regionId] || []) {
     let placed = 0;
     let tries = 0;
-    while (placed < entry.count && tries < 250) {
+    while (placed < entry.count && tries < 500) {
       tries++;
       const x = 2 + Math.floor(rand() * (MAP_W - 4));
       const y = 2 + Math.floor(rand() * (MAP_H - 4));
@@ -214,21 +230,41 @@ export function generateRegionWorld(regionId) {
     }
   }
 
-  // Initial residents (Fogliolo starts exploring near Landa's terrarium so player immediately meets a friendly creature!)
-  const residents = [];
-  if (regionId === 'landa') {
-    residents.push({
-      id: 'fogliolo',
-      x: 15.2,
-      y: 11.4,
-      targetX: 15.2,
-      targetY: 11.4,
-      hearts: 1,
-      giftTimer: 25,
-      hasGift: false,
-      met: false
-    });
-  }
+  // Initial friendly wild Biomini exploring each region
+  const starterMap = {
+    landa: [
+      { id: 'fogliolo', x: 23.2, y: 18.4 },
+      { id: 'trifoglino', x: 11.5, y: 10.5 }
+    ],
+    costa: [
+      { id: 'sabbietta', x: 10.5, y: 16.2 },
+      { id: 'medusella', x: 23.0, y: 14.0 }
+    ],
+    creste: [
+      { id: 'piumavento', x: 22.5, y: 20.0 },
+      { id: 'quarzo', x: 17.5, y: 11.5 }
+    ],
+    foresta: [
+      { id: 'lumifungo', x: 20.5, y: 16.5 },
+      { id: 'lichenino', x: 24.5, y: 12.0 }
+    ],
+    isole: [
+      { id: 'nubolino', x: 22.0, y: 18.0 },
+      { id: 'prisma', x: 17.5, y: 16.5 }
+    ]
+  };
+
+  const residents = (starterMap[regionId] || []).map((s) => ({
+    id: s.id,
+    x: s.x,
+    y: s.y,
+    targetX: s.x,
+    targetY: s.y,
+    hearts: 1,
+    giftTimer: 25,
+    hasGift: false,
+    met: false
+  }));
 
   return {
     id: regionId,
@@ -242,7 +278,6 @@ export function generateRegionWorld(regionId) {
 }
 
 export function replenishRegionNodes(region) {
-  // Gently regrow a few natural pickups each morning so players can never run out
   const pool = {
     landa: ['node_wood', 'node_stone', 'node_clay', 'node_berry', 'node_herb'],
     costa: ['node_sand', 'node_shell', 'node_wood', 'node_stone'],
@@ -252,7 +287,7 @@ export function replenishRegionNodes(region) {
   }[region.id] || ['node_wood', 'node_stone'];
 
   let spawned = 0;
-  for (let tries = 0; tries < 70 && spawned < 6; tries++) {
+  for (let tries = 0; tries < 120 && spawned < 10; tries++) {
     const x = 2 + Math.floor(Math.random() * (MAP_W - 4));
     const y = 2 + Math.floor(Math.random() * (MAP_H - 4));
     const k = `${x},${y}`;

@@ -1,7 +1,7 @@
 /* ===== MORFALIA · World & Mechanics Configuration ===== */
 
-export const MAP_W = 26;
-export const MAP_H = 20;
+export const MAP_W = 42;
+export const MAP_H = 32;
 export const TILE_SIZE = 48;
 
 export const DAY_LENGTH_SECONDS = 240; // 4 real minutes = 24 in-game hours
@@ -117,8 +117,8 @@ export const REGIONS = [
     unlockHint: 'Regione iniziale',
     desc: 'Una conca silenziosa attorno al vecchio Santuario del Seme, dove Mimo si è risvegliato.',
     sanctuaryName: 'Santuario del Seme',
-    sanctuaryPos: { x: 13, y: 7 },
-    spawnPos: { x: 13, y: 11 },
+    sanctuaryPos: { x: 21, y: 9 },
+    spawnPos: { x: 21, y: 18 },
     skyWithered: '#6e6a60',
     skyLush: '#78b982',
     sanctuaryCost: { wood: 6, stone: 4, clay: 3 }
@@ -132,8 +132,8 @@ export const REGIONS = [
     unlockHint: 'Completa il Capitolo 1 nella Landa Inaridita',
     desc: 'Una baia prosciugata e coperta di sabbia grigia con un antico faro spento.',
     sanctuaryName: 'Faro delle Maree',
-    sanctuaryPos: { x: 19, y: 6 },
-    spawnPos: { x: 5, y: 10 },
+    sanctuaryPos: { x: 32, y: 8 },
+    spawnPos: { x: 7, y: 15 },
     skyWithered: '#686b72',
     skyLush: '#56aac9',
     sanctuaryCost: { lumber: 5, glass: 4, stone: 6 }
@@ -147,8 +147,8 @@ export const REGIONS = [
     unlockHint: 'Completa il Capitolo 2 sulla Costa di Cenere',
     desc: 'Terrazze rocciose percorse da vecchi cavi e turbine abbandonate dai Custodi.',
     sanctuaryName: 'Centrale Eolica',
-    sanctuaryPos: { x: 13, y: 5 },
-    spawnPos: { x: 13, y: 16 },
+    sanctuaryPos: { x: 21, y: 7 },
+    spawnPos: { x: 21, y: 26 },
     skyWithered: '#5c5863',
     skyLush: '#c9a66b',
     sanctuaryCost: { iron_bar: 5, brick: 5, spark_core: 3 }
@@ -162,8 +162,8 @@ export const REGIONS = [
     unlockHint: 'Completa il Capitolo 3 sulle Creste di Basalto',
     desc: 'Un antico bosco velato da spore soporifere, custode del Grande Albero Madre.',
     sanctuaryName: 'Albero Madre',
-    sanctuaryPos: { x: 13, y: 8 },
-    spawnPos: { x: 4, y: 10 },
+    sanctuaryPos: { x: 21, y: 13 },
+    spawnPos: { x: 6, y: 16 },
     skyWithered: '#494257',
     skyLush: '#4a8f7a',
     sanctuaryCost: { lumber: 6, glow_mushroom: 6, pollen: 5 }
@@ -177,8 +177,8 @@ export const REGIONS = [
     unlockHint: 'Completa il Capitolo 4 nella Foresta di Nebbia',
     desc: 'Un arcipelago fluttuante di laboratori cristallini sospeso sopra le nuvole.',
     sanctuaryName: 'Faro di Risonanza',
-    sanctuaryPos: { x: 13, y: 6 },
-    spawnPos: { x: 13, y: 16 },
+    sanctuaryPos: { x: 21, y: 8 },
+    spawnPos: { x: 21, y: 26 },
     skyWithered: '#5f687a',
     skyLush: '#86b5f5',
     sanctuaryCost: { crystal: 8, iron_bar: 6, glass: 6, spark_core: 4 }

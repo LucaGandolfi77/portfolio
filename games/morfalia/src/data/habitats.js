@@ -198,6 +198,67 @@ export const HABITATS = [
     region: null, attracts: 'astralio', harmony: 85,
     reqs: { objs: { prof_greenhouse: 1, botanic_shelf: 1, fountain: 1, flower_bed: 1 } },
     hint: 'La grande opera finale: Serra del Professore + Scaffale Botanico + Fontana + Vaso di Fiori!'
+  },
+  // --- 10 NUOVI HABITAT (Totale 40) ---
+  {
+    id: 'hab_quadrifoglio', name: 'Radura Fortunata', icon: '🍀',
+    region: 'landa', attracts: 'trifoglino', harmony: 30,
+    reqs: { tiles: { flowers: 3, grass: 4 } },
+    hint: 'Nella Landa: 3 caselle di Prato Fiorito vicino a 4 di Prato Verde.'
+  },
+  {
+    id: 'hab_galleria_argilla', name: 'Orto Sotterraneo', icon: '🐾',
+    region: null, attracts: 'talpino', harmony: 32,
+    reqs: { tiles: { soil: 5, path: 2 } },
+    hint: '5 Aiuole Orto lungo 2 caselle di Sentiero in Pietra.'
+  },
+  {
+    id: 'hab_sentiero_lucciole', name: 'Viale delle Lucciole', icon: '✨',
+    region: null, attracts: 'lucciolina', harmony: 34,
+    reqs: { objs: { lantern: 2 }, tiles: { flowers: 2 } },
+    hint: '2 Lanterne di Giardino vicino a 2 caselle di Prato Fiorito.'
+  },
+  {
+    id: 'hab_laguna_trasparente', name: 'Laguna delle Meduse', icon: '🪼',
+    region: 'costa', attracts: 'medusella', harmony: 36,
+    reqs: { tiles: { water: 4, sand: 3 } },
+    hint: 'Sulla Costa: 4 caselle d\'Acqua vicino a 3 di Sabbia Dorata.'
+  },
+  {
+    id: 'hab_approdo_tartarughe', name: 'Approdo delle Tartarughe', icon: '🐢',
+    region: null, attracts: 'tartamar', harmony: 38,
+    reqs: { objs: { beach_umbrella: 1 }, tiles: { bridge: 2, sand: 3 } },
+    hint: '1 Ombrellone Costiero con 2 caselle di Ponte di Legno e 3 di Sabbia Dorata.'
+  },
+  {
+    id: 'hab_salotto_perla', name: 'Salotto di Madreperla', icon: '🦪',
+    region: null, attracts: 'perletta', harmony: 40,
+    reqs: { objs: { shell_arch: 1, fountain: 1 } },
+    hint: '1 Arco di Conchiglie accanto a 1 Fontana di Rugiada.'
+  },
+  {
+    id: 'hab_piazza_dinamo', name: 'Piazza della Dinamo', icon: '🌋',
+    region: 'creste', attracts: 'magmino', harmony: 40,
+    reqs: { objs: { furnace: 2, campfire: 1 } },
+    hint: 'Sulle Creste: 2 Fornaci di Argilla vicino a 1 Falò.'
+  },
+  {
+    id: 'hab_nido_correnti', name: 'Nido delle Correnti', icon: '🦅',
+    region: null, attracts: 'falchetto', harmony: 42,
+    reqs: { objs: { windmill: 1, cozy_tent: 1 }, tiles: { rock: 3 } },
+    hint: '1 Mulino a Vento + 1 Tenda Rifugio su 3 caselle di Basalto.'
+  },
+  {
+    id: 'hab_radura_volpe', name: 'Radura della Volpe', icon: '🦊',
+    region: 'foresta', attracts: 'volpombra', harmony: 44,
+    reqs: { objs: { mushroom_lamp: 1, picnic_table: 1 }, tiles: { grass: 4 } },
+    hint: 'Nella Foresta: 1 Lampada Fungo + 1 Tavolo da Picnic su 4 caselle di Prato.'
+  },
+  {
+    id: 'hab_osservatorio_comete', name: 'Osservatorio delle Comete', icon: '🌟',
+    region: 'isole', attracts: 'cometa', harmony: 52,
+    reqs: { objs: { crystal_pillar: 1, street_lamp: 1, log_bench: 1 } },
+    hint: 'Nelle Isole Sospese: 1 Pilastro di Cristallo + 1 Lampione Elettrico + 1 Panchina.'
   }
 ];
 

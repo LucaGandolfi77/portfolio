@@ -44,8 +44,8 @@ export function createInitialState() {
     activePower: 'hand',
     buildItemId: null,
     player: {
-      x: 13.0,
-      y: 11.2,
+      x: 21.0,
+      y: 18.2,
       facingX: 0,
       facingY: 1,
       energy: 100,

@@ -58,9 +58,9 @@ export class WorldRenderer3D {
     // Three.js core
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#6ca87d');
-    this.scene.fog = new THREE.FogExp2('#6ca87d', 0.022);
+    this.scene.fog = new THREE.FogExp2('#6ca87d', 0.017);
 
-    this.camera = new THREE.PerspectiveCamera(42, this.width / this.height, 0.2, 90);
+    this.camera = new THREE.PerspectiveCamera(42, this.width / this.height, 0.2, 95);
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.shadowMap.enabled = true;
@@ -78,7 +78,7 @@ export class WorldRenderer3D {
     this.sunLight.shadow.mapSize.set(1024, 1024);
     this.sunLight.shadow.camera.near = 2;
     this.sunLight.shadow.camera.far = 55;
-    const d = 18;
+    const d = 21;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
@@ -173,7 +173,7 @@ export class WorldRenderer3D {
     this.weatherDrops = [];
     this.initWeather3D();
 
-    this.camLookAt = new THREE.Vector3(13, 0, 11);
+    this.camLookAt = new THREE.Vector3(MAP_W / 2, 0, MAP_H / 2);
     this.resize();
   }
 
@@ -279,6 +279,8 @@ export class WorldRenderer3D {
         const m = new THREE.Mesh(this.tileGeo, this.tileMaterials[tid] || this.tileMaterials.withered);
         m.position.set(x + 0.5, -0.225, y + 0.5);
         m.receiveShadow = true;
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
         this.terrainGroup.add(m);
         this.tileMeshes[y][x] = m;
         this.tileStateGrid[y][x] = '';
@@ -303,6 +305,7 @@ export class WorldRenderer3D {
     } else {
       mesh.position.y = -0.225;
     }
+    mesh.updateMatrix();
 
     // Remove old tile deco if any
     const dk = `${x},${y}`;
