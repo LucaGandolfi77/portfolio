@@ -1,10 +1,8 @@
 /* Italy 3D Flight Sim — Three.js scene, cameras, lighting and weather */
 
 import * as THREE from '../../_vendor/three.module.js';
-import { WORLD } from './config.js';
-import { terrainHeight } from './geo.js';
 import { GLIDE_SLOPE, RUNWAY, airfields, runwayCoords } from './airfields.js';
-import { createWorld, terrainColor, happyColor } from './terrain.js';
+import { createWorld } from './terrain.js';
 import { createPlaneMesh, animatePlane } from './planes.js';
 import { createLandmarks } from './landmarks.js';
 
@@ -20,14 +18,19 @@ function cloudTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+/* Clouds drift in a square that travels with the aircraft. */
+const CLOUD_SPAN = 7000;
+const FOG = { clear: 0.00024, cloudy: 0.00048, fog: 0.0016 };
+const wrapAround = (value, centre, span) => value - Math.round((value - centre) / span) * span;
+
 function makeClouds(scene, quality, happy) {
-  const count = quality === 'low' ? 24 : 70;
+  const count = quality === 'low' ? 36 : 110;
   const tex = cloudTexture();
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: happy ? 0.95 : 0.75 });
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const s = new THREE.Sprite(mat);
-    s.position.set((Math.random() - 0.5) * WORLD.width * 1.4, 550 + Math.random() * 700, (Math.random() - 0.5) * WORLD.depth * 1.4);
+    s.position.set((Math.random() - 0.5) * CLOUD_SPAN, 550 + Math.random() * 700, (Math.random() - 0.5) * CLOUD_SPAN);
     const scale = 120 + Math.random() * 180;
     s.scale.set(scale, scale * 0.45, 1);
     group.add(s);
@@ -39,25 +42,36 @@ function makeClouds(scene, quality, happy) {
 export function createRenderer(canvas, quality = 'high', initialTexture = null, visual = 'happy') {
   let imageryTexture = initialTexture;
   let happyMode = visual === 'happy';
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'high-performance' });
+  /* A logarithmic depth buffer keeps distant shores and runways from flickering. */
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'high-performance', logarithmicDepthBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 2 : 1));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(happyMode ? '#8fdcf5' : '#8cc3e8');
-  scene.fog = new THREE.FogExp2(happyMode ? '#c4ecf7' : '#a9c9dc', 0.00075);
+  scene.fog = new THREE.FogExp2(happyMode ? '#c4ecf7' : '#a9c9dc', FOG.clear);
 
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 1, 7000);
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 1, 60000);
   const hemi = new THREE.HemisphereLight('#e6f8ff', happyMode ? '#7fc46a' : '#4c6b50', happyMode ? 1.5 : 1.1);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff6d8', happyMode ? 2.1 : 1.8);
   sun.position.set(400, 800, -300);
   scene.add(sun);
 
-  const world = createWorld(scene, quality, imageryTexture, visual);
+  const world = createWorld(scene, quality);
+  /* Behind the menus, look out over the coast west of Rome. */
+  const home = airfields().find(f => f.code === 'FCO');
+  camera.position.set(home.x + 520, 240, home.z + 420);
+  camera.lookAt(home.x - 200, 0, home.z - 80);
+  /* Seen from the overview, the aircraft itself is far too small to find. */
+  const marker = new THREE.Mesh(new THREE.ConeGeometry(110, 330, 4), new THREE.MeshBasicMaterial({ color: '#ffffff', fog: false }));
+  marker.geometry.rotateX(-Math.PI / 2);
+  marker.visible = false;
+  scene.add(marker);
   const clouds = makeClouds(scene, quality, happyMode);
   let planeMesh = null;
+  let landmarks = [];
   let trafficMeshes = [];
   let sunTime = 0.3;
   let mapMode = false;
@@ -123,7 +137,29 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     }
     sun.position.set(Math.cos(sunTime * Math.PI * 2) * 700, 200 + day * 800, -400);
 
-    clouds.rotation.y += dt * 0.002;
+    const focus = s || camera.position;
+    for (const cloud of clouds.children) {
+      cloud.position.x = wrapAround(cloud.position.x + dt * 6, focus.x, CLOUD_SPAN);
+      cloud.position.z = wrapAround(cloud.position.z, focus.z, CLOUD_SPAN);
+    }
+    world.ground.uniforms.seaTime.value = time % 1000;
+    world.terrain.update(focus.x, focus.z, quality === 'low' ? 1 : 2);
+    const overview = !!s && game.view === 'overview';
+    scene.fog.density = overview ? 0 : FOG[weather];
+    clouds.visible = !overview;
+    marker.visible = overview;
+    for (const { sprite, range: reach } of world.labels) {
+      sprite.visible = !overview && Math.hypot(focus.x - sprite.position.x, focus.z - sprite.position.z) < reach;
+    }
+    for (const mesh of world.cities) {
+      const c = mesh.userData.center;
+      mesh.visible = !overview && Math.hypot(focus.x - c.x, focus.z - c.z) < (quality === 'low' ? 2000 : 3600);
+    }
+    for (const node of landmarks) {
+      const near = !overview && Math.hypot(focus.x - node.position.x, focus.z - node.position.z) < 3000;
+      node.visible = near;
+      node.userData.tag.visible = near && Math.hypot(focus.x - node.position.x, focus.z - node.position.z) < 1500;
+    }
 
     if (!s) { renderer.render(scene, camera); return; }
     if (!planeMesh) setPlane(game.plane);
@@ -132,11 +168,9 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     animatePlane(planeMesh, time, s.boosting);
 
     if (happyMode) {
-      const shimmer = world.sea.userData.shimmer;
-      if (shimmer) { shimmer.offset.x = time * 0.01; shimmer.offset.y = Math.sin(time * 0.2) * 0.02; }
-      for (const bird of world.happy?.userData.birds?.children || []) {
-        bird.position.x += bird.userData.speed * dt;
-        if (bird.position.x > WORLD.width / 2) bird.position.x = -WORLD.width / 2;
+      for (const bird of world.happy.userData.birds.children) {
+        bird.position.x = wrapAround(bird.position.x + bird.userData.speed * dt, s.x, 1800);
+        bird.position.z = wrapAround(bird.position.z, s.z, 1800);
         bird.rotation.z = Math.sin(time * 4 + bird.position.z) * 0.2;
       }
       confetti.visible = !!s.boosting;
@@ -163,7 +197,7 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     updatePapi(s);
 
     // Real city buildings are only drawn near the aircraft.
-    const range = quality === 'low' ? 480 : 760;
+    const range = quality === 'low' ? 1400 : 2600;
     for (const mesh of world.realBuildings || []) {
       const c = mesh.userData.center;
       mesh.visible = !!c && Math.hypot(s.x - c.x, s.z - c.z) < range;
@@ -178,9 +212,11 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     planeMesh.visible = !banked;
     if (game.view === 'overview') {
       camera.fov = 55;
-      tempLook.set(0, 0, 0);
-      camera.position.lerp(new THREE.Vector3(0, 950, 820), Math.min(1, dt * 3));
+      tempLook.set(0, 0, 400);
+      camera.position.lerp(new THREE.Vector3(0, 11800, 8600), Math.min(1, dt * 3));
       camera.lookAt(tempLook);
+      marker.position.set(s.x, 400, s.z);
+      marker.rotation.y = -s.heading;
     } else if (game.view === 'cockpit') {
       camera.fov = 78;
       tempLook.copy(planeMesh.position).add(forward.clone().multiplyScalar(160)).addScaledVector(camera.up, 8);
@@ -192,7 +228,9 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
     } else {
       camera.fov = 70;
       const behind = planeMesh.position.clone().add(forward.clone().multiplyScalar(-52)).add(new THREE.Vector3(0, 20, 0));
-      camera.position.lerp(behind, Math.min(1, dt * 4));
+      /* Cut straight there after a jump, such as a new flight or a respawn. */
+      if (camera.position.distanceTo(behind) > 200) camera.position.copy(behind);
+      else camera.position.lerp(behind, Math.min(1, dt * 4));
       tempLook.copy(planeMesh.position).add(forward.clone().multiplyScalar(45)).add(new THREE.Vector3(0, 7, 0));
       camera.lookAt(tempLook);
     }
@@ -213,38 +251,13 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
   }
 
   function applyVisual() {
-    const geo = world.terrain.geometry;
-    const colors = geo.attributes.color;
-    const pos = geo.attributes.position;
-    const source = happyMode ? geo.userData.happyColors : geo.userData.satColors;
-    for (let i = 0; i < colors.count; i++) {
-      if (mapMode && !happyMode) {
-        const c = terrainColor(pos.getY(i));
-        colors.setXYZ(i, c.r, c.g, c.b);
-      } else if (source) {
-        colors.setXYZ(i, source[i * 3], source[i * 3 + 1], source[i * 3 + 2]);
-      }
-    }
-    colors.needsUpdate = true;
-    const mat = world.terrain.material;
-    mat.map = !happyMode && !mapMode && imageryOn ? imageryTexture : null;
-    mat.color.set('#ffffff');
-    mat.needsUpdate = true;
-
-    world.sea.material.color.set(happyMode ? '#3fc3d6' : mapMode ? '#1a86c9' : '#1b6b93');
-    world.sea.material.map = happyMode ? world.sea.userData.shimmer : null;
-    world.sea.material.opacity = 1;
-    world.sea.material.needsUpdate = true;
+    const satellite = !happyMode && !mapMode && imageryOn ? imageryTexture : null;
+    world.setLook(happyMode ? 'happy' : mapMode ? 'map' : 'natural', satellite);
     scene.background.set(happyMode ? '#8fdcf5' : '#8cc3e8');
     scene.fog.color.set(happyMode ? '#c4ecf7' : '#a9c9dc');
     hemi.groundColor.set(happyMode ? '#7fc46a' : '#4c6b50');
     hemi.intensity = happyMode ? 1.5 : 1.1;
     sun.intensity = happyMode ? 2.1 : 1.8;
-    if (world.happy) world.happy.visible = happyMode;
-    for (const mesh of world.coast || []) {
-      mesh.material.color.set(happyMode ? '#9ce8d8' : '#54c4d8');
-      mesh.material.opacity = happyMode ? 0.75 : mapMode ? 0.9 : 0.55;
-    }
     for (const cloud of clouds.children) cloud.material.opacity = happyMode ? 0.95 : 0.75;
   }
 
@@ -275,11 +288,10 @@ export function createRenderer(canvas, quality = 'high', initialTexture = null, 
 
   function setWeather(preset) {
     weather = ['clear', 'cloudy', 'fog'].includes(preset) ? preset : 'clear';
-    scene.fog.density = weather === 'fog' ? 0.0024 : weather === 'cloudy' ? 0.0012 : 0.00075;
     for (const cloud of clouds.children) cloud.material.opacity = weather === 'fog' ? 0.25 : weather === 'cloudy' ? 0.9 : happyMode ? 0.95 : 0.75;
   }
 
-  function addLandmarks() { return createLandmarks(world.group); }
+  function addLandmarks() { landmarks = createLandmarks(world.group); return landmarks; }
 
   function setImageryTexture(tex) {
     imageryTexture = tex;

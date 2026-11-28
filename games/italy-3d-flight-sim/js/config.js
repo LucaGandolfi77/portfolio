@@ -1,9 +1,10 @@
 /* Italy 3D Flight Sim — aircraft, real airports, missions and bilingual strings */
 
 export const WORLD = {
-  width: 1760, depth: 1430,
+  width: 17600, depth: 14300,
   minLon: 4.5, maxLon: 20.5, minLat: 35.0, maxLat: 48.0,
-  elevScale: 0.05, maxAlt: 3000, grid: 512
+  /* World units of height per metre of real elevation. */
+  elevScale: 0.05 / 3, maxAlt: 3000, grid: 512
 };
 
 export const loc = (value, lang = 'en') =>
@@ -78,21 +79,21 @@ export const PLANES = [
 ];
 
 // Airport coordinates in decimal degrees. `rwy` is the approximate main runway
-// heading in degrees; `offset` nudges the game airfield clear of landmarks.
+// heading in degrees.
 export const AIRPORTS = [
   { code: 'MXP', lon: 8.724, lat: 45.630, rwy: 350, name: { en: 'Milano Malpensa', it: 'Milano Malpensa' } },
-  { code: 'LIN', lon: 9.276, lat: 45.445, rwy: 355, offset: [22, -2], name: { en: 'Milano Linate', it: 'Milano Linate' } },
+  { code: 'LIN', lon: 9.276, lat: 45.445, rwy: 355, name: { en: 'Milano Linate', it: 'Milano Linate' } },
   { code: 'GOA', lon: 8.842, lat: 44.410, rwy: 100, name: { en: 'Genova', it: 'Genova' } },
-  { code: 'VCE', lon: 12.351, lat: 45.505, rwy: 40, offset: [60, 40], name: { en: 'Venezia', it: 'Venezia' } },
-  { code: 'BLQ', lon: 11.287, lat: 44.508, rwy: 120, offset: [18, -26], name: { en: 'Bologna', it: 'Bologna' } },
-  { code: 'FLR', lon: 11.199, lat: 43.810, rwy: 50, offset: [-46, 10], name: { en: 'Firenze', it: 'Firenze' } },
-  { code: 'FCO', lon: 12.252, lat: 41.800, rwy: 160, offset: [-36, 4], name: { en: 'Roma Fiumicino', it: 'Roma Fiumicino' } },
-  { code: 'CIA', lon: 12.594, lat: 41.799, rwy: 150, offset: [12, -38], name: { en: 'Roma Ciampino', it: 'Roma Ciampino' } },
-  { code: 'NAP', lon: 14.292, lat: 40.886, rwy: 60, offset: [-20, -30], name: { en: 'Napoli', it: 'Napoli' } },
+  { code: 'VCE', lon: 12.351, lat: 45.505, rwy: 40, name: { en: 'Venezia', it: 'Venezia' } },
+  { code: 'BLQ', lon: 11.287, lat: 44.508, rwy: 120, name: { en: 'Bologna', it: 'Bologna' } },
+  { code: 'FLR', lon: 11.199, lat: 43.810, rwy: 50, name: { en: 'Firenze', it: 'Firenze' } },
+  { code: 'FCO', lon: 12.252, lat: 41.800, rwy: 160, name: { en: 'Roma Fiumicino', it: 'Roma Fiumicino' } },
+  { code: 'CIA', lon: 12.594, lat: 41.799, rwy: 150, name: { en: 'Roma Ciampino', it: 'Roma Ciampino' } },
+  { code: 'NAP', lon: 14.292, lat: 40.886, rwy: 60, name: { en: 'Napoli', it: 'Napoli' } },
   { code: 'BRI', lon: 16.760, lat: 41.140, rwy: 70, name: { en: 'Bari', it: 'Bari' } },
   { code: 'BDS', lon: 17.948, lat: 40.658, rwy: 130, name: { en: 'Brindisi', it: 'Brindisi' } },
-  { code: 'PMO', lon: 13.099, lat: 38.176, rwy: 70, offset: [-2, -8], name: { en: 'Palermo', it: 'Palermo' } },
-  { code: 'CTA', lon: 15.063, lat: 37.468, rwy: 80, offset: [14, 24], name: { en: 'Catania', it: 'Catania' } },
+  { code: 'PMO', lon: 13.099, lat: 38.176, rwy: 70, name: { en: 'Palermo', it: 'Palermo' } },
+  { code: 'CTA', lon: 15.063, lat: 37.468, rwy: 80, name: { en: 'Catania', it: 'Catania' } },
   { code: 'CAG', lon: 9.069, lat: 39.251, rwy: 140, name: { en: 'Cagliari', it: 'Cagliari' } },
   { code: 'OLB', lon: 9.518, lat: 40.896, rwy: 50, name: { en: 'Olbia', it: 'Olbia' } }
 ];

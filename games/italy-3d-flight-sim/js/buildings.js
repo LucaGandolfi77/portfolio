@@ -2,10 +2,12 @@
 
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
-import { geoToWorld, terrainHeight } from './geo.js';
+import { geoToWorld, isWater, terrainHeight } from './geo.js';
 import { onAirfield } from './airfields.js';
 
-const BUILD_SCALE = 0.34;
+/* Footprints are widened and heights kept low, to read as a town from the air. */
+const BUILD_SCALE = 0.16;
+const FOOTPRINT = 8;
 let data = null;
 
 export function initBuildingsData(json) { data = json; }
@@ -27,7 +29,7 @@ export function buildCityLights(group) {
       lon /= ring.length; lat /= ring.length;
       const p = geoToWorld(lon, lat);
       if (onAirfield(p.x, p.z, 110, 20)) continue;
-      positions.push(p.x, terrainHeight(p.x, p.z) + 4, p.z);
+      positions.push(p.x, terrainHeight(p.x, p.z) + 2.5, p.z);
     }
   }
   if (!positions.length) return null;
@@ -58,9 +60,10 @@ export function buildRealBuildings(group, quality = 'high') {
       let cx = 0, cz = 0;
       for (const p of pts) { cx += p.x; cz += p.z; }
       cx /= pts.length; cz /= pts.length;
-      if (onAirfield(cx, cz, 110, 20)) continue;
+      if (onAirfield(cx, cz, 110, 20) || isWater(cx, cz)) continue;
+      for (const p of pts) { p.x = cx + (p.x - cx) * FOOTPRINT; p.z = cz + (p.z - cz) * FOOTPRINT; }
       const base = terrainHeight(cx, cz);
-      const top = base + Math.max(2, height * BUILD_SCALE);
+      const top = base + Math.max(1.2, height * BUILD_SCALE);
       const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
       let faces = [];
       try { faces = THREE.ShapeUtils.triangulateShape(contour, []); } catch (e) { continue; }

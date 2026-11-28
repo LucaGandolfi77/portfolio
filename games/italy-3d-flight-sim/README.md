@@ -8,12 +8,13 @@ Open <https://lucagandolfi77.github.io/portfolio/games/italy-3d-flight-sim/> and
 
 ## What's inside
 
-- **Real terrain**: SRTM-derived elevation grid (512×512, ~0.12 world units per metre) with Alpine and Apennine heights up to ~4600 m, vertex-coloured by altitude with snow caps.
-- **Real water**: Natural Earth coastline, lakes and rivers.
-- **Happy mode by default**: sunny semi-real look with vivid green terrain, flower meadows, more trees, cheerful pastel buildings, turquoise water, animated ripples, birds, rainbows and boost confetti. Switch to SATELLITE or MAP MODE in the pause menu at any time.
+- **Large map**: 17 600 × 14 300 world units, built from the SRTM-derived elevation grid (512×512). Relief is gentle by design: one unit of height per 60 m, so the highest peaks stand under 60 units.
+- **Sea and beaches**: the shoreline comes from the elevation data, with shallows, surf, wet and dry sand, deep water and level lakes; Natural Earth rivers run across the land.
+- **Streamed terrain**: the ground is built in chunks, fine near the aircraft and coarse far away, with trees (and flowers in happy mode) grown only nearby.
+- **Happy mode by default**: sunny semi-real look with vivid green terrain, fields, flower meadows, pastel buildings, turquoise water with moving swell and surf, birds, a rainbow and boost confetti. Switch to SATELLITE or MAP MODE in the pause menu at any time.
 - **Real imagery**: EOX Sentinel‑2 cloudless 2016 tiles (CC BY 4.0) are bundled offline and draped over the terrain.
 - **Real places**: OSM building footprints for 12 major Italian cities are extruded into 3D; other urban areas use instanced buildings from Natural Earth polygons.
-- **15 airfields** with level ground, numbered runways at approximate real headings, edge lights, tower and working PAPI lamps. Several are nudged a few units so they do not sit on a landmark.
+- **15 airfields** at their real positions, with level ground, numbered runways at approximate real headings, edge lights, tower and working PAPI lamps.
 - **Two flight models**: *realistic* (default) for the seven fixed-wing aircraft, or *arcade*. Switch in the menu or while paused. The helicopter and starships are always arcade.
 - **Realistic model**: lift, drag, thrust and weight; air that thins with height; bank-to-turn; angle-of-attack stalls (with alpha limiters on the A320 and fighters); g limits; elevator trim, rudder, airbrake and wheel brakes. HUD shows IAS, G, angle of attack and trim. Z/X rudder, R/F trim, Space brake.
 - **Whole flights**: start on the runway, take off with flaps, fly, then land and brake to a stop. Landings are graded 0–100 on sink rate, centreline, alignment and touchdown zone.
@@ -37,7 +38,7 @@ Regenerate with `npm run data`, `npm run data:imagery` and `npm run data:buildin
 ```bash
 npm run check
 npm test
-npm run build      # standalone dist/, ~1.5 MB (includes Three.js and geodata)
+npm run build      # standalone dist/, ~13 MB (includes Three.js, geodata and imagery)
 npm run preview    # http://localhost:8000/
 ```
 
@@ -62,4 +63,4 @@ Every switch also has an on-screen button.
 
 ## Flight model notes
 
-`js/flight-model.js`, `js/airfields.js` and `js/autopilot.js` are pure logic; per-aircraft figures are the `aero` blocks in `js/config.js`. One world unit is one metre of height and airspeed, while the map is far more compressed: horizontal travel is halved in flight and slowed to a fifth near the ground (`motionFactor`), so turns and runway rolls fit. Air density uses `ATMOS_METRES_PER_UNIT`. The distance readout is in real kilometres, so it does not match the airspeed over time. The tests in `test/` check every aircraft headlessly, including a take-off, a flown approach and a graded landing.
+`js/flight-model.js`, `js/airfields.js` and `js/autopilot.js` are pure logic; per-aircraft figures are the `aero` blocks in `js/config.js`. One world unit is one metre of height and airspeed, while on the ground plan a unit covers roughly 70–90 m: horizontal travel is halved in flight and slowed to a fifth near the ground (`motionFactor`), so turns and runway rolls fit. Air density uses `ATMOS_METRES_PER_UNIT`. Fuel burn is scaled by `FUEL_RATE` so a tank covers the long legs of the map. The coastline field lives in `js/coast.js`, terrain chunks in `js/terrain-grid.js` and the ground shader in `js/terrain-material.js`. The distance readout is in real kilometres, so it does not match the airspeed over time. The tests in `test/` check every aircraft headlessly, including a take-off, a flown approach and a graded landing.

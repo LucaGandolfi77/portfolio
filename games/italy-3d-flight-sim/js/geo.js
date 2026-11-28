@@ -1,7 +1,8 @@
 /* Italy 3D Flight Sim — geographic coordinate and elevation helpers (pure) */
 
 import { WORLD } from './config.js';
-import { initAirfields, flattenHeight } from './airfields.js';
+import { initAirfields, airfieldPads, flattenHeight } from './airfields.js';
+import { initCoast, coastDistance, waterLevel, shoreHeight } from './coast.js';
 
 let heightData = null;
 let meta = null;
@@ -15,21 +16,38 @@ export function initGeo(heightBuffer, metaJson, vectorJson) {
   const smooth = new Float32Array(w * h);
   const at = (x, y) => heightData.getInt16((Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))) * 2, true);
   const kernel = [1, 4, 6, 4, 1];
+  /* Only land samples are averaged, so the sea floor does not drown the coast. */
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       let sum = 0, weight = 0;
       for (let ky = -2; ky <= 2; ky++) {
         for (let kx = -2; kx <= 2; kx++) {
+          const e = at(x + kx, y + ky);
+          if (e <= 0) continue;
           const k = kernel[kx + 2] * kernel[ky + 2];
-          sum += at(x + kx, y + ky) * k;
+          sum += e * k;
           weight += k;
         }
       }
-      smooth[y * w + x] = sum / weight;
+      smooth[y * w + x] = weight ? sum / weight : 0;
     }
   }
   smoothed = smooth;
+  initCoast({ width: w, height: h, elevation: at, lakes: lakeShapes(), pads: airfieldPads(geoToWorld) });
   initAirfields(naturalHeight, geoToWorld);
+}
+
+/* Lakes in data-grid coordinates, each at the level of its lowest shores. */
+function lakeShapes() {
+  const { bbox, width, height } = meta;
+  return (vectors?.lakes || []).map(ring => {
+    const grid = ring.map(([lon, lat]) => [
+      (lon - bbox.minLon) / (bbox.maxLon - bbox.minLon) * (width - 1),
+      (bbox.maxLat - lat) / (bbox.maxLat - bbox.minLat) * (height - 1)
+    ]);
+    const shores = ring.map(([lon, lat]) => elevationAt(lon, lat) * WORLD.elevScale).sort((a, b) => a - b);
+    return { ring: grid, level: Math.max(1, shores[Math.floor(shores.length * 0.2)]) };
+  });
 }
 
 let smoothed = null;
@@ -64,16 +82,24 @@ export function elevationAt(lon, lat) {
   return a * (1 - ty) + b * ty;
 }
 
+/* Height of the ground, or of the water surface. */
 export function terrainHeight(x, z) {
   return flattenHeight(x, z, naturalHeight(x, z));
 }
 
-/* Elevation from the data alone, before the airfields are levelled. */
+/* Relief settles to the plain over this distance at the borders of the map. */
+const EDGE_FADE = 500;
+
+/* Elevation from the data and the shore profile, before the airfields are levelled. */
 export function naturalHeight(x, z) {
   const { lon, lat } = worldToGeo(x, z);
-  const e = elevationAt(lon, lat);
-  return e > 0 ? Math.max(1.5, e * WORLD.elevScale) : 0;
+  const edge = Math.min(WORLD.width / 2 - Math.abs(x), WORLD.depth / 2 - Math.abs(z));
+  const t = Math.max(0, Math.min(1, edge / EDGE_FADE));
+  const relief = elevationAt(lon, lat) * WORLD.elevScale * t * t * (3 - 2 * t);
+  return shoreHeight(coastDistance(x, z), waterLevel(x, z), relief);
 }
+
+export const isWater = (x, z) => coastDistance(x, z) <= 0;
 
 export function pointInRing(lon, lat, ring) {
   let inside = false;

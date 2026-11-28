@@ -81,8 +81,11 @@ export function createFlight(plane, airport, altitude = 220, wanted = 'arcade', 
   return state;
 }
 
+/* Consumption is scaled so that a tank covers the long legs of the large map. */
+export const FUEL_RATE = 0.1;
+
 function burnFuel(state, plane, dt) {
-  state.fuel = Math.max(0, state.fuel - plane.burn * (0.3 + 0.7 * state.throttle) * (state.boosting ? 2.2 : 1) * dt);
+  state.fuel = Math.max(0, state.fuel - plane.burn * FUEL_RATE * (0.3 + 0.7 * state.throttle) * (state.boosting ? 2.2 : 1) * dt);
   state.fuelWarn = state.fuel < plane.fuel * 0.18;
 }
 

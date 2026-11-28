@@ -1,9 +1,12 @@
 /* Italy 3D Flight Sim — real Italian landmarks as procedural 3D models */
 
 import * as THREE from '../../_vendor/three.module.js';
+import { WORLD } from './config.js';
 import { geoToWorld, terrainHeight } from './geo.js';
 
-const SCALE = 0.34;
+const SCALE = 0.15;
+
+export const landmarkHeight = lm => Math.min(30, lm.height * SCALE);
 let data = null;
 
 export function initLandmarks(json) { data = json; }
@@ -19,21 +22,24 @@ function label(text) {
   ctx.fillStyle = '#ffd86b';
   ctx.textAlign = 'center';
   ctx.fillText(text.toUpperCase(), 160, 42);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false }));
-  sprite.scale.set(86, 18, 1);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false, sizeAttenuation: false }));
+  sprite.scale.set(0.2, 0.04, 1);
   return sprite;
 }
 
-function modelFor(kind, height, color) {
+function modelFor(kind, height, color, rise) {
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
   const light = new THREE.MeshStandardMaterial({ color: '#f5efe2', roughness: 0.85 });
-  const h = Math.min(70, height * SCALE);
+  const h = Math.min(30, height * SCALE);
   if (kind === 'volcano') {
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(46, 34, 12), new THREE.MeshStandardMaterial({ color: '#6b6058', roughness: 1 }));
-    cone.position.y = 17; g.add(cone);
-    const crater = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 2, 12), new THREE.MeshBasicMaterial({ color: '#ff7b42' }));
-    crater.position.y = 34; g.add(crater);
+    /* A truncated cone from the ground up to the summit, with a glowing crater. */
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(7, 16 + rise * 1.8, rise, 24, 1, true),
+      new THREE.MeshStandardMaterial({ color: '#7a665a', roughness: 1, flatShading: true }));
+    cone.position.y = rise / 2; g.add(cone);
+    const crater = new THREE.Mesh(new THREE.CircleGeometry(7, 24), new THREE.MeshBasicMaterial({ color: '#ff7b42' }));
+    crater.rotation.x = -Math.PI / 2;
+    crater.position.y = rise - 0.6; g.add(crater);
     return g;
   }
   if (kind === 'colosseum' || kind === 'arena') {
@@ -77,13 +83,18 @@ export function createLandmarks(group) {
   const colors = ['#e8c9a0', '#d9b48f', '#efd9b0', '#caa47e'];
   for (const lm of data.landmarks) {
     const p = geoToWorld(lm.lon, lm.lat);
-    const node = modelFor(lm.kind, lm.height, colors[made.length % colors.length]);
-    node.position.set(p.x, terrainHeight(p.x, p.z), p.z);
+    const base = terrainHeight(p.x, p.z);
+    /* Summits stand at the same third of their real height as the rest of the relief. */
+    const rise = lm.kind === 'volcano' ? Math.max(6, lm.height * WORLD.elevScale - base) : 0;
+    const top = rise || landmarkHeight(lm);
+    const node = modelFor(lm.kind, lm.height, colors[made.length % colors.length], rise);
+    node.position.set(p.x, base, p.z);
     node.userData.landmark = lm;
     group.add(node);
     const tag = label(lm.name.en);
-    tag.position.set(p.x, terrainHeight(p.x, p.z) + Math.min(70, lm.height * SCALE) + 32, p.z);
+    tag.position.set(p.x, base + top + 30, p.z);
     group.add(tag);
+    node.userData.tag = tag;
     made.push(node);
   }
   return made;

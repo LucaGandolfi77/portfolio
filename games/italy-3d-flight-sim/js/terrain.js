@@ -1,9 +1,12 @@
-/* Italy 3D Flight Sim — real-data Three.js world (terrain, water, cities, airports) */
+/* Italy 3D Flight Sim — real-data Three.js world (streamed terrain, sea, rivers, cities, airports) */
 
 import * as THREE from '../../_vendor/three.module.js';
 import { WORLD } from './config.js';
 import { RUNWAY, airfields, onAirfield } from './airfields.js';
-import { elevationAt, geoToWorld, terrainHeight, vectorData, worldPolygon, insideItaly } from './geo.js';
+import { COAST, coastDistance, waterLevel } from './coast.js';
+import { geoToWorld, isWater, pointInRing, terrainHeight, vectorData, worldPolygon } from './geo.js';
+import { COLS, ROWS, RANGE, SEGMENTS, chunkData, chunkDistance, chunkLevel, chunkOrigin, CHUNK, hasAirfield, isOpenWater } from './terrain-grid.js';
+import { createTerrainMaterial, PALETTES } from './terrain-material.js';
 import { seededRandom } from '../../_kit/core.js';
 import { buildRealBuildings, buildCityLights, realCityCenters } from './buildings.js';
 
@@ -19,216 +22,198 @@ function labelSprite(text, color = '#eaf6ff') {
   ctx.textAlign = 'center';
   ctx.fillText(text, 128, 42);
   const tex = new THREE.CanvasTexture(canvas);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sprite.scale.set(70, 17, 1);
+  /* A constant size on screen, so a tag never fills the view as you pass it. */
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
+  sprite.scale.set(0.15, 0.037, 1);
   return sprite;
 }
 
-export function terrainColor(h) {
-  if (h > 300) return new THREE.Color('#e8eef2');
-  if (h > 230) return new THREE.Color('#8a8f96');
-  if (h > 150) return new THREE.Color('#5b6b54');
-  if (h > 40) return new THREE.Color('#4a7b4e');
-  return new THREE.Color('#5f8a5a');
+/* Trees, and flowers in happy mode, are grown only on chunks close to the aircraft. */
+function createDecorator(group, quality) {
+  const treeGeo = new THREE.ConeGeometry(1.7, 5.6, 6);
+  treeGeo.translate(0, 2.8, 0);
+  const flowerGeo = new THREE.SphereGeometry(0.75, 5, 4);
+  flowerGeo.translate(0, 0.75, 0);
+  const treeMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 });
+  const flowerMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 });
+  const palettes = {
+    happy: ['#3fa34d', '#57b85a', '#2f8f45', '#74c96a', '#46a658'].map(c => new THREE.Color(c)),
+    natural: ['#204f34', '#2b5a39', '#1c4630', '#355f3a', '#244f33'].map(c => new THREE.Color(c))
+  };
+  const blossom = ['#ff6b8a', '#ffd166', '#b197fc', '#ffffff', '#ffa8a8'].map(c => new THREE.Color(c));
+  const dummy = new THREE.Object3D();
+  let happy = true;
+
+  function scatter(geo, mat, col, row, seed, count, clusters, spread, colors, fits) {
+    const rng = seededRandom(seed + row * COLS + col);
+    const o = chunkOrigin(col, row);
+    const mesh = new THREE.InstancedMesh(geo, mat, count);
+    const centres = Array.from({ length: clusters }, () => ({ x: o.x + rng() * CHUNK.width, z: o.z + rng() * CHUNK.depth }));
+    let placed = 0;
+    for (let tries = 0; tries < count * 3 && placed < count; tries++) {
+      const centre = centres[tries % clusters];
+      const x = centre.x + (rng() - 0.5) * spread, z = centre.z + (rng() - 0.5) * spread;
+      const size = 0.6 + rng() * 0.8, turn = rng() * Math.PI;
+      if (coastDistance(x, z) < COAST.beach + 8 || onAirfield(x, z)) continue;
+      const h = terrainHeight(x, z);
+      if (!fits(h)) continue;
+      dummy.position.set(x, h - 0.15, z);
+      dummy.rotation.y = turn;
+      dummy.scale.setScalar(size);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(placed, dummy.matrix);
+      mesh.setColorAt(placed, colors[placed % colors.length]);
+      placed++;
+    }
+    mesh.count = placed;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+    return mesh;
+  }
+
+  return {
+    grow(chunk) {
+      const dense = quality !== 'low';
+      const trees = scatter(treeGeo, treeMat, chunk.col, chunk.row, 9911, dense ? 220 : 80, 14, 90,
+        palettes[happy ? 'happy' : 'natural'], h => h < 34);
+      const flowers = scatter(flowerGeo, flowerMat, chunk.col, chunk.row, 7788, dense ? 140 : 40, 9, 55, blossom, h => h < 18);
+      flowers.visible = happy;
+      chunk.decor = { trees, flowers };
+    },
+    clear(chunk) {
+      for (const mesh of Object.values(chunk.decor)) { group.remove(mesh); mesh.dispose(); }
+      chunk.decor = null;
+    },
+    setHappy(value, chunks) {
+      happy = value;
+      for (const chunk of chunks) {
+        if (!chunk.decor) continue;
+        chunk.decor.flowers.visible = happy;
+        const colors = palettes[happy ? 'happy' : 'natural'];
+        for (let i = 0; i < chunk.decor.trees.count; i++) chunk.decor.trees.setColorAt(i, colors[i % colors.length]);
+        if (chunk.decor.trees.instanceColor) chunk.decor.trees.instanceColor.needsUpdate = true;
+      }
+    }
+  };
 }
 
-export function happyColor(h) {
-  if (h > 300) return new THREE.Color('#ffffff');
-  if (h > 230) return new THREE.Color('#dfe7d2');
-  if (h > 150) return new THREE.Color('#8fca79');
-  if (h > 40) return new THREE.Color('#71c45a');
-  return new THREE.Color('#82d16a');
+/* Chunks are rebuilt a few per frame as the aircraft moves; a long jump, such as
+ * a respawn, rebuilds everything near the new position at once. */
+function createTerrain(group, material, quality) {
+  const segments = SEGMENTS[quality] || SEGMENTS.high;
+  const detail = (RANGE[quality] || RANGE.high).detail;
+  const decorator = createDecorator(group, quality);
+  const chunks = [];
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      chunks.push({ col, row, sea: isOpenWater(col, row), airfield: hasAirfield(col, row), level: null, mesh: null, decor: null });
+    }
+  }
+
+  function build(chunk, level) {
+    const data = chunkData(chunk.col, chunk.row, chunk.sea ? 1 : segments[level]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
+    geo.setIndex(new THREE.BufferAttribute(data.index, 1));
+    geo.computeBoundingSphere();
+    if (chunk.mesh) {
+      chunk.mesh.geometry.dispose();
+      chunk.mesh.geometry = geo;
+    } else {
+      chunk.mesh = new THREE.Mesh(geo, material);
+      chunk.mesh.matrixAutoUpdate = false;
+      group.add(chunk.mesh);
+    }
+    chunk.level = level;
+  }
+
+  for (const chunk of chunks) build(chunk, 2);
+
+  let queue = [];
+  let last = null;
+  function plan(x, z) {
+    queue = [];
+    for (const chunk of chunks) {
+      const distance = chunkDistance(chunk.col, chunk.row, x, z);
+      const level = chunk.sea ? 2 : chunkLevel(distance, quality, chunk.level, chunk.airfield);
+      const wantDecor = !chunk.sea && distance < detail + (chunk.decor ? 150 : 0);
+      if (level !== chunk.level || wantDecor !== !!chunk.decor) queue.push({ chunk, level, wantDecor, distance });
+    }
+    queue.sort((a, b) => a.distance - b.distance);
+  }
+
+  function apply({ chunk, level, wantDecor }) {
+    if (level !== chunk.level) build(chunk, level);
+    if (wantDecor && !chunk.decor) decorator.grow(chunk);
+    else if (!wantDecor && chunk.decor) decorator.clear(chunk);
+  }
+
+  return {
+    update(x, z, budget = 2) {
+      const jumped = !last || Math.hypot(x - last.x, z - last.z) > 600;
+      if (jumped || Math.hypot(x - last.x, z - last.z) > 60) { plan(x, z); last = { x, z }; }
+      let left = jumped ? Infinity : budget;
+      while (queue.length && left > 0) {
+        const job = queue.shift();
+        apply(job);
+        /* Far chunks and cleanups cost little, so several fit in one frame. */
+        left -= job.level === 2 && !job.wantDecor ? 0.25 : 1;
+      }
+    },
+    setHappy(value) { decorator.setHappy(value, chunks); },
+    chunks
+  };
 }
 
-function buildTerrain(quality, imageryTexture, visual) {
-  const seg = quality === 'low' ? 160 : 256;
-  const geo = new THREE.PlaneGeometry(WORLD.width, WORLD.depth, seg, seg);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const h = terrainHeight(x, z);
-    pos.setY(i, h);
-    const c = visual === 'happy' ? happyColor(h) : imageryTexture
-      ? new THREE.Color().setRGB(0.9 + Math.min(0.1, h / 6000), 0.92 + Math.min(0.08, h / 8000), 0.9)
-      : terrainColor(h);
-    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
-  }
-  if (imageryTexture) {
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.userData.satColors = new Float32Array(colors);
-  const happy = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const c = happyColor(pos.getY(i));
-    happy[i * 3] = c.r; happy[i * 3 + 1] = c.g; happy[i * 3 + 2] = c.b;
-  }
-  geo.userData.happyColors = happy;
-  geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.95, metalness: 0,
-    map: imageryTexture || null,
-    color: imageryTexture ? '#ffffff' : '#ffffff'
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.receiveShadow = true;
-  return mesh;
+/* Land and sea carried on past the edges of the mapped area, up to the horizon:
+ * the ground material repeats whatever it finds along each border. */
+function buildSurround(group, material) {
+  const reach = 40000;
+  const plane = (w, d, x, z) => {
+    const geo = new THREE.PlaneGeometry(w, d);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(x, -0.05, z);
+    group.add(new THREE.Mesh(geo, material));
+  };
+  plane(WORLD.width + reach * 2, reach, 0, -WORLD.depth / 2 - reach / 2);
+  plane(WORLD.width + reach * 2, reach, 0, WORLD.depth / 2 + reach / 2);
+  plane(reach, WORLD.depth, -WORLD.width / 2 - reach / 2, 0);
+  plane(reach, WORLD.depth, WORLD.width / 2 + reach / 2, 0);
 }
 
-function shapeFromRing(ring, y) {
-  const pts = worldPolygon(ring).map(p => new THREE.Vector2(p.x, -p.z));
-  const shape = new THREE.Shape(pts);
-  const geo = new THREE.ShapeGeometry(shape);
-  geo.rotateX(-Math.PI / 2);
-  const positions = geo.attributes.position;
-  for (let i = 0; i < positions.count; i++) positions.setY(i, y);
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function rippleTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 128, 128);
-  ctx.strokeStyle = 'rgba(255,255,255,0.32)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 14; i++) {
-    const y = (i / 14) * 128;
-    ctx.beginPath();
-    for (let x = 0; x <= 128; x += 4) ctx.lineTo(x, y + Math.sin(x * 0.12 + i) * 3);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(26, 26);
-  return tex;
-}
-
-function buildWater(vectors, group, visual) {
-  const happy = visual === 'happy';
-  const seaGeo = new THREE.PlaneGeometry(4200, 3800);
-  seaGeo.rotateX(-Math.PI / 2);
-  const shimmer = rippleTexture();
-  const seaMat = new THREE.MeshStandardMaterial({
-    color: happy ? '#3fc3d6' : '#1b6b93', roughness: 0.28, metalness: 0.08,
-    transparent: true, opacity: 0.94, map: happy ? shimmer : null
-  });
-  const sea = new THREE.Mesh(seaGeo, seaMat);
-  sea.position.y = 0;
-  sea.userData.shimmer = shimmer;
-  group.add(sea);
-
-  const lakeMat = new THREE.MeshStandardMaterial({ color: happy ? '#54cfe0' : '#2e8fb5', roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
-  for (const ring of vectors.lakes) {
-    const pts = worldPolygon(ring);
-    let cy = 0;
-    for (const p of pts) cy += terrainHeight(p.x, p.z);
-    cy = Math.max(2, cy / pts.length - 1);
-    group.add(new THREE.Mesh(shapeFromRing(ring, cy), lakeMat));
-  }
-  const riverMat = new THREE.MeshStandardMaterial({ color: happy ? '#5dd3e3' : '#3b9ac2', roughness: 0.4 });
+/* Rivers are ribbons laid on the ground, sampled finely enough to follow it. */
+function buildRivers(group, vectors) {
+  const material = new THREE.MeshStandardMaterial({ color: PALETTES.happy.shallow, roughness: 0.5, side: THREE.DoubleSide });
+  const half = 4;
   for (const line of vectors.rivers) {
-    const pts = worldPolygon(line).map(p => new THREE.Vector3(p.x, terrainHeight(p.x, p.z) + 2.5, p.z));
+    const pts = worldPolygon(line).map(p => new THREE.Vector3(p.x, 0, p.z));
     if (pts.length < 2) continue;
     const curve = new THREE.CatmullRomCurve3(pts);
-    group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(120, pts.length * 2), 1.8, 5, false), riverMat));
-  }
-  return sea;
-}
-
-function buildCoastline(group, vectors, visual) {
-  const happy = visual === 'happy';
-  const shallow = new THREE.MeshBasicMaterial({
-    color: happy ? '#9ce8d8' : '#54c4d8', transparent: true, opacity: happy ? 0.75 : 0.55,
-    side: THREE.DoubleSide, depthWrite: false
-  });
-  const foam = new THREE.LineBasicMaterial({ color: happy ? '#ffffff' : '#d8fbff', transparent: true, opacity: 0.9 });
-  const sand = new THREE.MeshBasicMaterial({ color: '#f6e2a8', side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-  const meshes = [];
-  for (const ring of vectors.coastline) {
-    const pts = worldPolygon(ring);
-    if (pts.length < 3) continue;
-    let cx = 0, cz = 0;
-    for (const p of pts) { cx += p.x; cz += p.z; }
-    cx /= pts.length; cz /= pts.length;
-    const outer = pts.map((p, i) => {
-      const prev = pts[(i - 1 + pts.length) % pts.length];
-      const next = pts[(i + 1) % pts.length];
-      const tx = next.x - prev.x, tz = next.z - prev.z;
-      let nx = -tz, nz = tx;
-      const len = Math.hypot(nx, nz) || 1;
-      nx /= len; nz /= len;
-      if (nx * (p.x - cx) + nz * (p.z - cz) < 0) { nx = -nx; nz = -nz; }
-      return { x: p.x + nx * 16, z: p.z + nz * 16 };
-    });
-    const positions = [];
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      const ao = outer[i], bo = outer[(i + 1) % pts.length];
-      positions.push(a.x, 2.4, a.z, ao.x, 2.2, ao.z, b.x, 2.4, b.z);
-      positions.push(b.x, 2.4, b.z, ao.x, 2.2, ao.z, bo.x, 2.2, bo.z);
+    const steps = Math.max(2, Math.ceil(curve.getLength() / 16));
+    const positions = [], index = [];
+    let open = false;
+    for (let i = 0; i <= steps; i++) {
+      const p = curve.getPointAt(i / steps), t = curve.getTangentAt(i / steps);
+      if (isWater(p.x, p.z) && waterLevel(p.x, p.z) === 0) { open = false; continue; }
+      const length = Math.hypot(t.x, t.z) || 1;
+      const nx = -t.z / length * half, nz = t.x / length * half;
+      const n = positions.length / 3;
+      for (const side of [1, -1]) {
+        const x = p.x + nx * side, z = p.z + nz * side;
+        positions.push(x, terrainHeight(x, z) + 0.5, z);
+      }
+      if (open) index.push(n - 2, n - 1, n, n - 1, n + 1, n);
+      open = true;
     }
+    if (!index.length) continue;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    const mesh = new THREE.Mesh(geo, shallow);
-    group.add(mesh);
-    meshes.push(mesh);
-    if (happy) {
-      const inner = pts.map((p, i) => ({
-        x: p.x - (outer[i].x - p.x) * 0.55,
-        z: p.z - (outer[i].z - p.z) * 0.55
-      }));
-      const sandPos = [];
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i], b = pts[(i + 1) % pts.length];
-        const ai = inner[i], bi = inner[(i + 1) % pts.length];
-        sandPos.push(a.x, 2.6, a.z, ai.x, 2.7, ai.z, b.x, 2.6, b.z);
-        sandPos.push(b.x, 2.6, b.z, ai.x, 2.7, ai.z, bi.x, 2.7, bi.z);
-      }
-      const sandGeo = new THREE.BufferGeometry();
-      sandGeo.setAttribute('position', new THREE.Float32BufferAttribute(sandPos, 3));
-      group.add(new THREE.Mesh(sandGeo, sand));
-    }
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p.x, 3.2, p.z)));
-    group.add(new THREE.LineLoop(lineGeo, foam));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    group.add(new THREE.Mesh(geo, material));
   }
-  return meshes;
-}
-
-function buildVegetation(group, quality, visual) {
-  const rng = seededRandom(9911);
-  const happy = visual === 'happy';
-  const count = quality === 'low' ? (happy ? 700 : 450) : (happy ? 2800 : 1600);
-  const geo = new THREE.ConeGeometry(happy ? 3.2 : 2.6, happy ? 11 : 9, happy ? 7 : 5);
-  geo.translate(0, happy ? 5.5 : 4.5, 0);
-  const mat = new THREE.MeshStandardMaterial({ color: happy ? '#ffffff' : '#204f34', roughness: 1 });
-  const treeColors = ['#3fa34d', '#57b85a', '#2f8f45', '#74c96a', '#46a658'];
-  const mesh = new THREE.InstancedMesh(geo, mat, count);
-  const dummy = new THREE.Object3D();
-  let placed = 0;
-  for (let tries = 0; tries < count * 12 && placed < count; tries++) {
-    const x = (rng() - 0.5) * WORLD.width * 0.94;
-    const z = (rng() - 0.5) * WORLD.depth * 0.94;
-    const { lon, lat } = { lon: WORLD.minLon + (x + WORLD.width / 2) / WORLD.width * (WORLD.maxLon - WORLD.minLon), lat: WORLD.minLat - (z - WORLD.depth / 2) / WORLD.depth * (WORLD.maxLat - WORLD.minLat) };
-    if (!insideItaly(lon, lat)) continue;
-    const h = elevationAt(lon, lat);
-    if (h < 80 || h > 1700 || onAirfield(x, z)) continue;
-    dummy.position.set(x, terrainHeight(x, z), z);
-    dummy.rotation.y = rng() * Math.PI;
-    const s = 0.6 + rng() * 0.9;
-    dummy.scale.set(s, s, s);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(placed, dummy.matrix);
-    if (happy) mesh.setColorAt(placed, new THREE.Color(treeColors[placed % treeColors.length]));
-    placed++;
-  }
-  mesh.count = placed;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  group.add(mesh);
+  return material;
 }
 
 function buildHappyDetails(group, quality) {
@@ -236,38 +221,12 @@ function buildHappyDetails(group, quality) {
   const happy = new THREE.Group();
   group.add(happy);
 
-  const flowerCount = quality === 'low' ? 900 : 3200;
-  const flowerGeo = new THREE.SphereGeometry(1.3, 5, 4);
-  flowerGeo.translate(0, 1.3, 0);
-  const flowers = new THREE.InstancedMesh(flowerGeo, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }), flowerCount);
-  const palette = ['#ff6b8a', '#ffd166', '#8ce99a', '#b197fc', '#ffffff', '#ffa8a8'];
-  const dummy = new THREE.Object3D();
-  let placed = 0;
-  for (let tries = 0; tries < flowerCount * 15 && placed < flowerCount; tries++) {
-    const x = (rng() - 0.5) * WORLD.width * 0.95;
-    const z = (rng() - 0.5) * WORLD.depth * 0.95;
-    const lon = WORLD.minLon + (x + WORLD.width / 2) / WORLD.width * (WORLD.maxLon - WORLD.minLon);
-    const lat = WORLD.minLat - (z - WORLD.depth / 2) / WORLD.depth * (WORLD.maxLat - WORLD.minLat);
-    if (!insideItaly(lon, lat)) continue;
-    if (elevationAt(lon, lat) < 5 || elevationAt(lon, lat) > 320 || onAirfield(x, z)) continue;
-    dummy.position.set(x, terrainHeight(x, z), z);
-    const s = 0.6 + rng() * 0.8;
-    dummy.scale.set(s, s, s);
-    dummy.updateMatrix();
-    flowers.setMatrixAt(placed, dummy.matrix);
-    flowers.setColorAt(placed, new THREE.Color(palette[placed % palette.length]));
-    placed++;
-  }
-  flowers.count = placed;
-  if (flowers.instanceColor) flowers.instanceColor.needsUpdate = true;
-  happy.add(flowers);
-
   const birds = new THREE.Group();
   const birdMat = new THREE.LineBasicMaterial({ color: '#2b4d6b', transparent: true, opacity: 0.75 });
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < (quality === 'low' ? 8 : 16); i++) {
     const pts = [new THREE.Vector3(-4, 0, 0), new THREE.Vector3(0, 2, 0), new THREE.Vector3(4, 0, 0)];
     const bird = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), birdMat);
-    bird.position.set((rng() - 0.5) * WORLD.width, 280 + rng() * 260, (rng() - 0.5) * WORLD.depth);
+    bird.position.set((rng() - 0.5) * 1800, 90 + rng() * 260, (rng() - 0.5) * 1800);
     bird.userData.speed = 12 + rng() * 18;
     birds.add(bird);
   }
@@ -278,18 +237,18 @@ function buildHappyDetails(group, quality) {
   const rainbow = new THREE.Group();
   rainbowColors.forEach((color, i) => {
     const arc = new THREE.Mesh(
-      new THREE.TorusGeometry(70 + i * 5, 2.2, 5, 48, Math.PI),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55 })
+      new THREE.TorusGeometry(260 + i * 14, 6, 5, 64, Math.PI),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4 })
     );
-    arc.rotation.z = 0;
     rainbow.add(arc);
   });
-  rainbow.position.set(-WORLD.width * 0.38, 220, -WORLD.depth * 0.32);
+  const sky = geoToWorld(10.3, 41.0);
+  rainbow.position.set(sky.x, 20, sky.z);
   happy.add(rainbow);
   return happy;
 }
 
-function buildCities(group, vectors, quality) {
+function buildCities(group, vectors, quality, labels) {
   const rng = seededRandom(4242);
   const realCenters = realCityCenters();
   const urban = vectors.urban.filter(u => {
@@ -297,42 +256,53 @@ function buildCities(group, vectors, quality) {
     const clon = u.ring.reduce((s, p) => s + p[0], 0) / u.ring.length;
     const clat = u.ring.reduce((s, p) => s + p[1], 0) / u.ring.length;
     return !realCenters.some(([lon, lat]) => Math.abs(lon - clon) < 0.055 && Math.abs(lat - clat) < 0.055);
-  }).slice(0, quality === 'low' ? 30 : 70);
-  const perCity = quality === 'low' ? 12 : 34;
+  });
+  const most = quality === 'low' ? 140 : 480;
   const geo = new THREE.BoxGeometry(5, 1, 5);
   geo.translate(0, 0.5, 0);
-  const mat = new THREE.MeshStandardMaterial({ color: '#c9d4da', roughness: 0.8, metalness: 0.05 });
-  const total = urban.length * perCity;
-  const mesh = new THREE.InstancedMesh(geo, mat, total);
+  const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, metalness: 0.05 });
+  const walls = ['#f4e3c8', '#e8c4a8', '#d9dfe4', '#f2d0b0', '#cfd8c4'].map(c => new THREE.Color(c));
   const dummy = new THREE.Object3D();
-  let n = 0;
+  const cities = [];
   for (const area of urban) {
     const pts = worldPolygon(area.ring);
     const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
-    const base = Math.min(...pts.map(p => terrainHeight(p.x, p.z)));
+    const flat = pts.map(p => [p.x, p.z]);
+    const total = Math.max(24, Math.min(most, Math.round((maxX - minX) * (maxZ - minZ) / 220)));
+    const mesh = new THREE.InstancedMesh(geo, mat, total);
     const scale = Math.min(1.6, 0.6 + Math.log10(area.pop + 10) / 6);
-    for (let i = 0; i < perCity; i++) {
+    let n = 0;
+    for (let tries = 0; tries < total * 3 && n < total; tries++) {
       const x = minX + rng() * (maxX - minX);
       const z = minZ + rng() * (maxZ - minZ);
-      const h = (6 + rng() * 46) * scale;
-      if (onAirfield(x, z)) continue;
-      dummy.position.set(x, terrainHeight(x, z), z);
-      dummy.scale.set(0.7 + rng() * 0.9, h, 0.7 + rng() * 0.9);
-      dummy.rotation.y = rng() * Math.PI;
+      const h = (1.8 + rng() * rng() * 9) * scale;
+      const turn = rng() * Math.PI, wide = 0.7 + rng() * 0.9, deep = 0.7 + rng() * 0.9;
+      if (!pointInRing(x, z, flat) || coastDistance(x, z) < 12 || onAirfield(x, z)) continue;
+      dummy.position.set(x, terrainHeight(x, z) - 0.2, z);
+      dummy.scale.set(wide, h, deep);
+      dummy.rotation.y = turn;
       dummy.updateMatrix();
-      mesh.setMatrixAt(n++, dummy.matrix);
+      mesh.setMatrixAt(n, dummy.matrix);
+      mesh.setColorAt(n, walls[n % walls.length]);
+      n++;
     }
+    if (!n) continue;
+    mesh.count = n;
+    mesh.computeBoundingSphere();
+    mesh.userData.center = { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
+    group.add(mesh);
+    cities.push(mesh);
   }
-  mesh.count = n;
-  group.add(mesh);
 
-  for (const city of vectors.cities.slice(0, quality === 'low' ? 8 : 18)) {
+  for (const city of vectors.cities.slice(0, quality === 'low' ? 10 : 22)) {
     const p = geoToWorld(city.lon, city.lat);
     const label = labelSprite(city.name.toUpperCase());
-    label.position.set(p.x, terrainHeight(p.x, p.z) + 95, p.z);
+    label.position.set(p.x, terrainHeight(p.x, p.z) + 70, p.z);
     group.add(label);
+    labels.push({ sprite: label, range: 3200 });
   }
+  return cities;
 }
 
 function runwayNumber(heading) {
@@ -356,7 +326,7 @@ function numberDecal(text) {
 }
 
 /* Runways run along local -Z (the stored heading) and are returned with their PAPI lamps. */
-function buildAirports(group) {
+function buildAirports(group, labels) {
   const runwayMat = new THREE.MeshStandardMaterial({ color: '#3b4550', roughness: 1 });
   const markMat = new THREE.MeshBasicMaterial({ color: '#f4f7fb' });
   const terminalMat = new THREE.MeshStandardMaterial({ color: '#8fa7b8' });
@@ -406,26 +376,38 @@ function buildAirports(group) {
     g.add(terminal, tower);
     group.add(g);
     const label = labelSprite(f.code, '#ffd166');
-    label.scale.set(44, 11, 1);
+    label.scale.set(0.1, 0.025, 1);
     label.position.set(f.x, f.elevation + 55, f.z);
     group.add(label);
+    labels.push({ sprite: label, range: 5000 });
   }
   return papi;
 }
 
-export function createWorld(scene, quality = 'high', imageryTexture = null, visual = 'happy') {
+export function createWorld(scene, quality = 'high') {
   const group = new THREE.Group();
   scene.add(group);
-  const terrain = buildTerrain(quality, imageryTexture, visual);
-  group.add(terrain);
   const vectors = vectorData();
-  const sea = buildWater(vectors, group, visual);
-  const coast = buildCoastline(group, vectors, visual);
-  buildVegetation(group, quality, visual);
-  const happy = visual === 'happy' ? buildHappyDetails(group, quality) : null;
-  buildCities(group, vectors, quality);
+  const ground = createTerrainMaterial();
+  const terrain = createTerrain(group, ground.material, quality);
+  buildSurround(group, ground.material);
+  const rivers = buildRivers(group, vectors);
+  const happy = buildHappyDetails(group, quality);
+  /* Name tags are drawn over everything, so only nearby ones are shown. */
+  const labels = [];
+  const cities = buildCities(group, vectors, quality, labels);
   const realBuildings = buildRealBuildings(group, quality);
   const cityLights = buildCityLights(group);
-  const papi = buildAirports(group);
-  return { group, terrain, sea, coast, happy, realBuildings, cityLights, papi };
+  const papi = buildAirports(group, labels);
+
+  /* `mode` is 'happy', 'natural' or 'map'; `imagery` a satellite texture or null. */
+  function setLook(mode, imagery = null) {
+    ground.setPalette(mode);
+    ground.setImagery(imagery);
+    rivers.color.set(PALETTES[mode].shallow);
+    terrain.setHappy(mode === 'happy');
+    happy.visible = mode === 'happy';
+  }
+
+  return { group, terrain, ground, setLook, happy, cities, labels, realBuildings, cityLights, papi };
 }

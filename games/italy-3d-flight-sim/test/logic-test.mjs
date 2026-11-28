@@ -53,12 +53,14 @@ run('real OSM buildings exist with footprint rings and heights', () => {
   }
 });
 
-run('world is wide and terrain relief is low', () => {
-  ok(WORLD.maxLon - WORLD.minLon > 15);
-  ok(WORLD.maxLat - WORLD.minLat > 12);
-  ok(WORLD.elevScale <= 0.06 && WORLD.elevScale >= 0.04);
-  const peak = terrainHeight(geoToWorld(10.5, 46.5).x, geoToWorld(10.5, 46.5).z);
-  ok(peak < 260, `peak too high: ${peak}`);
+run('map is ten times wider and longer, with relief a third as tall', () => {
+  ok(WORLD.width >= 1760 * 10 && WORLD.depth >= 1430 * 10, `${WORLD.width} x ${WORLD.depth}`);
+  near(WORLD.elevScale, 0.05 / 3, 1e-9);
+  let peak = 0;
+  for (let x = -WORLD.width / 2; x <= WORLD.width / 2; x += 40) {
+    for (let z = -WORLD.depth / 2; z <= WORLD.depth / 2; z += 40) peak = Math.max(peak, terrainHeight(x, z));
+  }
+  ok(peak > 40 && peak < 75, `peak ${peak.toFixed(1)}`);
 });
 
 run('real landmarks cover Italy and tours reference them', () => {

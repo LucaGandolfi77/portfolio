@@ -1,7 +1,7 @@
 /* Italy 3D Flight Sim — airfields: flat ground, runway geometry and approach guidance (pure logic)
  *
- * The map is heavily compressed, so runways are game-sized, and a few airfields
- * are nudged a few units so they do not sit on top of a nearby landmark.
+ * The map is compressed, so runways are game-sized: much longer than life
+ * compared with the distances between cities.
  */
 
 import { AIRPORTS } from './config.js';
@@ -12,7 +12,7 @@ export const GLIDE_SLOPE = 0.1;
 
 const FLAT = { along: 125, across: 28, fadeAlong: 150, fadeAcross: 55 };
 const CORRIDOR = { start: 110, end: 520, across: 30, fade: 35, slope: 0.065 };
-const MIN_ELEVATION = 3.5;
+const MIN_ELEVATION = 2.5;
 const SHARED_RADIUS = 150;
 
 let fields = [];
@@ -20,17 +20,25 @@ let fields = [];
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const smooth = t => { const c = clamp01(t); return c * c * (3 - 2 * c); };
 
+function placement(airport, toWorld) {
+  const { x, z } = toWorld(airport.lon, airport.lat);
+  const heading = airport.rwy * Math.PI / 180;
+  return { airport, code: airport.code, x, z, heading, dir: { x: Math.sin(heading), z: -Math.cos(heading) } };
+}
+
+/* Rectangles that must be dry land, so coastal runways are not flooded. */
+export function airfieldPads(toWorld) {
+  return AIRPORTS.map(airport => ({
+    ...placement(airport, toWorld),
+    along: FLAT.along + FLAT.fadeAlong * 0.4, across: FLAT.across + FLAT.fadeAcross * 0.7
+  }));
+}
+
 export function initAirfields(naturalHeight, toWorld) {
   const built = AIRPORTS.map(airport => {
-    const base = toWorld(airport.lon, airport.lat);
-    const x = base.x + (airport.offset?.[0] || 0);
-    const z = base.z + (airport.offset?.[1] || 0);
-    const heading = airport.rwy * Math.PI / 180;
-    return {
-      airport, code: airport.code, x, z, heading,
-      dir: { x: Math.sin(heading), z: -Math.cos(heading) },
-      natural: Math.max(MIN_ELEVATION, naturalHeight(x, z))
-    };
+    const field = placement(airport, toWorld);
+    field.natural = Math.max(MIN_ELEVATION, naturalHeight(field.x, field.z));
+    return field;
   });
   /* Neighbouring fields share one elevation so their flat areas join cleanly. */
   for (const f of built) {
