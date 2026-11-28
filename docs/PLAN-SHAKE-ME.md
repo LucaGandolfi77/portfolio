@@ -176,8 +176,8 @@ tools/quality/e2e/shake-me.spec.mjs
 - **Nome:** Shake Me. Il barman resta Tobia.
 - **Niente Natale e niente stagioni:** il bar è uguale tutto l'anno. Le 24 serate diventano 12, senza date.
 - **Dosi a livelli:**
-  - **facile** (serate 1–4): sul misurino ci sono le tacche numerate e la linea della dose, tolleranza ±25%;
-  - **medio** (serate 5–8): tacche senza numeri, tolleranza ±15%;
+  - **facile** (serate 1–4): sul misurino ci sono le tacche numerate e la linea della dose, tolleranza ±25%. Dopo la prima prova, troppo difficile: il livello facile ora ha la guida passo passo, le scelte illuminate, il misurino che si ferma sulla dose, tolleranza ±35% e media 45 per superare la serata;
+  - **medio** (serate 5–8): tacche senza numeri, tolleranza ±18%;
   - **esperto** (serate 9–12): nessuna tacca, tolleranza ±8%.
 - **Analcolici:** sì, 10 ricette nostre segnate come «non IBA», servite all'autista astemio.
 - **Lingue:** italiano e inglese.

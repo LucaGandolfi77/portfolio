@@ -153,7 +153,7 @@ export function result(t, lang, recipe, res, info, line, names, buttons) {
 export function nightEnd(t, night, res, scores, orders) {
   return `<div class="card center"><h2>${esc(t('result.nightDone'))}</h2><p class="kicker">${esc(t('night', { n: night + 1 }))}</p>
     <p class="score"><b>${res.avg}</b><small>${esc(t('result.avg'))}</small></p>${stars(res.stars)}
-    <p class="${res.passed ? 'news' : 'muted'}">${esc(res.passed ? t('result.passed') : t('result.failed', { n: PASS }))}</p>
+    <p class="${res.passed ? 'news' : 'muted'}">${esc(res.passed ? t('result.passed') : t('result.failed', { n: res.pass ?? PASS }))}</p>
     <ul class="tally">${orders.map((o, i) => `<li><span>${esc(RECIPE[o.recipe].name)}</span><b>${scores[i] ?? '—'}</b></li>`).join('')}</ul>
     <div class="row">${btn('home', esc(t('menu')))}${btn('night-retry', esc(t('retry')))}${res.passed && night + 1 < NIGHTS ? btn('night-next', esc(t('next')), 'primary') : ''}</div></div>`;
 }

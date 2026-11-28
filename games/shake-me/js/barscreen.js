@@ -3,10 +3,10 @@
    ============================================================ */
 import * as W from './workbench.js';
 import { INGREDIENTS, BY_ID, KINDS, COUNT_UNITS } from './data/ingredients.js';
-import { GLASSES, ICES, RIMS, GARNISHES, ACTIONS, MUDDLE } from './data/bar.js';
+import { GLASSES, ICES, RIMS, GARNISHES, ACTIONS, MUDDLE, GARNISH } from './data/bar.js';
 import { RECIPE } from './data/recipes.js';
-import { TIERS } from './judge.js';
-import { stepsOf, doseText } from './steps.js';
+import { TIERS, bandOf } from './judge.js';
+import { stepsOf, doseText, nextStep } from './steps.js';
 import { glassSVG, toolSVG, personSVG } from './render/art.js';
 import { esc, customer, glassName } from './ui.js';
 
@@ -26,13 +26,18 @@ export function createBar(root, deps) {
 
   const recipe = () => RECIPE[order.recipe];
   const tier = () => TIERS[order.tier] || TIERS.easy;
+  const guided = () => order && tier().guide && order.recipeMode !== 'never';
+  /** The next move of the guide, or null. */
+  const hint = () => (guided() ? nextStep(recipe(), bench) : null);
+  const hinted = (fn, id) => { const h = hint(); return h && h[0] === fn && (id === undefined || h[1] === id) ? ' hint' : ''; };
   const lineFor = (id) => recipe().ings.find((l) => l.ids.includes(id));
   const unitFor = (id) => lineFor(id)?.unit ?? BY_ID[id].unit;
 
   function open(next) {
     order = next;
     bench = W.newBench();
-    tab = 'glass'; kind = 'spirit'; query = ''; sel = null; jig = 0; count = 0; hold = null;
+    tab = 'glass'; query = ''; sel = null; jig = 0; count = 0; hold = null;
+    kind = guided() ? 'need' : 'spirit';
     recipeOpen = !!next.recipeOpen;
     stageKey = '';
     render();
@@ -86,32 +91,37 @@ export function createBar(root, deps) {
 
   function panelHTML() {
     if (tab === 'glass') {
-      return `<div class="grid glasses">${GLASSES.map((g) => `<button type="button" class="pick" data-b="glass" data-id="${g.id}" aria-pressed="${bench.glass === g.id}">${glassSVG(g.id, { uid: 'p' + g.id, label: '' })}<span>${esc(g[lang()])}</span></button>`).join('')}</div>
-        <fieldset><legend>${esc(t('glass.ice'))}</legend><div class="chips">${ICES.map((i) => `<button type="button" class="chip" data-b="gice" data-id="${i}" aria-pressed="${bench.glassIce === i}">${esc(t(`ice.${i}`))}</button>`).join('')}</div></fieldset>
-        <fieldset><legend>${esc(t('glass.rim'))}</legend><div class="chips">${['none', ...RIMS].map((r) => `<button type="button" class="chip" data-b="rim" data-id="${r}" aria-pressed="${(bench.rim || 'none') === r}">${esc(t(`rim.${r}`))}</button>`).join('')}</div></fieldset>`;
+      return `<div class="grid glasses">${GLASSES.map((g) => `<button type="button" class="pick${hinted('chooseGlass', g.id)}" data-b="glass" data-id="${g.id}" aria-pressed="${bench.glass === g.id}">${glassSVG(g.id, { uid: 'p' + g.id, label: '' })}<span>${esc(g[lang()])}</span></button>`).join('')}</div>
+        <fieldset><legend>${esc(t('glass.ice'))}</legend><div class="chips">${ICES.map((i) => `<button type="button" class="chip${hinted('setGlassIce', i)}" data-b="gice" data-id="${i}" aria-pressed="${bench.glassIce === i}">${esc(t(`ice.${i}`))}</button>`).join('')}</div></fieldset>
+        <fieldset><legend>${esc(t('glass.rim'))}</legend><div class="chips">${['none', ...RIMS].map((r) => `<button type="button" class="chip${hinted('setRim', r)}" data-b="rim" data-id="${r}" aria-pressed="${(bench.rim || 'none') === r}">${esc(t(`rim.${r}`))}</button>`).join('')}</div></fieldset>`;
     }
     if (tab === 'tool') {
-      return `<div class="grid tools">${['shaker', 'mixing', 'blender', 'glass'].map((id) => `<button type="button" class="pick tool" data-b="tool" data-id="${id}" aria-pressed="${bench.tool === id}">
+      return `<div class="grid tools">${['shaker', 'mixing', 'blender', 'glass'].map((id) => `<button type="button" class="pick tool${hinted('chooseTool', id)}" data-b="tool" data-id="${id}" aria-pressed="${bench.tool === id}">
         <span class="ic">${id === 'glass' ? '🥃' : toolSVG(id, [], false, 'pt' + id)}</span><span>${esc(t(`tools.${id}`))}</span><small>${esc(t(`toolDesc.${id}`))}</small></button>`).join('')}</div>`;
     }
     if (tab === 'ings') return sel ? pourHTML() : shelfHTML();
     if (tab === 'tech') return techHTML();
-    return `<div class="chips garnishes">${GARNISHES.map((g) => `<button type="button" class="chip" data-b="garnish" data-id="${g.id}" aria-pressed="${bench.garnish.includes(g.id)}"><span aria-hidden="true">${g.icon}</span> ${esc(g[lang()])}</button>`).join('')}</div>`;
+    return `<div class="chips garnishes">${GARNISHES.map((g) => `<button type="button" class="chip${hinted('toggleGarnish', g.id)}" data-b="garnish" data-id="${g.id}" aria-pressed="${bench.garnish.includes(g.id)}"><span aria-hidden="true">${g.icon}</span> ${esc(g[lang()])}</button>`).join('')}</div>`;
   }
 
   function shelfHTML() {
     const q = query.trim().toLowerCase();
-    const showNeed = order.recipeMode !== 'never' && tier().target;
+    const showNeed = guided() || (order.recipeMode !== 'never' && tier().target);
     const need = new Set(showNeed ? recipe().ings.flatMap((l) => l.ids) : []);
-    const list = INGREDIENTS.filter((i) => (q ? i.name[lang()].toLowerCase().includes(q) || i.name.en.toLowerCase().includes(q) || i.id.includes(q) : i.kind === kind));
+    const h = hint();
+    const next = h && h[0] === 'pour' ? h[1] : null;
+    const list = q
+      ? INGREDIENTS.filter((i) => i.name[lang()].toLowerCase().includes(q) || i.name.en.toLowerCase().includes(q) || i.id.includes(q))
+      : kind === 'need' ? INGREDIENTS.filter((i) => need.has(i.id)) : INGREDIENTS.filter((i) => i.kind === kind);
+    const kinds = guided() ? ['need', ...KINDS] : KINDS;
     return `<input class="search" type="search" data-b-search placeholder="${esc(t('search'))}" value="${esc(query)}" aria-label="${esc(t('search'))}">
-      ${q ? '' : `<div class="chips scroll kinds">${KINDS.map((k) => `<button type="button" class="chip" data-b="kind" data-id="${k}" aria-pressed="${kind === k}">${esc(t(`kinds.${k}`))}</button>`).join('')}</div>`}
-      <div class="shelf">${list.map((i) => `<button type="button" class="bottle ${need.has(i.id) ? 'need' : ''}" data-b="ing" data-id="${i.id}"><i style="background:${i.color}"></i><span>${esc(i.name[lang()])}</span></button>`).join('')}</div>`;
+      ${q ? '' : `<div class="chips scroll kinds">${kinds.map((k) => `<button type="button" class="chip" data-b="kind" data-id="${k}" aria-pressed="${kind === k}">${esc(k === 'need' ? t('guide.need') : t(`kinds.${k}`))}</button>`).join('')}</div>`}
+      <div class="shelf">${list.map((i) => `<button type="button" class="bottle ${need.has(i.id) ? 'need' : ''}${i.id === next ? ' hint' : ''}" data-b="ing" data-id="${i.id}"><i style="background:${i.color}"></i><span>${esc(i.name[lang()])}</span></button>`).join('')}</div>`;
   }
 
   function targetHTML() {
     if (!bench.tool || bench.tool === 'glass' || bench.strained) return '';
-    return `<div class="chips target" role="group" aria-label="${esc(t('pour.into'))}">${['tool', 'glass'].map((x) => `<button type="button" class="chip" data-b="target" data-id="${x}" aria-pressed="${target === x}">${esc(t(`pour.${x}`))}</button>`).join('')}</div>`;
+    return `<div class="chips target" role="group" aria-label="${esc(t('pour.into'))}">${['tool', 'glass'].map((x) => `<button type="button" class="chip${(() => { const h = hint(); return h && h[0] === 'pour' && h[1] === sel && h[4] === x && target !== x ? ' hint' : ''; })()}" data-b="target" data-id="${x}" aria-pressed="${target === x}">${esc(t(`pour.${x}`))}</button>`).join('')}</div>`;
   }
 
   function jiggerMax() {
@@ -160,27 +170,27 @@ export function createBar(root, deps) {
   }
 
   function meterHTML(action) {
-    const a = ACTIONS[action];
+    const [lo, hi] = bandOf(action, order.tier);
     const p = bench.acts[action]?.progress || 0;
-    return `<div class="meter" data-meter="${action}"><i class="band" style="left:${a.band[0] * 100}%;width:${(a.band[1] - a.band[0]) * 100}%"></i><u style="width:${Math.min(100, p * 100)}%"></u></div>`;
+    return `<div class="meter" data-meter="${action}"><i class="band" style="left:${lo * 100}%;width:${(hi - lo) * 100}%"></i><u style="width:${Math.min(100, p * 100)}%"></u></div>`;
   }
 
   function techHTML() {
     if (!bench.tool) return `<p class="muted">${esc(t('tech.noTool'))}</p>`;
     const v = bench.tool === 'glass' || bench.strained ? 'glass' : 'tool';
-    const muddle = `<button type="button" class="btn" data-b="muddle">🪵 ${esc(t('tech.muddle', { n: bench.muddle[v] }))}</button>`;
+    const muddle = `<button type="button" class="btn${hinted('muddle')}" data-b="muddle">🪵 ${esc(t('tech.muddle', { n: bench.muddle[v] }))}</button>`;
     if (bench.tool === 'glass') {
       return `<p class="muted">${esc(t('in.glass'))}</p><div class="col">${muddle}
-        ${meterHTML('swizzle')}<button type="button" class="btn hold" data-hold="swizzle">${esc(t('tech.swizzle'))}</button></div>`;
+        ${meterHTML('swizzle')}<button type="button" class="btn hold${hinted('act')}" data-hold="swizzle">${esc(t('tech.swizzle'))}</button></div>`;
     }
     const action = ACTION_OF[bench.tool];
     return `<div class="col">
-      <button type="button" class="chip big" data-b="toolice" aria-pressed="${bench.toolIce}">🧊 ${esc(t('tech.toolIce'))}</button>
+      <button type="button" class="chip big${hinted('setToolIce')}" data-b="toolice" aria-pressed="${bench.toolIce}">🧊 ${esc(t('tech.toolIce'))}</button>
       ${muddle}
       ${meterHTML(action)}
-      <button type="button" class="btn hold primary" data-hold="${action}" ${bench.strained ? 'disabled' : ''}>${esc(t(`tech.${action}`))}</button>
+      <button type="button" class="btn hold primary${hinted('act')}" data-hold="${action}" ${bench.strained ? 'disabled' : ''}>${esc(t(`tech.${action}`))}</button>
       ${action === 'shake' && settings().sensor ? `<small class="muted">${esc(t('tech.sensor'))}</small>` : ''}
-      <button type="button" class="btn" data-b="strain" ${bench.strained ? 'disabled' : ''}>${esc(t(bench.tool === 'blender' ? 'tech.pourOut' : 'tech.strain'))}${bench.strained ? ' ✓' : ''}</button></div>`;
+      <button type="button" class="btn${hinted('strain')}" data-b="strain" ${bench.strained ? 'disabled' : ''}>${esc(t(bench.tool === 'blender' ? 'tech.pourOut' : 'tech.strain'))}${bench.strained ? ' ✓' : ''}</button></div>`;
   }
 
   function render() {
@@ -200,18 +210,51 @@ export function createBar(root, deps) {
       ${recipeHTML()}
       <div class="stage">${stageHTML()}</div>
       <p class="bar-toast" role="status" hidden></p>
+      <p class="guide" aria-live="polite" ${guided() ? '' : 'hidden'}>${guideText()}</p>
       <nav class="tabs" role="tablist">${TABS.map((x) => `<button type="button" role="tab" class="tab" data-b="tab" data-id="${x}" aria-selected="${tab === x}"><span aria-hidden="true">${TAB_ICON[x]}</span>${esc(t(`tabs.${x}`))}</button>`).join('')}</nav>
       <div class="panel" role="tabpanel">${panelHTML()}</div>
       <footer class="bar-foot"><button type="button" class="btn" data-b="reset">↺ ${esc(t('reset'))}</button><button type="button" class="btn primary serve" data-b="serve" ${W.contents(bench).glass.length ? '' : 'disabled'}>🛎️ ${esc(t('serve'))}</button></footer>`;
     stageKey = '';
+    refreshGuide();
+  }
+
+  function guideText() {
+    if (!guided()) return '';
+    const h = hint();
+    const L = lang();
+    if (!h) return `👉 ${esc(t('guide.serve'))}`;
+    const [fn, a, amount, unit] = h;
+    let text;
+    if (fn === 'chooseGlass') text = t('guide.glass', { x: glassName(a, L).toLowerCase() });
+    else if (fn === 'setGlassIce') text = t('guide.ice', { x: t(`ice.${a}`).toLowerCase() });
+    else if (fn === 'setRim') text = t('guide.rim', { x: t(`rim.${a}`).toLowerCase() });
+    else if (fn === 'chooseTool') text = t('guide.tool', { x: t(`tools.${a}`).toLowerCase() });
+    else if (fn === 'pour') text = t(h[4] === 'glass' && bench.tool && bench.tool !== 'glass' ? 'guide.pourGlass' : 'guide.pour', { x: doseText({ ids: [a], amount, unit, stage: 'base' }, L) });
+    else if (fn === 'muddle') text = t('guide.muddle', { n: MUDDLE.min });
+    else if (fn === 'setToolIce') text = t('guide.toolIce');
+    else if (fn === 'act') text = t(`guide.${a}`);
+    else if (fn === 'strain') text = t('guide.strain');
+    else if (fn === 'toggleGarnish') text = t('guide.garnish', { x: GARNISH[a][L].toLowerCase() });
+    const tabFor = { chooseGlass: 'glass', setGlassIce: 'glass', setRim: 'glass', chooseTool: 'tool', pour: 'ings', muddle: 'tech', setToolIce: 'tech', act: 'tech', strain: 'tech', toggleGarnish: 'garnish' }[fn];
+    return `👉 ${esc(text)}${tabFor && tabFor !== tab ? ` <button type="button" class="link" data-b="tab" data-id="${tabFor}">${esc(t(`tabs.${tabFor}`))} ›</button>` : ''}`;
+  }
+
+  function refreshGuide() {
+    const g = root.querySelector('.guide');
+    if (g && guided()) g.innerHTML = guideText();
+    const tabs = root.querySelectorAll('.tab');
+    const h = hint();
+    const tabFor = h && { chooseGlass: 'glass', setGlassIce: 'glass', setRim: 'glass', chooseTool: 'tool', pour: 'ings', muddle: 'tech', setToolIce: 'tech', act: 'tech', strain: 'tech', toggleGarnish: 'garnish' }[h[0]];
+    tabs.forEach((el) => el.classList.toggle('hint', !!tabFor && el.dataset.id === tabFor && el.dataset.id !== tab));
   }
 
   /** Light refresh: only the glass, the tool, the serve button and the recipe ticks. */
   function refreshStage() {
+    refreshGuide();
     const st = root.querySelector('.stage');
     if (st) st.innerHTML = stageHTML();
     const serve = root.querySelector('[data-b="serve"]');
-    if (serve) serve.disabled = !W.contents(bench).glass.length;
+    if (serve) { serve.disabled = !W.contents(bench).glass.length; serve.classList.toggle('hint', guided() && !hint()); }
     const rc = root.querySelector('.recipecard');
     if (rc) { const open = !rc.hidden; rc.outerHTML = recipeHTML(); if (open) root.querySelector('.recipecard').hidden = false; }
   }
@@ -219,6 +262,7 @@ export function createBar(root, deps) {
   function refreshPanel() {
     const p = root.querySelector('.panel');
     if (p) p.innerHTML = panelHTML();
+    refreshGuide();
     const s = p?.querySelector('[data-b-search]');
     if (s && query) { s.focus(); s.setSelectionRange(query.length, query.length); }
   }
@@ -288,7 +332,19 @@ export function createBar(root, deps) {
     root.querySelector(`[data-hold="${hold}"]`)?.classList.remove('down');
     const was = hold;
     hold = null;
-    if (was === 'pour') { const b = root.querySelector('[data-b="addml"]'); if (b) b.disabled = !(jig > 0); }
+    if (was === 'pour') {
+      // close enough to the dose: the jigger settles on it
+      const l = lineFor(sel);
+      const snap = tier().snap;
+      if (snap && l && l.unit === 'ml' && Math.abs(jig - l.amount) <= Math.max(3, l.amount * snap)) {
+        jig = l.amount;
+        refreshPanel();
+        root.querySelector('[data-b="addml"]')?.focus({ preventScroll: true });
+        return;
+      }
+      const b = root.querySelector('[data-b="addml"]');
+      if (b) b.disabled = !(jig > 0);
+    }
     else refreshStage();
   }
 
@@ -322,7 +378,8 @@ export function createBar(root, deps) {
     if (!hold || !order) return;
     holdT += dt;
     if (hold === 'pour') {
-      const rate = holdT < 0.5 ? 10 : 30;
+      // slow at first for small doses, then faster for the long pours
+      const rate = holdT < 0.5 ? 10 : !tier().guide ? 30 : holdT < 2 ? 18 : 40;
       jig = Math.min(jiggerMax(), jig + rate * dt);
       const svg = root.querySelector('.jigger');
       if (svg) {
@@ -339,6 +396,7 @@ export function createBar(root, deps) {
       W.act(bench, hold, cur + dt / a.full);
       const m = root.querySelector(`[data-meter="${hold}"] u`);
       if (m) m.style.width = `${Math.min(100, (bench.acts[hold].progress) * 100)}%`;
+      if (guided()) refreshGuide();
     }
   }
 

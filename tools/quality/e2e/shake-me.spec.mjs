@@ -22,7 +22,8 @@ async function open(page, adult = true) {
   await expect(page.locator('html')).toHaveAttribute('data-ready', '1');
 }
 
-const b = (page, k, id) => page.locator(id ? `[data-b="${k}"][data-id="${id}"]` : `[data-b="${k}"]`);
+// the guide repeats the tab buttons as links, so tabs are taken from the tab bar
+const b = (page, k, id) => page.locator(`${k === 'tab' ? '.tabs ' : ''}${id ? `[data-b="${k}"][data-id="${id}"]` : `[data-b="${k}"]`}`);
 /** Holds a button for `ms` of game time (the clock is advanced by the test hook). */
 async function hold(page, sel, ms) {
   const box = await page.locator(sel).boundingBox();
@@ -58,8 +59,8 @@ test.describe('Shake Me', () => {
     await b(page, 'gice', 'cubes').click();
     await b(page, 'tab', 'tool').click();
     await b(page, 'tool', 'glass').click();
-    // 0.5 s at 10 ml/s, then 30 ml/s: 1.33 s ≈ 30 ml
-    for (const id of ['gin', 'red-bitter', 'sweet-vermouth']) await pourMl(page, id, 1333);
+    // easy: 0.5 s at 10 ml/s, then 18 ml/s; 1.8 s ≈ 28 ml settles on 30
+    for (const id of ['gin', 'red-bitter', 'sweet-vermouth']) await pourMl(page, id, 1800);
     await b(page, 'tab', 'garnish').click();
     await b(page, 'garnish', 'orange-slice').click();
     await b(page, 'serve').click();
@@ -76,8 +77,8 @@ test.describe('Shake Me', () => {
     await b(page, 'glass', 'cocktail').click();
     await b(page, 'tab', 'tool').click();
     await b(page, 'tool', 'shaker').click();
-    await pourMl(page, 'white-rum', 2333);
-    await pourMl(page, 'lime', 1000);
+    await pourMl(page, 'white-rum', 3550);
+    await pourMl(page, 'lime', 1333);
     await b(page, 'tab', 'ings').click();
     await page.locator('[data-b-search]').fill('zucchero');
     await b(page, 'ing', 'sugar').click();
@@ -125,6 +126,39 @@ test.describe('Shake Me', () => {
     expect(errors).toEqual([]);
   });
 
+  test('first evening: the guide leads, highlights the next choice and the jigger settles on the dose', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await page.evaluate(() => window.__shake.start('school', { recipe: 'negroni' }));
+    await expect(page.locator('.guide')).toContainText('old fashioned');
+    await expect(page.locator('[data-b="glass"][data-id="rocks"]')).toHaveClass(/hint/);
+    await b(page, 'glass', 'rocks').click();
+    await expect(page.locator('.guide')).toContainText('cubetti');
+    await b(page, 'gice', 'cubes').click();
+    await page.locator('.guide [data-b="tab"]').click();
+    await expect(page.locator('[data-b="tool"][data-id="glass"]')).toHaveClass(/hint/);
+    await b(page, 'tool', 'glass').click();
+    await page.locator('.guide [data-b="tab"]').click();
+    // the shelf opens on the ingredients of this drink, the next one glowing
+    await expect(page.locator('.bottle')).toHaveCount(3);
+    await expect(page.locator('[data-b="ing"][data-id="gin"]')).toHaveClass(/hint/);
+    for (const id of ['gin', 'red-bitter', 'sweet-vermouth']) {
+      await b(page, 'ing', id).click();
+      // 1.6 s is about 25 ml: close enough, the jigger settles on 30
+      await hold(page, '[data-hold="pour"]', 1600);
+      await expect(page.locator('.readout')).toHaveText('30 ml');
+      await b(page, 'addml').click();
+    }
+    await expect(page.locator('.guide')).toContainText('arancia');
+    await page.locator('.guide [data-b="tab"]').click();
+    await b(page, 'garnish', 'orange-slice').click();
+    await expect(page.locator('.guide')).toContainText('servi');
+    await expect(page.locator('[data-b="serve"]')).toHaveClass(/hint/);
+    await b(page, 'serve').click();
+    await expect(page.locator('.score b')).toHaveText('100');
+    expect(errors).toEqual([]);
+  });
+
   test('later evenings hide the marks on the jigger', async ({ page }) => {
     await open(page);
     await page.evaluate(() => window.__shake.start('night', { night: 9 }));
@@ -133,6 +167,7 @@ test.describe('Shake Me', () => {
     await b(page, 'tab', 'ings').click();
     await b(page, 'ing', 'gin').click();
     await expect(page.locator('.jigger line')).toHaveCount(0);
+    await expect(page.locator('.guide')).toBeHidden();
     await expect(page.locator('.jigger text')).toHaveCount(0);
     await page.evaluate(() => window.__shake.start('school', { recipe: 'negroni' }));
     await b(page, 'tab', 'tool').click();

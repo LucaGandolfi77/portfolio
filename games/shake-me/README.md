@@ -15,9 +15,9 @@ PWA offline in JavaScript vanilla (ES module), disegni SVG, audio sintetizzato, 
   - filtrare, colmare e guarnire.
 - **Giudizio** su 100: ingredienti 35, dosi 25, tecnica 15, bicchiere e ghiaccio 15, guarnizione e bordo 10. Tobia commenta l'errore principale e l'elenco dice cosa correggere.
 - **Livelli di precisione**:
-  - serate 1–4: tacche numerate e linea della dose, ±25%;
-  - serate 5–8: tacche senza numeri, ±15%;
-  - serate 9–12: niente tacche, ±8%.
+  - serate 1–4 (e Scuola): Tobia dice ogni passo in una riga verde e illumina la scelta giusta; lo scaffale si apre sugli ingredienti del drink; il misurino ha tacche numerate e linea della dose, versa più piano all'inizio e si ferma sulla dose quando ci arrivi vicino (entro il 25%); tolleranza ±35%, zona verde dello shaker più larga, serata superata con media 45;
+  - serate 5–8: tacche senza numeri, ±18%, media 55;
+  - serate 9–12: niente tacche, ±8%, media 55.
 - **Modalità**: 12 Serate da cinque clienti (i 102 cocktail divisi dal più semplice al più difficile), Scuola, A memoria, Sfida del giorno, Ricettario.
 - Italiano e inglese, testo grande, meno movimento.
 

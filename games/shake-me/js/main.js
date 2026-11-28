@@ -175,7 +175,7 @@ const btn = (act, label, cls = '') => `<button type="button" class="btn ${cls}" 
 function nextOrder() {
   if (session.i + 1 < session.orders.length) { session.i++; openOrder(); return; }
   if (session.kind === 'night') {
-    const res = V.nightResult(session.scores);
+    const res = V.nightResult(session.scores, session.night);
     S.finishNight(state, session.night, res);
     save();
     res.passed ? audio.sfx.good() : audio.sfx.bad();

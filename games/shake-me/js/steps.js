@@ -149,6 +149,36 @@ export function perfectPlay(recipe) {
   return moves;
 }
 
+/** True when the bench already has what a perfect move would do. */
+function satisfied(recipe, b, [fn, ...args]) {
+  switch (fn) {
+    case 'chooseGlass': return recipe.glass.includes(b.glass);
+    case 'setGlassIce': return recipe.ice === '*' ? true : b.glassIce === args[0];
+    case 'setRim': return b.rim === args[0];
+    case 'chooseTool': return b.tool === args[0];
+    case 'pour': {
+      const line = recipe.ings.find((l) => l.ids.includes(args[0]));
+      return b.pours.some((p) => line.ids.includes(p.id) && p.target === args[3]);
+    }
+    case 'muddle': return b.muddle[TOOL_FOR[recipe.method] === 'glass' ? 'glass' : 'tool'] >= MUDDLE.min;
+    case 'setToolIce': return b.toolIce || b.strained;
+    case 'act': { const p = b.acts[args[0]]?.progress ?? 0; return p >= ACTIONS[args[0]].band[0] - 0.15; }
+    case 'strain': return b.strained;
+    case 'toggleGarnish': { const g = recipe.garnish.find((x) => x.ids.includes(args[0])); return g.ids.some((id) => b.garnish.includes(id)); }
+    default: return true;
+  }
+}
+
+/**
+ * The next thing to do, for the guide of the easy levels:
+ * the first perfect move the bench does not show yet, or null (serve).
+ */
+export function nextStep(recipe, bench) {
+  const moves = perfectPlay(recipe);
+  // glass, ice and rim can be done in any order before the rest
+  return moves.find((m) => !satisfied(recipe, bench, m)) || null;
+}
+
 export function play(bench, moves) {
   for (const [fn, ...args] of moves) {
     const err = W[fn](bench, ...args);

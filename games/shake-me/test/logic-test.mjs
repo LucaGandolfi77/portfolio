@@ -8,7 +8,8 @@ import { INGREDIENTS, BY_ID } from '../js/data/ingredients.js';
 import { GARNISH, GLASSES, TOOL_FOR } from '../js/data/bar.js';
 import * as W from '../js/workbench.js';
 import { judge, starsOf } from '../js/judge.js';
-import { stepsOf, perfectPlay, play, doseText } from '../js/steps.js';
+import { stepsOf, perfectPlay, play, doseText, nextStep } from '../js/steps.js';
+import { TIERS, bandOf } from '../js/judge.js';
 import * as V from '../js/service.js';
 import * as S from '../js/state.js';
 import { STRINGS } from '../js/strings.js';
@@ -130,6 +131,38 @@ t('nothing poured scores almost nothing; stars follow the score', () => {
   const b = W.newBench(); W.chooseGlass(b, 'rocks');
   ok(judge(RECIPE.negroni, b).score < 30);
   eq([0, 54, 55, 74, 75, 89, 90, 100].map(starsOf).join(), '0,0,1,1,2,2,3,3');
+});
+
+t('following the guide step by step makes every drink perfectly', () => {
+  for (const r of RECIPES) {
+    const b = W.newBench();
+    let n = 0, step;
+    while ((step = nextStep(r, b)) && n++ < 60) {
+      const [fn, ...args] = step;
+      const err = W[fn](b, ...args);
+      ok(!err, `${r.id}: ${fn} ${err}`);
+    }
+    eq(nextStep(r, b), null, r.id);
+    eq(judge(r, b, 'easy').score, 100, r.id);
+  }
+});
+t('the guide skips what is already done and starts with the glass', () => {
+  const r = RECIPE.daiquiri, b = W.newBench();
+  eq(nextStep(r, b)[0], 'chooseGlass');
+  W.chooseGlass(b, 'cocktail'); W.chooseTool(b, 'shaker');
+  eq(nextStep(r, b).slice(0, 2).join(), 'pour,white-rum');
+});
+t('the first evenings forgive more', () => {
+  ok(TIERS.easy.tol > TIERS.medium.tol && TIERS.medium.tol > TIERS.hard.tol);
+  ok(TIERS.easy.guide && !TIERS.medium.guide && !TIERS.hard.guide);
+  ok(bandOf('shake', 'easy')[0] < bandOf('shake', 'hard')[0] && bandOf('shake', 'easy')[1] > bandOf('shake', 'hard')[1]);
+  const r = RECIPE.daiquiri;
+  const short = perfectPlay(r).map((m) => (m[0] === 'act' ? ['act', 'shake', 0.33] : m));
+  eq(run(r, short, 'easy').parts.tech, 15);
+  ok(run(r, short, 'hard').parts.tech < 15);
+  const res = V.nightResult([48, 50, 46, 44, 52], 0);
+  ok(res.passed && res.stars >= 1 && res.pass === 45);
+  ok(!V.nightResult([48, 50, 46, 44, 52], 6).passed);
 });
 
 /* ---------- the bench ---------- */

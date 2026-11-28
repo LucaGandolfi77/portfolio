@@ -9,11 +9,23 @@ import { TOOL_FOR, ACTIONS, MUDDLE } from './data/bar.js';
 import { UNIT_ML } from './data/ingredients.js';
 import { mlOf } from './workbench.js';
 
+/**
+ * tol: dose margin · lines: marks on the jigger · target: the green dose line
+ * guide: next-step hints and highlighted choices · snap: a pour close to the
+ * dose settles on it · slack: how much wider the green zone of shaking is.
+ */
 export const TIERS = {
-  easy: { tol: 0.25, lines: 'numbers', target: true },
-  medium: { tol: 0.15, lines: 'plain', target: false },
-  hard: { tol: 0.08, lines: 'none', target: false },
+  easy: { tol: 0.35, lines: 'numbers', target: true, guide: true, snap: 0.25, slack: 0.15, pass: 45 },
+  medium: { tol: 0.18, lines: 'plain', target: false, guide: false, snap: 0, slack: 0.05, pass: 55 },
+  hard: { tol: 0.08, lines: 'none', target: false, guide: false, snap: 0, slack: 0, pass: 55 },
 };
+
+/** The green zone of a hold action at a tier. */
+export function bandOf(action, tier = 'easy') {
+  const [lo, hi] = ACTIONS[action].band;
+  const s = (TIERS[tier] || TIERS.easy).slack;
+  return [Math.max(0.05, lo - s), Math.min(1.2, hi + s)];
+}
 
 export const STARS = [55, 75, 90];
 export const starsOf = (score) => STARS.filter((s) => score >= s).length;
@@ -77,7 +89,7 @@ export function judge(recipe, bench, tier = 'easy') {
     const spec = ACTIONS[action];
     if (!done) defects.push({ key: 'noAction', action });
     else {
-      const [lo, hi] = spec.band;
+      const [lo, hi] = bandOf(action, tier);
       const p = done.progress;
       const miss = p < lo ? lo - p : p > hi ? p - hi : 0;
       let pts = 4 * Math.max(0, 1 - miss / 0.3);

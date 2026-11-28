@@ -4,7 +4,7 @@
 import { seededRandom, dailySeed } from '../../_kit/core.js';
 import { RECIPES } from './data/recipes.js';
 import { BY_ID } from './data/ingredients.js';
-import { starsOf } from './judge.js';
+import { starsOf, TIERS } from './judge.js';
 
 export const NIGHTS = 12;
 export const ORDERS = 5;
@@ -65,9 +65,13 @@ export function nightOrders(night, seed = 0) {
   }));
 }
 
-export function nightResult(scores) {
+/** The average needed to pass an evening: lower while the marks are on the jigger. */
+export const passOf = (night) => TIERS[tierOf(night)].pass ?? PASS;
+
+export function nightResult(scores, night = 4) {
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-  return { avg, passed: avg >= PASS, stars: starsOf(avg) };
+  const pass = passOf(night);
+  return { avg, pass, passed: avg >= pass, stars: avg >= pass ? Math.max(1, starsOf(avg)) : 0 };
 }
 
 /** Recipes the player may pick freely: everything of the evenings reached. */
