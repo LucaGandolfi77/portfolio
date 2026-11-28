@@ -259,6 +259,67 @@ export const HABITATS = [
     region: 'isole', attracts: 'cometa', harmony: 52,
     reqs: { objs: { crystal_pillar: 1, street_lamp: 1, log_bench: 1 } },
     hint: 'Nelle Isole Sospese: 1 Pilastro di Cristallo + 1 Lampione Elettrico + 1 Panchina.'
+  },
+  // --- 10 NUOVI HABITAT (Totale 50) ---
+  {
+    id: 'hab_bosco_ghiande', name: 'Radura delle Ghiande', icon: '🌰',
+    region: 'landa', attracts: 'ghirino', harmony: 30,
+    reqs: { objs: { log_bench: 2 }, tiles: { grass: 4 } },
+    hint: 'Nella Landa: 2 Panchine di Tronco su 4 caselle di Prato Verde.'
+  },
+  {
+    id: 'hab_diga_castoro', name: 'Pontile del Castoro', icon: '🦫',
+    region: null, attracts: 'castorino', harmony: 34,
+    reqs: { tiles: { bridge: 2, water: 3, path: 2 } },
+    hint: '2 caselle di Ponte di Legno vicino a 3 d\'Acqua e 2 di Sentiero.'
+  },
+  {
+    id: 'hab_campo_papaveri', name: 'Campo Scarlatto', icon: '🌺',
+    region: null, attracts: 'papavero', harmony: 34,
+    reqs: { objs: { flower_bed: 3 }, tiles: { flowers: 3 } },
+    hint: '3 Vasi di Fiori circondati da 3 caselle di Prato Fiorito.'
+  },
+  {
+    id: 'hab_baia_delfini', name: 'Baia dei Delfini', icon: '🐬',
+    region: 'costa', attracts: 'delfinello', harmony: 40,
+    reqs: { objs: { fountain: 1, shell_arch: 1 }, tiles: { water: 4 } },
+    hint: 'Sulla Costa: 1 Fontana di Rugiada + 1 Arco di Conchiglie vicino a 4 caselle d\'Acqua.'
+  },
+  {
+    id: 'hab_faro_gabbiani', name: 'Molo dei Gabbiani', icon: '🕊️',
+    region: null, attracts: 'gabbianello', harmony: 38,
+    reqs: { objs: { lantern: 1, beach_umbrella: 1 }, tiles: { bridge: 2 } },
+    hint: '1 Lanterna + 1 Ombrellone Costiero vicino a 2 caselle di Ponte.'
+  },
+  {
+    id: 'hab_picco_stambecchi', name: 'Terrazza dello Stambecco', icon: '🐐',
+    region: 'creste', attracts: 'capriolo', harmony: 40,
+    reqs: { objs: { cozy_tent: 1 }, tiles: { rock: 5, path: 2 } },
+    hint: 'Sulle Creste: 1 Tenda Rifugio su 5 caselle di Basalto e 2 di Sentiero.'
+  },
+  {
+    id: 'hab_fucina_lingotti', name: 'Fonderia dei Custodi', icon: '🪙',
+    region: null, attracts: 'lingottino', harmony: 44,
+    reqs: { objs: { furnace: 1, generator: 1, workbench: 1 } },
+    hint: '1 Fornace + 1 Generatore Solare + 1 Banco da Lavoro vicini.'
+  },
+  {
+    id: 'hab_radura_cervo', name: 'Radura del Cerbiatto', icon: '🦌',
+    region: 'foresta', attracts: 'cerbiatto', harmony: 44,
+    reqs: { objs: { moss_statue: 1, flower_bed: 2 }, tiles: { grass: 4 } },
+    hint: 'Nella Foresta: 1 Statua di Muschio + 2 Vasi di Fiori su 4 Prati.'
+  },
+  {
+    id: 'hab_giardino_lunare', name: 'Giardino Lunare', icon: '🌙',
+    region: null, attracts: 'nebulina', harmony: 52,
+    reqs: { objs: { crystal_pillar: 1, mushroom_lamp: 1 }, tiles: { flowers: 2 } },
+    hint: '1 Pilastro di Cristallo + 1 Lampada Fungo vicino a 2 Prati Fioriti.'
+  },
+  {
+    id: 'hab_altare_solstizio', name: 'Altare del Solstizio', icon: '☀️',
+    region: 'isole', attracts: 'solstizio', harmony: 60,
+    reqs: { objs: { crystal_pillar: 2, generator: 1, street_lamp: 1 } },
+    hint: 'Nelle Isole Sospese: 2 Pilastri di Cristallo + 1 Generatore + 1 Lampione Elettrico.'
   }
 ];
 

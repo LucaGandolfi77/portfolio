@@ -161,8 +161,18 @@ export class WorldRenderer3D {
 
     // Caches for incremental syncing
     this.currentRegionId = null;
-    this.tileMeshes = [];
+    this.tileInstanced = {};
+    for (const [id, mat] of Object.entries(this.tileMaterials)) {
+      const im = new THREE.InstancedMesh(this.tileGeo, mat, MAP_W * MAP_H);
+      im.receiveShadow = true;
+      im.count = 0;
+      im.frustumCulled = false;
+      this.terrainGroup.add(im);
+      this.tileInstanced[id] = im;
+    }
     this.tileStateGrid = [];
+    this.tilesDirty = false;
+    this._dummy = new THREE.Object3D();
     this.tileDecoMap = new Map();
     this.objMeshes = new Map(); // key -> { sig, mesh }
     this.resMeshes = new Map(); // resId -> mesh
@@ -251,12 +261,9 @@ export class WorldRenderer3D {
 
   rebuildRegionScene(region) {
     this.currentRegionId = region.id;
-    // Clear terrain
-    while (this.terrainGroup.children.length) this.terrainGroup.remove(this.terrainGroup.children[0]);
     while (this.decoGroup.children.length) this.decoGroup.remove(this.decoGroup.children[0]);
     while (this.objectGroup.children.length) this.objectGroup.remove(this.objectGroup.children[0]);
     while (this.residentGroup.children.length) this.residentGroup.remove(this.residentGroup.children[0]);
-    this.tileMeshes = [];
     this.tileStateGrid = [];
     this.tileDecoMap.clear();
     this.objMeshes.clear();
@@ -272,40 +279,45 @@ export class WorldRenderer3D {
     }
 
     for (let y = 0; y < MAP_H; y++) {
-      this.tileMeshes[y] = [];
       this.tileStateGrid[y] = [];
       for (let x = 0; x < MAP_W; x++) {
-        const tid = region.tiles[y][x];
-        const m = new THREE.Mesh(this.tileGeo, this.tileMaterials[tid] || this.tileMaterials.withered);
-        m.position.set(x + 0.5, -0.225, y + 0.5);
-        m.receiveShadow = true;
-        m.matrixAutoUpdate = false;
-        m.updateMatrix();
-        this.terrainGroup.add(m);
-        this.tileMeshes[y][x] = m;
         this.tileStateGrid[y][x] = '';
-        this.applyTileVisual(x, y, tid);
+        this.applyTileVisual(x, y, region.tiles[y][x]);
       }
     }
+    this.syncTerrainInstances(region);
+  }
+
+  syncTerrainInstances(region) {
+    const counts = {};
+    for (const id of Object.keys(this.tileInstanced)) counts[id] = 0;
+
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const tid = region.tiles[y][x];
+        const im = this.tileInstanced[tid] || this.tileInstanced.withered;
+        const key = this.tileInstanced[tid] ? tid : 'withered';
+        const idx = counts[key]++;
+        let ty = -0.225;
+        if (tid === 'water') ty = -0.52;
+        else if (tid === 'bridge') ty = -0.18;
+        else if (tid === 'soil') ty = -0.25;
+        this._dummy.position.set(x + 0.5, ty, y + 0.5);
+        this._dummy.updateMatrix();
+        im.setMatrixAt(idx, this._dummy.matrix);
+      }
+    }
+    for (const [id, im] of Object.entries(this.tileInstanced)) {
+      im.count = counts[id];
+      im.instanceMatrix.needsUpdate = true;
+    }
+    this.tilesDirty = false;
   }
 
   applyTileVisual(x, y, tid) {
     if (this.tileStateGrid[y][x] === tid) return;
     this.tileStateGrid[y][x] = tid;
-    const mesh = this.tileMeshes[y][x];
-    mesh.material = this.tileMaterials[tid] || this.tileMaterials.withered;
-
-    // Subtle elevation differences for tactile diorama depth!
-    if (tid === 'water') {
-      mesh.position.y = -0.52;
-    } else if (tid === 'bridge') {
-      mesh.position.y = -0.18;
-    } else if (tid === 'soil') {
-      mesh.position.y = -0.25;
-    } else {
-      mesh.position.y = -0.225;
-    }
-    mesh.updateMatrix();
+    this.tilesDirty = true;
 
     // Remove old tile deco if any
     const dk = `${x},${y}`;
@@ -622,6 +634,7 @@ export class WorldRenderer3D {
           this.applyTileVisual(x, y, region.tiles[y][x]);
         }
       }
+      if (this.tilesDirty) this.syncTerrainInstances(region);
     }
 
     // 2. Sync objects, residents & 3D FX

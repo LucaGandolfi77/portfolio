@@ -404,6 +404,167 @@ export const BIOMINI = [
       'Quando l\'aurora scende sulle isole, tutta Morfalia sogna in pace.',
       'Che gioia vedere questo cielo ripopolarsi!'
     ]
+  },
+  // --- 16 NUOVI BIOMINI ORIGINALI (Totale 56) ---
+  {
+    id: 'ghirino', name: 'Ghirino', element: 'Erba', icon: '🌰',
+    bodyColor: '#b58352', accentColor: '#6bbd5e', shape: 'round_ear',
+    region: 'landa', teaches: null, gift: 'wood', favFood: 'berry',
+    bio: 'Uno scoiattolino ghianda dalla coda soffice che raccoglie bacche e nocciole.',
+    quotes: [
+      'Crik-crok! Ho nascosto tre bacche dolci vicino al vecchio sentiero!',
+      'Gli alberi torneranno presto a ombreggiare tutta la Landa.'
+    ]
+  },
+  {
+    id: 'castorino', name: 'Castorino', element: 'Acqua', icon: '🦫',
+    bodyColor: '#8f6142', accentColor: '#d9b589', shape: 'golem',
+    region: 'landa', teaches: null, gift: 'lumber', favFood: 'turnip',
+    bio: 'Un piccolo castoro ingegnere che adora costruire ponticelli sui ruscelli.',
+    quotes: [
+      'Slap! Un buon ponte di legno unisce sempre nuovi amici!',
+      'Se ti serve legname lavorato, passa a salutarmi.'
+    ]
+  },
+  {
+    id: 'papavero', name: 'Papavero', element: 'Erba', icon: '🌺',
+    bodyColor: '#ff6e76', accentColor: '#ffe875', shape: 'star',
+    region: 'landa', teaches: null, gift: 'herb', favFood: 'honey_cookies',
+    bio: 'Un bocciolo scarlatto che apre i petali solo quando sente risuonare l\'armonia.',
+    quotes: [
+      'I prati fioriti sono la coperta più bella della valle!',
+      'Grazie per avermi dato tanta luce.'
+    ]
+  },
+  {
+    id: 'stellamar', name: 'Stellamar', element: 'Acqua', icon: '⭐',
+    bodyColor: '#ffad5e', accentColor: '#fff0a6', shape: 'star',
+    region: 'costa', teaches: null, gift: 'shell', favFood: 'strawberry',
+    bio: 'Una stella marina dorata che brilla sulle rive pulite dalla cenere.',
+    quotes: [
+      'Quando la sabbia torna d\'oro, brilliamo come un cielo rovesciato!',
+      'Adoro il suono delle onde calme.'
+    ]
+  },
+  {
+    id: 'gabbianello', name: 'Gabbianello', element: 'Vento', icon: '🕊️',
+    bodyColor: '#f2f6ff', accentColor: '#6ba4d9', shape: 'winged',
+    region: 'costa', teaches: null, gift: 'sand_ore', favFood: 'golden_bread',
+    bio: 'Un gabbiano curioso che porta messaggi tra i porti e i fari della costa.',
+    quotes: [
+      'Kyaa! Dall\'alto il Faro delle Maree è magnifico!',
+      'La brezza marina porta sempre buone notizie.'
+    ]
+  },
+  {
+    id: 'delfinello', name: 'Delfinello', element: 'Acqua', icon: '🐬',
+    bodyColor: '#66c2f0', accentColor: '#d9f5ff', shape: 'drop',
+    region: 'costa', teaches: null, gift: 'shell', favFood: 'strawberry_cake',
+    bio: 'Un delfino giocoso che salta tra gli spruzzi delle fontane costiere.',
+    quotes: [
+      'Fiuuu-splash! Hai visto che salto?',
+      'L\'acqua della baia non è mai stata così fresca!'
+    ]
+  },
+  {
+    id: 'tuonino', name: 'Tuonino', element: 'Elettro', icon: '⚡',
+    bodyColor: '#f5c542', accentColor: '#5c6687', shape: 'spiky',
+    region: 'creste', teaches: null, gift: 'spark_core', favFood: 'honey_cookies',
+    bio: 'Un riccio temporalesco dalle spine dorate che accumula elettricità statica.',
+    quotes: [
+      'Zzz-crack! Con una piccola scintilla riaccendiamo tutte le Creste!',
+      'I lampioni dei Custodi sono i miei giocattoli preferiti.'
+    ]
+  },
+  {
+    id: 'capriolo', name: 'Capriolo', element: 'Roccia', icon: '🐐',
+    bodyColor: '#c2b09b', accentColor: '#6b5b4b', shape: 'horned',
+    region: 'creste', teaches: null, gift: 'stone', favFood: 'turnip',
+    bio: 'Un stambecco agile delle terrazze rocciose con corna levigate come marmo.',
+    quotes: [
+      'Toc-toc! Nessuna scogliera è troppo ripida per noi!',
+      'Le pietre delle Creste sono perfette per costruire case solide.'
+    ]
+  },
+  {
+    id: 'lingottino', name: 'Lingottino', element: 'Roccia', icon: '🪙',
+    bodyColor: '#d99e4e', accentColor: '#fff0a6', shape: 'golem',
+    region: 'creste', teaches: null, gift: 'iron_bar', favFood: 'golden_bread',
+    bio: 'Un golem lucente di bronzo e ferro che lucida le turbine eoliche.',
+    quotes: [
+      'Clank-clink! Ogni ingranaggio gira liscio come l\'olio!',
+      'Tieni un lingotto ben temprato per le tue opere!'
+    ]
+  },
+  {
+    id: 'cerbiatto', name: 'Cerbiatto', element: 'Erba', icon: '🦌',
+    bodyColor: '#c98e5b', accentColor: '#82d474', shape: 'horned',
+    region: 'foresta', teaches: null, gift: 'herb', favFood: 'moon_carrot',
+    bio: 'Un giovane cervo dai palchi fioriti che guida i viandanti fuori dalla nebbia.',
+    quotes: [
+      'Segui i sentieri fioriti quando la Foresta si fa silenziosa.',
+      'Le carote lunari sono una delizia!'
+    ]
+  },
+  {
+    id: 'riccioforo', name: 'Riccioforo', element: 'Spore', icon: '🍄',
+    bodyColor: '#7a68a6', accentColor: '#80f5c4', shape: 'spiky',
+    region: 'foresta', teaches: null, gift: 'glow_mushroom', favFood: 'mushroom_broth',
+    bio: 'Un istrice boschivo le cui punte brillano al buio come piccole torce verdi.',
+    quotes: [
+      'Senti che pace tra gli alberi ora che le spore si sono diradate?',
+      'Un brodo caldo di funghi è il massimo dopo una passeggiata!'
+    ]
+  },
+  {
+    id: 'linfino', name: 'Linfino', element: 'Erba', icon: '💧',
+    bodyColor: '#7ae89b', accentColor: '#ffe375', shape: 'drop',
+    region: 'foresta', teaches: null, gift: 'pollen', favFood: 'berry_soup',
+    bio: 'Una goccia di linfa dorata nata dalle radici dell\'Albero Madre.',
+    quotes: [
+      'Plip! Porto nutrimento a tutti i semi più rari del bosco!',
+      'L\'Albero Madre ti ringrazia con tutto il cuore.'
+    ]
+  },
+  {
+    id: 'celestino', name: 'Celestino', element: 'Vento', icon: '🐦',
+    bodyColor: '#7ec4ff', accentColor: '#ffffff', shape: 'winged',
+    region: 'isole', teaches: null, gift: 'pollen', favFood: 'honey_cookies',
+    bio: 'Un uccellino azzurro delle nuvole che canta note cristalline all\'alba.',
+    quotes: [
+      'Tweet-tlin! Da quassù tutta Morfalia sembra un giardino dipinto!',
+      'I mulini a vento suonano in armonia col mio canto.'
+    ]
+  },
+  {
+    id: 'siderio', name: 'Siderio', element: 'Cristallo', icon: '🔮',
+    bodyColor: '#a285f5', accentColor: '#8cf2ff', shape: 'golem',
+    region: 'isole', teaches: null, gift: 'crystal', favFood: 'harmony_elixir',
+    bio: 'Un antico automa di cristallo lasciato dai Custodi per sorvegliare il Faro.',
+    quotes: [
+      'Bip-hum... Rilevo livelli d\'armonia in costante crescita!',
+      'I Custodi saranno fieri di ciò che hai ricostruito, Mimo.'
+    ]
+  },
+  {
+    id: 'nebulina', name: 'Nebulina', element: 'Armonia', icon: '🌙',
+    bodyColor: '#e2c7ff', accentColor: '#ffe68c', shape: 'round_leaf',
+    region: 'isole', teaches: null, gift: 'crystal', favFood: 'moon_carrot',
+    bio: 'Una soffice creatura lunare che culla i sogni delle isole sospese.',
+    quotes: [
+      'Sotto le stelle dell\'aurora, ogni cristallo risponde alla tua voce.',
+      'Resta quanto vuoi tra le nuvole!'
+    ]
+  },
+  {
+    id: 'solstizio', name: 'Solstizio', element: 'Armonia', icon: '☀️',
+    bodyColor: '#ffbe4f', accentColor: '#fff59e', shape: 'flame',
+    region: 'isole', teaches: null, gift: 'spark_core', favFood: 'harmony_elixir',
+    bio: 'Uno spirito solare radioso che accende l\'ultima scintilla sopra le nuvole.',
+    quotes: [
+      'La mia luce è tua, piccolo Mimo: illumina ogni sentiero del mondo!',
+      'Quando sole e cristalli si incontrano, nasce l\'arcobaleno!'
+    ]
   }
 ];
 

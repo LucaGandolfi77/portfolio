@@ -263,68 +263,68 @@ export const QUESTS = [
       { speaker: 'Prof. Intreccio', role: 'Custode Botanico', portrait: '🌿', text: 'Oh... Mimo! Le mie radici tremano di commozione! È più bella di quanto avessi osato sognare nei miei secoli d\'attesa.' },
       { speaker: 'Astralio', role: 'Cervo Stellare', portrait: '🦌', text: 'La Sinfonia di Morfalia risuona di nuovo dalla costa fino alle nuvole. I semi piantati con cura non muoiono mai.' },
       { speaker: 'Prof. Intreccio', role: 'Custode Botanico', portrait: '🌿', text: 'I cinque Santuari brillano come stelle sulla valle. Se i Custodi umani guardano da lontano, oggi vedranno il mondo fiorire ancora... grazie a un piccolo Mimo dal cuore immenso.' },
-      { speaker: 'Cronaca di Morfalia', role: 'Epilogo Sbloccato', portrait: '✨', text: 'Hai completato la storia principale di MORFALIA! Continua liberamente in modalità Epilogo per scoprire tutti i 40 Habitat, fare amicizia con tutti i 40 Biomini, raccogliere i 10 Diari e portare ogni regione al Livello Armonia 5!' }
+      { speaker: 'Cronaca di Morfalia', role: 'Epilogo Sbloccato', portrait: '✨', text: 'Hai completato la storia principale di MORFALIA! Continua liberamente in modalità Epilogo per scoprire tutti i 50 Habitat, fare amicizia con tutti i 56 Biomini, raccogliere i 10 Diari e portare ogni regione al Livello Armonia 5!' }
     ]
   }
 ];
 
 export const LORE_LOGS = [
   {
-    id: 'log_1', region: 'landa', pos: { x: 8, y: 7 },
+    id: 'log_1', region: 'landa', pos: { x: 10, y: 9 },
     title: 'Diario #1 — Il Giorno del Silenzio',
     author: 'Dott.ssa Elena, Archivio della Valle',
     text: '«Il vento si è fermato tre settimane fa. Non è stata una guerra: la Terra aveva semplicemente finito il fiato dopo troppo rumore. Abbiamo deciso di lasciare le città e concedere alla valle un lungo sonno rigenerante.»'
   },
   {
-    id: 'log_2', region: 'landa', pos: { x: 34, y: 24 },
+    id: 'log_2', region: 'landa', pos: { x: 49, y: 36 },
     title: 'Diario #2 — Progetto Mimo',
     author: 'Ingegnere Marco',
     text: '«Abbiamo sigillato una piccola creatura polimorfa nel terrario del Santuario. Non sa combattere, sa solo imitare con empatia ciò che ama. Quando il suolo sarà pronto, si sveglierà per imparare di nuovo il linguaggio dei Biomini.»'
   },
   {
-    id: 'log_3', region: 'costa', pos: { x: 11, y: 23 },
+    id: 'log_3', region: 'costa', pos: { x: 14, y: 34 },
     title: 'Diario #3 — L\'Ultima Marea',
     author: 'Guardiana del Faro',
     text: '«Prima di imbarcarci sulle chiatte solari, ho lasciato le chiavi del Faro delle Maree tra le conchiglie. Il Prof. Intreccio ha promesso di restare sveglio finché il piccolo Mimo non avrebbe aperto gli occhi.»'
   },
   {
-    id: 'log_4', region: 'costa', pos: { x: 34, y: 20 },
+    id: 'log_4', region: 'costa', pos: { x: 49, y: 28 },
     title: 'Diario #4 — Arca di Clorofilla',
     author: 'Botanica Chiara',
     text: '«Ogni specie di Biomino torna spontaneamente non appena ritrova l\'equilibrio del proprio Habitat. Non servono gabbie né sfere: basta costruire un luogo dove qualcuno si senta atteso.»'
   },
   {
-    id: 'log_5', region: 'creste', pos: { x: 7, y: 9 },
+    id: 'log_5', region: 'creste', pos: { x: 10, y: 12 },
     title: 'Diario #5 — Le Turbine Addormentate',
     author: 'Capo Tecnico Leo',
     text: '«Abbiamo spento la Centrale Eolica in modalità riposo. Basterà una sola Scintilla gentile — non la forza bruta — per far ripartire i condensatori senza spaventare gli uccelli del vento.»'
   },
   {
-    id: 'log_6', region: 'creste', pos: { x: 35, y: 18 },
+    id: 'log_6', region: 'creste', pos: { x: 50, y: 26 },
     title: 'Diario #6 — Il Giuramento d\'Acciaio',
     author: 'Ingegnere Marco',
     text: '«Sulle Creste abbiamo imparato che pietra e fiori non sono nemici: una fornace calda e un giardino fiorito possono dividere lo stesso sentiero.»'
   },
   {
-    id: 'log_7', region: 'foresta', pos: { x: 9, y: 6 },
+    id: 'log_7', region: 'foresta', pos: { x: 12, y: 9 },
     title: 'Diario #7 — Il Velo di Spore',
     author: 'Guardaboschi Silvia',
     text: '«L\'Albero Madre ha avvolto il bosco in spore soporifere per proteggere i semi più rari. Solo una brezza amica potrà sollevare il velo senza spezzare un solo ramo.»'
   },
   {
-    id: 'log_8', region: 'foresta', pos: { x: 34, y: 25 },
+    id: 'log_8', region: 'foresta', pos: { x: 49, y: 36 },
     title: 'Diario #8 — Luci nel Crepuscolo',
     author: 'Botanica Chiara',
     text: '«Di notte i Lumifunghi illuminano i sentieri meglio di qualsiasi lampione. Ho disegnato il progetto di una grande Serra per il Prof. Intreccio: spero che un giorno qualcuno la costruisca per lui.»'
   },
   {
-    id: 'log_9', region: 'isole', pos: { x: 8, y: 17 },
+    id: 'log_9', region: 'isole', pos: { x: 11, y: 24 },
     title: 'Diario #9 — L\'Osservatorio tra le Nuvole',
     author: 'Dott.ssa Elena',
     text: '«Dalle Isole Sospese abbiamo lanciato le navi-nido verso l\'orizzonte lontano. Il Faro di Risonanza è la nostra promessa: quando tornerà a cantare, sapremo che casa nostra ci sta chiamando.»'
   },
   {
-    id: 'log_10', region: 'isole', pos: { x: 34, y: 11 },
+    id: 'log_10', region: 'isole', pos: { x: 49, y: 14 },
     title: 'Diario #10 — Lettera al Piccolo Mimo',
     author: 'I Custodi di Morfalia',
     text: '«Se stai leggendo queste righe, significa che ce l\'hai fatta. Non importa quale forma tu scelga di avere: sei il cuore di questo mondo. Tieni accesa la Serra... stiamo già volgendo le vele verso casa.»'

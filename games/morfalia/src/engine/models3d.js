@@ -1,4 +1,4 @@
-/* ===== MORFALIA 3D · Procedural Low-Poly Cozy Sculptures ===== */
+/* ===== MORFALIA 3D · Detailed Procedural Cozy Sculptures ===== */
 import * as THREE from '../../vendor/three.module.js';
 import { CROPS } from '../data/items.js';
 
@@ -29,19 +29,29 @@ function addPart(group, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, c
   return mesh;
 }
 
-function addEyes(group, y, z, spacing = 0.11, size = 0.042) {
-  const eyeMat = getMat(0x1f152e, { roughness: 0.15 });
-  const hiMat = getMat(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.1 });
+function addEyes(group, y, z, spacing = 0.11, size = 0.042, eyeColor = 0x1f152e) {
+  const eyeMat = getMat(eyeColor, { roughness: 0.15 });
+  const hiMat = getMat(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.45, roughness: 0.1 });
   const cheekMat = getMat(0xff9ac2, { roughness: 0.5, opacity: 0.85 });
   const eyeGeo = new THREE.SphereGeometry(size, 10, 8);
-  const hiGeo = new THREE.SphereGeometry(size * 0.34, 6, 6);
+  const hiGeo = new THREE.SphereGeometry(size * 0.36, 6, 6);
   const cheekGeo = new THREE.SphereGeometry(size * 0.85, 8, 6);
 
   for (const s of [-1, 1]) {
     addPart(group, eyeGeo, eyeMat, s * spacing, y, z, 0, 0, 0, false);
-    addPart(group, hiGeo, hiMat, s * spacing - 0.012, y + 0.015, z + size * 0.72, 0, 0, 0, false);
-    const ch = addPart(group, cheekGeo, cheekMat, s * (spacing + 0.085), y - 0.055, z - 0.02, 0, 0, 0, false);
+    addPart(group, hiGeo, hiMat, s * spacing - 0.012, y + 0.015, z + size * 0.75, 0, 0, 0, false);
+    const ch = addPart(group, cheekGeo, cheekMat, s * (spacing + 0.08), y - 0.055, z - 0.015, 0, 0, 0, false);
     ch.scale.set(1.25, 0.65, 0.5);
+  }
+}
+
+function addPaws(group, mat, rx = 0.14, rz = 0.12, y = 0.06, r = 0.065) {
+  const g = new THREE.SphereGeometry(r, 8, 6);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const p = addPart(group, g, mat, sx * rx, y, sz * rz);
+      p.scale.set(0.95, 0.72, 1.25);
+    }
   }
 }
 
@@ -57,11 +67,9 @@ export function createMimoMesh() {
     metalness: 0.06
   });
 
-  // Soft plump pear-like blob body
   const torso = addPart(bodyGroup, new THREE.SphereGeometry(0.32, 18, 14), bodyMat, 0, 0.34, 0);
   torso.scale.set(1.04, 1.15, 0.96);
 
-  // Cute stubby arms & feet
   const armGeo = new THREE.SphereGeometry(0.11, 10, 8);
   const leftArm = addPart(bodyGroup, armGeo, bodyMat, -0.32, 0.34, 0.04);
   leftArm.scale.set(1.1, 0.8, 0.8);
@@ -74,7 +82,6 @@ export function createMimoMesh() {
   const rightFoot = addPart(bodyGroup, footGeo, bodyMat, 0.14, 0.09, 0.04);
   rightFoot.scale.set(1, 0.7, 1.2);
 
-  // Twin leaf sprout on top of head
   const stemMat = getMat(0x459c52, { roughness: 0.5 });
   const leafMat = getMat(0x7be87f, { roughness: 0.45 });
   addPart(bodyGroup, new THREE.CylinderGeometry(0.022, 0.028, 0.15, 6), stemMat, 0, 0.72, 0);
@@ -84,10 +91,8 @@ export function createMimoMesh() {
   const l2 = addPart(bodyGroup, leafGeo, leafMat, 0.1, 0.8, 0, 0, 0, -0.45);
   l2.scale.set(1.25, 0.42, 0.7);
 
-  // Expressive dot eyes & blush
   addEyes(bodyGroup, 0.42, 0.27, 0.105, 0.04);
 
-  // Cute smile arc
   const smile = addPart(
     bodyGroup,
     new THREE.TorusGeometry(0.055, 0.013, 6, 12, Math.PI),
@@ -96,12 +101,10 @@ export function createMimoMesh() {
   );
   smile.scale.set(1.1, 0.85, 1);
 
-  // Morph elemental aura (hidden unless casting Mimic Power)
   const auraMat = new THREE.MeshBasicMaterial({
     color: 0x79e087,
     transparent: true,
-    opacity: 0.34,
-    wireframe: false
+    opacity: 0.34
   });
   const aura = new THREE.Mesh(new THREE.SphereGeometry(0.52, 16, 12), auraMat);
   aura.position.y = 0.42;
@@ -121,7 +124,6 @@ export function createProfessorMesh() {
   const scarfMat = getMat(0xe0a54a, { roughness: 0.6 });
   const goldMat = getMat(0xffe680, { roughness: 0.25, metalness: 0.5 });
 
-  // Layered vine body
   addPart(root, new THREE.SphereGeometry(0.4, 16, 14), vineDark, 0, 0.44, 0);
   const tufts = [
     [-0.28, 0.62, 0.08, 0.19, vineMid],
@@ -135,18 +137,15 @@ export function createProfessorMesh() {
     addPart(root, new THREE.SphereGeometry(r, 10, 8), m, x, y, z);
   }
 
-  // Warm botanist scarf
   const scarf = addPart(root, new THREE.TorusGeometry(0.34, 0.075, 8, 18), scarfMat, 0, 0.28, 0, Math.PI / 2, 0, 0);
   scarf.scale.set(1.05, 1.05, 0.9);
 
-  // Cute round spectacles
   const glassGeo = new THREE.TorusGeometry(0.095, 0.016, 8, 16);
   addPart(root, glassGeo, goldMat, -0.115, 0.5, 0.36, 0, 0, 0, false);
   addPart(root, glassGeo, goldMat, 0.115, 0.5, 0.36, 0, 0, 0, false);
   addPart(root, new THREE.CylinderGeometry(0.012, 0.012, 0.06, 6), goldMat, 0, 0.5, 0.36, 0, 0, Math.PI / 2, false);
   addEyes(root, 0.5, 0.35, 0.115, 0.036);
 
-  // Floating golden quest beacon (!)
   const beacon = new THREE.Group();
   const beaconMat = getMat(0xffe066, { emissive: 0xffc833, emissiveIntensity: 0.7, roughness: 0.2 });
   addPart(beacon, new THREE.OctahedronGeometry(0.14, 0), beaconMat, 0, 1.25, 0, 0, 0, 0, false);
@@ -156,93 +155,284 @@ export function createProfessorMesh() {
   return root;
 }
 
-/* ===== 24 ORIGINAL BIOMINI 3D SCULPTURES ===== */
+/* ===== 56 DETAILED SPECIES-ACCURATE BIOMINI 3D SCULPTURES ===== */
 export function createBiominoMesh(bio) {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
 
-  const mainMat = getMat(bio.bodyColor, { roughness: 0.45 });
-  const accMat = getMat(bio.accentColor, { roughness: 0.45 });
+  const id = bio.id;
+  const mainMat = getMat(bio.bodyColor, { roughness: 0.42 });
+  const accMat = getMat(bio.accentColor, { roughness: 0.42 });
+  const creamMat = getMat(0xf7efe0, { roughness: 0.55 });
+  const darkMat = getMat(0x282130, { roughness: 0.4 });
 
-  if (bio.shape === 'drop') {
-    const base = addPart(body, new THREE.SphereGeometry(0.27, 14, 12), mainMat, 0, 0.28, 0);
-    base.scale.set(1, 0.95, 1);
-    addPart(body, new THREE.ConeGeometry(0.22, 0.34, 12), mainMat, 0, 0.52, 0);
-    addPart(body, new THREE.SphereGeometry(0.08, 8, 8), accMat, 0, 0.68, 0);
-    addEyes(body, 0.32, 0.24, 0.09, 0.034);
-  } else if (bio.shape === 'golem') {
-    addPart(body, new THREE.BoxGeometry(0.5, 0.46, 0.44), mainMat, 0, 0.32, 0);
-    addPart(body, new THREE.BoxGeometry(0.14, 0.3, 0.16), accMat, -0.32, 0.26, 0);
-    addPart(body, new THREE.BoxGeometry(0.14, 0.3, 0.16), accMat, 0.32, 0.26, 0);
-    addPart(body, new THREE.OctahedronGeometry(0.14, 0), accMat, 0, 0.62, 0);
-    addEyes(body, 0.36, 0.23, 0.11, 0.036);
-  } else if (bio.shape === 'mushroom') {
-    addPart(body, new THREE.CylinderGeometry(0.16, 0.2, 0.3, 12), getMat(0xf5ead6, { roughness: 0.6 }), 0, 0.16, 0);
-    const capMat = getMat(bio.bodyColor, { emissive: bio.bodyColor, emissiveIntensity: 0.35, roughness: 0.35 });
-    const cap = addPart(body, new THREE.SphereGeometry(0.34, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), capMat, 0, 0.28, 0);
-    cap.scale.set(1.05, 0.85, 1.05);
-    addPart(body, new THREE.SphereGeometry(0.07, 8, 6), accMat, -0.14, 0.48, 0.12);
-    addPart(body, new THREE.SphereGeometry(0.06, 8, 6), accMat, 0.16, 0.44, 0.1);
-    addEyes(body, 0.2, 0.18, 0.07, 0.03);
-  } else if (bio.shape === 'winged') {
-    addPart(body, new THREE.SphereGeometry(0.26, 14, 12), mainMat, 0, 0.42, 0);
-    const wingGeo = new THREE.SphereGeometry(0.18, 10, 8);
-    const lw = addPart(body, wingGeo, accMat, -0.32, 0.48, -0.04, 0, 0, 0.35);
-    lw.scale.set(1.2, 0.35, 0.75);
-    const rw = addPart(body, wingGeo, accMat, 0.32, 0.48, -0.04, 0, 0, -0.35);
-    rw.scale.set(1.2, 0.35, 0.75);
-    addEyes(body, 0.45, 0.23, 0.09, 0.034);
-    body.userData.wings = [lw, rw];
-  } else if (bio.shape === 'flame') {
-    const fMat = getMat(bio.bodyColor, { emissive: bio.bodyColor, emissiveIntensity: 0.35, roughness: 0.3 });
-    addPart(body, new THREE.SphereGeometry(0.27, 14, 12), fMat, 0, 0.28, 0);
-    addPart(body, new THREE.ConeGeometry(0.18, 0.34, 10), getMat(bio.accentColor, { emissive: bio.accentColor, emissiveIntensity: 0.5 }), 0, 0.56, 0);
-    addEyes(body, 0.32, 0.24, 0.09, 0.034);
-  } else if (bio.shape === 'horned') {
-    const torso = addPart(body, new THREE.SphereGeometry(0.28, 14, 12), mainMat, 0, 0.34, 0);
-    torso.scale.set(0.95, 1.1, 1.15);
-    addPart(body, new THREE.ConeGeometry(0.06, 0.24, 8), accMat, -0.14, 0.65, 0.02, 0, 0, 0.28);
-    addPart(body, new THREE.ConeGeometry(0.06, 0.24, 8), accMat, 0.14, 0.65, 0.02, 0, 0, -0.28);
-    addEyes(body, 0.38, 0.28, 0.095, 0.034);
-  } else if (bio.shape === 'crab') {
-    const shell = addPart(body, new THREE.SphereGeometry(0.29, 14, 10), mainMat, 0, 0.24, 0);
-    shell.scale.set(1.2, 0.75, 0.95);
-    addPart(body, new THREE.SphereGeometry(0.11, 8, 8), accMat, -0.34, 0.28, 0.16);
-    addPart(body, new THREE.SphereGeometry(0.11, 8, 8), accMat, 0.34, 0.28, 0.16);
-    addEyes(body, 0.32, 0.23, 0.1, 0.032);
-  } else if (bio.shape === 'star') {
-    addPart(body, new THREE.SphereGeometry(0.24, 12, 10), mainMat, 0, 0.34, 0);
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      addPart(body, new THREE.ConeGeometry(0.09, 0.22, 6), accMat, Math.cos(a) * 0.24, 0.34 + Math.sin(a) * 0.24, 0, 0, 0, a - Math.PI / 2);
-    }
-    addEyes(body, 0.36, 0.22, 0.08, 0.032);
-  } else {
-    // round_leaf, round_ear, spiky, frog
-    addPart(body, new THREE.SphereGeometry(0.28, 16, 12), mainMat, 0, 0.3, 0);
-    if (bio.shape === 'round_ear' || bio.shape === 'frog') {
-      addPart(body, new THREE.SphereGeometry(0.1, 10, 8), accMat, -0.18, 0.56, 0);
-      addPart(body, new THREE.SphereGeometry(0.1, 10, 8), accMat, 0.18, 0.56, 0);
-    } else if (bio.shape === 'spiky') {
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        addPart(body, new THREE.ConeGeometry(0.08, 0.2, 6), accMat, Math.cos(a) * 0.2, 0.44, Math.sin(a) * 0.2, Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5);
+  // --- 1. GRACEFUL STAGS & DEER (Astralio, Cerbiatto, Capriolo) ---
+  if (id === 'astralio' || id === 'cerbiatto' || id === 'capriolo') {
+    const torso = addPart(body, new THREE.SphereGeometry(0.24, 14, 12), mainMat, 0, 0.34, -0.04);
+    torso.scale.set(0.85, 0.88, 1.38);
+    addPaws(body, accMat, 0.13, 0.18, 0.12, 0.055);
+    // Neck & Head
+    addPart(body, new THREE.CylinderGeometry(0.09, 0.12, 0.26, 10), mainMat, 0, 0.52, 0.18, -0.35, 0, 0);
+    const head = addPart(body, new THREE.SphereGeometry(0.17, 14, 12), mainMat, 0, 0.64, 0.24);
+    head.scale.set(0.95, 0.9, 1.12);
+    // Ears
+    addPart(body, new THREE.ConeGeometry(0.05, 0.15, 6), accMat, -0.14, 0.74, 0.19, 0, 0, 0.65);
+    addPart(body, new THREE.ConeGeometry(0.05, 0.15, 6), accMat, 0.14, 0.74, 0.19, 0, 0, -0.65);
+    // Antlers / Horns
+    const hornMat = id === 'astralio' ? getMat(bio.accentColor, { emissive: bio.accentColor, emissiveIntensity: 0.45 }) : accMat;
+    for (const s of [-1, 1]) {
+      addPart(body, new THREE.CylinderGeometry(0.022, 0.032, 0.3, 6), hornMat, s * 0.09, 0.86, 0.22, -0.2, 0, -s * 0.3);
+      if (id !== 'capriolo') {
+        addPart(body, new THREE.CylinderGeometry(0.016, 0.022, 0.18, 6), hornMat, s * 0.17, 0.94, 0.2, 0, 0, -s * 0.75);
       }
-    } else {
-      const lf = new THREE.SphereGeometry(0.11, 10, 8);
-      const a = addPart(body, lf, accMat, -0.1, 0.6, 0, 0, 0, 0.4);
-      a.scale.set(1.2, 0.4, 0.7);
-      const b = addPart(body, lf, accMat, 0.1, 0.6, 0, 0, 0, -0.4);
-      b.scale.set(1.2, 0.4, 0.7);
     }
-    addEyes(body, 0.34, 0.25, 0.095, 0.034);
+    if (id === 'astralio') {
+      addPart(body, new THREE.OctahedronGeometry(0.08, 0), hornMat, 0, 0.42, 0.22, 0, 0, 0, false);
+    }
+    addPart(body, new THREE.SphereGeometry(0.075, 8, 6), creamMat, 0, 0.38, -0.35);
+    addEyes(body, 0.66, 0.39, 0.075, 0.03);
+  }
+  // --- 2. FOXES, SQUIRRELS & ELECTRIC PUPS (Cristallino, Volpombra, Voltacchio, Scintillino, Ghirino) ---
+  else if (id === 'cristallino' || id === 'volpombra' || id === 'voltacchio' || id === 'scintillino' || id === 'ghirino') {
+    const torso = addPart(body, new THREE.SphereGeometry(0.24, 14, 12), mainMat, 0, 0.28, -0.02);
+    torso.scale.set(0.95, 0.9, 1.25);
+    addPaws(body, accMat, 0.14, 0.14, 0.07, 0.06);
+    // Head & pointed muzzle
+    addPart(body, new THREE.SphereGeometry(0.2, 14, 12), mainMat, 0, 0.48, 0.14);
+    const snout = addPart(body, new THREE.ConeGeometry(0.09, 0.16, 10), creamMat, 0, 0.44, 0.34, Math.PI / 2, 0, 0);
+    addPart(body, new THREE.SphereGeometry(0.032, 6, 6), darkMat, 0, 0.45, 0.41);
+    // Pointed Fox/Squirrel Ears
+    for (const s of [-1, 1]) {
+      addPart(body, new THREE.ConeGeometry(0.08, 0.24, 8), mainMat, s * 0.13, 0.68, 0.12, -0.1, 0, -s * 0.25);
+      addPart(body, new THREE.ConeGeometry(0.045, 0.16, 6), accMat, s * 0.13, 0.67, 0.15, -0.1, 0, -s * 0.25, false);
+    }
+    // Fluffy curled tail
+    const tail = addPart(body, new THREE.SphereGeometry(0.16, 12, 10), mainMat, 0, 0.38, -0.34);
+    tail.scale.set(0.85, 1.35, 1.15);
+    addPart(body, new THREE.SphereGeometry(0.11, 10, 8), accMat, 0, 0.54, -0.36);
+    addEyes(body, 0.52, 0.31, 0.09, 0.032);
+  }
+  // --- 3. TURTLES & BEAVER (Tartamar, Fornacino, Castorino) ---
+  else if (id === 'tartamar' || id === 'fornacino' || id === 'castorino') {
+    const shell = addPart(body, new THREE.SphereGeometry(0.32, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), mainMat, 0, 0.14, -0.02);
+    shell.scale.set(1.05, 0.92, 1.2);
+    addPart(body, new THREE.TorusGeometry(0.31, 0.05, 8, 18), accMat, 0, 0.15, -0.02, Math.PI / 2, 0, 0);
+    addPaws(body, accMat, 0.22, 0.18, 0.07, 0.075);
+    // Head
+    addPart(body, new THREE.SphereGeometry(0.16, 12, 10), id === 'castorino' ? mainMat : accMat, 0, 0.28, 0.34);
+    // Tail (flat paddle for castorino, fiery tip for fornacino)
+    const tail = addPart(body, new THREE.BoxGeometry(0.18, 0.05, 0.28), darkMat, 0, 0.12, -0.44);
+    if (id !== 'castorino') tail.scale.set(0.45, 1.2, 0.7);
+    addEyes(body, 0.32, 0.47, 0.07, 0.028);
+  }
+  // --- 4. MARINE SWIMMERS (Ondolina, Delfinello) ---
+  else if (id === 'ondolina' || id === 'delfinello') {
+    const sleek = addPart(body, new THREE.SphereGeometry(0.24, 16, 12), mainMat, 0, 0.26, 0);
+    sleek.scale.set(0.92, 0.9, 1.45);
+    addPart(body, new THREE.SphereGeometry(0.18, 12, 10), mainMat, 0, 0.42, 0.22);
+    // Flippers
+    for (const s of [-1, 1]) {
+      const fl = addPart(body, new THREE.SphereGeometry(0.12, 8, 6), accMat, s * 0.26, 0.16, 0.08, 0, 0, -s * 0.35);
+      fl.scale.set(1.3, 0.35, 0.75);
+    }
+    // Tail fluke
+    const fluke = addPart(body, new THREE.SphereGeometry(0.15, 8, 6), accMat, 0, 0.2, -0.38);
+    fluke.scale.set(1.5, 0.25, 0.75);
+    if (id === 'delfinello') {
+      addPart(body, new THREE.ConeGeometry(0.06, 0.2, 8), mainMat, 0, 0.44, -0.02, -0.4, 0, 0);
+      addPart(body, new THREE.ConeGeometry(0.065, 0.16, 8), mainMat, 0, 0.39, 0.42, Math.PI / 2, 0, 0);
+    } else {
+      addPart(body, new THREE.TorusGeometry(0.18, 0.05, 8, 16), accMat, 0, 0.34, 0.16, Math.PI / 2, 0, 0);
+    }
+    addEyes(body, 0.45, 0.37, 0.08, 0.03);
+  }
+  // --- 5. FLOWER & CLOVER CREATURES (Solaris, Papavero, Fogliolo, Trifoglino) ---
+  else if (id === 'solaris' || id === 'papavero' || id === 'fogliolo' || id === 'trifoglino') {
+    const base = addPart(body, new THREE.SphereGeometry(0.25, 16, 12), mainMat, 0, 0.28, 0);
+    base.scale.set(1.02, 0.95, 0.96);
+    addPaws(body, accMat, 0.13, 0.06, 0.06, 0.065);
+    if (id === 'solaris' || id === 'papavero') {
+      const petals = id === 'solaris' ? 10 : 6;
+      const pMat = id === 'solaris' ? mainMat : mainMat;
+      for (let i = 0; i < petals; i++) {
+        const a = (i / petals) * Math.PI * 2;
+        const p = addPart(body, new THREE.SphereGeometry(0.11, 8, 6), pMat, Math.cos(a) * 0.28, 0.36 + Math.sin(a) * 0.28, -0.04);
+        p.scale.set(1.2, 0.75, 0.45);
+      }
+      addPart(body, new THREE.SphereGeometry(0.2, 12, 10), accMat, 0, 0.36, 0.04);
+      addEyes(body, 0.38, 0.23, 0.085, 0.03);
+    } else {
+      // Fogliolo & Trifoglino twin/quad clover crown
+      addPart(body, new THREE.CylinderGeometry(0.025, 0.03, 0.18, 6), accMat, 0, 0.56, 0);
+      const leaves = id === 'trifoglino' ? 4 : 2;
+      for (let i = 0; i < leaves; i++) {
+        const a = (i / leaves) * Math.PI * 2;
+        const lf = addPart(body, new THREE.SphereGeometry(0.11, 8, 6), accMat, Math.cos(a) * 0.13, 0.65, Math.sin(a) * 0.13);
+        lf.scale.set(1.25, 0.38, 0.9);
+      }
+      addEyes(body, 0.33, 0.22, 0.09, 0.034);
+    }
+  }
+  // --- 6. OWLS & BIRDS (Ombraluce, Piumavento, Falchetto, Gabbianello, Celestino) ---
+  else if (id === 'ombraluce' || id === 'piumavento' || id === 'falchetto' || id === 'gabbianello' || id === 'celestino') {
+    const torso = addPart(body, new THREE.SphereGeometry(0.25, 14, 12), mainMat, 0, 0.38, 0);
+    torso.scale.set(0.95, 1.1, 0.95);
+    addPart(body, new THREE.SphereGeometry(0.18, 12, 10), creamMat, 0, 0.34, 0.1, 0, 0, 0, false);
+    // Beak
+    addPart(body, new THREE.ConeGeometry(0.055, 0.13, 6), getMat(0xffb83d), 0, 0.42, 0.28, Math.PI / 2, 0, 0);
+    // Tail feathers
+    addPart(body, new THREE.BoxGeometry(0.18, 0.05, 0.22), accMat, 0, 0.24, -0.28, 0.35, 0, 0);
+    // Articulated Wings
+    const wingGeo = new THREE.SphereGeometry(0.17, 10, 8);
+    const lw = addPart(body, wingGeo, accMat, -0.28, 0.42, -0.02, 0, 0, 0.35);
+    lw.scale.set(1.25, 0.35, 0.85);
+    const rw = addPart(body, wingGeo, accMat, 0.28, 0.42, -0.02, 0, 0, -0.35);
+    rw.scale.set(1.25, 0.35, 0.85);
+    if (id === 'ombraluce') {
+      // Owl ear tufts & glowing amber spectacles
+      addPart(body, new THREE.ConeGeometry(0.06, 0.14, 6), accMat, -0.14, 0.64, 0.08, 0, 0, 0.35);
+      addPart(body, new THREE.ConeGeometry(0.06, 0.14, 6), accMat, 0.14, 0.64, 0.08, 0, 0, -0.35);
+      addEyes(body, 0.48, 0.22, 0.09, 0.04, 0xffcc33);
+    } else {
+      addEyes(body, 0.47, 0.22, 0.085, 0.032);
+    }
+    body.userData.wings = [lw, rw];
+  }
+  // --- 7. BUTTERFLIES, MOTHS, BEES & AURORA (Luminella, Falena, Pollinello, Lucciolina, Aurorina) ---
+  else if (bio.shape === 'winged') {
+    const torso = addPart(body, new THREE.SphereGeometry(0.22, 14, 12), mainMat, 0, 0.4, 0);
+    torso.scale.set(0.85, 1.15, 0.85);
+    // Upper + Lower twin wings
+    const uwGeo = new THREE.SphereGeometry(0.22, 10, 8);
+    const lw = addPart(body, uwGeo, accMat, -0.3, 0.5, -0.06, 0, 0, 0.35);
+    lw.scale.set(1.25, 0.28, 0.95);
+    const rw = addPart(body, uwGeo, accMat, 0.3, 0.5, -0.06, 0, 0, -0.35);
+    rw.scale.set(1.25, 0.28, 0.95);
+    addPart(body, uwGeo, mainMat, -0.24, 0.32, -0.08, 0, 0, 0.2).scale.set(0.95, 0.24, 0.75);
+    addPart(body, uwGeo, mainMat, 0.24, 0.32, -0.08, 0, 0, -0.2).scale.set(0.95, 0.24, 0.75);
+    // Antennae
+    addPart(body, new THREE.CylinderGeometry(0.015, 0.015, 0.16, 5), darkMat, -0.06, 0.65, 0.08, 0.3, 0, 0.25);
+    addPart(body, new THREE.CylinderGeometry(0.015, 0.015, 0.16, 5), darkMat, 0.06, 0.65, 0.08, 0.3, 0, -0.25);
+    if (id === 'aurorina' || id === 'lucciolina') {
+      addPart(body, new THREE.TorusGeometry(0.18, 0.025, 6, 16), getMat(bio.accentColor, { emissive: bio.accentColor, emissiveIntensity: 0.65 }), 0, 0.75, 0, Math.PI / 2, 0, 0, false);
+    }
+    addEyes(body, 0.45, 0.19, 0.08, 0.032);
+    body.userData.wings = [lw, rw];
+  }
+  // --- 8. CRABS & BEETLES (Sabbietta, Ferrotto) ---
+  else if (bio.shape === 'crab') {
+    const shell = addPart(body, new THREE.SphereGeometry(0.29, 14, 10), mainMat, 0, 0.22, 0);
+    shell.scale.set(1.25, 0.72, 0.95);
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        addPart(body, new THREE.CylinderGeometry(0.028, 0.022, 0.22, 6), accMat, s * 0.32, 0.1, -0.14 + i * 0.14, 0, 0, s * 0.75);
+      }
+      // Pincers
+      addPart(body, new THREE.SphereGeometry(0.11, 8, 8), accMat, s * 0.3, 0.3, 0.22);
+    }
+    addEyes(body, 0.32, 0.22, 0.1, 0.032);
+  }
+  // --- 9. MUSHROOM SPIRIT (Lumifungo) ---
+  else if (bio.shape === 'mushroom') {
+    addPart(body, new THREE.CylinderGeometry(0.16, 0.21, 0.32, 12), creamMat, 0, 0.16, 0);
+    addPaws(body, creamMat, 0.12, 0.05, 0.05, 0.055);
+    const capMat = getMat(bio.bodyColor, { emissive: bio.bodyColor, emissiveIntensity: 0.35, roughness: 0.35 });
+    const cap = addPart(body, new THREE.SphereGeometry(0.36, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), capMat, 0, 0.28, 0);
+    cap.scale.set(1.06, 0.85, 1.06);
+    for (const [sx, sy, sz] of [[-0.16, 0.48, 0.14], [0.17, 0.45, 0.1], [0, 0.54, -0.15]]) {
+      addPart(body, new THREE.SphereGeometry(0.075, 8, 6), accMat, sx, sy, sz);
+    }
+    addEyes(body, 0.2, 0.18, 0.075, 0.03);
+  }
+  // --- 10. GOLEMS & ROCK SPIRITS (Ciotolino, Gemmoro, Quarzo, Lingottino, Siderio) ---
+  else if (bio.shape === 'golem') {
+    const torso = addPart(body, new THREE.DodecahedronGeometry(0.3, 0), mainMat, 0, 0.34, 0);
+    torso.scale.set(1.08, 0.96, 0.9);
+    addPart(body, new THREE.BoxGeometry(0.15, 0.32, 0.16), accMat, -0.34, 0.28, 0.04, 0, 0, 0.15);
+    addPart(body, new THREE.BoxGeometry(0.15, 0.32, 0.16), accMat, 0.34, 0.28, 0.04, 0, 0, -0.15);
+    addPaws(body, accMat, 0.15, 0.05, 0.07, 0.075);
+    const crown = addPart(body, new THREE.OctahedronGeometry(0.15, 0), getMat(bio.accentColor, { emissive: bio.accentColor, emissiveIntensity: 0.3 }), 0, 0.65, 0);
+    crown.scale.set(0.85, 1.25, 0.85);
+    addEyes(body, 0.38, 0.25, 0.1, 0.034);
+  }
+  // --- 11. JELLYFISH, DROPS & PRISMS (Medusella, Gocciolino, Zefirino, Linfino, Prisma) ---
+  else if (bio.shape === 'drop') {
+    if (id === 'medusella') {
+      const bell = addPart(body, new THREE.SphereGeometry(0.28, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), getMat(bio.bodyColor, { opacity: 0.85, emissive: bio.bodyColor, emissiveIntensity: 0.25 }), 0, 0.36, 0);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        addPart(body, new THREE.CylinderGeometry(0.025, 0.015, 0.28, 6), accMat, Math.cos(a) * 0.14, 0.22, Math.sin(a) * 0.14);
+      }
+      addEyes(body, 0.44, 0.22, 0.085, 0.032);
+    } else if (id === 'prisma') {
+      const pr = addPart(body, new THREE.OctahedronGeometry(0.3, 0), getMat(bio.bodyColor, { emissive: bio.accentColor, emissiveIntensity: 0.35, roughness: 0.15 }), 0, 0.38, 0);
+      pr.scale.set(0.9, 1.25, 0.9);
+      addEyes(body, 0.38, 0.22, 0.08, 0.03);
+    } else {
+      addPart(body, new THREE.SphereGeometry(0.26, 14, 12), mainMat, 0, 0.28, 0);
+      addPart(body, new THREE.ConeGeometry(0.21, 0.32, 12), mainMat, 0, 0.52, 0);
+      addPart(body, new THREE.SphereGeometry(0.085, 8, 8), accMat, 0, 0.67, 0);
+      addEyes(body, 0.32, 0.23, 0.09, 0.034);
+    }
+  }
+  // --- 12. FLAMES & SUN (Bracino, Magmino, Solstizio) ---
+  else if (bio.shape === 'flame') {
+    const fMat = getMat(bio.bodyColor, { emissive: bio.bodyColor, emissiveIntensity: 0.4, roughness: 0.3 });
+    addPart(body, new THREE.SphereGeometry(0.27, 14, 12), fMat, 0, 0.3, 0);
+    addPart(body, new THREE.ConeGeometry(0.18, 0.34, 10), getMat(bio.accentColor, { emissive: bio.accentColor, emissiveIntensity: 0.6 }), 0, 0.58, 0);
+    if (id === 'solstizio') {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        addPart(body, new THREE.ConeGeometry(0.06, 0.18, 6), accMat, Math.cos(a) * 0.32, 0.32 + Math.sin(a) * 0.32, 0, 0, 0, a - Math.PI / 2);
+      }
+    }
+    addEyes(body, 0.33, 0.24, 0.09, 0.034);
+  }
+  // --- 13. STARS & COMETS (Corallina, Stellamar, Cometa) ---
+  else if (bio.shape === 'star') {
+    addPart(body, new THREE.SphereGeometry(0.24, 14, 10), mainMat, 0, 0.36, 0);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + Math.PI / 2;
+      addPart(body, new THREE.ConeGeometry(0.1, 0.25, 8), accMat, Math.cos(a) * 0.24, 0.36 + Math.sin(a) * 0.24, 0, 0, 0, a - Math.PI / 2);
+    }
+    addEyes(body, 0.38, 0.22, 0.08, 0.032);
+  }
+  // --- 14. HEDGEHOGS, MOLES, CLOUD SHEEP, FROGS & PEARL (Muschietto, Talpino, Tuonino, Riccioforo, Nubolino, Nebulina, Rugiadina, Perletta) ---
+  else {
+    addPart(body, new THREE.SphereGeometry(0.28, 16, 12), mainMat, 0, 0.3, 0);
+    addPaws(body, accMat, 0.14, 0.08, 0.06, 0.06);
+    if (id === 'nubolino') {
+      // Fluffy wool puffs around body
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        addPart(body, new THREE.SphereGeometry(0.15, 10, 8), mainMat, Math.cos(a) * 0.2, 0.34, Math.sin(a) * 0.2);
+      }
+      addPart(body, new THREE.SphereGeometry(0.16, 12, 10), darkMat, 0, 0.32, 0.22);
+      addEyes(body, 0.35, 0.35, 0.075, 0.03, 0xffffff);
+    } else if (id === 'rugiadina') {
+      // Frog with lilypad hat
+      addPart(body, new THREE.CylinderGeometry(0.26, 0.26, 0.04, 14), getMat(0x52bd60), 0, 0.56, 0);
+      addPart(body, new THREE.SphereGeometry(0.085, 8, 8), mainMat, -0.12, 0.52, 0.14);
+      addPart(body, new THREE.SphereGeometry(0.085, 8, 8), mainMat, 0.12, 0.52, 0.14);
+      addEyes(body, 0.52, 0.21, 0.12, 0.032);
+    } else if (bio.shape === 'spiky') {
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        addPart(body, new THREE.ConeGeometry(0.08, 0.22, 6), accMat, Math.cos(a) * 0.2, 0.4, Math.sin(a) * 0.2 - 0.06, Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6);
+      }
+      addEyes(body, 0.34, 0.25, 0.095, 0.034);
+    } else {
+      addPart(body, new THREE.SphereGeometry(0.1, 10, 8), accMat, -0.18, 0.55, 0);
+      addPart(body, new THREE.SphereGeometry(0.1, 10, 8), accMat, 0.18, 0.55, 0);
+      addEyes(body, 0.34, 0.25, 0.095, 0.034);
+    }
   }
 
-  // Floating Gift Box indicator when creature has a passive gift!
+  // Floating Gift Box indicator when creature has a passive gift
   const giftBox = new THREE.Group();
-  addPart(giftBox, new THREE.BoxGeometry(0.22, 0.22, 0.22), getMat(0xffdf6b, { emissive: 0xffb833, emissiveIntensity: 0.45 }), 0, 0.96, 0, 0, 0, 0, false);
-  addPart(giftBox, new THREE.BoxGeometry(0.24, 0.06, 0.07), getMat(0xff6b8b), 0, 0.96, 0, 0, 0, 0, false);
+  addPart(giftBox, new THREE.BoxGeometry(0.22, 0.22, 0.22), getMat(0xffdf6b, { emissive: 0xffb833, emissiveIntensity: 0.45 }), 0, 1.05, 0, 0, 0, 0, false);
+  addPart(giftBox, new THREE.BoxGeometry(0.24, 0.06, 0.07), getMat(0xff6b8b), 0, 1.05, 0, 0, 0, 0, false);
   giftBox.visible = false;
   root.add(giftBox);
 
@@ -255,7 +445,6 @@ export function createObjectMesh(obj) {
   const g = new THREE.Group();
   const type = obj.type;
 
-  // 1. Sanctuary Landmark
   if (type === 'sanctuary') {
     const rep = !!obj.repaired;
     const stone = getMat(rep ? 0xf2ebd9 : 0x7b7870, { roughness: 0.6 });
@@ -265,24 +454,19 @@ export function createObjectMesh(obj) {
       emissiveIntensity: rep ? 0.75 : 0,
       roughness: 0.2
     });
-    // Stepped plinth
     addPart(g, new THREE.BoxGeometry(1.4, 0.22, 1.4), stone, 0, 0.11, 0);
-    // 4 pillars
     for (const sx of [-0.5, 0.5]) {
       for (const sz of [-0.5, 0.5]) {
         addPart(g, new THREE.CylinderGeometry(0.11, 0.13, 0.95, 8), stone, sx, 0.65, sz);
       }
     }
-    // Domed pavilion roof
     const dome = addPart(g, new THREE.SphereGeometry(0.76, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), roof, 0, 1.05, 0);
     dome.scale.set(1.05, 0.72, 1.05);
-    // Floating central crystal
     const orb = addPart(g, new THREE.OctahedronGeometry(0.24, 0), crys, 0, 0.72, 0);
     g.userData.floatPart = orb;
     return g;
   }
 
-  // 2. Custodian Lore Capsule
   if (type === 'lore_capsule') {
     const m = getMat(obj.read ? 0x87a4b8 : 0xffdf66, {
       emissive: obj.read ? 0x3a5b73 : 0xffbd33,
@@ -296,7 +480,6 @@ export function createObjectMesh(obj) {
     return g;
   }
 
-  // 3. Cracked Glass Terrarium
   if (type === 'terrarium') {
     addPart(g, new THREE.CylinderGeometry(0.42, 0.48, 0.18, 14), getMat(0x7c858c), 0, 0.09, 0);
     addPart(g, new THREE.SphereGeometry(0.4, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), getMat(0xa8ebff, { opacity: 0.45, roughness: 0.1 }), 0, 0.16, 0);
@@ -304,7 +487,6 @@ export function createObjectMesh(obj) {
     return g;
   }
 
-  // 4. Crops (3 growth stages)
   if (type === 'crop') {
     const crop = CROPS[obj.cropId] || CROPS.turnip;
     const leafM = getMat(0x55bf5e, { roughness: 0.55 });
@@ -324,7 +506,6 @@ export function createObjectMesh(obj) {
     return g;
   }
 
-  // 5. Natural Obstacles
   if (type === 'dead_tree') {
     const bark = getMat(0x6b503a, { roughness: 0.85 });
     addPart(g, new THREE.CylinderGeometry(0.12, 0.18, 0.95, 8), bark, 0, 0.48, 0);
@@ -350,7 +531,6 @@ export function createObjectMesh(obj) {
     return g;
   }
 
-  // 6. Craftable Structures & Furniture
   if (type === 'campfire') {
     const rk = getMat(0x7d7973, { roughness: 0.85 });
     for (let i = 0; i < 6; i++) {
@@ -474,7 +654,6 @@ export function createObjectMesh(obj) {
     addPart(g, new THREE.BoxGeometry(1.15, 0.18, 1.0), getMat(0xd9ceb8), 0, 0.09, 0);
     addPart(g, new THREE.BoxGeometry(1.05, 0.72, 0.9), getMat(0xb0f5e6, { opacity: 0.45, roughness: 0.1 }), 0, 0.52, 0);
     addPart(g, new THREE.CylinderGeometry(0.45, 0.45, 1.06, 12, 1, false, 0, Math.PI), getMat(0xc4fff0, { opacity: 0.48, roughness: 0.1 }), 0, 0.88, 0, 0, 0, Math.PI / 2);
-    // Lush plants inside!
     addPart(g, new THREE.SphereGeometry(0.24, 10, 8), getMat(0x52c468), -0.22, 0.4, 0);
     addPart(g, new THREE.SphereGeometry(0.22, 10, 8), getMat(0x7be882), 0.22, 0.44, 0.1);
     addPart(g, new THREE.SphereGeometry(0.14, 8, 8), getMat(0xffe46b, { emissive: 0xffcc33, emissiveIntensity: 0.5 }), 0, 0.58, -0.1);
@@ -518,7 +697,6 @@ export function createObjectMesh(obj) {
     return g;
   }
 
-  // 7. Natural Collectible Resource Nodes (chunky colorful 3D pickups!)
   const nodeConfigs = {
     node_wood: () => {
       addPart(g, new THREE.CylinderGeometry(0.08, 0.09, 0.56, 7), getMat(0x8c5c34), 0, 0.12, 0, 0, 0.4, Math.PI / 2);

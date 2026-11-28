@@ -58,8 +58,8 @@ for (const f of walkFiles(rootDir)) {
 
 // 3. Data integrity checks
 assert.equal(REGIONS.length, 5, 'Should have 5 regions');
-assert.equal(BIOMINI.length, 40, 'Should have 40 original Biomini');
-assert.equal(HABITATS.length, 40, 'Should have 40 habitats');
+assert.equal(BIOMINI.length, 56, 'Should have 56 original Biomini');
+assert.equal(HABITATS.length, 50, 'Should have 50 habitats');
 assert.equal(CHAPTERS.length, 6, 'Should have 6 chapters');
 assert.equal(LORE_LOGS.length, 10, 'Should have 10 lore logs');
 
