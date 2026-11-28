@@ -163,4 +163,6 @@ tools/quality/e2e/ultimo-colore.spec.mjs
 - **Difficoltà:** quattro livelli, compreso Racconto senza riflessi.
 - **Lingue:** italiano e inglese.
 
+- **Mondo aperto** (dopo la prima prova): al posto della rotta a nodi la laguna è un'unica mappa esplorabile, a piedi e in barca, con gli Sbiaditi visibili sulla mappa.
+
 Stato e differenze dell'Atto I: vedi `games/ultimo-colore/README.md`.

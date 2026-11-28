@@ -480,13 +480,13 @@ export function createBattleUI(root, deps) {
   }
 
   return {
-    start(battle, theNode, art, { tutorial = false } = {}) {
+    start(battle, theNode, art, { tutorial = false, note = '' } = {}) {
       b = battle; node = theNode; clock = 0; waits = []; paused = false; actor = null; pending = null; move = null; aim = null; tutorialPage = -1;
       root.classList.remove('picking-foe', 'picking-ally');
       root.dataset.foes = String(b.enemies.length);
       build(art);
       phase = 'resolve';
-      banner(theNode.name[L()]);
+      banner(note ? `${note} — ${theNode.name[L()]}` : theNode.name[L()]);
       wait(700, nextTurn);
       if (tutorial && !rules(b.difficulty).auto) { paused = true; tutorialNext(); }
     },

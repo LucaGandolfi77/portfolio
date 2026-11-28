@@ -1,7 +1,11 @@
 /* ============================================================
    Ultimo Colore — menus, map, camp and journal as HTML (pure)
    ============================================================ */
-import { NODES, NODE } from '../data/map.js';
+import { NODE } from '../data/map.js';
+import { CHESTS, STATUES } from '../data/places.js';
+import { WORLD, BOAT_AT } from '../world/layout.js';
+import { objective } from '../world/field.js';
+import { available } from '../world/progress.js';
 import { HEROES, statsAt, ITEMS } from '../data/party.js';
 import { MEMORIES, MEMORY, SLOTS, LEARN, TEACH_COST } from '../data/memories.js';
 import { DIARY, SPEAKERS } from '../data/story.js';
@@ -40,27 +44,19 @@ export function difficulty(t, hasSave) {
     <div class="col">${['story', 'easy', 'normal', 'hard'].map((d) => btn('start', `<b>${esc(t(`diff.${d}`))}</b><small>${esc(t(`diffDesc.${d}`))}</small>`, `choice ${d === 'normal' ? 'primary' : ''}`, `data-d="${d}"`)).join('')}</div>`;
 }
 
-export function map(t, lang, s, art, selected) {
-  const open = P.available(s);
-  const done = new Set(s.done);
-  const lines = NODES.flatMap((n) => n.next.map((to) => {
-    const a = n.pos, b = NODE[to].pos;
-    return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="${done.has(n.id) && done.has(to) ? 'walked' : ''} ${NODE[to].optional || n.optional ? 'side' : ''}"/>`;
-  })).join('');
-  const icon = { story: '❖', battle: '⚔', boss: '♛', camp: '🏮' };
-  const dots = NODES.map((n) => {
-    const state = done.has(n.id) ? 'done' : open.includes(n.id) ? 'open' : 'locked';
-    const usable = state === 'open' || (state === 'done' && n.type === 'camp');
-    return `<button type="button" class="node ${state} ${n.type} ${selected === n.id ? 'sel' : ''}" style="left:${n.pos[0]}%;top:${n.pos[1]}%" data-act="node" data-id="${n.id}" ${usable ? '' : 'disabled'} aria-label="${esc(n.name[lang])}, ${esc(t(`map.${state === 'locked' ? 'locked' : state === 'done' ? 'done' : 'enter'}`))}">${state === 'locked' ? '·' : state === 'done' && n.type !== 'camp' ? '✓' : icon[n.type]}</button>`;
-  }).join('');
-  const sel = selected && NODE[selected];
-  return `<div class="mapview">
-    <div class="mapart"><div class="mapsheet" style="background-image:url('${art}')">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="roads" aria-hidden="true">${lines}</svg>${dots}</div></div>
-    <div class="mapfoot">
-      ${sel ? `<div class="nodecard"><div><small>${esc(t(`type.${sel.type}`))}${sel.optional ? ` · ${esc(t('map.optional'))}` : ''}</small><strong>${esc(sel.name[lang])}</strong></div>${btn('enter', esc(t('map.enter')), 'primary', `data-id="${sel.id}"`)}</div>` : ''}
-      <nav class="mapnav">${btn('title', `⌂<span>${esc(t('menu'))}</span>`)}${btn('party', `👥<span>${esc(t('map.party'))}</span>`)}${btn('diary', `📖<span>${esc(t('map.diary'))}</span>`)}${btn('settings', `⚙<span>${esc(t('settings'))}</span>`)}</nav>
-    </div></div>`;
+export function atlas(t, lang, s, art) {
+  const pct = (p) => `left:${(p.x / WORLD.w) * 100}%;top:${(p.y / WORLD.h) * 100}%`;
+  const goal = objective(s);
+  const camps = s.done.filter((id) => NODE[id].type === 'camp').map((id) => `<span class="pin camp" style="${pct(NODE[id].at)}" title="${esc(NODE[id].name[lang])}">⌂</span>`).join('');
+  const open = available(s).filter((id) => !NODE[id].auto).map((id) => `<span class="pin ${goal?.id === id ? 'goal' : 'side'}" style="${pct(id === 'stiva' ? BOAT_AT : NODE[id].at)}">${NODE[id].enemies ? '⚔' : '!'}</span>`).join('');
+  return `${head(t, t('world.atlas'))}
+    <p class="muted">${goal ? esc(goal.goal[lang]) : esc(t('world.freeText'))}</p>
+    <div class="atlas"><img src="${art}" alt="">${camps}${open}<span class="pin you" style="${pct(s.pos)}" aria-label="${esc(t('world.you'))}">●</span></div>
+    <p class="muted">${esc(t('world.found', { c: s.opened.length, tc: CHESTS.length, s: s.read.length, ts: STATUES.length }))}</p>`;
+}
+
+export function statue(t, lang, st) {
+  return `<div class="card center statue"><p class="who">${esc(t('world.statue'))}</p><p class="words">${esc(st[lang])}</p>${btn('map', esc(t('close')), 'primary')}</div>`;
 }
 
 export function dialogue(t, lang, beat, n, total) {
@@ -132,7 +128,7 @@ export function end(t, lang, s) {
   return `<div class="card center end"><h2>${esc(t('end.title'))}</h2><p>${esc(t('end.text'))}</p>
     ${bonds.length ? `<h3>${esc(t('end.bonds'))}</h3><ul class="bonds">${bonds.map(([pair, n]) => `<li><span>${esc(pair.split('-').map((h) => HEROES[h]?.name).join(' & '))}</span><b>${'♥'.repeat(Math.min(5, n))}</b></li>`).join('')}</ul>` : ''}
     <p class="muted">${esc(t('end.next'))}</p>
-    <div class="col">${btn('party', esc(t('map.party')))}${btn('diary', esc(t('map.diary')))}${btn('title', esc(t('end.again')), 'primary')}</div></div>`;
+    <div class="col">${btn('explore', esc(t('end.explore')), 'primary')}${btn('party', esc(t('map.party')))}${btn('diary', esc(t('map.diary')))}${btn('title', esc(t('end.again')))}</div></div>`;
 }
 
 export function howto(t, back) {
@@ -151,7 +147,7 @@ export function settingsScreen(t, lang, s, difficultyNow, back) {
 
 export function defeat(t) {
   return `<div class="card center"><h2>${esc(t('lose.title'))}</h2><p>${esc(t('lose.text'))}</p>
-    <div class="col">${btn('retry', esc(t('lose.retry')), 'primary')}${btn('retry-easier', esc(t('lose.easier')))}${btn('map', esc(t('lose.map')))}</div></div>`;
+    <div class="col">${btn('retry', esc(t('lose.retry')), 'primary')}${btn('retry-easier', esc(t('lose.easier')))}${btn('to-camp', esc(t('lose.map')))}</div></div>`;
 }
 
 export { ITEMS, SLOTS, LEARN, memName };

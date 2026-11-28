@@ -14,6 +14,11 @@ import { SCENES, TALKS, DIARY, SPEAKERS } from '../js/data/story.js';
 import { STRINGS } from '../js/strings.js';
 import { fadePixels, weight } from '../js/render/fade.js';
 import { heroSVG, foeSVG } from '../js/render/sprites.js';
+import * as L from '../js/world/layout.js';
+import * as PL from '../js/data/places.js';
+import * as W from '../js/world/terrain.js';
+import * as F from '../js/world/field.js';
+import { WILD, CHESTS, STATUES } from '../js/data/places.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const results = [];
@@ -259,6 +264,157 @@ t('a save survives storage; rubbish does not break it', () => {
   eq(bad.difficulty, 'normal'); eq(bad.party.join(), 'ilario'); eq(bad.done.length, 0); eq(bad.xp, 0); eq(bad.equipped.ilario.length, 0); eq(bad.hp.ilario, 1);
 });
 t('levels', () => { eq(levelFor(0), 1); eq(levelFor(XP_TABLE[3]), 4); eq(skillsAt('nora', 1).length, 2); eq(skillsAt('nora', 5).length, 4); });
+
+/* ---------- the open lagoon ---------- */
+const ORDER = ['casa', 'ponte', 'darsena', 'stiva', 'canale', 'reti', 'campanaro', 'campanile', 'campo1', 'secche', 'statua', 'airone', 'campo2', 'cervo'];
+const goalAt = (id) => (id === 'stiva' ? L.BOAT_AT : NODE[id].at);
+const reachOf = (id) => (NODE[id].enemies ? (NODE[id].type === 'boss' ? 84 : 60) : NODE[id].type === 'camp' ? 100 : 80);
+t('every story point can be walked to, in order, with the gates of that moment', () => {
+  let done = [], pos = L.SPAWN;
+  for (const id of ORDER) {
+    const path = W.findPath(pos, goalAt(id), { boat: done.includes('stiva'), done }, reachOf(id));
+    ok(path, `${id} unreachable`);
+    pos = path.at(-1);
+    done = [...done, id];
+  }
+});
+t('closed passages really close the way, and the sea needs the boat', () => {
+  const upTo = (id) => ORDER.slice(0, ORDER.indexOf(id) + 1);
+  for (const [after, target] of [['casa', 'darsena'], ['stiva', 'reti'], ['campanile', 'secche'], ['secche', 'campo2'], ['airone', 'cervo']]) {
+    const done = upTo(after);
+    eq(W.findPath(L.SPAWN, goalAt(target), { boat: done.includes('stiva'), done }, 60), null, `${target} open after ${after}`);
+  }
+  eq(W.findPath(L.SPAWN, goalAt('reti'), { boat: false, done: upTo('campo1') }, 60), null, 'walked on water');
+});
+t('chests, statues and wandering enemies are all on reachable ground', () => {
+  const ctx = { boat: true, done: ORDER };
+  for (const x of [...CHESTS, ...STATUES]) ok(W.findPath(L.SPAWN, x, ctx, 62), x.id);
+  for (const x of STATUES) ok(!['solid'].includes(W.kindAt(x.x, x.y, ORDER)), x.id + ' inside something');
+  for (const w of WILD) { ok(W.canStand(w.x, w.y, ctx), w.id); ok(!w.after || NODE[w.after], w.id); for (const e of w.enemies) ok(ENEMIES[e], e); }
+  eq(new Set([...WILD, ...CHESTS, ...STATUES].map((x) => x.id)).size, WILD.length + CHESTS.length + STATUES.length);
+});
+t('walls stop movement and feet slide along them', () => {
+  const ctx = { boat: false, done: [] };
+  ok(W.canStand(L.SPAWN.x, L.SPAWN.y, ctx));
+  let p = { ...L.SPAWN };
+  const rand = rng(5);
+  for (let i = 0; i < 1500; i++) {
+    p = W.move(p, (rand() - 0.5) * 40, (rand() - 0.5) * 40, ctx);
+    ok(W.canStand(p.x, p.y, ctx), `inside a wall at ${p.x},${p.y}`);
+  }
+  const house = W.houseBlock(L.HOUSES[0]);
+  const start = { x: house.x - 20, y: house.y + house.h / 2 };
+  const slid = W.move(start, 60, 40, { boat: true, done: [] });
+  ok(slid.x < house.x && slid.y > start.y + 20, 'no slide');
+});
+
+const journey = (upTo) => {
+  const s = P.newGame();
+  for (const id of ORDER.slice(0, ORDER.indexOf(upTo) + 1)) { P.join(s, NODE[id].join); P.complete(s, id); }
+  return s;
+};
+t('story fights stand where the story is; wanderers need the boat', () => {
+  const early = F.createField(journey('casa'));
+  eq(early.groups.map((g) => g.id).join(), 'ponte');
+  const later = F.createField(journey('campo1'));
+  ok(later.groups.some((g) => g.id === 'secche') && later.groups.filter((g) => g.wild).length > 8);
+});
+t('walking moves the party, leaves footsteps and saves the place', () => {
+  const s = journey('casa'), f = F.createField(s);
+  for (let i = 0; i < 40; i++) F.update(s, f, 1 / 60, { x: 1, y: 0 });
+  ok(f.pos.x > L.SPAWN.x + 60 && f.facing === 1 && f.trail.length > 5);
+  eq(s.pos.x, Math.round(f.pos.x));
+});
+t('an unaware enemy can be surprised; a chasing one surprises you', () => {
+  const s = journey('campo1');
+  const f = F.createField(s);
+  const g = f.groups.find((x) => x.id === 'w-sud');
+  g.dir = { x: 1, y: 0 };
+  f.grace = 0; f.pos = { x: g.x - 115, y: g.y };
+  ok(!F.notices(g, f.pos), 'sees behind itself');
+  ok(F.notices(g, { x: g.x + 150, y: g.y }) && F.notices(g, { x: g.x - 50, y: g.y }));
+  F.update(s, f, 0.001);
+  eq(f.near.kind, 'strike'); eq(f.near.id, 'w-sud');
+  g.dir = { x: 1, y: 0 }; f.pos = { x: g.x - 30, y: g.y };
+  const direct = F.update(s, f, 0.001);
+  eq(direct.type, 'encounter'); eq(direct.advantage, 'party');
+  const f2 = F.createField(s);
+  const g2 = f2.groups.find((x) => x.id === 'w-sud');
+  f2.grace = 0; f2.pos = { x: g2.x - 150, y: g2.y };
+  let ev = null; const states = new Set();
+  for (let i = 0; i < 300 && !ev; i++) { if (g2.state === 'idle') g2.dir = { x: -1, y: 0 }; ev = F.update(s, f2, 1 / 60); states.add(g2.state); }
+  ok(states.has('chase'), [...states].join());
+  eq(ev.advantage, 'enemy');
+});
+t('running far enough sends them home; retreating gives a moment of peace', () => {
+  const s = journey('campo1'), f = F.createField(s);
+  const g = f.groups.find((x) => x.id === 'w-sud');
+  g.state = 'chase'; f.pos = { x: g.x - 600, y: g.y }; f.grace = 99;
+  F.update(s, f, 1 / 60); eq(g.state, 'return');
+  for (let i = 0; i < 600 && g.state !== 'idle'; i++) F.update(s, f, 1 / 60);
+  eq(g.state, 'idle');
+  f.pos = { x: g.x - 30, y: g.y };
+  const before = Math.hypot(f.pos.x - g.x, f.pos.y - g.y);
+  F.retreat(s, f, g);
+  ok(Math.hypot(f.pos.x - g.x, f.pos.y - g.y) > before + 80 && f.grace > 1);
+});
+t('beaten wanderers stay gone until the party rests', () => {
+  const s = journey('campo1');
+  s.cleared.push('w-sud');
+  ok(!F.createField(s).groups.some((g) => g.id === 'w-sud'));
+  P.rest(s);
+  ok(F.createField(s).groups.some((g) => g.id === 'w-sud'));
+});
+t('scenes start by themselves only when they should', () => {
+  const s = P.newGame(), f = F.createField(s);
+  const ev = F.update(s, f, 0.016);
+  eq(ev.type, 'auto'); eq(ev.node, 'casa');
+  const end = journey('cervo');
+  eq(F.update(end, F.createField(end), 0.016).node, 'tramonto');
+});
+t('what can be done from here: board, camp, chest, statue, closed way', () => {
+  const at = (s, p) => { const f = F.createField(s); f.pos = { ...p }; f.grace = 99; F.update(s, f, 0.001); return f.near; };
+  eq(at(journey('darsena'), { x: 1745, y: 2408 }).kind, 'board');
+  const s = journey('campanile');
+  eq(at(s, NODE.campo1.at).kind, 'camp');
+  eq(at(journey('airone'), NODE.campo1.at).kind, 'camp', 'camps stay open');
+  const c = CHESTS[0];
+  eq(at(journey('casa'), c).kind, 'chest');
+  const bag = journey('casa'); const oil = bag.items.olio;
+  ok(F.openChest(bag, c.id)); eq(F.openChest(bag, c.id), null); eq(bag.items.olio, oil + c.olio);
+  const st = STATUES[0];
+  eq(at(journey('casa'), { x: st.x - 30, y: st.y + 20 }).kind, 'statue');
+  F.readStatue(bag, st.id); F.readStatue(bag, st.id); eq(bag.read.length, 1);
+  eq(at(journey('casa'), { x: 1003, y: 2606 }).kind, 'gate');
+});
+t('the compass points to the next step, not to a side path', () => {
+  eq(F.objective(journey('casa')).id, 'ponte');
+  eq(F.objective(journey('canale')).id, 'campanaro');
+  for (const n of NODES) if (!n.auto) ok(n.goal?.it && n.goal?.en, n.id);
+});
+t('surprise decides who moves first', () => {
+  const slow = { party: ['bastiano'], enemies: ['cocci'], rng: fixed };
+  eq(E.next(E.createBattle(slow)).type, 'enemy');
+  const amb = E.createBattle({ ...slow, advantage: 'party' });
+  eq(amb.heroes[0].ap, E.AP_START + 1); eq(E.next(amb).type, 'hero');
+  eq(E.next(E.createBattle({ party: ['nora'], enemies: ['granchio'], rng: fixed, advantage: 'enemy' })).type, 'enemy');
+});
+t('a journey from the old route map wakes up in the lagoon', () => {
+  const old = { v: 1, party: ['ilario', 'tecla'], done: ['casa', 'ponte', 'darsena'] };
+  const s = P.hydrate(old);
+  eq(s.pos.x, NODE.darsena.at.x);
+  ok(F.createField(s).pos.x > 0);
+  const stuck = P.hydrate({ ...old, pos: { x: 700, y: 2200 } });
+  ok(W.canStand(F.createField(stuck).pos.x, F.createField(stuck).pos.y, F.ctxOf(stuck)), 'left in a wall');
+  const kept = P.hydrate({ ...old, cleared: ['w-sud', 'w-sud'], opened: ['c-casa'], read: ['s-bimbo'], camp: 'campo1', pos: { x: 900, y: 2900 } });
+  eq(kept.cleared.length, 1); eq(kept.opened.length, 1); eq(kept.camp, null, 'camp not reached yet'); eq(kept.pos.x, 900);
+});
+t('the painter’s copy of the map is up to date', () => {
+  const j = JSON.parse(readFileSync(join(ROOT, 'blender', 'world.json'), 'utf8'));
+  for (const k of ['WORLD', 'LEAN', 'ISLANDS', 'SHALLOWS', 'PIERS', 'HOUSES', 'TOWER', 'WILLOWS', 'CAMPS', 'WALLS', 'SHARDS']) eq(JSON.stringify(j[k]), JSON.stringify(L[k]), k);
+  eq(JSON.stringify(j.STATUES), JSON.stringify([...PL.STATUES, PL.ADA]), 'STATUES');
+  ok(existsSync(join(ROOT, 'art', 'world.webp')));
+});
 
 /* ---------- words and pictures ---------- */
 const beatsOf = (list) => list.flatMap((b) => (b.c ? b.c.flatMap((o) => [['choice', o.it, o.en], ...beatsOf(o.beats || [])]) : [b]));

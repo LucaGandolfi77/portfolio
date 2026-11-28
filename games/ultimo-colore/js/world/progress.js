@@ -6,6 +6,10 @@ import { MEMORY, SLOTS, LEARN, TEACH_COST } from '../data/memories.js';
 import { HERO_IDS, levelFor } from '../data/party.js';
 import { TALKS } from '../data/story.js';
 import { DIFFICULTY } from '../battle/timing.js';
+import { SPAWN, WORLD } from './layout.js';
+
+/** Wild fights are worth less experience than the story’s. */
+export const WILD_XP = 0.5;
 
 export const SAVE_KEY = 'ultimo-colore-v1';
 export const SETTINGS_KEY = 'ultimo-colore-settings';
@@ -17,6 +21,7 @@ export function newGame(difficulty = 'normal') {
     v: 1, difficulty, party: ['ilario'], xp: 0, light: 0, items: { ...SUPPLY },
     owned: [], equipped: {}, known: {}, uses: {}, hp: {},
     done: [], flags: {}, bonds: {}, talks: [], diary: [], actDone: false, battles: 0,
+    pos: { ...SPAWN }, camp: null, cleared: [], opened: [], read: [],
   };
 }
 
@@ -45,6 +50,15 @@ export function hydrate(raw) {
   s.talks = list(raw.talks).filter((x) => typeof x === 'string');
   s.diary = list(raw.diary).filter((x) => typeof x === 'string');
   s.actDone = !!raw.actDone;
+  const strings = (v) => [...new Set(list(v).filter((x) => typeof x === 'string'))];
+  s.cleared = strings(raw.cleared);
+  s.opened = strings(raw.opened);
+  s.read = strings(raw.read);
+  s.camp = NODE[raw.camp]?.type === 'camp' && s.done.includes(raw.camp) ? raw.camp : null;
+  const p = obj(raw.pos);
+  if (Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0 && p.x < WORLD.w && p.y < WORLD.h) s.pos = { x: p.x, y: p.y };
+  // a journey saved on the old route map wakes up where it had got to
+  else if (s.done.length) s.pos = { x: NODE[s.done[s.done.length - 1]].at.x, y: NODE[s.done[s.done.length - 1]].at.y + 20 };
   return s;
 }
 
@@ -150,7 +164,9 @@ export function afterBattle(s, battle, reward) {
   return { learned, levelUp: level(s) > before ? level(s) : 0 };
 }
 
+/** Resting heals and refills, and the wandering Faded come back. */
 export function rest(s) {
+  s.cleared = [];
   s.hp = {};
   s.items = { olio: Math.max(s.items.olio, SUPPLY.olio), cera: Math.max(s.items.cera, SUPPLY.cera) };
 }

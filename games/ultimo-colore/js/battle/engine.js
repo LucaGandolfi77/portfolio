@@ -42,14 +42,16 @@ function makeEnemy(type, i) {
   return { side: 'enemy', id: `${type}-${i}`, type, name: e.name, hp: e.hp, maxHp: e.hp, atk: e.atk, spd: e.spd, brk: 0, brkMax: e.brk, broken: false, skip: false, burn: 0, marked: 0, weak: false, phase: 1, lastMove: null };
 }
 
-export function createBattle({ party, level = 1, enemies, difficulty = 'normal', items = {}, equipped = {}, hp = {}, autoParry = false, rng = Math.random }) {
+export function createBattle({ party, level = 1, enemies, difficulty = 'normal', items = {}, equipped = {}, hp = {}, autoParry = false, rng = Math.random, advantage = null }) {
   const b = {
     heroes: party.map((id) => makeHero(id, level, { equipped, hp })),
     enemies: enemies.map(makeEnemy),
-    difficulty, autoParry, rng, items: { olio: 0, cera: 0, ...items },
+    difficulty, autoParry, rng, advantage, items: { olio: 0, cera: 0, ...items },
     round: 0, queue: [], current: null, wide: 0, over: null, sparksLeft: SPARKS_PER_TURN, dragged: false,
     stats: { parries: 0, perfects: 0, hitsTaken: 0 },
   };
+  // striking first: a little more breath to begin with
+  if (advantage === 'party') for (const h of b.heroes) h.ap = Math.min(AP_MAX, h.ap + 1);
   return b;
 }
 
@@ -83,8 +85,10 @@ export function next(b) {
     if (!b.queue.length) {
       b.round++;
       ombra(b, events);
+      // in the first round whoever surprised the other acts first
+      const first = b.round === 1 && b.advantage ? (b.advantage === 'party' ? 'hero' : 'enemy') : null;
       b.queue = [...living(b.heroes), ...living(b.enemies)]
-        .sort((x, y) => (y.spd + (y.tempo || 0)) - (x.spd + (x.tempo || 0)) || (x.side === 'hero' ? -1 : 1))
+        .sort((x, y) => (first ? (y.side === first) - (x.side === first) : 0) || (y.spd + (y.tempo || 0)) - (x.spd + (x.tempo || 0)) || (x.side === 'hero' ? -1 : 1))
         .map((a) => a.id);
       continue;
     }

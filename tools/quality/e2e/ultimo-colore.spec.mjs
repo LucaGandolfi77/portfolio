@@ -28,6 +28,24 @@ const until = (page, phases) => c(page, (list) => {
   return z.battle.phase;
 }, phases);
 
+/** Walks the party along a path found on the same ground the game uses. */
+const walkTo = (page, target, reach = 40) => page.evaluate(async ([goal, near]) => {
+  const { findPath } = await import('./js/world/terrain.js');
+  const { ctxOf } = await import('./js/world/field.js');
+  const z = window.__colore;
+  const path = findPath(z.save.pos, goal, ctxOf(z.save), near, 16);
+  if (!path) return 'no path';
+  for (const p of path) {
+    for (let i = 0; i < 40 && z.screen === 'world'; i++) {
+      const dx = p.x - z.save.pos.x, dy = p.y - z.save.pos.y, d = Math.hypot(dx, dy);
+      if (d < 10) break;
+      z.walk(dx / d, dy / d, Math.min(64, (d / 190) * 1000));
+    }
+    if (z.screen !== 'world') break;
+  }
+  return z.screen;
+}, [target, reach]);
+
 /** A new journey, already on the road, in a given fight. */
 async function fight(page, node = 'ponte', difficulty = 'normal') {
   await c(page, ([n, d]) => {
@@ -52,8 +70,8 @@ test.describe('Ultimo Colore', () => {
     for (let i = 0; i < 40 && (await page.locator('[data-act="choose"]').count()) === 0; i++) await page.locator('[data-act="advance"]').click();
     await page.locator('[data-act="choose"]').nth(1).click();
     for (let i = 0; i < 20 && (await screen(page)) === 'scene'; i++) await page.locator('[data-act="advance"]').click();
-    expect(await screen(page)).toBe('map');
-    await expect(page.locator('.node.open')).toHaveCount(1);
+    expect(await screen(page)).toBe('world');
+    await expect(page.locator('.w-goal strong')).toContainText('ponte');
     expect(await c(page, () => window.__colore.save.flags.rispetto)).toBe(true);
     expect(errors).toEqual([]);
   });
@@ -145,7 +163,7 @@ test.describe('Ultimo Colore', () => {
     expect(await c(page, () => window.__colore.save.difficulty)).toBe('normal');
   });
 
-  test('pause stops the clock; flee returns to the map', async ({ page }) => {
+  test('pause stops the clock; flee returns to the lagoon', async ({ page }) => {
     await open(page);
     await fight(page);
     await until(page, ['menu', 'defend']);
@@ -158,36 +176,147 @@ test.describe('Ultimo Colore', () => {
     await page.locator('#overlay [data-key="diff"][data-v="easy"]').click();
     await page.locator('#overlay .sc-head [data-act="resume"]').click();
     await page.locator('[data-act="flee"]').click();
-    expect(await screen(page)).toBe('map');
+    expect(await screen(page)).toBe('world');
+    // stepped back, with a moment of peace
+    expect(await c(page, () => window.__colore.world.field.grace)).toBeGreaterThan(1);
     expect(await c(page, () => window.__colore.save.difficulty)).toBe('easy');
   });
 
-  test('the whole first act, from the bakery to the sunset', async ({ page }) => {
+  test('walking: joystick and keys move the party; walls stop it', async ({ page }) => {
     const errors = collectErrors(page);
     await open(page);
-    await c(page, () => { window.__colore.newGame('normal'); });
+    await c(page, () => { const z = window.__colore; z.newGame(); z.jump('darsena'); });
+    expect(await screen(page)).toBe('world');
+    const pos = () => c(page, () => ({ ...window.__colore.save.pos }));
+    const a = await pos();
+    await page.keyboard.down('ArrowLeft');
+    await expect.poll(async () => (await pos()).x).toBeLessThan(a.x - 40);
+    await page.keyboard.up('ArrowLeft');
+    const b1 = await pos();
+    const box = await page.locator('.w-canvas').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.6);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height * 0.6, { steps: 4 });
+    await expect(page.locator('.w-stick')).toBeVisible();
+    await expect.poll(async () => (await pos()).x).toBeGreaterThan(b1.x + 40);
+    await page.mouse.up();
+    await expect(page.locator('.w-stick')).toBeHidden();
+    // without a boat the sea stops the walk
+    await c(page, () => { window.__colore.place(1300, 2490); window.__colore.walk(0, 1, 6000); });
+    expect((await pos()).y).toBeLessThan(2565);
+    expect(errors).toEqual([]);
+  });
+
+  test('walking into the guardians on the bridge starts the story fight', async ({ page }) => {
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('ponte'); z.save.flags.tutorial = true; });
+    await walkTo(page, { x: 1003, y: 2625 }, 20);
+    await c(page, () => window.__colore.walk(0, 0, 3000));
+    expect(await screen(page)).toBe('scene');
+    await c(page, () => window.__colore.readAll());
+    expect(await screen(page)).toBe('battle');
+    expect(await c(page, () => window.__colore.save.party)).toContain('tecla');
+  });
+
+  test('a wandering enemy can be struck first, beaten, and returns after resting', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('campo1'); });
+    await c(page, () => {
+      const z = window.__colore;
+      const g = z.world.field.groups.find((x) => x.id === 'w-sud');
+      z.place(g.x, g.y + 100);
+      const h = z.world.field.groups.find((x) => x.id === 'w-sud');
+      h.dir = { x: 0, y: -1 };
+      z.world.field.grace = 0;
+      z.walk(0, 0.0001, 16);
+    });
+    await expect(page.locator('.w-act')).toContainText('Colpisci');
+    await page.locator('.w-act').click();
+    expect(await screen(page)).toBe('battle');
+    await expect(page.locator('.banner')).toContainText('sorpresa');
+    const before = await c(page, () => window.__colore.save.xp);
+    await c(page, () => { window.__colore.battle.forceWin(); window.__colore.advance(2000); });
+    await page.locator('[data-act="gains-next"]').click();
+    expect(await screen(page)).toBe('world');
+    expect(await c(page, () => window.__colore.save.cleared)).toContain('w-sud');
+    expect(await c(page, () => window.__colore.save.xp)).toBeGreaterThan(before);
+    expect(await c(page, () => window.__colore.world.field.groups.some((g) => g.id === 'w-sud'))).toBe(false);
+    await c(page, () => { const z = window.__colore; z.enter('campo1'); z.readAll(); document.querySelector('[data-act="gains-next"]')?.click(); });
+    await page.locator('[data-act="rest"]').click();
+    await page.locator('[data-act="leave"]').click();
+    expect(await c(page, () => window.__colore.world.field.groups.some((g) => g.id === 'w-sud'))).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('lanterns, statues and the atlas', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('ponte'); z.place(1475, 2712); z.walk(0.5, 0, 100); });
+    await expect(page.locator('.w-act')).toContainText('lanterna');
+    await page.locator('.w-act').click();
+    await expect(page.locator('.w-toast')).toContainText('olio');
+    await c(page, () => { const z = window.__colore; z.place(1185, 2900); z.walk(0.3, 0, 60); });
+    await expect(page.locator('.w-act')).toContainText('statua');
+    await page.locator('.w-act').click();
+    await expect(page.locator('.statue .words')).toContainText('aquilone');
+    await page.locator('.statue [data-act="map"]').click();
+    await page.locator('.w-mini').click();
+    await expect(page.locator('.atlas .pin.you')).toBeVisible();
+    await expect(page.locator('.atlas .pin.goal')).toHaveCount(1);
+    await expect(page.locator('#screen')).toContainText('Lanterne trovate 1/9');
+    await page.locator('.sc-head [data-act="map"]').click();
+    expect(await screen(page)).toBe('world');
+    expect(errors).toEqual([]);
+  });
+
+  test('the whole first act on foot and by boat, from the bakery to the sunset', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame('normal'); z.save.flags.tutorial = true; });
     const route = ['casa', 'ponte', 'darsena', 'stiva', 'canale', 'reti', 'campanaro', 'campanile', 'campo1', 'secche', 'statua', 'airone', 'campo2', 'cervo', 'tramonto'];
     for (const id of route) {
-      await expect(page.locator(`.node[data-id="${id}"]`)).toBeEnabled();
-      await page.locator(`.node[data-id="${id}"]`).click({ force: true });
-      await page.locator(`[data-act="enter"][data-id="${id}"]`).click();
-      await c(page, () => window.__colore.readAll());
-      if ((await screen(page)) === 'battle') {
-        await c(page, () => {
-          const z = window.__colore;
-          document.querySelectorAll('.b-over:not([hidden]) button').forEach(() => {});
-          for (let i = 0; i < 4; i++) document.querySelector('.b-over:not([hidden]) [data-u="tutorial"]')?.click();
-          z.battle.forceWin(); z.advance(2000);
-        });
+      // walk there; wandering enemies met on the way are won at once
+      for (let tries = 0; tries < 12; tries++) {
+        const done = await c(page, (n) => window.__colore.save.done.includes(n), id);
+        if (done) break;
+        const where = await screen(page);
+        if (where === 'scene') await c(page, () => window.__colore.readAll());
+        else if (where === 'battle') await c(page, () => { window.__colore.battle.forceWin(); window.__colore.advance(2500); });
+        else if (where === 'gains') await page.locator('[data-act="gains-next"]').click();
+        else if (where === 'camp') {
+          await page.locator('[data-act="talk"]').first().click();
+          await c(page, () => window.__colore.readAll());
+          await page.locator('[data-act="rest"]').click();
+          await page.locator('[data-act="leave"]').click();
+        } else if (where === 'world') {
+          if (id === 'casa' || id === 'tramonto') await c(page, () => window.__colore.walk(0, 0, 32));
+          else {
+            const goal = await c(page, async (n) => {
+              const { NODE } = await import('./js/data/map.js');
+              const { BOAT_AT } = await import('./js/world/layout.js');
+              return n === 'stiva' ? BOAT_AT : NODE[n].at;
+            }, id);
+            const res = await walkTo(page, goal, id === 'stiva' ? 70 : 40);
+            expect(res, id).not.toBe('no path');
+            // stand there: guardians notice, and any moment of peace runs out
+            if ((await screen(page)) === 'world') await c(page, () => { window.__colore.walk(0, 0, 3000); if (window.__colore.screen === 'world') window.__colore.act(); });
+          }
+        }
       }
-      if (id.startsWith('campo')) {
-        if ((await screen(page)) === 'gains') await page.locator('[data-act="gains-next"]').click();
-        expect(await screen(page)).toBe('camp');
-        await page.locator('[data-act="talk"]').first().click();
-        await c(page, () => window.__colore.readAll());
-        await page.locator('[data-act="rest"]').click();
-        await page.locator('[data-act="leave"]').click();
-      } else if ((await screen(page)) === 'gains') await page.locator('[data-act="gains-next"]').click();
+      // settle the screens that follow
+      for (let i = 0; i < 6 && !['world', 'end'].includes(await screen(page)); i++) {
+        const where = await screen(page);
+        if (where === 'scene') await c(page, () => window.__colore.readAll());
+        else if (where === 'battle') await c(page, () => { window.__colore.battle.forceWin(); window.__colore.advance(2500); });
+        else if (where === 'gains') await page.locator('[data-act="gains-next"]').click();
+        else if (where === 'camp') {
+          await page.locator('[data-act="talk"]').first().click();
+          await c(page, () => window.__colore.readAll());
+          await page.locator('[data-act="leave"]').click();
+        }
+      }
+      expect(await c(page, (n) => window.__colore.save.done.includes(n), id), id).toBe(true);
     }
     expect(await screen(page)).toBe('end');
     const s = await c(page, () => window.__colore.save);
@@ -195,13 +324,12 @@ test.describe('Ultimo Colore', () => {
     expect(s.party).toEqual(['ilario', 'tecla', 'nora', 'bastiano']);
     expect(s.owned.length).toBe(20);
     expect(s.diary.length).toBe(4);
-    expect(Object.keys(s.bonds).length).toBeGreaterThan(0);
-    // the paintings have lost their green
-    await expect.poll(() => page.locator('#art').evaluate((el) => el.style.backgroundImage)).toContain('blob:');
+    await page.locator('[data-act="explore"]').click();
+    expect(await screen(page)).toBe('world');
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-ready', '1');
     await page.locator('[data-act="continue"]').click();
-    expect(await screen(page)).toBe('end');
+    expect(await screen(page)).toBe('world');
     expect(errors).toEqual([]);
   });
 
@@ -209,17 +337,17 @@ test.describe('Ultimo Colore', () => {
     const errors = collectErrors(page);
     await open(page);
     await c(page, () => { window.__colore.newGame(); window.__colore.jump('campo1'); });
-    await page.locator('.mapnav [data-act="party"]').click();
+    await page.locator('.w-nav [data-w="party"]').click();
     await expect(page.locator('.chips [data-act="hero"]')).toHaveCount(4);
     const worn = page.locator('.mems li.on');
     await expect(worn).toHaveCount(3);
     await worn.first().locator('.mem').click();
     await expect(page.locator('.mems li.on')).toHaveCount(2);
     await page.locator('.sc-head [data-act="map"]').click();
-    await page.locator('.mapnav [data-act="diary"]').click();
+    await page.locator('.w-nav [data-w="diary"]').click();
     await expect(page.locator('.page')).toHaveCount(1);
     await page.locator('.sc-head [data-act="map"]').click();
-    await page.locator('.mapnav [data-act="settings"]').click();
+    await page.locator('.w-nav [data-w="settings"]').click();
     await page.locator('[data-key="lang"][data-v="en"]').click();
     await expect(page.locator('.sc-head h2')).toHaveText('Settings');
     expect(errors).toEqual([]);
@@ -241,6 +369,8 @@ test.describe('Ultimo Colore', () => {
     });
     for (const sel of ['.def.parry', '.def.jump']) await expect(page.locator(sel)).toBeInViewport({ ratio: 1 });
     expect(await page.locator('#battle').evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    await c(page, () => { const z = window.__colore; z.battle.forceWin(); z.advance(2000); document.querySelector('[data-act="gains-next"]')?.click(); });
+    for (const sel of ['.w-goal', '.w-mini', '.w-nav [data-w="settings"]']) await expect(page.locator(sel)).toBeInViewport({ ratio: 1 });
   });
 
   test('works offline after the first visit', async ({ page, context }) => {

@@ -706,35 +706,10 @@ def scene_cervo():
     camera((0, -1.5, 2.1), (0, 14, 3.0), 30)
 
 
-def scene_mappa():
-    """The lagoon from above."""
-    sky([(-0.1, '#5a7080'), (1.0, '#6a8090')], 0.8)
-    water('#2a5a60', y0=-30, y1=40, x=24, amp=0.015, rough=0.35)
-    sand = mat('sandbank', '#b8a878', rough=0.95)
-    grass = mat('grass', '#5a7a3a', rough=0.95)
-    islands = [(0, -7.2, 2.1), (-2.2, -4.0, 1.3), (1.8, -2.6, 1.5), (-1.0, 0.0, 1.2), (2.5, 1.6, 1.0), (-2.7, 3.0, 1.1), (0.5, 3.9, 1.3), (2.4, 6.2, 1.1), (-1.4, 7.4, 1.7), (3.8, -5.6, 0.7), (-4.2, -0.8, 0.8), (4.4, 4.0, 0.6), (-3.8, -7.0, 0.8), (3.6, 9.2, 0.9)]
-    for x, y, r in islands:
-        ball((x, y, -0.15), r, sand, 4, (1.15, 1.0, 0.2), 0.05)
-        ball((x, y, -0.02), r * 0.75, grass, 3, (1.1, 0.95, 0.22), 0.09)
-    for x, y, r in islands[:3]:
-        for _ in range(int(r * 9)):
-            a, d = rng.uniform(0, 6.28), rng.uniform(0, r * 0.6)
-            house(x + d * math.cos(a), y + d * math.sin(a), 0.4, rng.uniform(0.25, 0.55), 0.4, rng.choice(['#a85a42', '#c89a60', '#8a6a70']), lit=0.3, rz=rng.uniform(0, 3), base=0.1)
-    tower(0.4, -7.0, 1.6, 0.32, '#a87058', base=0.1)
-    tower(2.6, 1.7, 1.1, 0.3, '#8a7866', lean=0.16, base=0.0)
-    for x, y in ((-2.8, 3.1), (0.3, 4.2), (-1.6, 7.6), (-0.8, 7.0)):
-        willow(x, y, 0.2, '#6d8a3a', strands=26)
-    boat(1.0, -5.0, 0.0, 1.1, 0.36, -0.7, mast=True)
-    reeds(-1.5, 2, 3.5, 5, 260, 0.2, '#6a8438')
-    moon(0, 8.0, 0.45, 0.14, '#b0ffd0', 6)
-    light('SUN', (0, 0, 10), 3.4, '#fff0d0', rot=(math.radians(38), 0, math.radians(32)))
-    camera((0, -13.5, 20.5), (0, 0.4, 0), 44)
-
-
 SCENES = {
     'titolo': scene_titolo, 'forno': scene_forno, 'ponte': scene_ponte, 'darsena': scene_darsena,
     'stiva': scene_stiva, 'canale': scene_canale, 'campanile': scene_campanile, 'campo': scene_campo,
-    'secche': scene_secche, 'cervo': scene_cervo, 'mappa': scene_mappa,
+    'secche': scene_secche, 'cervo': scene_cervo,
 }
 
 # ------------------------------------------------------------ the painter
@@ -782,17 +757,19 @@ def value_noise(h, w, cell, seed):
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 
 
-def paint(path, seed):
+def paint(path, seed, border=True, brush=None, wobble=1.0):
     src = bpy.data.images.load(path, check_existing=False)
     w, h = src.size
     px = np.empty(w * h * 4, dtype=np.float32)
     src.pixels.foreach_get(px)
     img = px.reshape(h, w, 4)[..., :3].astype(np.float64)
-    r = max(2, int(round(4 * w / 900)))
+    r = brush or max(2, int(round(4 * w / 900)))
     # wet edges: displace the picture a little with slow noise
     dx = ((value_noise(h, w, 9, seed) - 0.5) * 5 + (value_noise(h, w, 31, seed + 1) - 0.5) * 6).astype(int)
     dy = ((value_noise(h, w, 9, seed + 2) - 0.5) * 5 + (value_noise(h, w, 31, seed + 3) - 0.5) * 6).astype(int)
     yy, xx = np.mgrid[0:h, 0:w]
+    dx = (dx * wobble).astype(int)
+    dy = (dy * wobble).astype(int)
     img = img[np.clip(yy + dy, 0, h - 1), np.clip(xx + dx, 0, w - 1)]
     soft = kuwahara(img, r)
     lum = soft @ np.array([0.299, 0.587, 0.114])
@@ -813,9 +790,10 @@ def paint(path, seed):
     nx = (xx / (w - 1)) * 2 - 1
     ny = (yy / (h - 1)) * 2 - 1
     ragged = (value_noise(h, w, 46, seed + 9) - 0.5) * 0.09 + (value_noise(h, w, 11, seed + 10) - 0.5) * 0.035
-    border = np.maximum(np.abs(nx) ** 1.0, np.abs(ny) ** 1.0) + ragged
-    bleed = np.clip((border - 0.975) / 0.026, 0, 1)[..., None]
-    out = out * (1 - bleed) + paper * bleed
+    edge_dist = np.maximum(np.abs(nx) ** 1.0, np.abs(ny) ** 1.0) + ragged
+    bleed = np.clip((edge_dist - 0.975) / 0.026, 0, 1)[..., None]
+    if border:
+        out = out * (1 - bleed) + paper * bleed
     out = np.clip(out, 0, 1)
     rgba = np.ones((h, w, 4), dtype=np.float32)
     rgba[..., :3] = out
@@ -838,4 +816,5 @@ def main():
         print('PAINTED', name, flush=True)
 
 
-main()
+if __name__ == '__main__':
+    main()
