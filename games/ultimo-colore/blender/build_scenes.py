@@ -757,7 +757,8 @@ def value_noise(h, w, cell, seed):
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 
 
-def paint(path, seed, border=True, brush=None, wobble=1.0):
+def paint(path, seed, border=True, brush=None, wobble=1.0, grain_size=1.0):
+    nz = lambda h, w, cell, sd: value_noise(h, w, max(1, int(round(cell * grain_size))), sd)
     src = bpy.data.images.load(path, check_existing=False)
     w, h = src.size
     px = np.empty(w * h * 4, dtype=np.float32)
@@ -765,31 +766,31 @@ def paint(path, seed, border=True, brush=None, wobble=1.0):
     img = px.reshape(h, w, 4)[..., :3].astype(np.float64)
     r = brush or max(2, int(round(4 * w / 900)))
     # wet edges: displace the picture a little with slow noise
-    dx = ((value_noise(h, w, 9, seed) - 0.5) * 5 + (value_noise(h, w, 31, seed + 1) - 0.5) * 6).astype(int)
-    dy = ((value_noise(h, w, 9, seed + 2) - 0.5) * 5 + (value_noise(h, w, 31, seed + 3) - 0.5) * 6).astype(int)
+    dx = ((nz(h, w, 9, seed) - 0.5) * 5 + (nz(h, w, 31, seed + 1) - 0.5) * 6).astype(int)
+    dy = ((nz(h, w, 9, seed + 2) - 0.5) * 5 + (nz(h, w, 31, seed + 3) - 0.5) * 6).astype(int)
     yy, xx = np.mgrid[0:h, 0:w]
-    dx = (dx * wobble).astype(int)
-    dy = (dy * wobble).astype(int)
+    dx = (dx * wobble * grain_size).astype(int)
+    dy = (dy * wobble * grain_size).astype(int)
     img = img[np.clip(yy + dy, 0, h - 1), np.clip(xx + dx, 0, w - 1)]
     soft = kuwahara(img, r)
     lum = soft @ np.array([0.299, 0.587, 0.114])
     # charcoal: dark strokes where the painted shapes meet
     gy, gx = np.gradient(lum)
     edge = np.clip((np.hypot(gx, gy) - 0.018) * 9, 0, 1)
-    grit = 0.55 + 0.9 * value_noise(h, w, 2, seed + 4)
+    grit = 0.55 + 0.9 * nz(h, w, 2, seed + 4)
     out = soft * (1 - 0.55 * (edge * grit)[..., None])
     # pigment pools unevenly
-    pool = value_noise(h, w, 90, seed + 5) * 0.6 + value_noise(h, w, 24, seed + 6) * 0.4
+    pool = nz(h, w, 90, seed + 5) * 0.6 + nz(h, w, 24, seed + 6) * 0.4
     out = out * (0.9 + 0.22 * pool)[..., None]
     # a touch more saturation, then paper
     g = (out @ np.array([0.299, 0.587, 0.114]))[..., None]
     out = g + (out - g) * 1.14
-    grain = value_noise(h, w, 2, seed + 7) * 0.6 + value_noise(h, w, 5, seed + 8) * 0.4
+    grain = nz(h, w, 2, seed + 7) * 0.6 + nz(h, w, 5, seed + 8) * 0.4
     out = out * (0.93 + 0.13 * grain)[..., None]
     paper = np.array([0.93, 0.89, 0.80])
     nx = (xx / (w - 1)) * 2 - 1
     ny = (yy / (h - 1)) * 2 - 1
-    ragged = (value_noise(h, w, 46, seed + 9) - 0.5) * 0.09 + (value_noise(h, w, 11, seed + 10) - 0.5) * 0.035
+    ragged = (nz(h, w, 46, seed + 9) - 0.5) * 0.09 + (nz(h, w, 11, seed + 10) - 0.5) * 0.035
     edge_dist = np.maximum(np.abs(nx) ** 1.0, np.abs(ny) ** 1.0) + ragged
     bleed = np.clip((edge_dist - 0.975) / 0.026, 0, 1)[..., None]
     if border:

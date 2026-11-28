@@ -22,12 +22,12 @@ const box = (poly) => {
 const LAND = ISLANDS.map((i) => ({ ...i, box: box(i.poly) }));
 const SHOAL = SHALLOWS.map((i) => ({ ...i, box: box(i.poly) }));
 
-/** A house blocks its footprint and what its walls cover as they lean north. */
-export const houseBlock = (h) => ({ x: h.x, y: h.y - h.h * LEAN * 0.8, w: h.w, h: h.d + h.h * LEAN * 0.8 });
+/** A house blocks its footprint and a little behind it; further back one walks hidden by the roof. */
+export const houseBlock = (h) => ({ x: h.x, y: h.y - h.h * LEAN * 0.3, w: h.w, h: h.d + h.h * LEAN * 0.3 });
 const SOLID = [
   ...HOUSES.map(houseBlock),
   ...BLOCKS,
-  { x: TOWER.x - TOWER.w / 2, y: TOWER.y - TOWER.h * LEAN, w: TOWER.w, h: TOWER.h * LEAN + TOWER.w / 2 },
+  { x: TOWER.x - TOWER.w / 2, y: TOWER.y - TOWER.h * LEAN * 0.3, w: TOWER.w, h: TOWER.h * LEAN * 0.3 + TOWER.w / 2 },
   ...WALLS.flatMap((w) => (w.gap
     ? [{ x: w.from, y: w.y, w: w.gap[0] - w.from, h: w.h }, { x: w.gap[1], y: w.y, w: w.to - w.gap[1], h: w.h }]
     : [{ x: w.from, y: w.y, w: w.to - w.from, h: w.h }])),

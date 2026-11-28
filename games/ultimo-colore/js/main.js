@@ -13,6 +13,7 @@ import * as P from './world/progress.js';
 import * as F from './world/field.js';
 import { createWorld } from './ui/world.js';
 import { SPAWN } from './world/layout.js';
+import { WORLD_TILES } from './render/overworld.js';
 import { ENEMIES } from './data/enemies.js';
 import { createBattle, rewards } from './battle/engine.js';
 import { createAudio } from './audio.js';
@@ -126,11 +127,13 @@ function goWorld() {
   audio.music('explore');
   audio.setFaded(!!save.actDone);
   const open = () => { world.show(worldArt); world.render(); };
-  worldArt = artPath('world');
+  worldArt = worldPaths();
   open();
-  if (save.actDone) resolveArt('world').then((url) => { worldArt = url; if (screen === 'world') open(); });
+  if (save.actDone) Promise.all([...WORLD_TILES, 'world'].map(resolveArt)).then((urls) => { worldArt = { small: urls.pop(), tiles: urls }; if (screen === 'world') open(); });
 }
-let worldArt = artPath('world');
+/** The lagoon: sharp tiles to walk on, one small picture for the maps. */
+const worldPaths = () => ({ tiles: WORLD_TILES.map(artPath), small: artPath('world') });
+let worldArt = null;
 
 function encounter(group, advantage) {
   foe = { id: group.id, home: { ...group.home } };

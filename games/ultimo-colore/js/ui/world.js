@@ -158,7 +158,7 @@ export function createWorld(root, deps) {
       const s = getSave();
       hud();
       const goal = F.objective(s);
-      view.draw(field, s, goal);
+      view.draw(field, s, goal, document.body.classList.contains('calm'));
       miniClock += dt;
       if (miniClock > 0.2) { miniClock = 0; view.minimap(mini, field, s, goal); }
       if (toastLeft > 0) { toastLeft -= dt; if (toastLeft <= 0) root.querySelector('.w-toast').hidden = true; }
@@ -171,5 +171,6 @@ export function createWorld(root, deps) {
     },
     get field() { return field; },
     get active() { return active; },
+    get view() { return view; },
   };
 }

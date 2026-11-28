@@ -29,7 +29,7 @@ export const WILD = [
 const C = (id, x, y, olio, cera, light) => ({ id, x, y, olio, cera, light });
 
 export const CHESTS = [
-  C('c-casa', 1530, 2712, 1, 0, 10),
+  C('c-casa', 1472, 2688, 1, 0, 10),
   C('c-porto', 548, 2480, 0, 1, 15),
   C('c-isolotto', 1850, 1420, 1, 0, 30),
   C('c-sud', 160, 2000, 1, 1, 20),

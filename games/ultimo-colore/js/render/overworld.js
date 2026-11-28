@@ -1,9 +1,10 @@
 /* ============================================================
    Ultimo Colore — drawing the open lagoon
    ------------------------------------------------------------
-   The painted map from Blender, with everything that moves or
-   changes drawn on top: the party, the Faded, closed passages,
-   markers and the compass.
+   Three layers: the painted map from Blender with the water and
+   lamplight on it; the figures in 3D (render3d/); then the air,
+   markers and compass. Without WebGL the figures are the flat
+   drawings, on the bottom layer.
    ============================================================ */
 import { WORLD, GATES, BOAT_AT } from '../world/layout.js';
 import { kindAt, gateOpen } from '../world/terrain.js';
@@ -11,8 +12,16 @@ import { CHESTS, STATUES } from '../data/places.js';
 import { NODE } from '../data/map.js';
 import * as P from '../world/progress.js';
 import { heroSVG, dogSVG, foeSVG, SPRITE_SCALE } from './sprites.js';
+import { createEffects } from './effects.js';
+import { createRenderer, ELEVATION } from '../render3d/gl.js';
+import { createCast, occluders } from '../render3d/scene.js';
 
 const TAU = Math.PI * 2;
+/** The sharp map comes in tiles, left to right then top to bottom. */
+export const TILE = 1024;
+export const WORLD_TILES = Array.from({ length: (WORLD.w / TILE) * (WORLD.h / TILE) }, (_, i) => `world-${i}`);
+/** How high above its feet each of the Faded carries its mark, on screen. */
+const TALL = { cocci: 66, granchio: 54, spenta: 80, alga: 76, airone: 134, cervo: 180 };
 
 /** An SVG string as an image the canvas can draw. */
 function sprite(svg, w, h) {
@@ -25,18 +34,42 @@ function sprite(svg, w, h) {
 const ready = (img) => img && img.complete && img.naturalWidth > 0;
 
 export function createOverworld(canvas) {
-  const ctx = canvas.getContext('2d');
-  const world = new Image();
-  let artSrc = '';
+  const base = canvas.getContext('2d');
+  let ctx = base;
+  const layer = (name) => {
+    const c = document.createElement('canvas');
+    c.className = `w-layer ${name}`;
+    c.setAttribute('aria-hidden', 'true');
+    return c;
+  };
+  const glCanvas = layer('w-gl'), topCanvas = layer('w-top');
+  const renderer = createRenderer(glCanvas);
+  if (renderer) renderer.setOccluders(occluders());
+  // evening light and darkened corners: it never changes, so CSS paints it once
+  const shade = document.createElement('div');
+  shade.className = 'w-layer w-shade';
+  shade.setAttribute('aria-hidden', 'true');
+  canvas.after(...(renderer ? [glCanvas, shade, topCanvas] : [shade, topCanvas]));
+  const top = topCanvas.getContext('2d');
+  const effects = createEffects();
+  const cast = createCast();
+  const small = new Image();
+  let tiles = [], artKey = '';
   const heroes = {}, foes = {};
-  const dog = sprite(dogSVG(), 200, 160);
+  let dogImage = null;
+  const dog = () => (dogImage = dogImage || sprite(dogSVG(), 200, 160));
   const hero = (id) => (heroes[id] = heroes[id] || sprite(heroSVG(id), 208, 300));
   const foe = (type) => (foes[type] = foes[type] || sprite(foeSVG(type), 240, 260));
   let w = 1, h = 1, dpr = 1;
   let view = { x: 0, y: 0, zoom: 1 };
+  let camera = null, stats = { mode: renderer ? '3d' : 'flat', figures: 0 };
 
-  function setArt(url) {
-    if (url !== artSrc) { artSrc = url; world.src = url; }
+  function setArt(art) {
+    const key = art.tiles.join('|');
+    if (key === artKey) return;
+    artKey = key;
+    small.src = art.small;
+    tiles = art.tiles.map((url) => { const img = new Image(); img.src = url; return img; });
   }
 
   function resize() {
@@ -44,8 +77,8 @@ export function createOverworld(canvas) {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = Math.max(1, Math.round(r.width));
     h = Math.max(1, Math.round(r.height));
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    for (const c of [canvas, topCanvas]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    renderer?.resize(canvas.width, canvas.height);
   }
 
   const shadow = (x, y, rx) => {
@@ -116,7 +149,7 @@ export function createOverworld(canvas) {
       ripple(x, by + 14, 56, field.time);
       sail(x, by, field.facing, field.time);
       s.party.slice().reverse().forEach((id, i, list) => picture(hero(id), x + field.facing * (34 - (list.length - 1 - i) * 21), by + 8, 62, field.facing));
-      picture(dog, x + field.facing * 52, by, 26, field.facing, 100 / 80);
+      picture(dog(), x + field.facing * 52, by, 26, field.facing, 100 / 80);
       boatHull(x, by + 2, field.facing, field.time);
       return;
     }
@@ -132,7 +165,7 @@ export function createOverworld(canvas) {
       if (sunk) ripple(px, py, 18, field.time + px * 0.01); else shadow(px, py + 2, wk.id === 'ombra' ? 16 : 18);
       ctx.save();
       if (sunk) { ctx.beginPath(); ctx.rect(px - 60, py - 140, 120, 140 + 1); ctx.clip(); }
-      if (wk.id === 'ombra') picture(dog, px, py + sunk * 0.6 - bob * 0.5, 34, field.facing, 100 / 80);
+      if (wk.id === 'ombra') picture(dog(), px, py + sunk * 0.6 - bob * 0.5, 34, field.facing, 100 / 80);
       else picture(hero(wk.id), px, py + sunk - bob, wk.lead ? 78 : 69, field.facing);
       ctx.restore();
     }
@@ -150,6 +183,11 @@ export function createOverworld(canvas) {
       if (wet) ripple(x, y, hh * 0.36, time + i); else shadow(x, y + 3, hh * 0.32);
       picture(foe(type), x, y + Math.sin(time * 2.6 + i * 2 + g.home.x) * 4, hh, 1, 12 / 13);
     });
+  }
+
+  /** "!" when it has seen you; crossed swords over those who bar the way. */
+  function badge(g, time) {
+    const size = renderer ? TALL[g.enemies[0]] : (g.boss ? 112 : 80) * SPRITE_SCALE[g.enemies[0]];
     if (g.state === 'alert' || g.state === 'chase') mark(g.x, g.y - size - 20, '!', '#ff5a5a', time);
     else if (g.node) mark(g.x, g.y - size - 20, '⚔', '#f0a850', time, 17);
   }
@@ -222,34 +260,87 @@ export function createOverworld(canvas) {
     ctx.restore();
   }
 
-  function draw(field, s, goal) {
-    if (!field) return;
-    const zoom = Math.max(w / 900, Math.min(w / 470, h / 700));
+  /** The camera trails the party a little, and shows more of what is north. */
+  function follow(field, dt, zoom) {
     const vw = w / zoom, vh = h / zoom;
-    const x = vw >= WORLD.w ? (WORLD.w - vw) / 2 : Math.max(0, Math.min(WORLD.w - vw, field.pos.x - vw / 2));
-    // a little more of what lies ahead, to the north
-    const y = vh >= WORLD.h ? (WORLD.h - vh) / 2 : Math.max(0, Math.min(WORLD.h - vh, field.pos.y - vh * 0.56));
-    view = { x, y, zoom };
+    const tx = vw >= WORLD.w ? (WORLD.w - vw) / 2 : Math.max(0, Math.min(WORLD.w - vw, field.pos.x - vw / 2));
+    const ty = vh >= WORLD.h ? (WORLD.h - vh) / 2 : Math.max(0, Math.min(WORLD.h - vh, field.pos.y - vh * 0.56));
+    if (!camera || camera.field !== field || dt <= 0 || Math.hypot(tx - camera.x, ty - camera.y) > 180) camera = { field, x: tx, y: ty };
+    else { const k = 1 - Math.exp(-dt * 8); camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k; }
+    return { x: camera.x, y: camera.y, zoom };
+  }
+
+  let lastTime = 0;
+  function draw(field, s, goal, calm = false) {
+    if (!field) return;
+    const time = field.time;
+    const dt = camera?.field === field ? Math.max(0, Math.min(0.1, time - lastTime)) : 0;
+    if (camera?.field !== field) effects.clear();
+    lastTime = time;
+    const zoom = Math.max(w / 900, Math.min(w / 410, h / 630));
+    view = follow(field, dt, zoom);
+    const { x, y } = view;
+    const vw = w / zoom, vh = h / zoom;
+    const frame = { x, y, w, h, zoom, time: calm ? 0 : time, drain: s.actDone ? 1 : 0 };
+    const seen = (p, r = 140) => p.x > x - r && p.x < x + vw + r && p.y > y - r && p.y < y + vh + r * 1.6;
+    const world = (c) => c.setTransform(dpr * zoom, 0, 0, dpr * zoom, -x * dpr * zoom, -y * dpr * zoom);
+    const actors = renderer ? cast.actors(field, s, seen) : [];
+    effects.update(actors, dt, calm);
+
+    // the map and what lies on it
+    ctx = base;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#1f4a52';
     ctx.fillRect(0, 0, w, h);
-    ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, -x * dpr * zoom, -y * dpr * zoom);
-    if (ready(world)) {
-      const k = world.naturalWidth / WORLD.w;
-      const cx = Math.max(0, x), cy = Math.max(0, y), cw = Math.min(vw, WORLD.w - cx), ch = Math.min(vh, WORLD.h - cy);
-      ctx.drawImage(world, cx * k, cy * k, cw * k, ch * k, cx, cy, cw, ch);
-    }
-    const time = field.time;
-    const seen = (p, r = 140) => p.x > x - r && p.x < x + vw + r && p.y > y - r && p.y < y + vh + r * 1.6;
-    gates(s, time);
-    if (!s.done.includes('stiva')) { ripple(BOAT_AT.x, BOAT_AT.y + 12, 54, time * 0.5); sail(BOAT_AT.x, BOAT_AT.y, 1, time); boatHull(BOAT_AT.x, BOAT_AT.y + 2, 1, time); }
-
-    for (const c of CHESTS) if (!s.opened.includes(c.id) && seen(c)) chest(c, time);
+    world(ctx);
+    const columns = WORLD.w / TILE;
+    tiles.forEach((img, i) => {
+      const tx = (i % columns) * TILE, ty = Math.floor(i / columns) * TILE;
+      if (ready(img) && tx < x + vw && tx + TILE > x && ty < y + vh && ty + TILE > y) ctx.drawImage(img, tx, ty, TILE + 0.7, TILE + 0.7);
+    });
+    effects.ground(ctx, frame, s, time, calm);
     for (const g of field.groups) if (g.state === 'idle' && seen(g, 240)) sight(g);
-    const things = field.groups.filter((g) => seen(g, 220)).map((g) => ({ y: g.y, draw: () => enemy(g, s, time) }));
-    things.push({ y: field.pos.y, draw: () => party(field, s) });
-    things.sort((a, b) => a.y - b.y).forEach((t) => t.draw());
+    if (goal) {
+      const at = goal.id === 'stiva' ? BOAT_AT : goal.at;
+      ctx.strokeStyle = 'rgba(255,214,90,.85)'; ctx.lineWidth = 3.5; ctx.setLineDash([9, 9]); ctx.lineDashOffset = -time * 20;
+      ctx.beginPath(); ctx.ellipse(at.x, at.y + 4, 56, 26, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const near = field.near;
+    if (near?.kind === 'strike') {
+      const g = field.groups.find((q) => q.id === near.id);
+      if (g) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.ellipse(g.x, g.y + 4, 52, 22, 0, 0, TAU); ctx.stroke(); }
+    }
 
+    // the figures
+    let lantern = null;
+    if (renderer && !renderer.lost) {
+      for (const a of actors) {
+        if (a.wet) ripple(a.x, a.y + 2, a.enemy ? 34 : 17, time + a.x * 0.01);
+        if (a.kind === 'boat') ripple(a.x, a.y + 8, 66, time * 0.5);
+      }
+      renderer.render(frame, actors);
+      const keeper = actors.find((a) => a.id === 'ilario');
+      if (keeper) lantern = lanternAt(keeper);
+    } else {
+      gates(s, time);
+      if (!s.done.includes('stiva')) { ripple(BOAT_AT.x, BOAT_AT.y + 12, 54, time * 0.5); sail(BOAT_AT.x, BOAT_AT.y, 1, time); boatHull(BOAT_AT.x, BOAT_AT.y + 2, 1, time); }
+      for (const c of CHESTS) if (!s.opened.includes(c.id) && seen(c)) chest(c, time);
+      const things = field.groups.filter((g) => seen(g, 220)).map((g) => ({ y: g.y, draw: () => enemy(g, s, time) }));
+      things.push({ y: field.pos.y, draw: () => party(field, s) });
+      things.sort((a, b) => a.y - b.y).forEach((t) => t.draw());
+    }
+    stats = { mode: renderer && !renderer.lost ? '3d' : 'flat', figures: actors.length, particles: effects.count };
+
+    // the air, then signs
+    ctx = top;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, topCanvas.width, topCanvas.height);
+    world(ctx);
+    effects.air(ctx, frame, s, time, calm, lantern);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    effects.sky(ctx, w, h, time, calm);
+    world(ctx);
+    for (const g of field.groups) if (seen(g, 220)) badge(g, time);
     for (const st of STATUES) {
       if (s.read.includes(st.id) || !seen(st) || Math.hypot(st.x - field.pos.x, st.y - field.pos.y) > 260) continue;
       mark(st.x, st.y - 58, '…', '#efe9dc', time, 11);
@@ -260,21 +351,18 @@ export function createOverworld(canvas) {
       const at = id === 'stiva' ? BOAT_AT : n.at;
       mark(at.x, at.y - (id === 'stiva' ? 120 : 92), n.type === 'camp' ? '⌂' : '!', '#ffd24a', time, 18);
     }
-    if (goal) {
-      const at = goal.id === 'stiva' ? BOAT_AT : goal.at;
-      ctx.strokeStyle = 'rgba(255,214,90,.8)'; ctx.lineWidth = 3; ctx.setLineDash([9, 9]); ctx.lineDashOffset = -time * 20;
-      ctx.beginPath(); ctx.ellipse(at.x, at.y + 4, 52, 22, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-    }
-    const near = field.near;
-    if (near?.kind === 'strike') {
-      const g = field.groups.find((q) => q.id === near.id);
-      if (g) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(g.x, g.y + 4, 46, 18, 0, 0, TAU); ctx.stroke(); }
-    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
-    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(8,10,14,.42)');
-    ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
     if (goal) compass(goal.id === 'stiva' ? BOAT_AT : goal.at, field, time);
+    ctx = base;
+  }
+
+  /** Where the light on Ilario's pole (or at the stern) falls on screen, in map units. */
+  function lanternAt(a) {
+    const [lx, ly, lz] = a.model.lantern, k = a.scale, turn = a.heading;
+    const x = (lx * Math.cos(turn) + lz * Math.sin(turn)) * k, z = (-lx * Math.sin(turn) + lz * Math.cos(turn)) * k;
+    const [ox, oy, oz] = a.offset || [0, 0, 0], base3 = a.base || 0;
+    const px = x + ox * Math.cos(base3) + oz * Math.sin(base3), pz = z - ox * Math.sin(base3) + oz * Math.cos(base3), py = ly * k + oy + (a.lift || 0);
+    return { x: a.x + px, y: a.y - (py * Math.cos(ELEVATION) - pz * Math.sin(ELEVATION)) };
   }
 
   /** The little map in the corner. */
@@ -282,7 +370,7 @@ export function createOverworld(canvas) {
     const c = target.getContext('2d');
     const mw = target.width, mh = target.height;
     c.clearRect(0, 0, mw, mh);
-    if (ready(world)) c.drawImage(world, 0, 0, mw, mh);
+    if (ready(small)) c.drawImage(small, 0, 0, mw, mh);
     c.fillStyle = 'rgba(6,10,14,.18)'; c.fillRect(0, 0, mw, mh);
     const dot = (p, color, r) => { c.fillStyle = color; c.beginPath(); c.arc((p.x / WORLD.w) * mw, (p.y / WORLD.h) * mh, r, 0, TAU); c.fill(); c.lineWidth = 1.5; c.strokeStyle = '#000'; c.stroke(); };
     for (const g of field?.groups || []) if (g.node) dot(g, '#ff7a5a', 3.5);
@@ -291,5 +379,5 @@ export function createOverworld(canvas) {
   }
 
   resize();
-  return { draw, minimap, resize, setArt, get view() { return view; } };
+  return { draw, minimap, resize, setArt, renderer, get view() { return view; }, get stats() { return stats; } };
 }

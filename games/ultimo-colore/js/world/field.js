@@ -38,11 +38,28 @@ function wanderers(s) {
   }));
 }
 
+/**
+ * The others arrive in a line, not piled on the leader: a trail that
+ * reaches back over open ground (south if it can), oldest point first.
+ */
+export function tail(pos, ctx, length = 240, step = 6) {
+  for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1], [-0.7, 0.7], [0.7, 0.7]]) {
+    const points = [];
+    for (let d = step; d <= length; d += step) {
+      const p = { x: pos.x + dx * d, y: pos.y + dy * d };
+      if (!canStand(p.x, p.y, ctx)) break;
+      points.push(p);
+    }
+    if (points.length * step >= length - step) return [...points.reverse(), { ...pos }];
+  }
+  return [{ ...pos }];
+}
+
 export function createField(s) {
   const field = { pos: { ...s.pos }, facing: 1, moving: false, trail: [], time: 0, grace: GRACE, groups: [...guardians(s), ...wanderers(s)], near: null, done: false };
   // never start inside a wall, whatever the save says
   if (!canStand(field.pos.x, field.pos.y, ctxOf(s))) field.pos = { ...SPAWN };
-  field.trail = [{ ...field.pos }];
+  field.trail = tail(field.pos, ctxOf(s));
   return field;
 }
 

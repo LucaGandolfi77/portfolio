@@ -207,6 +207,57 @@ test.describe('Ultimo Colore', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the lagoon is drawn in 3D over the sharp map, without catching taps', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('campo1'); });
+    const stats = () => c(page, () => window.__colore.world.view.stats);
+    await c(page, () => window.__colore.world.render(0));
+    expect((await stats()).mode).toBe('3d');
+    expect((await stats()).figures).toBeGreaterThan(5);
+    await expect(page.locator('canvas.w-gl')).toHaveCSS('pointer-events', 'none');
+    await expect(page.locator('canvas.w-top')).toHaveCSS('pointer-events', 'none');
+    // something is really painted around the leader
+    await expect.poll(() => c(page, () => {
+      const z = window.__colore, gl = z.world.view.renderer.gl;
+      z.world.render(0);
+      const px = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+      gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let solid = 0;
+      for (let i = 3; i < px.length; i += 4) if (px[i] === 255) solid++;
+      return solid;
+    })).toBeGreaterThan(1500);
+    for (let i = 0; i < 6; i++) expect((await page.request.get(`${APP}art/world-${i}.webp`)).ok()).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('a lost graphics context falls back to flat drawings and comes back', async ({ page }) => {
+    const errors = collectErrors(page);
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('darsena'); window.lose = z.world.view.renderer.gl.getExtension('WEBGL_lose_context'); window.lose.loseContext(); });
+    const mode = () => c(page, () => { window.__colore.world.render(0); return window.__colore.world.view.stats.mode; });
+    await expect.poll(mode).toBe('flat');
+    await c(page, () => window.lose.restoreContext());
+    await expect.poll(mode).toBe('3d');
+    expect(errors).toEqual([]);
+  });
+
+  test('without WebGL the lagoon is still walkable', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.addInitScript(() => {
+      const real = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (kind, ...rest) { return /webgl/.test(kind) ? null : real.call(this, kind, ...rest); };
+    });
+    await open(page);
+    await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('darsena'); });
+    await expect(page.locator('canvas.w-gl')).toHaveCount(0);
+    const before = await c(page, () => window.__colore.save.pos.x);
+    await c(page, () => window.__colore.walk(-1, 0, 500));
+    expect(await c(page, () => window.__colore.save.pos.x)).toBeLessThan(before - 40);
+    expect(await c(page, () => window.__colore.world.view.stats.mode)).toBe('flat');
+    expect(errors).toEqual([]);
+  });
+
   test('walking into the guardians on the bridge starts the story fight', async ({ page }) => {
     await open(page);
     await c(page, () => { const z = window.__colore; z.freeze(); z.newGame(); z.jump('ponte'); z.save.flags.tutorial = true; });
@@ -381,6 +432,12 @@ test.describe('Ultimo Colore', () => {
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-ready', '1');
     await expect(page.locator('[data-act="new"]')).toBeVisible();
+    // the lagoon and its figures are there too
+    const errors = collectErrors(page);
+    await c(page, () => { const z = window.__colore; z.newGame(); z.jump('campo1'); });
+    expect(await c(page, async () => (await Promise.all([0, 1, 2, 3, 4, 5].map((i) => fetch(`art/world-${i}.webp`)))).every((r) => r.ok))).toBe(true);
+    expect(await c(page, () => window.__colore.world.view.stats.mode)).toBe('3d');
+    expect(errors).toEqual([]);
     await context.setOffline(false);
   });
 });

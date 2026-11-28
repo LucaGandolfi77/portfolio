@@ -19,6 +19,15 @@ import * as PL from '../js/data/places.js';
 import * as W from '../js/world/terrain.js';
 import * as F from '../js/world/field.js';
 import { WILD, CHESTS, STATUES } from '../js/data/places.js';
+import { boneMatrix, solve, turnToward, MAX_BONES } from '../js/render3d/rig.js';
+import { builder, STRIDE } from '../js/render3d/geom.js';
+import { heroModel, dogModel, HERO_IDS as FIGURES } from '../js/render3d/heroes.js';
+import { creatureModel, CREATURE_IDS } from '../js/render3d/creatures.js';
+import { boatModel, SEATS } from '../js/render3d/boat.js';
+import { lanternModel, barricadeModel, reedsModel } from '../js/render3d/props.js';
+import { followPoint, createCast, occluders, GAP } from '../js/render3d/scene.js';
+import { DEPTH_PER_Y } from '../js/render3d/gl.js';
+import { waterSpots, lamps } from '../js/render/effects.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const results = [];
@@ -414,6 +423,101 @@ t('the painter’s copy of the map is up to date', () => {
   for (const k of ['WORLD', 'LEAN', 'ISLANDS', 'SHALLOWS', 'PIERS', 'HOUSES', 'TOWER', 'WILLOWS', 'CAMPS', 'WALLS', 'SHARDS']) eq(JSON.stringify(j[k]), JSON.stringify(L[k]), k);
   eq(JSON.stringify(j.STATUES), JSON.stringify([...PL.STATUES, PL.ADA]), 'STATUES');
   ok(existsSync(join(ROOT, 'art', 'world.webp')));
+  for (let i = 0; i < 6; i++) ok(existsSync(join(ROOT, 'art', `world-${i}.webp`)), `tile ${i}`);
+});
+
+/* ---------- the figures in 3D ---------- */
+const MODELS = () => [...FIGURES.map(heroModel), dogModel(), boatModel(), ...CREATURE_IDS.map(creatureModel), lanternModel(), barricadeModel(126), reedsModel(196, 50)];
+
+t('bones turn about their pivots and carry their children', () => {
+  const m = boneMatrix(new Float32Array(16), [3, 4, 5], { rx: 0.7, ry: -1.1, rz: 0.4, s: 1.3 });
+  const at = (p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+  at([3, 4, 5]).forEach((v, i) => near(v, [3, 4, 5][i], 1e-4));
+  const b = builder([['root', null, [0, 0, 0]], ['arm', 'root', [0, 10, 0]]]);
+  const p = solve(b.build(), { root: { tx: 5 } });
+  near(p[16 + 12], 5, 1e-5, 'the child moved with its parent');
+  near(turnToward(3.1, -3.1, 1), -3.1 + Math.PI * 2, 1e-5, 'the short way round');
+});
+
+t('every figure builds, fits the shader and stays finite while moving', () => {
+  for (const m of MODELS()) {
+    ok(m.bones.length <= MAX_BONES && m.count > 100 && m.count % 3 === 0 && m.data.length === m.count * STRIDE);
+    ok(m.data.every(Number.isFinite));
+    for (let i = 0; i < m.count; i++) ok(m.data[i * STRIDE + 12] < m.bones.length);
+    for (const ctx of [{ t: 0 }, { t: 7.3, phase: 2.1, amp: 1, anger: 1 }, { t: 2, sit: true }]) {
+      const pose = m.pose(ctx);
+      for (const name of Object.keys(pose)) ok(m.bones.some((b) => b.name === name), `bone ${name}`);
+      ok(solve(m, pose).every(Number.isFinite));
+    }
+  }
+  ok(Object.keys(ENEMIES).every((id) => CREATURE_IDS.includes(id)), 'every kind of enemy has its own figure');
+  eq(SEATS.length, 4);
+});
+
+t('triangles face outward', () => {
+  const b = builder([['root', null, [0, 0, 0]]]);
+  b.box('root', [0, 0, 0], [2, 2, 2], '#ffffff').ball('root', [9, 0, 0], 3, '#ffffff').tube('root', [0, 5, 0], [0, 9, 0], 2, 1, '#ffffff');
+  const { data, count } = b.build();
+  const middle = (i) => (i < 36 ? [0, 0, 0] : data[i * STRIDE] > 5 ? [9, 0, 0] : [0, 7, 0]);
+  for (let i = 0; i < count; i += 3) {
+    const p = [0, 1, 2].map((k) => [0, 1, 2].map((j) => data[(i + k) * STRIDE + j]));
+    const u = p[1].map((v, j) => v - p[0][j]), v = p[2].map((w, j) => w - p[0][j]);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const c = middle(i), out = [0, 1, 2].map((j) => (p[0][j] + p[1][j] + p[2][j]) / 3 - c[j]);
+    ok(n[0] * out[0] + n[1] * out[1] + n[2] * out[2] > 0, `triangle ${i / 3}`);
+  }
+});
+
+t('followers walk behind in a line, even on arrival', () => {
+  const trail = [{ x: 0, y: 100 }, { x: 0, y: 60 }, { x: 0, y: 30 }];
+  eq(followPoint(trail, { x: 0, y: 20 }, 25).y, 45);
+  eq(followPoint(trail, { x: 0, y: 20 }, 999).y, 100);
+  const s = P.newGame('normal');
+  s.pos = { x: 1000, y: 2900 };
+  const f = F.createField(s);
+  const places = [1, 2, 3, 4].map((i) => followPoint(f.trail, f.pos, i * GAP));
+  places.forEach((p, i) => { ok(W.canStand(p.x, p.y, F.ctxOf(s)), 'on firm ground'); ok(Math.hypot(p.x - f.pos.x, p.y - f.pos.y) >= (i + 1) * GAP - 7, 'apart'); });
+});
+
+t('the cast faces the way it walks, boards the boat and shows the Faded', () => {
+  const s = P.newGame('normal');
+  P.join(s, ['tecla', 'nora', 'bastiano']);
+  P.complete(s, 'casa');
+  s.pos = { x: 1000, y: 2900 };
+  const f = F.createField(s);
+  const cast = createCast(), all = () => true;
+  cast.actors(f, s, all);
+  for (let i = 0; i < 40; i++) { F.update(s, f, 1 / 30, { x: 1, y: 0 }); cast.actors(f, s, all); }
+  near(cast.heading('ilario'), Math.PI / 2, 0.1, 'walking east');
+  let list = cast.actors(f, s, all);
+  for (const id of [...s.party, 'ombra']) ok(list.some((a) => a.id === id), id);
+  ok(list.find((a) => a.id === 'ilario').xray && list.some((a) => a.gate));
+  ok(list.filter((a) => a.enemy).length >= 2, 'the guardians on the bridge');
+  s.done.push('ponte', 'darsena', 'stiva');
+  const g = F.createField({ ...s, pos: { x: 1000, y: 1900 } });
+  list = cast.actors(g, s, all);
+  ok(list.some((a) => a.id === 'boat'));
+  eq(list.filter((a) => a.base !== undefined).length, 1 + s.party.length + 1, 'everyone aboard');
+});
+
+t('buildings hide who walks behind them, not who stands in front', () => {
+  const house = L.HOUSES[0], cover = occluders()[0];
+  const hides = (y, height) => cover.depthY * DEPTH_PER_Y > y * DEPTH_PER_Y + height;
+  ok(hides(house.y - house.h * L.LEAN, 40), 'behind');
+  ok(!hides(house.y + house.d + 14, 0), 'in front');
+  eq(occluders().length, L.HOUSES.length + 1);
+});
+
+t('nothing to be found is painted behind a roof', () => {
+  const cover = occluders();
+  const hidden = (p) => cover.some((o) => o.depthY > p.y && [0, -18, -36].some((d) => W.inPoly(p.x, p.y + d, o.points)));
+  for (const p of [...CHESTS, ...STATUES, ...NODES.map((n) => ({ id: n.id, ...n.at })), { id: 'spawn', ...L.SPAWN }]) ok(!hidden(p), p.id);
+});
+
+t('water glints lie on water and the lamps are on the map', () => {
+  const spots = waterSpots();
+  ok(spots.length > 800 && spots.every((p) => W.kindAt(p.x, p.y) === 'water'));
+  ok(lamps().length === 18 && lamps().every(([x, y]) => x > 0 && x < L.WORLD.w && y > 0 && y < L.WORLD.h));
 });
 
 /* ---------- words and pictures ---------- */

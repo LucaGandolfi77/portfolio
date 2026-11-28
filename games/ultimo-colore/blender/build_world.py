@@ -22,7 +22,7 @@ with open(os.path.join(HERE, 'world.json')) as f:
 
 W, H = L['WORLD']['w'], L['WORLD']['h']
 SAMPLES = int(os.environ.get('UC_SAMPLES', '32'))
-SCALE = float(os.environ.get('UC_SCALE', '1.0'))
+SCALE = float(os.environ.get('UC_SCALE', '1.5'))
 K = 100.0
 
 
@@ -131,6 +131,74 @@ def points_in(poly, n):
     return out
 
 
+def grow(poly, d):
+    """The polygon pushed outward by d units from its middle."""
+    cx = sum(p[0] for p in poly) / len(poly)
+    cy = sum(p[1] for p in poly) / len(poly)
+    out = []
+    for x, y in poly:
+        l = math.hypot(x - cx, y - cy) or 1
+        out.append((x + (x - cx) / l * d, y + (y - cy) / l * d))
+    return out
+
+
+def along(poly, step):
+    """Points every `step` units round the edge."""
+    for i in range(len(poly)):
+        (ax, ay), (bx, by) = poly[i], poly[(i + 1) % len(poly)]
+        n = max(1, int(math.hypot(bx - ax, by - ay) / step))
+        for k in range(n):
+            t = k / n
+            yield ax + (bx - ax) * t, ay + (by - ay) * t, math.atan2(by - ay, bx - ax)
+
+
+def shores(rng):
+    """Lighter water over the sandbanks, and a broken line of foam."""
+    for n, isle in enumerate(L['ISLANDS']):
+        grass = isle['ground'] != 'cobble'
+        wide = (46, 24) if grass else (30, 15)
+        slab(grow(isle['poly'], wide[0]), -0.09, -0.055 + n * 0.0001, B.mat('halo0', '#316a68', rough=0.55, noise=0.3, scale=1.1), 'halo')
+        slab(grow(isle['poly'], wide[1]), -0.09, -0.0525 + n * 0.0001, B.mat('halo1', '#47847a', rough=0.6, noise=0.3, scale=1.6), 'halo')
+        for x, y, a in along(grow(isle['poly'], 7), 9):
+            if rng.random() < 0.55:
+                B.box(*P(x + rng.uniform(-2, 2), y + rng.uniform(-2, 2), -0.044), rng.uniform(0.05, 0.15), 0.022, 0.006,
+                      B.mat('foam', '#bcd8cc', rough=0.6, noise=0), -a + rng.uniform(-0.2, 0.2))
+
+
+def meadow(isle, rng):
+    """Patches, tufts and flowers, so no lawn is one flat green."""
+    area = isle['poly']
+    for x, y in points_in(grow(area, -26), 26):
+        c = rng.choice(['#6a8a3e', '#4a6a34', '#78944a'])
+        B.ball(P(x, y, 0.056), rng.uniform(0.12, 0.28), B.mat('patch' + c, c, rough=0.95, noise=0.3, scale=5), 2, (1.4, 1, 0.04), 0.25)
+    for cx, cy in points_in(grow(area, -22), 11):
+        c = rng.choice(['#f2ecd8', '#f0c648', '#e8dcc0', '#d86a50'])
+        for _ in range(rng.randint(3, 8)):
+            x, y = cx + rng.uniform(-11, 11), cy + rng.uniform(-7, 7)
+            B.ball(P(x, y, 0.1), 0.022, B.mat('flower' + c, c, emit=c, strength=0.25, noise=0), 1)
+    for x, y in points_in(grow(area, -14), 40):
+        B.reeds(x / K, (H - y) / K, 0.03, 0.02, 5, 0.09, rng.choice(['#8aa84c', '#6c8c3a']))
+
+
+def facade(cx, cy, wb, db, hb, rh, roof_i, cols, rng):
+    """Eaves, ridge and rows of tiles on the side that faces us."""
+    trim = B.mat('trim', '#d8c8a8', rough=0.9)
+    dark = B.mat('eave', '#241610')
+    B.box(cx, cy - db / 2 - 0.05, hb - 0.015, wb + 0.2, 0.09, 0.04, dark)
+    B.cyl((cx - wb / 2 + 0.1, cy, hb + rh + 0.015), (cx + wb / 2 - 0.1, cy, hb + rh + 0.015), 0.028, B.mat('ridge', '#8a5a40'))
+    tile = B.mat('tile' + str(roof_i), ['#744434', '#8a5038', '#5a465a'][roof_i], scale=9)
+    rows = 5
+    for r in range(1, rows):
+        t = r / rows
+        y = cy - (db / 2 + 0.08) * (1 - t)
+        z = hb + rh * t + 0.012
+        width = wb + 0.16 - 0.4 * t
+        n = int(width / 0.11)
+        for i in range(n):
+            B.box(cx - width / 2 + (i + 0.5 + (r % 2) * 0.4) * width / n, y, z, width / n * 0.78, 0.03, 0.018, tile)
+    B.box(cx, cy - db / 2 - 0.02, 0.025, 0.3, 0.1, 0.05, trim)
+
+
 def build():
     B.reset(4242)
     sc = bpy.context.scene
@@ -153,6 +221,8 @@ def build():
         for x, y in points_in(s['poly'], 12):
             B.reeds(x / K, (H - y) / K, 0.16, 0.16, 12, 0.36, '#6a8438')
 
+    shores(rng)
+
     sand = B.mat('sand', '#b7a67c', rough=0.95, scale=2.5)
     grass = B.mat('turf', '#58773a', rough=0.95, noise=0.32, scale=2.2)
     stone = B.mat('quayside', '#6e645c', rough=0.9, scale=3)
@@ -161,6 +231,8 @@ def build():
         if isle['ground'] == 'cobble':
             slab(isle['poly'], -0.2, 0.05, stone, 'quay')
             slab(isle['poly'], 0.0, 0.065, paving, 'paving', 0.035)
+            for x, y, a in along(grow(isle['poly'], -5), 21):
+                B.box(*P(x, y, 0.07), 0.17, 0.08, 0.03, B.mat('kerb', '#a89a88', noise=0.15, scale=8), -a + rng.uniform(-0.05, 0.05))
             # paving stones on a loose grid, so no two share the same spot
             xs, ys = [q[0] for q in isle['poly']], [q[1] for q in isle['poly']]
             for gy in range(int(min(ys)) + 10, int(max(ys)) - 6, 19):
@@ -172,6 +244,7 @@ def build():
         else:
             slab(isle['poly'], -0.15, 0.03, sand, 'beach')
             slab(isle['poly'], 0.0, 0.055, grass, 'turf', 0.13)
+            meadow(isle, rng)
             for x, y in points_in(isle['poly'], int(len(isle['poly']) * 2.2)):
                 if rng.random() < 0.7:
                     B.reeds(x / K, (H - y) / K, 0.08, 0.08, 7, 0.17, '#74903c')
@@ -218,9 +291,22 @@ def build():
                 lit = rng.random() < 0.4
                 col = rng.choice(['#ffb04a', '#ffd070']) if lit else '#141a22'
                 wm = B.mat('w' + col, col, emit=col if lit else None, strength=1.4 if lit else 0, noise=0, rough=0.3)
-                B.box(cx - wb / 2 + (c + 0.5) * wb / cols, cy - db / 2 - 0.012, 0.3 + r * 0.42, 0.14, 0.03, 0.22, wm)
+                wx, wz = cx - wb / 2 + (c + 0.5) * wb / cols, 0.3 + r * 0.42
+                B.box(wx, cy - db / 2 - 0.006, wz, 0.18, 0.02, 0.26, B.mat('trim', '#d8c8a8', rough=0.9))
+                B.box(wx, cy - db / 2 - 0.02, wz, 0.13, 0.02, 0.21, wm)
+                B.box(wx, cy - db / 2 - 0.032, wz, 0.012, 0.01, 0.21, B.mat('trim', '#d8c8a8'))
+                B.box(wx, cy - db / 2 - 0.04, wz - 0.14, 0.2, 0.06, 0.025, B.mat('sill', '#8a7a66'))
+                if rng.random() < 0.45:
+                    sh = rng.choice(['#3a6a5a', '#7a3428', '#35506e'])
+                    for side in (-1, 1):
+                        B.box(wx + side * 0.12, cy - db / 2 - 0.02, wz, 0.055, 0.02, 0.24, B.mat('shutter' + sh, sh))
+                if r == 0 and rng.random() < 0.3:
+                    for k in range(5):
+                        B.ball((wx - 0.07 + k * 0.035, cy - db / 2 - 0.07, wz - 0.11), 0.026, B.mat('bloom' + str(k % 2), ['#d84a3c', '#5a8a3a'][k % 2], noise=0), 1)
         B.box(cx, cy - db / 2 - 0.016, 0.15, 0.2, 0.03, 0.3, B.mat('door', '#2a180e'))
         B.box(cx + wb * 0.24, cy + db * 0.1, hb + rh * 0.7, 0.14, 0.14, 0.3, B.mat('chimney', '#5a443a'))
+        B.box(cx + wb * 0.24, cy + db * 0.1, hb + rh * 0.7 + 0.17, 0.19, 0.19, 0.04, B.mat('cap', '#2a201c'))
+        facade(cx, cy, wb, db, hb, rh, i % 3, cols, rng)
 
     # Ada's counter, her bread and awning
     B.box(*P(1180, 2862, 0.12), 0.62, 0.22, 0.22, B.mat('counter', '#6a3e22'))
@@ -229,6 +315,19 @@ def build():
     # lantern strings across the streets
     for a, b in (((590, 2858), (800, 2858)), ((1170, 2878), (1300, 2862)), ((880, 2470), (1160, 2470))):
         B.rope_lanterns(P(a[0], a[1], 0.95), P(b[0], b[1], 0.95), 4, 0.15, r=0.07, lamp=3)
+    for y in (2128, 2196, 2262):
+        a, b = (868, y), (1085, y + 8)
+        B.cyl(P(a[0], a[1], 0.92), P(b[0], b[1], 0.92), 0.006, B.mat('line', '#2a201a'), n=4)
+        for i in range(6):
+            t = (i + 0.6) / 6.4
+            c = rng.choice(['#e8e0cc', '#c8503c', '#4a6a8a', '#d8b050'])
+            tall = rng.uniform(0.14, 0.26)
+            B.box(*P(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.9 - tall / 2), rng.uniform(0.13, 0.2), 0.012, tall, B.mat('cloth' + c, c, rough=0.95), rng.uniform(-0.1, 0.1))
+    for x, y in ((592, 2855), (743, 2866), (1286, 2850), (1112, 2850), (570, 2442), (1312, 2447)):
+        for dx, dy in ((0, 0), (15, 5)):
+            B.cyl(P(x + dx, y + dy, 0.05), P(x + dx, y + dy, 0.25), 0.065, B.mat('barrel', '#6a4426', scale=8))
+            B.cyl(P(x + dx, y + dy, 0.2), P(x + dx, y + dy, 0.215), 0.07, B.mat('hoop', '#2a2420'))
+
     # crates and nets by the harbour and on the isle of nets
     for x, y in ((1545, 2408), (1560, 2455), (1520, 2330)):
         B.box(*P(x, y, 0.15), 0.22, 0.22, 0.2, B.mat('crate', '#7a5a34'), rng.uniform(0, 1))
@@ -317,7 +416,7 @@ def build():
     path = os.path.join(B.OUT, 'world.png')
     sc.render.filepath = path
     bpy.ops.render.render(write_still=True)
-    B.paint(path, 900, border=False, brush=2, wobble=0.45)
+    B.paint(path, 900, border=False, brush=max(2, round(2 * SCALE)), wobble=0.45, grain_size=SCALE)
     print('PAINTED world', flush=True)
 
 

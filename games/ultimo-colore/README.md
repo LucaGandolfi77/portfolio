@@ -23,6 +23,8 @@ Gioco di ruolo a turni con difesa a tempo. Storia, mondo, personaggi, musica e d
 - **Difficoltà:** Racconto (senza riflessi), Facile, Normale, Difficile; parata automatica al 50% come aiuto.
 - **Storia:** dialoghi con scelte che legano i personaggi, conversazioni al campo, diario di Tecla.
 - **Dieci scene e la mappa dipinte con Blender** (`blender/build_scenes.py` e `blender/build_world.py`, con filtro acquerello e carboncino in numpy).
+- **Figure in 3D nel mondo aperto:** la spedizione, il cane, la barca, i sei tipi di nemici, lanterne, barricata e canneti sono modelli low-poly animati, disegnati in WebGL con ombre, contorno a china e un piccolo motore scritto per il gioco (`js/render3d/`, nessuna libreria). Si cammina anche dietro i tetti, con la sagoma in trasparenza. Senza WebGL tornano i disegni piatti.
+- **Laguna viva:** riflessi, risacca, scia della barca, polvere e spruzzi, luce di lanterne e fuochi, nuvole, nebbia, foglie, lucciole e uccelli. Con le animazioni ridotte restano fermi. I menu e i combattimenti sono ancora illustrati in 2D.
 - Alla fine dell'atto il verde sparisce davvero dai dipinti, e gli archi spariscono dalla musica.
 
 ## Differenze rispetto al piano (`docs/PLAN-ULTIMO-COLORE.md`)
@@ -39,11 +41,12 @@ Gioco di ruolo a turni con difesa a tempo. Storia, mondo, personaggi, musica e d
 js/data/     party enemies memories map story
 js/battle/   engine (turni, puro) timing (finestre, puro)
 js/world/    layout (la mappa) terrain (dove si cammina) field (nemici, luoghi) progress (salvataggio), tutti puri
-js/render/   sprites (SVG) fade (colore che muore)
+js/render/   overworld (i tre livelli) effects (acqua e aria) sprites (SVG) fade (colore che muore)
+js/render3d/ rig geom (puri) heroes creatures boat props (modelli) scene (chi sta dove) gl (WebGL)
 js/ui/       battle screens
 js/          main audio strings
 blender/     scene e mappa → blender/out/*.png → WebP in art/
-scripts/     export-world.mjs (layout.js → blender/world.json), pack-art.mjs
+scripts/     export-world.mjs (layout.js → blender/world.json), pack-art.mjs (la mappa 3072×4608 in 6 riquadri)
 ```
 
 ## Verifiche
@@ -62,4 +65,4 @@ Blender -b --factory-startup --python games/ultimo-colore/blender/build_world.py
 node games/ultimo-colore/scripts/pack-art.mjs
 ```
 
-Hook per i test: `window.__colore` (`newGame`, `jump`, `enter`, `place`, `walk`, `act`, `readAll`, `advance`, `freeze`, `battle`, `world`).
+Hook per i test: `window.__colore` (`newGame`, `jump`, `enter`, `place`, `walk`, `act`, `readAll`, `advance`, `freeze`, `battle`, `world`; `world.view.stats` dice se il mondo è in 3D).

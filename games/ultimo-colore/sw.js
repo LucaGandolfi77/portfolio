@@ -2,7 +2,10 @@
 // (scripts/build-site.mjs); only caches with our own prefix are removed,
 // because every PWA of the portfolio shares one origin.
 const PREFIX = 'ultimo-colore-';
-const CACHE = PREFIX + '__BUILD_ID__';
+// The number goes up when the files change shape: the new worker then fills a
+// cache of its own, straight from the network, so a page never mixes old and
+// new modules.
+const CACHE = PREFIX + '3-__BUILD_ID__';
 const ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './art/campanile.webp',
@@ -15,6 +18,12 @@ const ASSETS = [
   './art/secche.webp',
   './art/stiva.webp',
   './art/titolo.webp',
+  './art/world-0.webp',
+  './art/world-1.webp',
+  './art/world-2.webp',
+  './art/world-3.webp',
+  './art/world-4.webp',
+  './art/world-5.webp',
   './art/world.webp',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -30,9 +39,18 @@ const ASSETS = [
   './js/data/places.js',
   './js/data/story.js',
   './js/main.js',
+  './js/render/effects.js',
   './js/render/fade.js',
   './js/render/overworld.js',
   './js/render/sprites.js',
+  './js/render3d/boat.js',
+  './js/render3d/creatures.js',
+  './js/render3d/geom.js',
+  './js/render3d/gl.js',
+  './js/render3d/heroes.js',
+  './js/render3d/props.js',
+  './js/render3d/rig.js',
+  './js/render3d/scene.js',
   './js/strings.js',
   './js/ui/battle.js',
   './js/ui/screens.js',
@@ -44,7 +62,7 @@ const ASSETS = [
   '../_kit/i18n.js', '../_kit/storage.js', '../_kit/pwa.js', '../_kit/a11y.css'
 ];
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()

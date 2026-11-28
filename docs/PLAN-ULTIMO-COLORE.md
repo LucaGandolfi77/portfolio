@@ -164,5 +164,6 @@ tools/quality/e2e/ultimo-colore.spec.mjs
 - **Lingue:** italiano e inglese.
 
 - **Mondo aperto** (dopo la prima prova): al posto della rotta a nodi la laguna è un'unica mappa esplorabile, a piedi e in barca, con gli Sbiaditi visibili sulla mappa.
+- **Figure in 3D**: nel mondo aperto personaggi, nemici e barca sono modelli low-poly animati in WebGL, sopra la mappa dipinta (più nitida e dettagliata, con acqua, luci e atmosfera animate). Menu e combattimenti restano in 2D.
 
 Stato e differenze dell'Atto I: vedi `games/ultimo-colore/README.md`.
